@@ -24,3 +24,36 @@ jobs:
 
       - name: Run deno test
         run: deno test
+
+  plant-assets:
+    name: plant sprites (generate + verify)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate sprites (run twice to check determinism)
+        working-directory: products/lien/assets/plant
+        run: |
+          python3 tools/gen_sprites.py
+          python3 tools/build_asset_catalog.py
+          find png preview PlantAssets.xcassets -type f | sort | xargs sha256sum > /tmp/run1.sha
+          python3 tools/gen_sprites.py
+          python3 tools/build_asset_catalog.py
+          find png preview PlantAssets.xcassets -type f | sort | xargs sha256sum > /tmp/run2.sha
+          diff /tmp/run1.sha /tmp/run2.sha
+
+      - name: Verify 13 sprites + asset catalog
+        working-directory: products/lien/assets/plant
+        run: python3 tools/verify_assets.py
+
+      - name: Validate Contents.json (json.tool)
+        working-directory: products/lien/assets/plant
+        run: |
+          count=0
+          for f in $(find PlantAssets.xcassets -name Contents.json | sort); do
+            python3 -m json.tool "$f" > /dev/null
+            count=$((count + 1))
+          done
+          echo "validated $count Contents.json files"
+          test "$count" -eq 14  # ルート1 + imageset13
