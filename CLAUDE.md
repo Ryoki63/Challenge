@@ -1,22 +1,12 @@
-# 挑戦 (Challenge) — 自律ループ実行リポジトリ
+# CLAUDE.md
 
-このリポジトリは Loop Engineering 方式（Addy Osmani / Ralph パターン）の自律タスク実行システムです。
-エージェントは BACKLOG のタスクを1件ずつ処理し、状態をファイルと git 履歴に永続化します。
+このリポジトリの最上位指示は AGENTS.md にある。**必ず先に読んで従うこと**:
 
-## 構成
+@AGENTS.md
 
-| パス | 役割 |
-|------|------|
-| `LOOP.md` | ループ1回分の実行手順書。「LOOP.mdに従って」と言われたら必ず先に全文を読むこと |
-| `tasks/BACKLOG.md` | タスクキュー。上から順に処理する |
-| `tasks/DONE.md` | 完了タスクのアーカイブ |
-| `progress/JOURNAL.md` | 実行履歴（追記専用。過去の記録は編集禁止） |
-| `ralph.ps1` | ヘッドレス実行ランナー（`claude -p` を while ループで回す） |
+## Claude Code 固有の補足
 
-## このリポジトリでの約束事
-
-- ループ実行時は 1実行 = 1タスク。複数タスクを前倒しで処理しない。
-- タスク完了時は BACKLOG から削除 → DONE に追記 → JOURNAL に記録 → commit までがワンセット。
-- `git push` はタスクに明記されている場合のみ。それ以外はローカル commit まで。
-- このリポジトリの外のファイルは変更しない。
-- JOURNAL.md と DONE.md は追記のみ。削除・改変しない。
+- 「LOOP.mdに従って」と言われたら、作業前に LOOP.md 全文を読むこと
+- タスクの分解・追加は `/plan`、進捗確認は `/status`、GitHub同期は `/sync` のプロジェクトskillを使う
+- コミットメッセージは `loop: <要約>`(ループ実行時)/ `chore|feat|fix: <要約>`(手動作業時)
+- **commit したら必ず push する**(GitHub常時連携ポリシー)

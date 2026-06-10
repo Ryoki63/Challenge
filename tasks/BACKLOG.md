@@ -9,5 +9,4 @@
 
 ---
 
-- [ ] demo: `hello/hello.py` を作成する。実行すると "Hello from the loop!" と出力される。完了条件: `python hello/hello.py` の出力が一致すること。
 - [ ] demo: このリポジトリの構成（各ファイル・フォルダの役割）を `docs/STRUCTURE.md` に日本語でまとめる。完了条件: ルート直下の全ファイル・フォルダが言及されていること。

@@ -3,3 +3,5 @@
 ループが完了したタスクをここに移動します（新しいものが下）。
 
 ---
+
+- [x] demo: `hello/hello.py` を作成する。実行すると "Hello from the loop!" と出力される。完了条件: `python hello/hello.py` の出力が一致すること。 — 2026-06-10 21:07

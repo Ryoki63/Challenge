@@ -1,0 +1,16 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# dependencies / build
+node_modules/
+dist/
+build/
+.expo/
+__pycache__/
+*.pyc
+
+# OS / editor
+.DS_Store
+Thumbs.db
