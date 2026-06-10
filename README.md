@@ -6,6 +6,12 @@ Claude Code がこのフォルダ上で**自律的にタスクをぐるぐる処
 > Loop engineering is replacing yourself as the person who prompts the agent.
 > You design the system that does it instead.
 
+## 何を作っているか
+
+月3万円の継続収益を目指す個人開発プロジェクト。
+現在のプロダクトは **ふたり習慣（仮称）** — 2人で約束を1つだけして、ふたりで続ける習慣アプリ。
+企画の決定事項・海外事例エビデンス・MVPスコープは [docs/CONCEPT.md](docs/CONCEPT.md) 参照。
+
 ## 仕組み
 
 ```
