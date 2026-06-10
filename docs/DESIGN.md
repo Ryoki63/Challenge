@@ -158,10 +158,12 @@ B端末: LienNSE 起動(通知表示の前に実行される)
 {
   "aps": { "alert": {"title": "<相手名>", "body": "<messages.tsから>"},
            "sound": "default", "mutable-content": 1 },
-  "lien": { "type": "partner_checkin | nudge | reaction | streak_risk | milestone | ticket_used | pair_update",
+  "lien": { "type": "partner_checkin | nudge | reaction | streak_risk | milestone | ticket_used | pair_update | streak_reset",
             "snapshot": { ...受信者視点のPairSnapshot... } }
 }
 ```
+
+- `streak_reset` は close-day(§5.4 手順4)が「責めない文言」とともに送出する(2026-06-11 実装同期。`_shared/apns.ts` の `LienPushType` にも追記すること)
 
 - 通知を出さない更新(チェックイン取消など)は `content-available: 1` のサイレントプッシュ。ただし**サイレントは配送保証がない(OSスロットル)ため、フォールバック扱い**
 - 自己修復: アプリ本体はフォアグラウンド復帰時に必ず `GET /snapshot` で最新を取得し App Group を上書きする
@@ -211,6 +213,7 @@ B端末: LienNSE 起動(通知表示の前に実行される)
 2. 両者 checkin あり → `streak_days(d, 'both')` を upsert
 3. 欠けあり(1人でも) → `ticket_balance > 0` なら balance−1、`streak_days(d, 'ticket')` upsert、ledger に `consume` 記録、両者へ `ticket_used` push
 4. チケットなし → 行を作らない(=途切れ)。`streak_reset` イベント記録。push は「責めない文言」(messages.ts の reset 系)
+   - **既知の未決事項(2026-06-11 注記)**: `streak_reset` イベントの記録は現状 close-day 実装では構造化 console ログのみで、永続化先は未定(events テーブル新設 or ticket_ledger 拡張)。issue #47 でユーザー判断待ち
 
 現在値の導出:
 - `current = streak_days を d 降順に走査し、昨日(close-day確定済みの最新日)から連続する行数`

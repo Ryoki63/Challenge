@@ -176,17 +176,23 @@
 ## 5. データモデル(Supabase / PostgreSQL)
 
 ```sql
-users          (id uuid PK, apple_sub text?, nickname text, avatar_emoji text,
+users          (id uuid PK, apple_sub text? UNIQUE, nickname text, avatar_emoji text,
                 timezone text, remind_at time?, push_token text?,
                 premium_until timestamptz?,  -- RevenueCat Webhookで更新
                 created_at)
+                -- 2026-06-11 実装同期: apple_sub に UNIQUE(migration 0001)
 pairs          (id uuid PK, status text /* active|dissolved */, started_on date,
-                ticket_balance int, created_at)
+                dissolved_at timestamptz?,  -- 解消時刻。dissolve処理が status と同時に設定
+                ticket_balance int, created_at,
+                CHECK ((status = 'dissolved') = (dissolved_at IS NOT NULL)))
                 -- ペアのプレミアム判定はメンバーの premium_until から導出(planカラムは持たない)
+                -- 2026-06-11 実装同期: dissolved_at と整合CHECKを追加(migration 0001)
 pair_members   (pair_id FK, user_id FK, joined_at, PRIMARY KEY(pair_id, user_id))
 promises       (id uuid PK, user_id FK, title text, emoji text,
-                remind_at time?, created_at, archived_at?)
+                remind_at time?, created_at, archived_at?,
+                UNIQUE(user_id) WHERE archived_at IS NULL)  -- 部分一意: 現役の約束は1人1つ
                 -- 約束はユーザーに1つ(ペアに属さない)。v2複数ペアでもこのまま
+                -- 2026-06-11 実装同期: 「1人1つ」の部分一意インデックスをDBでも担保(migration 0001)
 checkins       (id uuid PK, promise_id FK, user_id FK, date_local date,
                 photo_path text?, created_at, UNIQUE(user_id, date_local))
 streak_days    (pair_id FK, date_local date, kind text /* both|ticket */,
@@ -194,9 +200,12 @@ streak_days    (pair_id FK, date_local date, kind text /* both|ticket */,
 ticket_ledger  (id PK, pair_id FK, delta int, reason text /* monthly|consume|declare */,
                 date_local date, created_at)
 nudges         (id PK, pair_id FK, from_user FK, stamp text, replied text?, created_at)
-reactions      (id PK, checkin_id FK, from_user FK, stamp text, created_at)
+reactions      (id PK, checkin_id FK, from_user FK, stamp text, created_at,
+                UNIQUE(checkin_id, from_user))  -- 1チェックインにつき1人1スタンプ(§3.8)
+                -- 2026-06-11 実装同期: UNIQUE(checkin_id, from_user) を追加(migration 0001)
 plants         (pair_id PK, species text, name text?, grown_days int, stage int)
-invites        (token PK, from_user FK, expires_at, used_at?)
+invites        (token PK, from_user FK, created_at, expires_at, used_at?)
+                -- 2026-06-11 実装同期: created_at を追加(発行時刻の監査用。migration 0001)
 ```
 
 - ストリーク判定は Edge Function(チェックイン書き込み時)で `streak_days` を更新 → サイレントプッシュ送信、の一本道にする
