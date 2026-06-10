@@ -38,9 +38,21 @@
 
 ## 動き方
 
-- 仕事はすべて `tasks/BACKLOG.md` 経由。思いついた作業も直接やらず、まずタスク化する(分解は `/plan` skill)
+### タスク管理は GitHub Issues が正
+
+- **タスクの正式な一覧・状態は GitHub Issues**(`https://github.com/Ryoki63/Challenge/issues`)。`tasks/BACKLOG.md` はローカル補助キューとして残すが、issueと乖離した場合はissueを優先する
+- 新しいタスクを作るときは `gh issue create` でissueを作成してから BACKLOG に書く(分解は `/plan` skill)
 - ループ実行時は `LOOP.md` の手順に厳密に従う(1実行 = 1タスク)
 - 実行記録は `progress/JOURNAL.md` に必ず残す。JOURNAL と DONE は追記のみ、過去分の編集禁止
+
+### GitHub Issues への記録ルール
+
+| タイミング | 操作 |
+|---|---|
+| タスク着手時 | `gh issue comment <番号> --body "着手: <日時>。<やること一言>"` を投稿 |
+| タスク完了時 | `gh issue comment <番号> --body "完了: <日時>。<やったこと要約>"` を投稿してから `gh issue close <番号>` |
+| ブロック時 | `gh issue comment <番号> --body "BLOCKED: <理由>。<ユーザーへの質問>"` を投稿し、issueは開いたまま |
+| 人間ゲート待ち | issueに `human-gate` ラベルが付いているものはエージェントがcloseしない。人間が対応後にcloseする |
 
 ## GitHub 同期ポリシー(常時連携)
 
