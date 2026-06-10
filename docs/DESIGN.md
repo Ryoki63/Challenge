@@ -236,6 +236,19 @@ B端末: LienNSE 起動(通知表示の前に実行される)
 - push: DB コミット後に送信。送信失敗はリトライ1回まで、失敗しても処理は成功扱い(自己修復経路があるため)
 - レート制限(nudge 3回/日)は Function 内で当日カウント
 
+### 5.6 写真アップロード経路(2026-06-11 決定・issue #48)
+
+- **checkin Function が Supabase Storage の署名付きアップロードURL(createSignedUploadUrl)を発行**し、クライアントが直接アップロード → checkin 行に photo_path を記録する
+- 理由: Edge Function でのバイナリプロキシはメモリ/実行時間を浪費する。署名URLならバケット非公開・RLS を維持したままクライアント直送できる
+- サムネ(NSE 用 200KB 上限)は**クライアント側で縮小してからアップロード**(サーバー画像処理を持たない=シンプル最優先)。原寸用とサムネ用の2オブジェクトを `pairs/<pair_id>/<date>/photo.jpg` / `photo_thumb.jpg` に置く
+- 必要な storage ポリシー追記は migration 0002 で行う(T14 実装時)
+
+### 5.7 仕様ギャップの決定事項(2026-06-11 ユーザー回答・issue #47)
+
+1. **お休み宣言(declare)の返金なし**: 宣言した日に結果的に両者達成だった場合もチケットは返金しない(kind=both で確定するのみ。シンプル優先)
+2. **streak_reset は永続化しない**: console ログのみで確定(現状実装どおり)。将来は §7 相当の計測イベント基盤に統合する
+3. **ペア解消後の photo_path 行は現状維持**: 行自体は SELECT 可能だが、署名付きURLを発行しないため画像実体は見えない(これを仕様とする)
+
 ## 6. 招待フロー(v1.0)
 
 1. A が invite-create → アプリは2形式を得る: `lien://invite/<token>` と `https://<GH_PAGES>/lien/i/?t=<token>`
