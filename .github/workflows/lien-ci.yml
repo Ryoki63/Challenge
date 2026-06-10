@@ -1,0 +1,26 @@
+# Lien CI — deno test(DESIGN §8: ubuntu 等倍・全 push で起動)
+# iOS ビルドジョブは T06 で別ワークフロー(products/lien/ios/** 変更時のみ起動)として追加する
+name: lien-ci
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  deno-test:
+    name: deno test (supabase functions)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/lien/supabase/functions
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Run deno test
+        run: deno test
