@@ -8,7 +8,8 @@
 # Default mode uses --dangerously-skip-permissions, the standard for headless
 # Ralph loops: a headless agent cannot answer permission prompts, so anything
 # not pre-approved would dead-lock the loop. Guardrails live in LOOP.md
-# (one task per run, no push, repo-only scope) and -MaxIterations.
+# (one task per run, push after every commit, no force-push, repo-only scope)
+# and -MaxIterations.
 param(
     [int]$MaxIterations = 5,
     [int]$PauseSeconds = 3,
@@ -22,6 +23,18 @@ if (-not (Test-Path (Join-Path $root "LOOP.md"))) {
 }
 
 Set-Location $root
+
+# Sync with GitHub before starting (skip silently if no remote)
+git remote get-url origin 2>$null | Out-Null
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Syncing with GitHub (git pull --rebase)..." -ForegroundColor DarkGray
+    git pull --rebase
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "git pull failed. Resolve manually before looping." -ForegroundColor Red
+        exit 1
+    }
+}
+
 $bootstrap = "Read LOOP.md and follow its instructions exactly. Process exactly one task this run."
 
 $claudeArgs = @("-p", $bootstrap)
