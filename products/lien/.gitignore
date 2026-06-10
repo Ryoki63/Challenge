@@ -1,0 +1,21 @@
+# Xcode / XcodeGen(project.yml が正。.xcodeproj はコミットしない — DESIGN §3.2)
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+build/
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# シークレット(DESIGN §7: Secrets.example.xcconfig のみコミット)
+ios/Config/Secrets.xcconfig
+.env
+.env.*
+
+# Supabase ローカル作業ファイル
+supabase/.temp/
+supabase/.branches/
+
+# OS
+.DS_Store
