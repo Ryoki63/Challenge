@@ -28,3 +28,11 @@
 - 判断したこと: アーカイブは別ファイルに分けず、同一ファイル先頭の要約セクションで運用(原則1「シンプル最優先」)。成果物が消えている hello デモは最小要約に圧縮。
 - 検証: 4ファイルの相互参照(AGENTS↔LOOP↔CLAUDE)とJOURNALの新構成を目視確認。矛盾していた「追記専用・改変禁止」と新ローテーション規定を整合済み。
 - 結果: 完了
+
+## 2026-06-11 00:54 — 【節目】Wave 2 マルチエージェント並列実行: 8タスク中7タスク実装完了
+- 体制: ユーザー指示によりGitHub issue駆動・4レーン並列(バックエンド ∥ iOS ∥ アセット ∥ マーケ)のWorkflowで実行中。各タスク = 着手コメント→実装→独立検証エージェント→NGなら修正1回→実施結果コメント。git操作はオーケストレータが直列管理(競合防止)
+- 完了済み(Wave 1): #1 T01 雛形(CI deno-test緑、close済み)/ #45 STRUCTURE.md(close済み)
+- 実装完了・検証済み(Wave 2、commit待ち): #2 migration 0001(独立検証でprivacy hole 2件指摘→修正済み)/ #3 streak.ts+tickets.ts(31テスト緑)/ #4 checkin/snapshot/apns.ts(モック注入)/ #6 ios project.yml+3ターゲット+lien-ios.yml CI / #7 PairSnapshot+AppGroupStore+静的ウィジェット+NSE骨格+LienTests / #9 植物ドット絵13枚+AssetCatalog取込+8倍プレビュー(G2 #40へ提出予定)/ #25 プライバシーポリシー+利用規約+HTML(G4ひな形)
+- 実行中: #5 invite-create/invite-accept/close-day/grant-tickets(バックエンドレーン最終タスク)
+- 補足: ghトークンにworkflowスコープが無くCI workflowのpushが一度拒否→ユーザーがデバイスフロー承認で解決(00:45頃)
+- 次: #5完了→タスク単位commit+push→CI(deno+iOSビルド)緑確認→各issueをclose→G2提出コメント→フォローアップissue作成
