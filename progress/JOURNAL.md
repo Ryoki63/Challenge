@@ -36,3 +36,13 @@
 - 実行中: #5 invite-create/invite-accept/close-day/grant-tickets(バックエンドレーン最終タスク)
 - 補足: ghトークンにworkflowスコープが無くCI workflowのpushが一度拒否→ユーザーがデバイスフロー承認で解決(00:45頃)
 - 次: #5完了→タスク単位commit+push→CI(deno+iOSビルド)緑確認→各issueをclose→G2提出コメント→フォローアップissue作成
+
+## 2026-06-11 01:16 — 【締め】Wave 2 完了: M0の[W]タスク全消化+前倒し2件、CI全緑
+- 結果: 8/8タスクが独立検証パス(修正ラウンド必要は#2のみ)。タスク単位で8コミットをmainにpush
+- CI: lien-ci(deno 132テスト+スプライト検証)success / lien-ios(xcodegen→ビルド+シミュレータテスト、macos-15)success — ローカルXcodeなしで初回緑
+- close済みissue: #2 #3 #4 #5 #6 #7 #9 #25(完了コメント付き)。Wave 1の#1 #45と合わせ計10件完了
+- G2提出: #40 に植物スプライト13枚のコンタクトシート+既知の制限(fidget未作成等)をコメント。トーン選定は人間判断待ち
+- 特筆: #2は独立検証エージェントがPGlite(実PostgreSQL 16.4)上でmigration全文を実行し、RLS・権限昇格遮断を50項目で実証検証。privacy hole 2件を発見→修正
+- 残る[W]の実行可能タスク: #26(T26 アイコン+スクショ素材、T09依存→解消済み)のみ。M1(T10〜)はT08=G0待ち
+- 主要フォローアップ(issue化する): checkin-cancel function未実装(DESIGN §5.3) / REQUIREMENTS §5へ実装スキーマの追記同期 / 写真アップロード経路の設計決定 / streak_resetイベント永続化+push type正式化
+- M0の残り: #8(T08 Supabaseデプロイ+実機G1計測)= G0(#38)の人間対応待ちが律速
