@@ -1,0 +1,37 @@
+name: approval-ping
+
+# 人間承認プロトコルの「通知」担当。
+# issue に `needs-approval` ラベルが付くと、github-actions[bot](= Ryoki63 本人とは別アクター)が
+# @Ryoki63 をメンションするコメントを投稿し、GitHub Mobile にプッシュ通知を飛ばす。
+# エージェントは Ryoki63 本人として動くため、自分のコメント/自己メンションでは通知が出ない。
+# そこで別アクターである bot からメンションして確実に通知する。
+# 詳細は AGENTS.md「人間承認プロトコル」を参照。
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  ping:
+    if: github.event.label.name == 'needs-approval'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mention owner for mobile push
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          TITLE: ${{ github.event.issue.title }}
+          URL: ${{ github.event.issue.html_url }}
+        run: |
+          gh issue comment "$ISSUE" --repo "$REPO" --body "$(printf '%s\n' \
+            "🔔 @Ryoki63 承認/判断待ちのタスクがあります。" \
+            "" \
+            "#${ISSUE} ${TITLE}" \
+            "${URL}" \
+            "" \
+            "このissueに返信で決定を教えてください(エージェントが検知して該当タスクを再開します)。" \
+            "<!-- approval-ping bot -->")"

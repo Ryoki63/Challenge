@@ -9,6 +9,22 @@
    - リモートが未設定・到達不能なら、スキップして続行する(後の JOURNAL 記録にその旨を書く)。
    - コンフリクトが起きたら `git rebase --abort` で戻し、手順7(ブロック処理)へ。
 
+0.5 **承認待ちタスクの再開チェック(新タスク選択より優先)** — AGENTS.md「人間承認プロトコル ③」
+   ```
+   gh issue list --repo Ryoki63/Challenge --state open --label needs-approval \
+     --json number --jq '.[].number'
+   ```
+   各 issue について、bot を除いた最新コメントを確認する:
+   ```
+   gh issue view <番号> --repo Ryoki63/Challenge --json comments --jq '
+     [.comments[] | select(.author.login != "github-actions" and .author.login != "github-actions[bot]")]
+     | last | .body'
+   ```
+   - 最新コメントに `<!-- lien-agent -->` が**無い** = 人間が返信済み → このタスクを**最優先で再開する**(複数あれば番号の小さい順に1件)。
+     着手コメント(マーカー付き)を投稿 → 返信内容を反映して手順3以降を実行 → 完了時に `gh issue edit <番号> --remove-label needs-approval` でラベルを外して手順5へ。
+   - 最新コメントにマーカーが**有る**(まだ待ち)issue は飛ばす。
+   - 返信済みの再開対象が無ければ手順1へ進む。
+
 1. **次のタスクを GitHub Issues から選ぶ**
    ```
    gh issue list --repo Ryoki63/Challenge --state open \
@@ -64,10 +80,15 @@
 7. **失敗・ブロック時の処理**：
    - BACKLOG.md のタスク行を `- [!] <元の内容> — BLOCKED: <理由>` に書き換える(存在する場合)。
    - `progress/JOURNAL.md` に何を試して何が起きたかを記録する。
-   - **GitHub issue にブロックコメントを投稿する**:
+   - **GitHub issue に承認待ちコメントを投稿する(人間承認プロトコル ①)**。@メンション+隠しマーカーで、あなたのモバイルに通知が飛び、返信で再開できる:
      ```
-     gh issue comment <番号> --repo Ryoki63/Challenge \
-       --body "BLOCKED: <理由>。\n\nユーザーへの質問: <何を確認してほしいか>"
+     gh issue comment <番号> --repo Ryoki63/Challenge --body "$(printf '%s\n' \
+       '🔔 @Ryoki63 [承認待ち] <1行サマリ>' '' \
+       'BLOCKED / 判断待ち: <理由・何が起きたか>' \
+       '選択肢: <推奨案を先頭に。なければ「どう進めるべきか教えてください」>' \
+       'このissueに返信で決定を教えてください。エージェントが検知して再開します。' \
+       '<!-- lien-agent -->')"
+     gh issue edit <番号> --repo Ryoki63/Challenge --add-label "needs-approval,human-gate"
      ```
    - ここまでの変更をコミットし、push する（メッセージ: `loop: blocked - <要約>`）。
    - 最終出力の末尾に `<LOOP_BLOCKED>` と書いて終了する。**次のタスクには進まない。**
