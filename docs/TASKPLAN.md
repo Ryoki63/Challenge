@@ -120,3 +120,11 @@ T33 RevenueCat 組込+ペイウォール(3文脈) [W→G6] / T34 曜日指定 [W
 - [H] ゲート未達で進めないタスクは BACKLOG に積まない(本書に留めておく)
 - ループが BLOCKED を出したら: `progress/JOURNAL.md` の質問に答え、該当タスク行を `- [ ]` に戻して再開
 - 仕様の矛盾を見つけたタスクは、勝手に解釈せず BLOCKED + JOURNAL に「REQUIREMENTS/DESIGN のどちらを直すべきか」を書く
+## 7. 2026-06-11 改定: G0待ち期間のモックファースト方針
+
+- G0(#38)が最大律速のまま停滞し、Pairy 終了(06-30)前の G3 到達が危ういため、§3 の「T08 → T10〜」の順序を改定する。UI/機能タスク(T10〜T19, T21〜T24)は**プロトコル抽象+モック注入**で T08 前に前倒しし、各 issue の完了条件(deno test+iOS シミュレータ CI 緑)を先に消化する
+- 差し替えポイント: 実 Supabase 接続は `AuthServicing` / `InviteClient` / `CheckinAPI` / `HistoryRepository` / `RestDeclaring` 等のプロトコル境界に隔離。T08(G0 後デプロイ)完了時に Live 実装を結線し、T20 実機 E2E で一括検証する(「CI 緑だが未結線」状態は各 issue に残作業を明記して許容)
+- 競合回避: `Strings.swift` / `project.yml` / `LienApp.swift` を触るタスクは ios-serial レーン1本で直列(順序は BACKLOG どおり)。migration 連番は T14=0002 → T16=0003 → 以降は着手時採番。`messages.ts` の nudge 系文言は T15、streakRisk/milestone は T16 がオーナー。`PlantSprite.swift`+PlantAssets 取込は T13 がオーナー(T17/T22 は再利用)。`_shared/premium.ts` は最初に着手したタスクが作成し他は再利用
+- T08/T20/T28/T30/T32 は「準備スライス」(デプロイ CI・G1 ハーネス・E2E ランブック・リリース CI・レビューノート・ストアメタデータ)を Wave 4 で先行コミットし、ゲート開放後の人間作業を最小化する(issue は開いたまま)
+- リスク: モックで固定した契約(エラーコード・署名 URL 挙動・APNs)が実環境とズレる可能性 → T08 後のバックエンドスモーク+T20 実機 E2E を必須ゲートとして残す
+- M4(T33〜T36)および T34/T35 の前倒しは、Wave 4 の [W] が**実際に枯渇した場合のみ**検討する(条件: T20 完了まで v1.0 経路の意味変更を凍結・migration/snapshot 契約の直列順守)
