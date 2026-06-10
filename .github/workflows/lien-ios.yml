@@ -1,0 +1,50 @@
+# Lien iOS CI — xcodegen generate → xcodebuild(DESIGN §8)
+# CI 予算: macOS ランナーは10倍消費のため products/lien/ios/** 変更時のみ起動し、
+# 8分以内を目標にする(timeout-minutes: 15 は安全弁)
+name: lien-ios
+
+on:
+  push:
+    paths:
+      - "products/lien/ios/**"
+      - ".github/workflows/lien-ios.yml"
+  workflow_dispatch:
+
+# 同一ブランチで古い実行をキャンセルして macOS 分を節約
+concurrency:
+  group: lien-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: iOS build + test (simulator / no codesign)
+    runs-on: macos-15
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: products/lien/ios
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # xcodebuild test はビルドも行うため、ビルドとテストを1ステップに統合して
+      # macOS 分を節約する(T07)。LienTests は Lien スキームの testTargets(project.yml)。
+      # destination の "iPhone 16" は macos-15(Xcode 16.x)の標準シミュレータ。
+      # OS バージョンは指定せずランナー既載の最新ランタイムに委ねる
+      - name: Build & test (Lien scheme, iOS Simulator)
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Lien.xcodeproj \
+            -scheme Lien \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO

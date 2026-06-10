@@ -1,0 +1,120 @@
+# project.yml — XcodeGen 定義(正本: docs/DESIGN.md §3.1〜§3.3)
+#
+# - .xcodeproj はコミットしない(products/lien/.gitignore 済み)。この YAML が正
+# - Mac / CI では `xcodegen generate` → `xcodebuild build ...`(DESIGN §8)
+# - Bundle ID / App Group は Config/Base.xcconfig の LIEN_BUNDLE_ID_BASE /
+#   LIEN_APP_GROUP_ID に変数化している(G0 で人間が最終決定 — DESIGN §3.1。
+#   変更時は Base.xcconfig の2行 + 各 *.entitlements を更新する)
+# - 外部依存はまだゼロ。supabase-swift は T10 で追加する(DESIGN §3.1 で唯一の許可依存)
+
+name: Lien
+
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+# Debug / Release とも共通設定は Config/Base.xcconfig に置く。
+# Base.xcconfig の末尾で Secrets.xcconfig を optional include しているため、
+# Secrets が無い環境(CI)でもビルドが通る(DESIGN §7)。
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+
+targets:
+  # ---------------------------------------------------------------- アプリ本体
+  Lien:
+    type: application
+    platform: iOS
+    sources:
+      - path: Lien
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE)"
+        CODE_SIGN_ENTITLEMENTS: Lien/Lien.entitlements
+    info:
+      path: Lien/Info.plist
+      properties:
+        CFBundleDisplayName: Lien
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
+        # Config.swift(後続タスク)が xcconfig → Info.plist 経由で読む(DESIGN §3.3)
+        SUPABASE_URL: "$(SUPABASE_URL)"
+        SUPABASE_ANON_KEY: "$(SUPABASE_ANON_KEY)"
+        LIEN_APP_GROUP_ID: "$(LIEN_APP_GROUP_ID)"
+    dependencies:
+      - target: LienWidget
+      - target: LienNSE
+    scheme:
+      testTargets:
+        - LienTests
+
+  # ------------------------------------------------------ ウィジェット拡張
+  LienWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LienWidget
+      # App Group 共有契約のモデル/ストア/文言をアプリ本体とソース共有(T07)。
+      # ウィジェットは読み取り専用(DESIGN §3.4)
+      - path: Lien/Core/Models/PairSnapshot.swift
+      - path: Lien/Core/AppGroupStore.swift
+      - path: Lien/Core/Strings.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE).widget"
+        CODE_SIGN_ENTITLEMENTS: LienWidget/LienWidget.entitlements
+    info:
+      path: LienWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Lien
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LIEN_APP_GROUP_ID: "$(LIEN_APP_GROUP_ID)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
+  # ---------------------------------------- Notification Service Extension
+  LienNSE:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LienNSE
+      # App Group 共有契約のモデル/ストアをアプリ本体とソース共有(T07)
+      - path: Lien/Core/Models/PairSnapshot.swift
+      - path: Lien/Core/AppGroupStore.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE).nse"
+        CODE_SIGN_ENTITLEMENTS: LienNSE/LienNSE.entitlements
+    info:
+      path: LienNSE/Info.plist
+      properties:
+        CFBundleDisplayName: Lien
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LIEN_APP_GROUP_ID: "$(LIEN_APP_GROUP_ID)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).NotificationService"
+
+  # -------------------------------------------------------------- 単体テスト
+  LienTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: LienTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE).tests"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Lien.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Lien"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+    info:
+      path: LienTests/Info.plist
+      properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+    dependencies:
+      - target: Lien

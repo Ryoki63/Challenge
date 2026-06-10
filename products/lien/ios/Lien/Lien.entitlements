@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- App Group(DESIGN §3.1)。実体の ID は Config/Base.xcconfig の LIEN_APP_GROUP_ID。
+	     codesign 時にビルド設定が展開される(CI は CODE_SIGNING_ALLOWED=NO のため未使用) -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(LIEN_APP_GROUP_ID)</string>
+	</array>
+</dict>
+</plist>

@@ -1,0 +1,6 @@
+# xcodegen generate が生成するファイル(project.yml が正 — DESIGN §3.2)
+# *.xcodeproj は products/lien/.gitignore で除外済み
+Lien/Info.plist
+LienWidget/Info.plist
+LienNSE/Info.plist
+LienTests/Info.plist
