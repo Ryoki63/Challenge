@@ -9,8 +9,14 @@ Claude Code がこのフォルダ上で**自律的にタスクをぐるぐる処
 ## 何を作っているか
 
 月3万円の継続収益を目指す個人開発プロジェクト。
-現在のプロダクトは **ふたり習慣（仮称）** — 2人で約束を1つだけして、ふたりで続ける習慣アプリ。
-企画の決定事項・海外事例エビデンス・MVPスコープは [docs/CONCEPT.md](docs/CONCEPT.md) 参照。
+現在のプロダクトは **Lien（リアン）** — 2人で約束を1つだけ決めて、ふたりで続ける習慣アプリ。
+
+| ドキュメント | 内容 |
+|---|---|
+| [docs/CONCEPT.md](docs/CONCEPT.md) | 企画・海外事例エビデンス・市場タイミング |
+| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | 確定仕様(機能・非機能・データモデル) |
+| [docs/DESIGN.md](docs/DESIGN.md) | 技術設計書(コーディングエージェント向け) |
+| [docs/TASKPLAN.md](docs/TASKPLAN.md) | 実装計画(タスク順序・並列性・人間ゲート G0〜G6) |
 
 ## 仕組み
 
