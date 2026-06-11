@@ -35,6 +35,11 @@ targets:
     platform: iOS
     sources:
       - path: Lien
+      # 植物スプライト v0(正本: ../assets/plant — T09/T13)。imageset 名は契約
+      # (PlantSprite.swift が解決の一元点)。G2(#40)後の v2 差し替えはカタログ再生成のみ。
+      # LienWidget ターゲットへの共有追加は T17 の責務(今回はアプリ本体のみ)
+      - path: ../assets/plant/PlantAssets.xcassets
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE)"

@@ -150,4 +150,46 @@ enum Strings {
             "💊", "🤸", "🚴", "🏊", "🎨", "📷", "💌", "🌙",
         ]
     }
+
+    /// ホーム画面(REQUIREMENTS §3.4, §3.5, §3.9, §3.10 / T13)。
+    /// 罰・恥系の表現は使わない(§3.5。リセット時も責めない)
+    enum Home {
+        // 植物(§3.9。名前未設定のときは名前行を出さない — フォールバック文言は置かない)
+
+        /// ソロ状態(ペア未成立・鉢は土だけ)の一言(ウィジェットと同文言で統一)
+        static let soloCaption = Widget.soloCaption
+        /// ソロ状態の誘導(招待の動機付け — §3.9)
+        static let soloInviteHint = "招待した相手とペアになると、ふたりの約束がはじまります"
+
+        // ストリーク(§3.5: 最高記録は永続表示。リセット時も「ふたりの財産」として残す)
+        static let streakCaption = "ふたりの記録"
+        static func streakDays(_ days: Int) -> String {
+            "\(days)日"
+        }
+        static func streakBestNote(_ days: Int) -> String {
+            "最高記録 \(days)日"
+        }
+
+        // ふたりの今日(§3.10 の表示原則をアプリ内でも踏襲)
+        static let todaySectionTitle = "ふたりの今日"
+        static let meFallbackLabel = "じぶん"
+        static let partnerFallbackLabel = "あいて"
+        /// 約束が未設定のチップに出す一言(責めない)
+        static let promiseUnsetLabel = "約束はこれから"
+        /// 相手が先に完了しているときの一言(REQUIREMENTS §3.10 表示原則)
+        static func partnerWaiting(_ partnerName: String) -> String {
+            "\(partnerName)が待ってるよ"
+        }
+        /// 両者完了の演出(REQUIREMENTS §3.4)
+        static let bothDoneCelebration = "ふたり達成!"
+
+        // チェックイン(§3.4)
+        static let checkinButton = "できた!"
+        static let checkinDoneLabel = "今日のぶんは完了"
+        static let checkinErrorMessage = "通信がうまくいきませんでした。もう一度お試しください"
+
+        // 空状態(snapshot 未取得。フォアグラウンド復帰時の GET /snapshot で自己修復 — DESIGN §4)
+        static let emptyTitle = "Lien"
+        static let emptyMessage = "ふたりの今日を準備しています"
+    }
 }

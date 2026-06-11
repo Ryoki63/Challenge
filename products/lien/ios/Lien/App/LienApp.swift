@@ -51,7 +51,7 @@ struct LienApp: App {
 }
 
 /// AppPhase に応じて画面系統を切り替えるルート View(DESIGN §3.3)。
-/// solo = 招待画面(T11)/ paired はプレースホルダ(ホームは T13 で実装)。
+/// solo = 招待画面(T11)/ paired = ホーム画面(T13)。
 struct RootView: View {
     @Binding var phase: AppPhase
     let authService: AuthServicing
@@ -79,7 +79,11 @@ struct RootView: View {
                     onPaired: { phase = .paired }
                 )
             case .paired:
-                placeholder(systemImage: "heart")
+                HomeView(
+                    store: AppGroupStore.standard(),
+                    // T13 はローカルエコー(楽観反映のみ)。実 API+オフラインキューは T14 で差し替え
+                    checkinService: LocalEchoCheckinService()
+                )
             }
         }
         .onOpenURL { url in
@@ -87,20 +91,6 @@ struct RootView: View {
             if let token = DeepLinkHandler.inviteToken(from: url) {
                 pendingInviteToken = token
             }
-        }
-    }
-
-    private func placeholder(systemImage: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-            Text("Lien")
-                .font(.title2)
-            #if DEBUG
-            // G1 計測用ハーネス(issue #8 準備②)。Release には含まれない
-            DeviceTokenDebugView()
-            #endif
         }
     }
 }

@@ -7,6 +7,9 @@ on:
   push:
     paths:
       - "products/lien/ios/**"
+      # 植物スプライトのカタログは Lien ターゲットのリソース(project.yml が ../assets/ を参照 — T13)。
+      # アセット側だけの変更でも iOS ビルドが走るようにする
+      - "products/lien/assets/plant/PlantAssets.xcassets/**"
       - ".github/workflows/lien-ios.yml"
   workflow_dispatch:
 
