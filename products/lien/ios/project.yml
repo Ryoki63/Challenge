@@ -5,7 +5,8 @@
 # - Bundle ID / App Group は Config/Base.xcconfig の LIEN_BUNDLE_ID_BASE /
 #   LIEN_APP_GROUP_ID に変数化している(G0 で人間が最終決定 — DESIGN §3.1。
 #   変更時は Base.xcconfig の2行 + 各 *.entitlements を更新する)
-# - 外部依存はまだゼロ。supabase-swift は T10 で追加する(DESIGN §3.1 で唯一の許可依存)
+# - 外部依存は supabase-swift のみ(DESIGN §3.1 で唯一の許可依存。T10 で追加)。
+#   リンクするのは Lien ターゲットだけ(LienWidget / LienNSE には混ぜない — DESIGN §3.4)
 
 name: Lien
 
@@ -13,6 +14,12 @@ options:
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
+
+# SPM 依存(メジャー固定: 2.x — issue #10)
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: "2.0.0"
 
 # Debug / Release とも共通設定は Config/Base.xcconfig に置く。
 # Base.xcconfig の末尾で Secrets.xcconfig を optional include しているため、
@@ -47,6 +54,9 @@ targets:
     dependencies:
       - target: LienWidget
       - target: LienNSE
+      # supabase-swift はアプリ本体のみ(Widget/NSE は App Group 経由の読み取り設計を維持)
+      - package: Supabase
+        product: Supabase
     scheme:
       testTargets:
         - LienTests
