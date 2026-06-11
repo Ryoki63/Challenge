@@ -73,4 +73,47 @@ enum Strings {
             "⭐️", "🎵", "📚", "🏃", "💪", "🧸", "☕️", "💛",
         ]
     }
+
+    /// 招待・ペアリング画面(REQUIREMENTS §3.2 / DESIGN §6 / T11)
+    enum Pairing {
+        static let title = "ふたりをつなぐ"
+        static let subtitle = "大切な人を招待して、ひとつの約束をはじめよう。"
+
+        // 招待をおくる(発行)
+        static let inviteSectionTitle = "招待をおくる"
+        static let inviteExplainer = "リンク・QRコード・8文字のコード、どれでも招待できます。"
+        static let issueButton = "招待をつくる"
+        static let codeCaption = "招待コード"
+        static let qrCaption = "QRコードを読み取ってもらってね"
+        static let shareButton = "リンクをおくる"
+        static let shareMessage = "Lienで、ふたりでひとつの約束をはじめませんか?"
+        static func expiresNote(_ formattedDate: String) -> String {
+            "\(formattedDate) まで有効・1回かぎりの招待です"
+        }
+
+        // コードを入力(受諾)
+        static let acceptSectionTitle = "コードを入力"
+        static let acceptExplainer = "相手から受け取った8文字のコードを入れてね。"
+        static let codePlaceholder = "例: AbCd2345"
+        static let acceptButton = "ペアになる"
+
+        // エラー文言(InviteClientError → ユーザー向け。
+        // 罰・恥系の表現は使わない — REQUIREMENTS §3.5)
+        static let errorAlreadyPaired =
+            "すでにペアが成立しています"
+        static let errorPartnerAlreadyPaired =
+            "招待をくれた相手は、すでにべつのペアをはじめているみたい"
+        static let errorInviteNotFound =
+            "この招待が見つかりませんでした。コードをもう一度確かめてみてね"
+        static let errorInviteExpired =
+            "この招待は期限が切れています。新しい招待をもらってね"
+        static let errorInviteAlreadyUsed =
+            "この招待はすでに使われています。新しい招待をもらってね"
+        static let errorCannotAcceptOwnInvite =
+            "これは自分がつくった招待です。相手に送ってあげてね"
+        static let errorInvalidTokenFormat =
+            "コードは8文字の英数字です"
+        static let errorNetwork =
+            "通信がうまくいきませんでした。もう一度お試しください"
+    }
 }

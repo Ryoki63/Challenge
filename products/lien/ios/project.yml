@@ -47,6 +47,11 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
+        # 招待ディープリンク lien://invite/<token>(T11 / DESIGN §3.6)
+        CFBundleURLTypes:
+          - CFBundleURLName: "$(LIEN_BUNDLE_ID_BASE).invite"
+            CFBundleURLSchemes:
+              - lien
         # Config.swift(後続タスク)が xcconfig → Info.plist 経由で読む(DESIGN §3.3)
         SUPABASE_URL: "$(SUPABASE_URL)"
         SUPABASE_ANON_KEY: "$(SUPABASE_ANON_KEY)"

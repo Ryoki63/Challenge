@@ -1,0 +1,228 @@
+<!doctype html>
+<!--
+  Lien 招待ページ(T11 / DESIGN §6)
+  - GitHub Pages の /lien/i/ にマップして配信する想定(invite-create の webUrl 既定:
+    https://ryoki63.github.io/Challenge/lien/i/?t=<token> — Pages 配備は G0 後の別タスク)
+  - 依存ゼロの単一 HTML(インライン CSS / JS)。?t=<token> を読んで3状態を出し分ける:
+      1. valid   … 「アプリで開く」(lien://invite/<token>)+コード表示+App Store 誘導
+      2. missing … t が無い → 案内+コード手入力フォールバック
+      3. invalid … t が8文字英数でない → 案内+コード手入力フォールバック
+  - token の形式判定は invite-accept/core.ts の TOKEN_FORMAT と同一(契約整合)
+  - 文言は日本語・罰や恥をにおわせる表現は使わない(REQUIREMENTS §3.5)
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Lien — 招待が届いています</title>
+<style>
+  :root {
+    --green: #4a7c59;
+    --green-dark: #3c664a;
+    --bg: #f6f4ee;
+    --ink: #3a3a3a;
+    --muted: #8a8a82;
+    --line: #e4e1d8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    line-height: 1.7;
+  }
+  main.card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 2px 16px rgba(60, 70, 50, .08);
+    max-width: 420px;
+    width: 100%;
+    padding: 32px 24px 24px;
+    text-align: center;
+  }
+  .logo { font-size: 40px; line-height: 1; }
+  h1 { font-size: 24px; margin: 8px 0 0; letter-spacing: .04em; }
+  .tagline { color: var(--muted); font-size: 13px; margin: 4px 0 24px; }
+  .lead { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+  .note { color: var(--muted); font-size: 13px; margin: 12px 0; }
+  .note.small { font-size: 12px; }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 14px 16px;
+    border: 0;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    margin: 8px 0;
+    font-family: inherit;
+  }
+  .btn.primary { background: var(--green); color: #fff; }
+  .btn.primary:active { background: var(--green-dark); }
+  .btn.secondary { background: #fff; color: var(--green); border: 1.5px solid var(--green); }
+  .btn.ghost { background: transparent; color: var(--green); font-size: 14px; padding: 8px; }
+  .code-block {
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    padding: 12px;
+    margin: 16px 0;
+  }
+  .code-caption { color: var(--muted); font-size: 12px; margin: 0; }
+  .code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 28px;
+    letter-spacing: .12em;
+    margin: 6px 0;
+    user-select: all;
+    -webkit-user-select: all;
+  }
+  .copy-done { color: var(--green); font-size: 12px; margin: 0; }
+  form#manual-form {
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    text-align: left;
+  }
+  form#manual-form label { font-size: 13px; font-weight: 600; }
+  form#manual-form input {
+    display: block;
+    width: 100%;
+    margin: 8px 0;
+    padding: 12px;
+    font-size: 18px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .1em;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+  }
+  form#manual-form input:focus { outline: none; border-color: var(--green); }
+  .error { color: #c0764a; font-size: 13px; margin: 4px 0; }
+  footer { margin-top: 24px; }
+  footer p { color: var(--muted); font-size: 11px; margin: 0; }
+</style>
+</head>
+<body>
+<main class="card">
+  <header>
+    <div class="logo" aria-hidden="true">🌱</div>
+    <h1>Lien</h1>
+    <p class="tagline">ふたりで、ひとつの約束</p>
+  </header>
+
+  <!-- 状態1: token あり・形式OK -->
+  <section id="state-valid" hidden>
+    <p class="lead">あなたに招待が届いています</p>
+    <a id="open-app" class="btn primary" href="#">アプリで開く</a>
+    <div class="code-block">
+      <p class="code-caption">アプリの「コードを入力」で使える招待コード</p>
+      <p id="invite-code" class="code"></p>
+      <button id="copy-code" class="btn ghost" type="button">コードをコピー</button>
+      <p id="copy-done" class="copy-done" hidden>コピーしました</p>
+    </div>
+    <p class="note">アプリがまだの人は、先にインストールしてね。</p>
+    <!-- TODO(G3/G5): TestFlight / App Store の実リンクに差し替える(issue #11 リスク欄) -->
+    <a id="store-link" class="btn secondary" href="https://apps.apple.com/" target="_blank" rel="noopener">App Store でアプリを入手</a>
+    <p class="note small">この招待は発行から72時間・1回かぎり有効です。</p>
+  </section>
+
+  <!-- 状態2: token なし -->
+  <section id="state-missing" hidden>
+    <p class="lead">招待コードが見つかりませんでした</p>
+    <p class="note">招待リンクをもう一度開くか、相手から聞いた8文字のコードを下に入れてね。</p>
+  </section>
+
+  <!-- 状態3: token の形式が不正 -->
+  <section id="state-invalid" hidden>
+    <p class="lead">この招待リンクをうまく読み取れませんでした</p>
+    <p class="note">リンクが途中で切れていたのかも。相手から聞いた8文字のコードを下に入れてね。</p>
+  </section>
+
+  <!-- コード手入力フォールバック(missing / invalid のとき表示) -->
+  <form id="manual-form" hidden>
+    <label for="manual-input">招待コード(8文字の英数字)</label>
+    <input id="manual-input" name="t" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="8" placeholder="例: AbCd2345">
+    <p id="manual-error" class="error" hidden>コードは8文字の英数字です</p>
+    <button class="btn primary" type="submit">この招待をひらく</button>
+  </form>
+
+  <footer>
+    <p>Lien — 大切な人と約束をひとつだけ決めて、毎日そっと続ける習慣アプリ</p>
+  </footer>
+</main>
+
+<script>
+"use strict";
+
+// invite-accept/core.ts の TOKEN_FORMAT と同一(契約整合 — issue #11)
+var TOKEN_FORMAT = /^[A-Za-z0-9]{8}$/;
+
+/**
+ * クエリ文字列 → 表示状態。
+ * @param {string} search location.search("?t=..." または "")
+ * @returns {{state: "valid"|"missing"|"invalid", token: string|null}}
+ */
+function deriveInviteState(search) {
+  var params = new URLSearchParams(search);
+  var token = params.get("t");
+  if (token === null || token === "") return { state: "missing", token: null };
+  if (!TOKEN_FORMAT.test(token)) return { state: "invalid", token: null };
+  return { state: "valid", token: token };
+}
+
+/** カスタムスキーム URL(DESIGN §3.6: lien://invite/<token>) */
+function appUrlFor(token) {
+  return "lien://invite/" + token;
+}
+
+// ---- ここから DOM(node でのロジック検証時は実行されない) ----
+if (typeof document !== "undefined") {
+  var render = function (result) {
+    document.getElementById("state-valid").hidden = result.state !== "valid";
+    document.getElementById("state-missing").hidden = result.state !== "missing";
+    document.getElementById("state-invalid").hidden = result.state !== "invalid";
+    document.getElementById("manual-form").hidden = result.state === "valid";
+    if (result.state === "valid") {
+      document.getElementById("open-app").setAttribute("href", appUrlFor(result.token));
+      document.getElementById("invite-code").textContent = result.token;
+    }
+  };
+
+  render(deriveInviteState(window.location.search));
+
+  // コード手入力フォールバック: 形式OKなら valid 表示に切り替える(URL も ?t= に揃える)
+  document.getElementById("manual-form").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var raw = document.getElementById("manual-input").value.trim();
+    if (!TOKEN_FORMAT.test(raw)) {
+      document.getElementById("manual-error").hidden = false;
+      return;
+    }
+    document.getElementById("manual-error").hidden = true;
+    try {
+      window.history.replaceState(null, "", "?t=" + raw);
+    } catch (e) { /* file:// 直開き等で失敗しても表示は続行 */ }
+    render({ state: "valid", token: raw });
+  });
+
+  // コードコピー(Clipboard API 非対応環境では .code の user-select: all で手動選択)
+  document.getElementById("copy-code").addEventListener("click", function () {
+    var code = document.getElementById("invite-code").textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(function () {
+        document.getElementById("copy-done").hidden = false;
+      }, function () { /* 拒否時は何もしない(手動選択で代替できる) */ });
+    }
+  });
+}
+</script>
+</body>
+</html>
