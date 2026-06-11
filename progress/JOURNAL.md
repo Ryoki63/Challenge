@@ -136,6 +136,8 @@
 - 実施: functions 7本は **lien-deploy.yml(CI)経由でデプロイ成功**(SUPABASE_ACCESS_TOKEN をrepo secretsに登録)。Anonymous sign-ins をManagement APIで有効化。APIキーは .env.keys(gitignore対象)に保存
 - 検証: **スモークテスト全緑** — seed-pair.sh(匿名×2→ペア成立→約束seed)→ checkin 200(todayMeDone: true)→ snapshot 200(ペア・植物状態正常)。APNs はsecrets未投入のためスキップ(設計どおり)
 - 結果: **T08のエージェント側作業は完了**。#8の残り=Apple Developer加入→APNs secrets→実機G1計測(人間)。#38の残りはApple Developer加入のみ。Cloudflare対策(UA必須)とCLI Goバイナリ欠落の知見をissueに記録
+- 節目: **T11完了**(commit 6eafd27・lien-ios CI初回緑)→ #11 close。招待3導線+DeepLink+web/invite静的ページ。残作業=実HTTP結線(T08後)とPages配備(G3前)を#11に記録
+- 続行: レーンA次=T12(約束設定UI+functions promise-set)に着手。promise-setはスモークでservice_role直書きしていた約束作成の正式API化でもある
 
 ## 2026-06-11 (サブエージェント) — T08準備①: デプロイ自動化+G1計測ハーネス (#8/#50 レーンB)
 - 着手: config.toml / deploy.sh / lien-deploy.yml / g1ハーネス(seed-pair.sh, measure.sh, RUNBOOK.md) / .env.example を整備する(実行はしない。git操作はオーケストレータ)
