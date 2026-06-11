@@ -173,6 +173,16 @@ function makeRepo(db: SupabaseClient): CheckinRepo {
       if (e3) throw e3;
       return { created: false, photoUpdated: true };
     },
+
+    async createSignedUploadUrl(path: string): Promise<{ token: string }> {
+      // 署名付きアップロードURL(DESIGN §5.6 — issue #48)。upsert: true で同日差し替え可。
+      // バケットは非公開のまま(0001 §6)・書き込みポリシーは migration 0002
+      const { data, error } = await db.storage
+        .from("photos")
+        .createSignedUploadUrl(path, { upsert: true });
+      if (error) throw error;
+      return { token: data.token };
+    },
   };
 }
 
@@ -219,7 +229,11 @@ Deno.serve(async (req: Request) => {
     return json(401, { error: "unauthorized" });
   }
 
-  let payload: { dateLocal?: unknown; photoPath?: unknown };
+  let payload: {
+    dateLocal?: unknown;
+    photoPath?: unknown;
+    requestPhotoUpload?: unknown;
+  };
   try {
     payload = await req.json();
   } catch {
@@ -234,6 +248,12 @@ Deno.serve(async (req: Request) => {
   ) {
     return json(400, { error: "invalid_photo_path" });
   }
+  if (
+    payload.requestPhotoUpload !== undefined &&
+    typeof payload.requestPhotoUpload !== "boolean"
+  ) {
+    return json(400, { error: "invalid_request_photo_upload" });
+  }
 
   try {
     const result = await handleCheckin(
@@ -242,6 +262,7 @@ Deno.serve(async (req: Request) => {
         userId: authData.user.id,
         dateLocal: payload.dateLocal,
         photoPath: (payload.photoPath as string | null | undefined) ?? null,
+        requestPhotoUpload: payload.requestPhotoUpload === true,
       },
     );
     return json(result.status, result.body);

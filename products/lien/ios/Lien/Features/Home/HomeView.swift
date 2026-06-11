@@ -1,16 +1,19 @@
-// HomeView.swift — ホーム画面(T13 / REQUIREMENTS §3.4, §3.5, §3.9, §3.10 / §6)
+// HomeView.swift — ホーム画面(T13+T14 / REQUIREMENTS §3.4, §3.5, §3.9, §3.10 / §6)
 //
-// 構成: 植物(ドット絵+名前)/ ストリーク / ふたりの今日(自分・相手チップ)/ チェックインボタン。
-// 文言は Strings.Home、色・余白は DesignSystem の定数に集約(View 内に直書きしない — DESIGN §3.8)。
+// 構成: 植物(ドット絵+名前)/ ストリーク / ふたりの今日(自分・相手チップ)/
+//       チェックインフロー(CheckinFlowView — 1タップ完了+写真添付+当日取消)。
+// 文言は Strings.Home / Strings.Checkin、色・余白は DesignSystem の定数に集約(DESIGN §3.8)。
 // 表示原則(§3.10)はウィジェット(LienWidgetEntryView)と揃える:
 //   自分未完 = 自分側グレー / 相手が先に完了 =「(名前)が待ってるよ」。
 // ソロ状態(pairId = null)は土+誘導文言の最小表示(招待 UI は T11 PairingView の責務)。
+// 未送信キュー(pending_ops.json)の再送は表示時+フォアグラウンド復帰時(DESIGN §3.7)。
 
 import SwiftUI
 
 @MainActor
 struct HomeView: View {
     @State private var viewModel: HomeViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     init(store: AppGroupStore?, checkinService: CheckinPerforming) {
         _viewModel = State(initialValue: HomeViewModel(
@@ -37,6 +40,14 @@ struct HomeView: View {
             #endif
         }
         .onAppear { viewModel.load() }
+        .task { await viewModel.flushPendingOps() }
+        .onChange(of: scenePhase) {
+            // フォアグラウンド復帰時の再送(DESIGN §3.7。snapshot 表示も読み直す)
+            if scenePhase == .active {
+                viewModel.load()
+                Task { await viewModel.flushPendingOps() }
+            }
+        }
     }
 }
 
@@ -72,9 +83,9 @@ private struct SnapshotContent: View {
 
             TodayArea(viewModel: viewModel, snapshot: snapshot)
 
-            CheckinArea(viewModel: viewModel)
+            // チェックイン+写真添付+当日取消(T14 — Features/Checkin/CheckinFlowView.swift)
+            CheckinFlowView(viewModel: viewModel)
 
-            // TODO(T14): チェックイン完了後の「写真を添える」ボタン+当日中の取消導線(§3.4)
             // TODO(T15): 相手未完のときだけ出す「つつく」ボタン(1日3回まで — §3.7)
         }
     }
@@ -223,48 +234,7 @@ private struct TodayChip: View {
     }
 }
 
-// MARK: - チェックイン(§3.4。1日1回・完了済みは無効)
-
-@MainActor
-private struct CheckinArea: View {
-    let viewModel: HomeViewModel
-
-    /// body 外のヘルパから VM(@MainActor)に触るため struct ごと @MainActor にする
-    private var isDone: Bool {
-        viewModel.snapshot?.todayMeDone == true
-    }
-
-    var body: some View {
-        VStack(spacing: LienSpacing.s) {
-            if let message = viewModel.checkinErrorMessage {
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(LienColors.gentleAlert)
-                    .multilineTextAlignment(.center)
-            }
-
-            Button {
-                Task { await viewModel.performCheckin() }
-            } label: {
-                Group {
-                    if viewModel.isCheckingIn {
-                        ProgressView()
-                    } else if isDone {
-                        Label(Strings.Home.checkinDoneLabel, systemImage: "checkmark.circle.fill")
-                    } else {
-                        Text(Strings.Home.checkinButton)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(!viewModel.canCheckin)
-        }
-    }
-}
-
-// MARK: - 空状態(snapshot 未取得。GET /snapshot による自己修復は T14 — DESIGN §4)
+// MARK: - 空状態(snapshot 未取得。GET /snapshot による自己修復は後続 — DESIGN §4)
 
 private struct EmptyHomeContent: View {
     var body: some View {

@@ -1,10 +1,11 @@
-// HomeViewModel.swift — ホーム画面の状態管理(T13 / REQUIREMENTS §3.4, §3.9, §3.10)
+// HomeViewModel.swift — ホーム画面の状態管理(T13+T14 / REQUIREMENTS §3.4, §3.9, §3.10)
 //
 // - 状態の正はサーバー(DESIGN §3.3)。本 VM は App Group の PairSnapshot を読んで表示し、
 //   チェックインは CheckinPerforming 経由で楽観反映 → saveSnapshot → ウィジェット reload する
-// - CheckinPerforming の実装は T13 ではローカルエコー(LocalEchoCheckinService)。
-//   実 API(POST /checkin)+オフラインキュー(pending_ops.json — DESIGN §3.7)+写真添付+
-//   当日取消は **T14 で差し替える**
+// - 実 API+オフラインキューの実装は CheckinService(T14)。当日取消・写真添付・キュー再送は
+//   注入された checkinService が各能力プロトコル(CheckinCanceling / PhotoAttaching /
+//   PendingOpsFlushing — CheckinService.swift)に適合する場合のみ有効化する(as? で能力検出。
+//   LocalEchoCheckinService 注入時は従来どおりチェックインのみ)
 // - WidgetCenter.reloadAllTimelines はクロージャ注入(テストでは観測用に差し替え。
 //   reload のトリガーはアプリ本体と NSE のみ — DESIGN §3.5)
 
@@ -12,7 +13,7 @@ import Foundation
 import Observation
 import WidgetKit
 
-// MARK: - チェックイン実行の抽象(T13: ローカルエコー / T14: 実 API に差し替え)
+// MARK: - チェックイン実行の抽象(本実装: CheckinService — T14)
 
 protocol CheckinPerforming: AnyObject {
     /// 今日のチェックインを実行し、反映後の snapshot(受信者視点 — DESIGN §3.4)を返す
@@ -20,7 +21,8 @@ protocol CheckinPerforming: AnyObject {
 }
 
 /// ローカルエコー実装: サーバーを呼ばず、楽観更新済みの snapshot をそのまま返す。
-/// **T14 で実 API 実装(オフラインキュー込み)に差し替える**(本クラスはその場つなぎ)。
+/// 本実装は CheckinService(T14。実 API+オフラインキュー)。本クラスは Config 未設定
+/// (CI・Secrets なし)環境の場つなぎとして残す(LienApp.swift の結線が参照 — 差し替えは後続の数行)。
 /// ストリーク数は触らない(確定はサーバーのアルゴリズムが正 — DESIGN §5.4)
 final class LocalEchoCheckinService: CheckinPerforming {
     private let now: () -> Date
@@ -52,14 +54,29 @@ final class HomeViewModel {
     /// 表示中の snapshot(nil = 未取得の空状態)
     private(set) var snapshot: PairSnapshot?
     private(set) var isCheckingIn = false
+    /// 当日取消の送信中(T14)
+    private(set) var isCanceling = false
+    /// 写真添付の処理中(縮小+アップロード — T14)
+    private(set) var isAttachingPhoto = false
     /// チェックイン失敗時のユーザー向けメッセージ(リトライ可能。責めない文言 — §3.5)
     private(set) var checkinErrorMessage: String?
+    /// 取消失敗時のメッセージ(責めない文言 — §3.5)
+    private(set) var cancelErrorMessage: String?
+    /// 写真添付失敗時のメッセージ(責めない文言 — §3.5)
+    private(set) var photoErrorMessage: String?
+    /// 写真添付が完了した直後の一言(同一セッション内の表示用)
+    private(set) var photoAttachedNote: String?
 
     // MARK: 依存(モック注入可能)
 
     private let store: AppGroupStore?
     private let checkinService: CheckinPerforming
     private let reloadWidgets: () -> Void
+
+    /// 追加能力(T14)。checkinService が適合する場合のみ非 nil(能力検出)
+    private let cancelService: CheckinCanceling?
+    private let photoService: PhotoAttaching?
+    private let opsFlusher: PendingOpsFlushing?
 
     init(
         store: AppGroupStore?,
@@ -69,12 +86,16 @@ final class HomeViewModel {
         self.store = store
         self.checkinService = checkinService
         self.reloadWidgets = reloadWidgets
+        self.cancelService = checkinService as? CheckinCanceling
+        self.photoService = checkinService as? PhotoAttaching
+        self.opsFlusher = checkinService as? PendingOpsFlushing
     }
 
     // MARK: 読み込み
 
     /// App Group から snapshot を読み直す(onAppear / フォアグラウンド復帰時)。
-    /// サーバーとの再同期(GET /snapshot)は T14 の責務
+    /// 未送信キューの再送は flushPendingOps(T14)。サーバーとの能動的な再同期
+    /// (GET /snapshot)はスナップショット同期の後続タスクの責務
     func load() {
         snapshot = store?.loadSnapshot()
     }
@@ -124,25 +145,96 @@ final class HomeViewModel {
     /// ソロ状態でもチェックインは可能(招待待ちでも使える — §3.2)
     var canCheckin: Bool {
         guard let snapshot else { return false }
-        return !snapshot.todayMeDone && !isCheckingIn
+        return !snapshot.todayMeDone && !isBusy
     }
 
-    // MARK: チェックイン(楽観反映。オフラインキュー・写真・当日取消は T14)
+    /// 当日取消の導線を出すか(完了済み+取消能力あり — §3.4 / T14)
+    var canCancelCheckin: Bool {
+        guard let snapshot, cancelService != nil else { return false }
+        return snapshot.todayMeDone && !isBusy
+    }
+
+    /// 「写真を添える」を出すか(完了済み+写真能力あり+ペア成立 — §3.4 / DESIGN §5.6。
+    /// ソロは写真の置き場所が無いため出さない)
+    var canAttachPhoto: Bool {
+        guard let snapshot, photoService != nil else { return false }
+        return snapshot.todayMeDone && snapshot.pairId != nil && !isBusy
+    }
+
+    private var isBusy: Bool {
+        isCheckingIn || isCanceling || isAttachingPhoto
+    }
+
+    // MARK: チェックイン(楽観反映。実 API+オフラインキューは CheckinService — T14)
 
     func performCheckin() async {
         guard canCheckin, let current = snapshot else { return }
         isCheckingIn = true
-        checkinErrorMessage = nil
+        clearMessages()
         defer { isCheckingIn = false }
         do {
             let updated = try await checkinService.performCheckin(current: current)
-            snapshot = updated
-            // 保存失敗でも画面表示は更新済みのまま続行(フォアグラウンド復帰時の
-            // GET /snapshot で自己修復する設計 — DESIGN §4)
-            try? store?.saveSnapshot(updated)
-            reloadWidgets()
+            apply(updated)
         } catch {
             checkinErrorMessage = Strings.Home.checkinErrorMessage
         }
+    }
+
+    // MARK: 当日取消(誤タップ対応 — §3.4。責めない文言 / T14)
+
+    func performCancel() async {
+        guard canCancelCheckin, let current = snapshot, let cancelService else { return }
+        isCanceling = true
+        clearMessages()
+        defer { isCanceling = false }
+        do {
+            let updated = try await cancelService.cancelCheckin(current: current)
+            apply(updated)
+        } catch {
+            cancelErrorMessage = Strings.Checkin.cancelErrorMessage
+        }
+    }
+
+    // MARK: 写真添付(完了後・任意・その日1枚 — §3.4 / DESIGN §5.6 / T14)
+
+    func attachPhoto(_ imageData: Data) async {
+        guard canAttachPhoto, let current = snapshot, let photoService else { return }
+        isAttachingPhoto = true
+        clearMessages()
+        defer { isAttachingPhoto = false }
+        do {
+            let updated = try await photoService.attachPhoto(current: current, imageData: imageData)
+            apply(updated)
+            photoAttachedNote = Strings.Checkin.attachPhotoDoneNote
+        } catch {
+            photoErrorMessage = Strings.Checkin.attachPhotoErrorMessage
+        }
+    }
+
+    // MARK: 未送信キューの再送(起動時+フォアグラウンド復帰時 — DESIGN §3.7 / T14)
+
+    func flushPendingOps() async {
+        guard let opsFlusher, !isBusy else { return }
+        if let server = await opsFlusher.flushPendingOps() {
+            apply(server)
+        }
+    }
+
+    // MARK: private
+
+    /// 新しい snapshot を画面+App Group に反映し、ウィジェットを reload する。
+    /// 保存失敗でも画面表示は更新済みのまま続行(フォアグラウンド復帰時の
+    /// GET /snapshot で自己修復する設計 — DESIGN §4)
+    private func apply(_ updated: PairSnapshot) {
+        snapshot = updated
+        try? store?.saveSnapshot(updated)
+        reloadWidgets()
+    }
+
+    private func clearMessages() {
+        checkinErrorMessage = nil
+        cancelErrorMessage = nil
+        photoErrorMessage = nil
+        photoAttachedNote = nil
     }
 }

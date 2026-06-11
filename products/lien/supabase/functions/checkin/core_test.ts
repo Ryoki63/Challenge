@@ -49,6 +49,8 @@ interface World {
   checkins: Map<string, { photoPath: string | null }>; // key: `${userId}|${dateLocal}`
   streakDays: StreakDayRecord[];
   plant: SnapshotPlantRow | null;
+  /** createSignedUploadUrl が要求されたパスの記録(パス規約の検証用) */
+  signedUploadPaths: string[];
 }
 
 function makeRepo(world: World): CheckinRepo {
@@ -86,6 +88,12 @@ function makeRepo(world: World): CheckinRepo {
         return Promise.resolve({ created: false, photoUpdated: true });
       }
       return Promise.resolve({ created: false, photoUpdated: false });
+    },
+    createSignedUploadUrl: (path) => {
+      world.signedUploadPaths.push(path);
+      return Promise.resolve({
+        token: `tok-${world.signedUploadPaths.length}`,
+      });
     },
   };
 }
@@ -156,6 +164,7 @@ function makeWorld(overrides: Partial<World> = {}): World {
       "2026-06-09",
     ),
     plant: { grownDays: 13, name: "みどり" },
+    signedUploadPaths: [],
     ...overrides,
   };
 }
@@ -438,6 +447,90 @@ Deno.test("checkin: push 失敗(ok:false / throw)でも処理は成功扱い(DES
     assertEquals(result.status, 200, `pusher=${behavior}`);
     assertEquals(sent.length, 1, "送信自体は試みる");
   }
+});
+
+// ---- 署名付きアップロードURL(DESIGN §5.6 — issue #48 / T14) ----
+
+Deno.test("checkin: requestPhotoUpload — 原寸+サムネ2本の {path, token} を同梱(パス規約 pairs/<pairId>/<date>/)", async () => {
+  const world = makeWorld();
+  const { pusher } = makePusher();
+
+  const result = await handleCheckin(deps(world, pusher), {
+    userId: "user-a",
+    dateLocal: TODAY,
+    requestPhotoUpload: true,
+  });
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.alreadyCheckedIn, false, "チェックイン自体も実行される");
+  assertEquals(result.body.photoUpload, {
+    photo: { path: "pairs/pair-1/2026-06-10/photo.jpg", token: "tok-1" },
+    thumb: { path: "pairs/pair-1/2026-06-10/photo_thumb.jpg", token: "tok-2" },
+  });
+  // 署名はパス規約どおりの2本に対してのみ要求される(migration 0002 のポリシーと一致)
+  assertEquals(world.signedUploadPaths, [
+    "pairs/pair-1/2026-06-10/photo.jpg",
+    "pairs/pair-1/2026-06-10/photo_thumb.jpg",
+  ]);
+  // 発行されたパスは checkin の photoPath 検査('pairs/<pair_id>/' 始まり)を通る形式
+  if (!result.body.photoUpload) throw new Error("unreachable");
+  assertEquals(
+    result.body.photoUpload.photo.path.startsWith("pairs/pair-1/"),
+    true,
+  );
+});
+
+Deno.test("checkin: requestPhotoUpload — チェックイン済みの日の再要求も 200(冪等)で新しいURLを返す", async () => {
+  const world = makeWorld();
+  const { sent, pusher } = makePusher();
+  const d = deps(world, pusher);
+
+  await handleCheckin(d, { userId: "user-a", dateLocal: TODAY });
+  const again = await handleCheckin(d, {
+    userId: "user-a",
+    dateLocal: TODAY,
+    requestPhotoUpload: true,
+  });
+
+  assertEquals(again.status, 200);
+  if (again.status !== 200) throw new Error("unreachable");
+  assertEquals(again.body.alreadyCheckedIn, true);
+  assertEquals(again.body.photoUpload !== undefined, true);
+  assertEquals(sent.length, 1, "URL再発行だけでは push を再送しない");
+});
+
+Deno.test("checkin: requestPhotoUpload — ソロ状態は 400 no_pair(upsert もしない)", async () => {
+  const world = makeWorld({ pair: null, streakDays: [], plant: null });
+  const { sent, pusher } = makePusher();
+
+  const result = await handleCheckin(deps(world, pusher), {
+    userId: "user-a",
+    dateLocal: TODAY,
+    requestPhotoUpload: true,
+  });
+
+  assertEquals(result.status, 400);
+  if (result.status !== 400) throw new Error("unreachable");
+  assertEquals(result.body.error, "no_pair");
+  assertEquals(world.checkins.size, 0, "拒否時はチェックインも記録しない");
+  assertEquals(world.signedUploadPaths, []);
+  assertEquals(sent.length, 0);
+});
+
+Deno.test("checkin: requestPhotoUpload なし(従来リクエスト)は photoUpload キー自体を含まない", async () => {
+  const world = makeWorld();
+  const { pusher } = makePusher();
+
+  const result = await handleCheckin(deps(world, pusher), {
+    userId: "user-a",
+    dateLocal: TODAY,
+  });
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals("photoUpload" in result.body, false);
+  assertEquals(world.signedUploadPaths, []);
 });
 
 Deno.test("checkin: ペア成立当日(履歴なし)— streak はプレビュー1から始まる", async () => {

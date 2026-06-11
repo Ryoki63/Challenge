@@ -192,4 +192,22 @@ enum Strings {
         static let emptyTitle = "Lien"
         static let emptyMessage = "ふたりの今日を準備しています"
     }
+
+    /// チェックインフロー(写真添付+当日取消 — REQUIREMENTS §3.4 / T14)。
+    /// 罰・恥系の表現は使わない(§3.5。取消も「誤タップ対応」であって責めない)
+    enum Checkin {
+        // 写真を添える(完了後・任意・その日1枚 — §3.4)
+        static let attachPhotoButton = "写真を添える"
+        static let attachPhotoSending = "写真をおくっています…"
+        static let attachPhotoDoneNote = "今日の写真を添えました"
+        static let attachPhotoErrorMessage = "写真を送れませんでした。もう一度お試しください"
+
+        // 当日取消(誤タップ対応 — §3.4。責めない文言)
+        static let cancelButton = "取り消す"
+        static let cancelDialogTitle = "今日のチェックインを取り消しますか?"
+        static let cancelDialogMessage = "まちがえてタップしたときのために。いつでもまたチェックインできます"
+        static let cancelConfirm = "取り消す"
+        static let cancelKeep = "そのままにする"
+        static let cancelErrorMessage = "通信がうまくいきませんでした。もう一度お試しください"
+    }
 }
