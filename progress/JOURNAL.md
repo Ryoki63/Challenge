@@ -108,3 +108,16 @@
   - クリティカルパス: G0(#38) → T08 → T20 → T27 → T28(Beta審査1〜2日) → G3。**G0の1日遅れがそのままG3遅れ**(Pairy終了06-30前の配布が目標)
 - 検証: 敵対検証18件の指摘(migration連番の衝突、messages.ts文言オーナー重複、PlantSprite二重作成リスク等)をWave割当・オーナー表に反映済み
 - 結果: 完了(commit+push後、Wave 4実行はユーザーのGOまたは次ループで着手)
+
+## 2026-06-11 (対話) — G0部分解放: Supabaseプロジェクト作成 → T08バックエンド前倒し
+- 着手: ユーザーがSupabaseサインイン+プロジェクト作成完了(ref: lniheehfbtpfhglinfjm)。Apple Developer加入はまだ
+- 方針: いま可能になった範囲を即消化 — CLI認証確認 → config.toml作成+link → migration適用 → functions 7本デプロイ → 匿名サインイン有効化 → curlスモークテスト(APNs secretsはApple Developer待ちのため後回し、pushスキップ動作を確認)
+
+## 2026-06-11 (サブエージェント) — T08準備①: デプロイ自動化+G1計測ハーネス (#8/#50 レーンB)
+- 着手: config.toml / deploy.sh / lien-deploy.yml / g1ハーネス(seed-pair.sh, measure.sh, RUNBOOK.md) / .env.example を整備する(実行はしない。git操作はオーケストレータ)
+- 事前確認済み: 7関数すべて自己認証(checkin/cancel/snapshot/invite系=adminClient.auth.getUser、close-day/grant-tickets=SERVICE_ROLE_KEY完全一致)→ 全関数 verify_jwt=false が正しい。apns.ts env名= APNS_AUTH_KEY/APNS_KEY_ID/APPLE_TEAM_ID/APNS_ENV/APNS_TOPIC、未設定時はpushスキップ+warn(全index.tsで確認)
+- 成果物: ①supabase/config.toml(project_id=lniheehfbtpfhglinfjm+7関数verify_jwt=false) ②scripts/deploy.sh(冪等: 前提チェック→link→db push→7本deploy、DRY_RUN対応) ③.github/workflows/lien-deploy.yml(workflow_dispatch専用・CLI 2.105.0固定) ④scripts/g1/seed-pair.sh(匿名×2→invite-create/accept→push_token PATCH→promises seed) ⑤scripts/g1/measure.sh(checkin→目視Enter→cancelの10回ループ+p50/p90+JOURNALスニペット) ⑥scripts/g1/RUNBOOK.md(G0残作業〜G1の人間手順・所要時間付き) ⑦.env.example
+- 設計判断: (a)匿名サインイン=POST /auth/v1/signup に email/phone なし {"data":{}}(auth-js signInAnonymously実装をWebFetchで確認) (b)checkinは同日冪等でpush再発火しない→計測は checkin→cancel→checkin 方式(cancelのサイレントpushは配送保証なし→ラウンド間にBのアプリを開いて自己修復) (c)promisesはservice_roleのみ書込可(migration 0001確認)→seedにSERVICE_ROLE_KEY経路を追加(無いとcheckinが409 no_promise)
+- 検証: bash -n 3本OK / config.toml=deno @std/toml でパース+内容assert / lien-deploy.yml=deno @std/yaml でパース+dispatch専用assert / deploy.sh DRY_RUN実走(CLI 2.105.0検出・トークン未投入の停止メッセージ正常) / 集計・JSONヘルパをpython3.9で単体実行 / 既存CI干渉なし(lien-ios=ios/**のみ、lien-deployは手動専用、.gitignoreは.env除外済みで変更不要)
+- 注意点: ローカルmacの supabase コマンドはshimのみで supabase-go 実体欠落 → ローカルdeployは要再インストール(CIは setup-cli で問題なし)
+- 結果: 完了(git操作なし。コミットはオーケストレータ)

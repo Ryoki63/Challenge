@@ -1,0 +1,41 @@
+# Lien deploy — Supabase へ migration + Edge Functions をデプロイ(T08準備①)
+#
+# 手動起動のみ(workflow_dispatch)。push では走らない=既存CI(lien-ci / lien-ios)と独立。
+# 必要な GitHub secrets(リポジトリ Settings > Secrets and variables > Actions):
+#   SUPABASE_ACCESS_TOKEN — https://supabase.com/dashboard/account/tokens で発行
+#   SUPABASE_DB_PASSWORD  — プロジェクト作成時の DB パスワード(db push に必要)
+# project ref は products/lien/supabase/config.toml に固定(env PROJECT_REF で上書き可)。
+name: lien-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "前提チェックのみ(link/db push/deploy を実行しない)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: lien-deploy
+  cancel-in-progress: false # デプロイの同時実行・途中キャンセルはしない
+
+jobs:
+  deploy:
+    name: supabase db push + functions deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.105.0 # config.toml のスキーマ準拠バージョンに固定
+
+      - name: Deploy (scripts/deploy.sh)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: bash products/lien/scripts/deploy.sh
