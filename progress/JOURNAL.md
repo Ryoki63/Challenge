@@ -129,6 +129,14 @@
 - 締め: **#40へv3の3案(E/F/G)を再々提出**+needs-approvalラベル再発火(モバイル通知)。成長カーブ案は前回提示のまま有効と明記。トーン選定待ち
 - 本日のWave 4進捗: T10完了(#10 close・CI初回緑)/ T08準備①②完了(#8は開いたまま)/ 次=T11(招待UI+web/invite)はトーン選定と独立に進行可
 
+## 2026-06-11 (対話) — T08実行: Supabaseトークン投入→デプロイ+スモークテスト / T11並行着手
+- 着手: ユーザーが .env にアクセストークンを投入(「はいよ!」)。CLI認証確認→link→migrate→functions 7本デプロイ→匿名サインイン有効化→スモークテストへ
+- 並行: T11(招待UI+web/invite)をエージェント着手(レーンA直列の順番どおりT10完了後)
+- 実施: CLI認証OK(projects list成功)→ link成功 → migration適用は**Management API /database/query 経由**(ローカルCLIのfunctions deploy系はGoバイナリ欠落・DBパスワード未取得のため)。全11テーブル+RLS12ポリシー+migration履歴記録を確認
+- 実施: functions 7本は **lien-deploy.yml(CI)経由でデプロイ成功**(SUPABASE_ACCESS_TOKEN をrepo secretsに登録)。Anonymous sign-ins をManagement APIで有効化。APIキーは .env.keys(gitignore対象)に保存
+- 検証: **スモークテスト全緑** — seed-pair.sh(匿名×2→ペア成立→約束seed)→ checkin 200(todayMeDone: true)→ snapshot 200(ペア・植物状態正常)。APNs はsecrets未投入のためスキップ(設計どおり)
+- 結果: **T08のエージェント側作業は完了**。#8の残り=Apple Developer加入→APNs secrets→実機G1計測(人間)。#38の残りはApple Developer加入のみ。Cloudflare対策(UA必須)とCLI Goバイナリ欠落の知見をissueに記録
+
 ## 2026-06-11 (サブエージェント) — T08準備①: デプロイ自動化+G1計測ハーネス (#8/#50 レーンB)
 - 着手: config.toml / deploy.sh / lien-deploy.yml / g1ハーネス(seed-pair.sh, measure.sh, RUNBOOK.md) / .env.example を整備する(実行はしない。git操作はオーケストレータ)
 - 事前確認済み: 7関数すべて自己認証(checkin/cancel/snapshot/invite系=adminClient.auth.getUser、close-day/grant-tickets=SERVICE_ROLE_KEY完全一致)→ 全関数 verify_jwt=false が正しい。apns.ts env名= APNS_AUTH_KEY/APNS_KEY_ID/APPLE_TEAM_ID/APNS_ENV/APNS_TOPIC、未設定時はpushスキップ+warn(全index.tsで確認)
