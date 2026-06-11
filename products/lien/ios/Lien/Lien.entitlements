@@ -8,5 +8,11 @@
 	<array>
 		<string>$(LIEN_APP_GROUP_ID)</string>
 	</array>
+	<!-- APNs(issue #8 準備②)。Xcode 直インストールの development ビルドは sandbox。
+	     TestFlight/App Store(T28)は production が必要 — アーカイブ署名時に自動で
+	     差し替わる(automatic signing)。CI は CODE_SIGNING_ALLOWED=NO のため未使用。
+	     アプリ本体のみ(Widget/NSE に APNs 登録は不要) -->
+	<key>aps-environment</key>
+	<string>development</string>
 </dict>
 </plist>

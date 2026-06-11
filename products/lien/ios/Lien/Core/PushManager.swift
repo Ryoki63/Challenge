@@ -28,4 +28,19 @@ final class PushManager: PushAuthorizing {
         }
         return granted
     }
+
+    /// 起動時フック(issue #8 準備②): 既に許可済みなら OS ダイアログを出さずに
+    /// APNs 登録を(再)実行する。トークンは変わり得るため毎起動で呼んでよい。
+    /// 未決定・拒否なら何もしない(ダイアログはオンボのプレ許可画面だけが出す)
+    func registerForRemoteNotificationsIfAuthorized() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            await MainActor.run {
+                UIApplication.shared.registerForRemoteNotifications()
+            }
+        default:
+            break
+        }
+    }
 }

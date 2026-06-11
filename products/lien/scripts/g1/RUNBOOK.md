@@ -127,8 +127,9 @@ curl -sS -X POST "https://lniheehfbtpfhglinfjm.supabase.co/functions/v1/checkin-
 - 2台の UDID を Developer サイトに登録 → ad-hoc プロビジョニングプロファイル+配布証明書を作成 → CI(GitHub Actions macos)で署名付きビルド → IPA を Apple Configurator 等で導入
 - 証明書・プロファイルの secrets 管理が必要で手間が多い。Mac が使えるなら経路Aを推奨
 
-**push トークンの取得と登録**:
-- アプリの APNs 登録(remote notification 登録+トークン表示)は **T08準備②のハーネス(別タスク)** が担う。導入後、各端末のデバイストークンをコピーし、seed-pair.sh の引数(`bash seed-pair.sh <tokenA> <tokenB>`)か、seed 出力末尾の PATCH コマンドで `users.push_token` に設定する
+**push トークンの取得と登録**(T08準備②のハーネス実装済み):
+- アプリは通知許可後に APNs 登録を行う(オンボの通知許可直後+許可済みなら毎起動時に再登録)。**DEBUG ビルドではオンボ完了後の画面(solo/paired)に「Device Token(G1計測用)」**が hex 文字列で表示される(未取得時は「未取得(通知許可後に表示)」)
+- 各端末で「コピー」を押してトークンを取得し、seed-pair.sh の引数(`bash seed-pair.sh <tokenA> <tokenB>`)か、seed 出力末尾の PATCH コマンドで `users.push_token` に設定する(hex 文字列をそのまま渡してよい)
 - 計測に最低限必要なのは**デバイスB(観察側)のトークンのみ**(push は A→B 方向)
 
 **ウィジェット配置**: デバイスBのホーム画面長押し → 「+」→ Lien ウィジェット(S)を配置。

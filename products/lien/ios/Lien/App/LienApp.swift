@@ -7,6 +7,9 @@ import SwiftUI
 
 @main
 struct LienApp: App {
+    /// リモート通知登録コールバックの受け口(issue #8 準備② — AppDelegate.swift)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     private let authService: AuthServicing
     private let pushAuthorizer: PushAuthorizing
 
@@ -71,6 +74,10 @@ struct RootView: View {
                 .foregroundStyle(.secondary)
             Text("Lien")
                 .font(.title2)
+            #if DEBUG
+            // G1 計測用ハーネス(issue #8 準備②)。Release には含まれない
+            DeviceTokenDebugView()
+            #endif
         }
     }
 }
