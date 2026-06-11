@@ -139,6 +139,8 @@
 - 節目: **T11完了**(commit 6eafd27・lien-ios CI初回緑)→ #11 close。招待3導線+DeepLink+web/invite静的ページ。残作業=実HTTP結線(T08後)とPages配備(G3前)を#11に記録
 - 続行: レーンA次=T12(約束設定UI+functions promise-set)に着手。promise-setはスモークでservice_role直書きしていた約束作成の正式API化でもある
 - 節目: **T12完了**(commit 8427dec・deno 153件緑・iOS CI緑・ともに初回パス)→ #12 close。**promise-set を本番デプロイ**(live 8本)。続けてT13(ホーム画面)へ — トーン未定のためv0スプライトをプレースホルダ使用(G2確定後に差替)
+- 節目: **T13完了**(commit 24bc37b)→ #13 close。CI赤1回: PlantAssetsカタログ追加でactool初起動→xcodegen既定のAppIcon要求未充足 → icon_1024.pngで単一サイズAppIcon追加(f01c1a4)→ 緑。ホーム画面+PlantSprite一元解決+テスト16件
+- 続行: レーンA次=T14(チェックインフロー+オフラインキュー+写真+当日取消。migration 0002オーナー)に着手
 
 ## 2026-06-11 (サブエージェント) — T08準備①: デプロイ自動化+G1計測ハーネス (#8/#50 レーンB)
 - 着手: config.toml / deploy.sh / lien-deploy.yml / g1ハーネス(seed-pair.sh, measure.sh, RUNBOOK.md) / .env.example を整備する(実行はしない。git操作はオーケストレータ)
