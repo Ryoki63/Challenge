@@ -112,6 +112,15 @@
 ## 2026-06-11 (対話) — G0部分解放: Supabaseプロジェクト作成 → T08バックエンド前倒し
 - 着手: ユーザーがSupabaseサインイン+プロジェクト作成完了(ref: lniheehfbtpfhglinfjm)。Apple Developer加入はまだ
 - 方針: いま可能になった範囲を即消化 — CLI認証確認 → config.toml作成+link → migration適用 → functions 7本デプロイ → 匿名サインイン有効化 → curlスモークテスト(APNs secretsはApple Developer待ちのため後回し、pushスキップ動作を確認)
+- 判明: CLIは未認証(ダッシュボードサインインのみ)。非TTYで `supabase login` 不可 → ユーザーにターミナル実行 or トークンを.envへ、を依頼(#8コメント)
+- 実施: その間にT08準備①(トークン不要分)をエージェント委譲 → config.toml(verify_jwt=false×7)+deploy.sh+lien-deploy.yml+G1ハーネス(seed/measure/RUNBOOK)+.env.example を作成・検証・commit+push(20eacd5)
+- 発見: promises書込はservice_roleのみ=G1 seedにSERVICE_ROLE_KEY経路必須 / checkinは同日冪等→計測はcheckin→cancel→checkin方式 / 匿名サインイン=POST /auth/v1/signup 空data
+
+## 2026-06-11 (対話) — G2第2回差し戻し「まだキモい」→ ヒアリング → v3制作+T10並行着手
+- 差し戻し: v2の4案とも「まだキモい」。対話でヒアリング実施
+- ユーザー回答: 最寄り案=**B レトロたまごっち** / キモい主犯=**全部**(顔・ドットの粗さ・形・色)/ 製法=**高解像度ドット絵**
+- v3方針: 48×64px級・Bの太輪郭路線を踏襲・**手描きグリッド廃止→プロシージャル描画**(幾何計算→パレット量子化→輪郭抽出→セルシェード)で対称性と造形品質を計算で保証。v3_drafts/style_{e,f,g} の3バリエを並列制作(各デザイナー自己視認3回以上改良)
+- 並行: Wave 4 レーンA先頭の T10(匿名認証+オンボ3画面)もエージェント着手(ios/のみ・アセットと無競合。検証はCI)
 
 ## 2026-06-11 (サブエージェント) — T08準備①: デプロイ自動化+G1計測ハーネス (#8/#50 レーンB)
 - 着手: config.toml / deploy.sh / lien-deploy.yml / g1ハーネス(seed-pair.sh, measure.sh, RUNBOOK.md) / .env.example を整備する(実行はしない。git操作はオーケストレータ)
