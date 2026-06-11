@@ -129,6 +129,9 @@ PAIR_ID="$(json_get "$RES_ACCEPT" pairId)"
 echo "    pair_id: $PAIR_ID"
 
 # ---- 4. 約束(promise)作成 — checkin の前提条件 -------------------------------
+# NOTE(T12): promise-set Function が入ったため、デプロイ済み環境ならユーザーJWTで
+#   POST /functions/v1/promise-set {"title":...,"emoji":...} でも作成できる(service_role 不要)。
+#   本スクリプトは promise-set 未デプロイの環境でも動くよう service_role 直書きのまま。
 echo "==> 4/4 promises 行を作成(checkin は現役の約束が無いと 409 no_promise)"
 if [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
   api POST "$SUPABASE_URL/rest/v1/promises" 201 \

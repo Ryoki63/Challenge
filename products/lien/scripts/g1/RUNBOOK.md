@@ -79,7 +79,7 @@ set -a; source .env; set +a
 bash products/lien/scripts/deploy.sh
 ```
 
-成功すると: migration 0001 が適用され、Edge Functions 7本(checkin / checkin-cancel / snapshot / invite-create / invite-accept / close-day / grant-tickets)が verify_jwt=false でデプロイされる。
+成功すると: migration 0001 が適用され、Edge Functions 8本(checkin / checkin-cancel / snapshot / invite-create / invite-accept / promise-set / close-day / grant-tickets)が verify_jwt=false でデプロイされる。
 
 ## 5. スモークテスト(15分)
 
@@ -87,7 +87,7 @@ bash products/lien/scripts/deploy.sh
 
 ```bash
 export SUPABASE_ANON_KEY='<anon key>'
-export SUPABASE_SERVICE_ROLE_KEY='<service_role key>'   # promises 作成に必要
+export SUPABASE_SERVICE_ROLE_KEY='<service_role key>'   # promises 作成に必要(promise-set デプロイ済み環境ならユーザーJWTで POST /functions/v1/promise-set でも可 — T12)
 bash products/lien/scripts/g1/seed-pair.sh
 ```
 
@@ -157,7 +157,7 @@ bash products/lien/scripts/g1/measure.sh
 |---|---|
 | seed の signup が 422 `anonymous_provider_disabled` | 手順3(Anonymous sign-ins)が未実施 |
 | functions が 401 | JWT 失効(匿名セッション約1時間)→ refresh か seed やり直し |
-| checkin が 409 `no_promise` | promises 未作成 → `SUPABASE_SERVICE_ROLE_KEY` 付きで seed-pair.sh を再実行(promises への書き込みは service_role のみ。クライアント書き込みは RLS/GRANT で deny — migration 0001) |
+| checkin が 409 `no_promise` | promises 未作成 → `SUPABASE_SERVICE_ROLE_KEY` 付きで seed-pair.sh を再実行(promises への直接書き込みは service_role のみ。クライアント書き込みは RLS/GRANT で deny — migration 0001)。promise-set Function デプロイ済みならユーザーJWTで `POST /functions/v1/promise-set`(T12)でも作成できる |
 | push がデバイスBに届かない | ① `supabase secrets list` で APNs 5変数を確認 ② `APNS_ENV` の sandbox/production がビルド配布経路と一致しているか(Xcode直=sandbox) ③ `users.push_token` がデバイスBの最新トークンか ④ `supabase functions logs checkin` で送信結果を確認 |
 | db push が失敗 | `SUPABASE_DB_PASSWORD` の誤り → Dashboard でリセットして GitHub secret も更新 |
 | close-day を手動で叩きたい | `Authorization: Bearer <service_role key>` の**完全一致**が必要(Edge Runtime が注入する `SUPABASE_SERVICE_ROLE_KEY` と同じ値 = Dashboard の legacy `service_role` キー)。一致しない場合は 401 |

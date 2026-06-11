@@ -116,4 +116,38 @@ enum Strings {
         static let errorNetwork =
             "通信がうまくいきませんでした。もう一度お試しください"
     }
+
+    /// 約束設定画面(REQUIREMENTS §3.3 / T12)。罰・恥系の表現は使わない(§3.5)
+    enum PromiseSetup {
+        static let title = "あなたの約束をきめよう"
+        static let subtitle = "毎日続けたいことを、ひとつだけ。\nあとからいつでも変えられます。"
+
+        // タイトル入力
+        static let titleSectionTitle = "約束"
+        static let titlePlaceholder = "例: まいにち散歩(20文字まで)"
+        static let titleEmptyError = "約束を入力してね"
+        static let titleTooLongError = "約束は20文字までです"
+
+        // 絵文字選択
+        static let emojiSectionTitle = "絵文字をえらんでね"
+
+        // リマインド(任意。ローカル通知のスケジューリングは T16)
+        static let remindSectionTitle = "リマインド"
+        static let remindToggleLabel = "毎日そっとお知らせ"
+        static let remindTimeLabel = "時刻"
+
+        // 保存
+        static let saveButton = "この約束にする"
+        /// 寛容設計の一言(§3.3: 約束を変えてもストリークは継続)
+        static let editKeepsStreakNote = "約束を変えても、ふたりの記録はそのまま続きます"
+        // 送信エラー(リトライ可能。責めない文言 — REQUIREMENTS §3.5)
+        static let saveErrorMessage = "通信がうまくいきませんでした。もう一度お試しください"
+
+        /// 約束の絵文字パレット(固定候補。サーバー側は長さ上限のみの検査 — issue #12)
+        static let emojiPalette: [String] = [
+            "💪", "🏃", "🚶", "🧘", "📚", "✍️", "🗣️", "🎹",
+            "💧", "🌿", "🍎", "🥗", "🛏️", "🦷", "🧹", "☀️",
+            "💊", "🤸", "🚴", "🏊", "🎨", "📷", "💌", "🌙",
+        ]
+    }
 }

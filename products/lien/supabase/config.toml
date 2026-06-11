@@ -4,7 +4,7 @@
 # project_id はリモートプロジェクトの ref(G0 でユーザーが作成。issue #38)。
 # `supabase link --project-ref` は deploy.sh が行う。
 #
-# verify_jwt = false の理由(全7関数共通):
+# verify_jwt = false の理由(全関数共通):
 #   各 function は内部で自己認証する(ユーザー系は adminClient.auth.getUser(token)、
 #   cron 系の close-day / grant-tickets は SERVICE_ROLE_KEY との完全一致比較)。
 #   gateway の JWT 検証を有効にすると、新キー体系(sb_secret_...)は JWT ではないため
@@ -25,6 +25,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.invite-accept]
+verify_jwt = false
+
+[functions.promise-set]
 verify_jwt = false
 
 [functions.close-day]

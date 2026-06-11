@@ -192,6 +192,7 @@ B端末: LienNSE 起動(通知表示の前に実行される)
 | checkin-cancel | POST | dateLocal | 当日のみ削除 → 相手へサイレント更新 |
 | invite-create | POST | — | token発行(8桁, 72h, 1回限り) |
 | invite-accept | POST | token | ペア作成(双方が未ペアであること検査) → 両者へpush |
+| promise-set | POST | title, emoji, remindAt? | 自分の現役の約束を upsert(編集は同一 promise_id への UPDATE = checkins の FK 継続でストリーク非影響 — REQUIREMENTS §3.3)→ ペアなら相手へサイレント更新(2026-06-11 実装同期・T12。§5.2「書き込みは Function 経由」のギャップを充足) |
 | nudge | POST | stamp | 1日3回制限 → 相手へpush(文言は messages.ts からサーバーが選ぶ) |
 | react | POST | checkinId, stamp | リアクション保存 → 相手へpush |
 | snapshot | GET | — | 自分視点の PairSnapshot(起動時の自己修復用) |
