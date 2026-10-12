@@ -12,12 +12,18 @@ SWIFT_VERSION = 5.0
 TARGETED_DEVICE_FAMILY = 1
 
 // ---- バージョン(Info.plist の $(MARKETING_VERSION) / $(CURRENT_PROJECT_VERSION) が参照)
-MARKETING_VERSION = 0.1.0
+// MARKETING_VERSION = ストアに表示される版(x.y.z。v1.0 の初回提出は 1.0.0)。
+// CURRENT_PROJECT_VERSION = ビルド番号。ローカルは 1 のまま。TestFlight に上げるビルドは
+// lien-release が github.run_number をコマンドラインで上書きする(同じ版の中で単調増加が必須)
+MARKETING_VERSION = 1.0.0
 CURRENT_PROJECT_VERSION = 1
 
 // ---- Supabase 接続情報の既定値(空)
-// CI には Secrets.xcconfig が無いが、空のままでもビルドは通る(DESIGN §7)。
+// CI(lien-ios)には Secrets.xcconfig が無いが、空のままでも Debug ビルド・テストは通る(DESIGN §7)。
 // 実値は Secrets.xcconfig(gitignore 済み)が下の optional include で上書きする。
+// 空のまま作った **Release ビルドは起動時に明示エラーで止まる**(Config.MissingPolicy — issue #28)。
+// TestFlight 用の archive は lien-release が GitHub Secrets から Secrets.xcconfig を作り、
+// archive の Info.plist に値が入っていることを検査してからアップロードする(ios/README.md)。
 SUPABASE_URL =
 SUPABASE_ANON_KEY =
 

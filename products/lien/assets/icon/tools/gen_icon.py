@@ -11,8 +11,10 @@ Pillow 不要 / Python 3.9+。
     PNG は color type 2(RGB・アルファなし)で書く。角丸は Apple 側が適用する
   - パレットは gen_sprites.py の PALETTE と同一の色 + 背景色(あたたかいオフホワイト)
 
+【2026-10-13 廃止予定の旧ツール】本番アイコンは v4「タネの子」(空色)に差し替えた(issue #28 / D1)。
+本番の ../icon_1024.png はこのツールでは書かない(README.md 参照)。旧ネオドット絵の下書きだけを出力する。
+
 出力:
-  ../icon_1024.png                       本命(draft B: 鉢の相棒 + 双葉 + ハート)
   ../icon_drafts/draft_a_bloom_1024.png  A案: 開花クローズアップ
   ../icon_drafts/draft_b_buddy_1024.png  B案: 鉢の相棒(本命)
   ../icon_drafts/draft_c_heart_1024.png  C案: 双葉ハート(シンボル)
@@ -145,7 +147,7 @@ DRAFTS = [
     ("draft_b_buddy", DRAFT_B, DRAFT_B_EXTRA),
     ("draft_c_heart", DRAFT_C, DRAFT_C_EXTRA),
 ]
-CHOSEN = "draft_b_buddy"  # 本命 → icon_1024.png(G4で差し替え可)
+CHOSEN = "draft_b_buddy"  # 旧本命(v4 に置き換え済み。参考として残す)
 
 
 # ---------------------------------------------------------------------------
@@ -236,29 +238,19 @@ def main():
         write_png_rgb(os.path.join(DRAFT_DIR, name + "_1024.png"),
                       SIZE, SIZE, grid_to_rgb_rows(grid, SCALE))
 
-    # 本命を icon_1024.png に
-    write_png_rgb(os.path.join(ICON_DIR, "icon_1024.png"),
-                  SIZE, SIZE, grid_to_rgb_rows(grids[CHOSEN], SCALE))
+    # 本番の icon_1024.png は v4(空色)に差し替え済み。旧下書きの再生成で上書きしない(issue #28)
 
     sheet, sw, sh = make_contact_sheet([grids[n] for n, _, _ in DRAFTS])
     write_png_rgb(os.path.join(DRAFT_DIR, "contact_sheet.png"), sw, sh, sheet)
 
     # --- 自己検証: 寸法 1024x1024 / 8bit / color type 2(RGB・透過なし) ---
-    targets = [os.path.join(ICON_DIR, "icon_1024.png")]
-    targets += [os.path.join(DRAFT_DIR, n + "_1024.png") for n, _, _ in DRAFTS]
+    targets = [os.path.join(DRAFT_DIR, n + "_1024.png") for n, _, _ in DRAFTS]
     for path in targets:
         w, h, depth, ctype = read_png_header(path)
         assert (w, h) == (SIZE, SIZE), "%s: %dx%d != %dx%d" % (path, w, h, SIZE, SIZE)
         assert depth == 8 and ctype == 2, "%s: depth=%d ctype=%d (RGB必須)" % (path, depth, ctype)
     w, h, depth, ctype = read_png_header(os.path.join(DRAFT_DIR, "contact_sheet.png"))
     assert (w, h) == (sw, sh) and ctype == 2
-    # 本命 = 選択ドラフトのバイト一致
-    with open(os.path.join(ICON_DIR, "icon_1024.png"), "rb") as f:
-        chosen_bytes = f.read()
-    with open(os.path.join(DRAFT_DIR, CHOSEN + "_1024.png"), "rb") as f:
-        assert chosen_bytes == f.read(), "icon_1024.png != %s" % CHOSEN
-
-    print("OK: icon_1024.png (%dx%d, RGB, chosen=%s)" % (SIZE, SIZE, CHOSEN))
     print("OK: %d drafts + contact_sheet (%dx%d) -> %s" % (len(DRAFTS), sw, sh, DRAFT_DIR))
     return 0
 

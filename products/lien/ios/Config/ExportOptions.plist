@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- lien-release が `xcodebuild -exportArchive -exportOptionsPlist` に渡す書き出し設定(issue #28)。
+	     - app-store-connect + upload: 書き出しと同時に App Store Connect(TestFlight)へアップロードする
+	     - automatic: ASC API キーのクラウド署名(-allowProvisioningUpdates -authenticationKey*)。証明書・プロファイルは
+	       Apple 側が管理するので、CI に証明書を置かない。配布署名のときに aps-environment は production に差し替わる
+	     - teamID: ここは雛形(REPLACE_WITH_APPLE_TEAM_ID)。lien-release が secrets の APPLE_TEAM_ID を実行時に差し込む。
+	       チーム ID をコミットしない
+	     - manageAppVersionAndBuildNumber = false: ビルド番号は CI の github.run_number。Xcode に書き換えさせない -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>upload</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>teamID</key>
+	<string>REPLACE_WITH_APPLE_TEAM_ID</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>
