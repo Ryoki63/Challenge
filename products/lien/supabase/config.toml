@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.react]
 verify_jwt = false
+
+[functions.plant-name]
+verify_jwt = false

@@ -221,10 +221,12 @@ function makeRepo(db: SupabaseClient): CloseDayRepo {
       if (error) throw error;
     },
 
-    async updatePlantGrowth(pairId, grownDays, stage): Promise<void> {
+    async updatePlantGrowth(pairId, grownDays): Promise<void> {
+      // stage は書かない(plants.stage の CHECK(0〜5)は10段階に合わない。
+      // 表示用の段階は snapshot が streak_days から計算する — GROWTH §7.2)
       const { error } = await db
         .from("plants")
-        .update({ grown_days: grownDays, stage })
+        .update({ grown_days: grownDays })
         .eq("pair_id", pairId);
       if (error) throw error;
     },

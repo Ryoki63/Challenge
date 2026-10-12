@@ -144,14 +144,18 @@ function makeWorld(overrides: Partial<World> = {}): World {
       memberIds: ["user-a", "user-b"],
     },
     checkins: new Map(),
+    // 確定済みの連続5日(6/5〜6/9)+途切れた前の1日(6/2)= ふたり達成 6 回(わかば(7回)の一歩手前)。
+    // 成長回数は streak_days の both の行数から数える(GROWTH §7.2)
     streakDays: bothDays(
+      "2026-06-02",
       "2026-06-05",
       "2026-06-06",
       "2026-06-07",
       "2026-06-08",
       "2026-06-09",
     ),
-    plant: { grownDays: 13, name: "みどり" },
+    // grown_days は控え。snapshot は読まない(わざと行数と違う値にして、読んでいないことを検知する)
+    plant: { grownDays: 99, name: "みどり" },
     ...overrides,
   };
 }
@@ -190,7 +194,10 @@ Deno.test("checkin-cancel: 当日削除成功 — 削除後snapshot返却+相手
     partnerName: "ゆうき",
     partnerPromiseTitle: "ランニング",
     partnerPromiseEmoji: "🏃",
-    plantStage: 2,
+    plantStage: 2, // ふたり達成 6 回 = めばえ(3 回〜)
+    plantGrownDays: 6,
+    plantStageFloor: 3,
+    plantNextStageAt: 7,
     plantMood: "normal",
     plantName: "みどり",
     hasPartnerPhotoToday: false,
@@ -236,7 +243,12 @@ Deno.test("checkin-cancel: 両者完了からの取消 — プレビュー+1とh
   assertEquals(s.todayMeDone, false);
   assertEquals(s.todayPartnerDone, true);
   assertEquals(s.streakCurrent, 5, "両者達成プレビュー(6)が確定値5に戻る");
-  assertEquals(s.plantStage, 2, "プレビュー昇格(14日)が13日に戻り双葉のまま");
+  assertEquals(
+    s.plantStage,
+    2,
+    "先取りしていた昇格(6+1=7 回でわかば)が6回に戻り、めばえのまま(GROWTH §3.2: 当日の取消は戻る)",
+  );
+  assertEquals(s.plantGrownDays, 6, "先取りの1回分が戻る");
   assertEquals(s.plantMood, "fidget", "片方未完のそわそわに戻る");
 
   assertEquals(sent.length, 1);
@@ -245,6 +257,11 @@ Deno.test("checkin-cancel: 両者完了からの取消 — プレビュー+1とh
   assertEquals(partnerView.todayMeDone, true, "B 自身は完了のまま");
   assertEquals(partnerView.todayPartnerDone, false, "B 視点で相手(A)は未完に");
   assertEquals(partnerView.streakCurrent, 5);
+  assertEquals(
+    partnerView.plantGrownDays,
+    6,
+    "相手視点の snapshot も先取りが戻る",
+  );
   assertEquals(partnerView.plantMood, "fidget");
 });
 
@@ -360,6 +377,9 @@ Deno.test("checkin-cancel: ソロ状態(未ペア)でも自分のcheckin削除�
     partnerPromiseTitle: null,
     partnerPromiseEmoji: null,
     plantStage: 0,
+    plantGrownDays: 0,
+    plantStageFloor: 0,
+    plantNextStageAt: null,
     plantMood: "normal",
     plantName: null,
     hasPartnerPhotoToday: false,

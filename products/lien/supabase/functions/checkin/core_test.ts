@@ -162,14 +162,18 @@ function makeWorld(overrides: Partial<World> = {}): World {
       memberIds: ["user-a", "user-b"],
     },
     checkins: new Map(),
+    // 確定済みの連続5日(6/5〜6/9)+途切れた前の1日(6/2)= ふたり達成 6 回(わかば(7回)の一歩手前)。
+    // 成長回数は streak_days の both の行数から数える(GROWTH §7.2)
     streakDays: bothDays(
+      "2026-06-02",
       "2026-06-05",
       "2026-06-06",
       "2026-06-07",
       "2026-06-08",
       "2026-06-09",
     ),
-    plant: { grownDays: 13, name: "みどり" },
+    // grown_days は控え。snapshot は読まない(わざと行数と違う値にして、読んでいないことを検知する)
+    plant: { grownDays: 99, name: "みどり" },
     signedUploadPaths: [],
     ...overrides,
   };
@@ -207,7 +211,10 @@ Deno.test("checkin: 初回(相手未完)— 自分用snapshot返却+相手へ可
     partnerName: "ゆうき",
     partnerPromiseTitle: "ランニング",
     partnerPromiseEmoji: "🏃",
-    plantStage: 2,
+    plantStage: 2, // ふたり達成 6 回 = めばえ(3 回〜)
+    plantGrownDays: 6,
+    plantStageFloor: 3,
+    plantNextStageAt: 7,
     plantMood: "fidget",
     plantName: "みどり",
     hasPartnerPhotoToday: false,
@@ -258,7 +265,14 @@ Deno.test("checkin: 2人目の完了で両者達成 — プレビュー+1・happ
     "確定5+今日両者完了で6(DESIGN §5.4 プレビュー)",
   );
   assertEquals(s.streakBest, 6);
-  assertEquals(s.plantStage, 3, "累計13+1=14日で若葉");
+  assertEquals(
+    s.plantStage,
+    3,
+    "ふたり達成 6 + 今日の先取り 1 = 7 回でわかばに昇格",
+  );
+  assertEquals(s.plantGrownDays, 7);
+  assertEquals(s.plantStageFloor, 7);
+  assertEquals(s.plantNextStageAt, 14);
   assertEquals(s.plantMood, "happy");
 
   assertEquals(sent.length, 1);
@@ -268,6 +282,8 @@ Deno.test("checkin: 2人目の完了で両者達成 — プレビュー+1・happ
   assertEquals(partnerView.todayMeDone, true);
   assertEquals(partnerView.todayPartnerDone, true);
   assertEquals(partnerView.streakCurrent, 6);
+  assertEquals(partnerView.plantStage, 3, "相手視点の snapshot も同じ成長回数");
+  assertEquals(partnerView.plantGrownDays, 7);
   assertEquals(partnerView.plantMood, "happy");
 });
 
@@ -441,6 +457,9 @@ Deno.test("checkin: ソロ状態 — pairId null の snapshot・push なし", as
     partnerPromiseTitle: null,
     partnerPromiseEmoji: null,
     plantStage: 0,
+    plantGrownDays: 0,
+    plantStageFloor: 0,
+    plantNextStageAt: null,
     plantMood: "normal",
     plantName: null,
     hasPartnerPhotoToday: false,
@@ -694,6 +713,13 @@ Deno.test("checkin: ペア成立当日(履歴なし)— streak はプレビュ�
     1,
     "今日の両者達成プレビュー",
   );
-  assertEquals(result.body.snapshot.plantStage, 0, "累計0+1=1日はまだ種");
+  assertEquals(
+    result.body.snapshot.plantStage,
+    1,
+    "ふたり達成 0 + 今日の先取り 1 = 1 回で、成立当日にふたばになる(最初の成功をすぐ返す — GROWTH §3.3)",
+  );
+  assertEquals(result.body.snapshot.plantGrownDays, 1);
+  assertEquals(result.body.snapshot.plantStageFloor, 1);
+  assertEquals(result.body.snapshot.plantNextStageAt, 3);
   assertEquals(result.body.snapshot.plantMood, "happy");
 });

@@ -5,7 +5,7 @@
 //
 // 確定処理(前日 d を処理):
 //   1. pairs.status='active' かつ started_on <= d のペアを列挙
-//   2. 両者 checkin あり → streak_days(d,'both') upsert(+植物の成長 grown_days+1)
+//   2. 両者 checkin あり → streak_days(d,'both') upsert(+ plants.grown_days を both の行数で数え直す)
 //   3. 欠けあり → ticket_balance > 0 なら balance-1・streak_days(d,'ticket') upsert・
 //      ledger に consume 記録・両者へ ticket_used push(事前お休み宣言済みなら追加消費なし)
 //   4. チケットなし → 行を作らない(=途切れ)。streak_reset イベント記録。
@@ -20,8 +20,13 @@
 //   - reset(行なし)の再実行は再び reset 分岐に入るが、書き込みが無いので
 //     実害は push の再送のみ。index 側の cron は1日1回なので許容
 //
-// 植物の成長(REQUIREMENTS §3.9): grown_days は「ふたり達成日の累計」なので
-// kind='both' の確定時のみ +1(ticket の日はストリーク継続だが達成日ではない)。
+// 植物の成長(REQUIREMENTS §3.9 / GROWTH §7.2): 成長回数は「ふたり達成日の累計」なので
+// kind='both' の確定時だけ増える(ticket の日はストリーク継続だが達成日ではない)。
+// 表示用の段階は snapshot が streak_days の both の行数から計算する。close-day が plants に書くのは
+// grown_days(分析用と v1.1 用の控え)だけで、**stage は書かない**:
+//   - plants.stage の CHECK(0〜5)は 10段階に合わない(6 以上を書くと違反して、行は書けたのに
+//     成長だけ失敗し、再実行も already_finalized で飛ばされて永久に欠ける)
+//   - 「+1」ではなく both の行数を数え直して書く(書き込みが一度失敗しても次回で追いつく)
 
 import {
   assertDateLocal,
@@ -31,9 +36,9 @@ import {
 } from "../_shared/streak.ts";
 import {
   addDaysLocal,
+  countBothDays,
   dateLocalInTimeZone,
   DEFAULT_TIMEZONE,
-  derivePlantStage,
   loadSnapshotForUser,
   type SnapshotRepo,
 } from "../_shared/snapshot.ts";
@@ -85,12 +90,11 @@ export interface CloseDayRepo extends SnapshotRepo {
     reason: "consume";
     dateLocal: string;
   }): Promise<void>;
-  /** plants.grown_days / stage の更新(kind='both' 確定時のみ呼ばれる) */
-  updatePlantGrowth(
-    pairId: string,
-    grownDays: number,
-    stage: number,
-  ): Promise<void>;
+  /**
+   * plants.grown_days の更新(kind='both' 確定時のみ呼ばれる)。値は streak_days の both の行数。
+   * **stage は書かない**(引数に無い。plants.stage の CHECK(0〜5)に触れないため — GROWTH §7.2)
+   */
+  updatePlantGrowth(pairId: string, grownDays: number): Promise<void>;
   /**
    * streak_reset イベントの記録(DESIGN §5.4 手順4)。
    * 専用テーブルが未定義のため実装は構造化ログでよい(followup 参照)
@@ -205,17 +209,18 @@ async function closeOnePair(
   // 1. skip(確定済み or 対象外)— 何も書かない・送らない(再実行の冪等性)
   if (decision.action === "skip") return "skip";
 
-  // 2. 両者達成 → streak_days(d,'both') + 植物の成長(ふたり達成の累計 +1)。
-  //    push は不要(両者とも checkin 時に partner_checkin を受け取っている)
+  // 2. 両者達成 → streak_days(d,'both') + grown_days の数え直し(GROWTH §7.2)。
+  //    push は不要(両者とも checkin 時に partner_checkin を受け取っている)。
+  //    行の書き込みの後で数えるので、今日の分を含む。plants の更新だけが失敗しても、
+  //    表示(snapshot)は行から数えるので成長は欠けず、grown_days も次の確定で追いつく。
+  //    ※ listStreakDays は PostgREST の既定の上限(1000行 ≒ 2.7年分)で切られる。
+  //      v1.0 では問題ないが、v1.x のうちに件数を数える問い合わせ(count)に置き換える
   if (decision.action === "record" && decision.kind === "both") {
     await deps.repo.upsertStreakDay(pair.pairId, dateLocal, "both");
-    const plant = await deps.repo.getPlant(pair.pairId);
-    const grownDays = (plant?.grownDays ?? 0) + 1;
-    await deps.repo.updatePlantGrowth(
-      pair.pairId,
-      grownDays,
-      derivePlantStage(grownDays),
+    const grownDays = countBothDays(
+      await deps.repo.listStreakDays(pair.pairId),
     );
+    await deps.repo.updatePlantGrowth(pair.pairId, grownDays);
     return "both";
   }
 

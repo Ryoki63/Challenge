@@ -66,7 +66,10 @@ interface World {
     reason: string;
     dateLocal: string;
   }>;
-  plants: Map<string, { grownDays: number; stage: number }>;
+  /** plants.grown_days(控え)。stage は close-day が書かないので持たない(GROWTH §7.2) */
+  plants: Map<string, { grownDays: number }>;
+  /** updatePlantGrowth に渡された生の引数(stage を渡していないことの検査用) */
+  plantWrites: unknown[][];
   resets: Array<{ pairId: string; dateLocal: string }>;
   /** このペアIDの getStreakDay を throw させる(エラー隔離テスト用) */
   failPairIds: Set<string>;
@@ -134,8 +137,10 @@ function makeRepo(world: World): CloseDayRepo {
       world.ledger.push({ ...params });
       return Promise.resolve();
     },
-    updatePlantGrowth: (pairId, grownDays, stage) => {
-      world.plants.set(pairId, { grownDays, stage });
+    updatePlantGrowth: (...args: unknown[]) => {
+      world.plantWrites.push(args);
+      const [pairId, grownDays] = args as [string, number];
+      world.plants.set(pairId, { grownDays });
       return Promise.resolve();
     },
     recordStreakReset: (pairId, dateLocal) => {
@@ -205,7 +210,10 @@ function makeWorld(overrides: Partial<World> = {}): World {
     streakDays: new Map(),
     declares: new Set(),
     ledger: [],
-    plants: new Map([["pair-1", { grownDays: 13, stage: 2 }]]),
+    // grown_days は控え。わざと行数(5)と違う古い値にして、close-day が「+1」ではなく
+    // both の行数で数え直すことを検査する(GROWTH §7.2)
+    plants: new Map([["pair-1", { grownDays: 13 }]]),
+    plantWrites: [],
     resets: [],
     failPairIds: new Set(),
     ...overrides,
@@ -240,7 +248,7 @@ Deno.test("close-day: 既定の対象日は JST の前日(00:10 JST 実行 → d
   assertEquals(result.body.dateLocal, D);
 });
 
-Deno.test("close-day: 両者達成 → streak_days(d,'both')+植物の成長 grown_days+1(push なし)", async () => {
+Deno.test("close-day: 両者達成 → streak_days(d,'both')+ grown_days を both の行数で数え直す(push なし)", async () => {
   const world = makeWorld();
   world.checkins.add(`user-a|${D}`).add(`user-b|${D}`);
   const { sent, pusher } = makePusher();
@@ -253,8 +261,13 @@ Deno.test("close-day: 両者達成 → streak_days(d,'both')+植物の成長 gro
   assertEquals(world.streakDays.get(`pair-1|${D}`), "both");
   assertEquals(
     world.plants.get("pair-1"),
-    { grownDays: 14, stage: 3 },
-    "累計14日で若葉へ昇格(REQUIREMENTS §3.9)",
+    { grownDays: 6 },
+    "古い控え 13 に +1 ではなく、both の行数(6/5〜6/9 の 5 行 + 今回の 1 行)に数え直す",
+  );
+  assertEquals(
+    world.plantWrites,
+    [["pair-1", 6]],
+    "plants には pairId と grown_days の2引数だけを渡す(stage は書かない — GROWTH §7.2)",
   );
   assertEquals(world.ledger.length, 0);
   assertEquals(
@@ -286,8 +299,8 @@ Deno.test("close-day: 片方未達+チケットあり → balance-1・ledger con
   ]);
   assertEquals(world.plants.get("pair-1"), {
     grownDays: 13,
-    stage: 2,
-  }, "ticket の日は達成日ではないので植物は成長しない");
+  }, "ticket の日は達成日ではないので植物は成長しない(plants は触らない)");
+  assertEquals(world.plantWrites.length, 0);
 
   // 両者へ ticket_used push(snapshot 同梱・システム名義)
   assertEquals(sent.length, 2);
@@ -429,7 +442,16 @@ Deno.test("close-day: 再実行は冪等 — 2回目はすべて skip で何も�
   const d2 = deps(w2, p2);
   await handleCloseDay(d2, {});
   await handleCloseDay(d2, {});
-  assertEquals(w2.plants.get("pair-1"), { grownDays: 14, stage: 3 });
+  assertEquals(
+    w2.plants.get("pair-1"),
+    { grownDays: 6 },
+    "二重に数えない(行は1日1行)",
+  );
+  assertEquals(
+    w2.plantWrites.length,
+    1,
+    "確定済みの再実行は plants に書かない",
+  );
 });
 
 Deno.test("close-day: 対象外ペアは skip — started_on より前・dissolved(DESIGN §5.4-1)", async () => {
@@ -458,7 +480,7 @@ Deno.test("close-day: ペア成立当日(started_on = d)は判定対象(DESIGN �
   const world = makeWorld({
     pairs: [basePair({ startedOn: D })],
     streakDays: new Map(),
-    plants: new Map([["pair-1", { grownDays: 0, stage: 0 }]]),
+    plants: new Map([["pair-1", { grownDays: 0 }]]),
   });
   world.checkins.add(`user-a|${D}`).add(`user-b|${D}`);
   const { pusher } = makePusher();
@@ -469,6 +491,7 @@ Deno.test("close-day: ペア成立当日(started_on = d)は判定対象(DESIGN �
   if (result.status !== 200) throw new Error("unreachable");
   assertEquals(result.body.recordedBoth, 1);
   assertEquals(world.streakDays.get(`pair-1|${D}`), "both");
+  assertEquals(world.plants.get("pair-1"), { grownDays: 1 }, "成立日の1回目");
 });
 
 Deno.test("close-day: 1ペアの失敗は隔離 — 他ペアは処理されエラーは報告される", async () => {
@@ -484,8 +507,8 @@ Deno.test("close-day: 1ペアの失敗は隔離 — 他ペアは処理されエ�
     pairs: [pairNg, pairOk],
     streakDays: new Map(),
     plants: new Map([
-      ["pair-ok", { grownDays: 0, stage: 0 }],
-      ["pair-ng", { grownDays: 0, stage: 0 }],
+      ["pair-ok", { grownDays: 0 }],
+      ["pair-ng", { grownDays: 0 }],
     ]),
     failPairIds: new Set(["pair-ng"]),
   });
@@ -549,4 +572,65 @@ Deno.test("close-day: push が throw しても確定処理は成功扱い(DESIGN
   assertEquals(result.body.recordedTicket, 1);
   assertEquals(result.body.errors.length, 0);
   assertEquals(world.streakDays.get(`pair-1|${D}`), "ticket");
+});
+
+Deno.test("close-day: 10段階でも失敗しない — 30 回目(段階 6)でも plants には stage を渡さない(CHECK 0〜5 に触れない)", async () => {
+  // 旧実装は stage を書いていたため、段階 6 以上で plants.stage の CHECK(0〜5)に違反し、
+  // streak_days の行だけが書かれて成長が永久に欠けた(GROWTH §7.2)
+  const world = makeWorld({ streakDays: new Map() });
+  // 29 日分の達成済みの行(5/2〜5/30。連続していなくてもよい)
+  for (let i = 0; i < 29; i++) {
+    const day = new Date(Date.UTC(2026, 4, 2 + i)).toISOString().slice(0, 10);
+    world.streakDays.set(`pair-1|${day}`, "both");
+  }
+  world.checkins.add(`user-a|${D}`).add(`user-b|${D}`);
+  const { pusher } = makePusher();
+
+  const result = await handleCloseDay(deps(world, pusher), {});
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.recordedBoth, 1);
+  assertEquals(result.body.errors, []);
+  assertEquals(
+    world.plantWrites,
+    [["pair-1", 30]],
+    "30 回目。stage は渡さない",
+  );
+});
+
+Deno.test("close-day: grown_days に数えるのは both の行だけ — ticket の行は数えない", async () => {
+  const world = makeWorld({ streakDays: new Map() });
+  world.streakDays.set("pair-1|2026-06-05", "both");
+  world.streakDays.set("pair-1|2026-06-06", "ticket");
+  world.streakDays.set("pair-1|2026-06-07", "ticket");
+  world.streakDays.set("pair-1|2026-06-08", "both");
+  world.streakDays.set("pair-1|2026-06-09", "ticket");
+  world.checkins.add(`user-a|${D}`).add(`user-b|${D}`);
+  const { pusher } = makePusher();
+
+  await handleCloseDay(deps(world, pusher), {});
+
+  assertEquals(
+    world.plants.get("pair-1"),
+    { grownDays: 3 },
+    "both 2 行 + 今回の 1 行。ticket の 3 行はストリークは守るが植物は育てない",
+  );
+});
+
+Deno.test("close-day: plants の書き込みが前回失敗していても、次の確定で行数に追いつく(数え直し)", async () => {
+  // 前日までの both の行は 3 行あるのに、plants.grown_days は 0 のまま(書き込み失敗の名残)
+  const world = makeWorld({
+    streakDays: new Map(),
+    plants: new Map([["pair-1", { grownDays: 0 }]]),
+  });
+  world.streakDays.set("pair-1|2026-06-07", "both");
+  world.streakDays.set("pair-1|2026-06-08", "both");
+  world.streakDays.set("pair-1|2026-06-09", "both");
+  world.checkins.add(`user-a|${D}`).add(`user-b|${D}`);
+  const { pusher } = makePusher();
+
+  await handleCloseDay(deps(world, pusher), {});
+
+  assertEquals(world.plants.get("pair-1"), { grownDays: 4 });
 });

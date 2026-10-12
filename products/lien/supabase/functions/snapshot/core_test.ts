@@ -111,7 +111,8 @@ Deno.test("snapshot: 自分視点で返る(相手完了済み・写真あり →
       { dateLocal: "2026-06-08", kind: "both" },
       { dateLocal: "2026-06-09", kind: "ticket" },
     ],
-    plant: { grownDays: 7, name: "みどり" },
+    // grown_days は控え。snapshot は読まない(行から数える — GROWTH §7.2)
+    plant: { grownDays: 99, name: "みどり" },
   });
 
   const result = await handleSnapshot({ repo, now: () => NOW }, {
@@ -128,7 +129,14 @@ Deno.test("snapshot: 自分視点で返る(相手完了済み・写真あり →
   assertEquals(s.partnerPromiseTitle, "筋トレ");
   assertEquals(s.hasPartnerPhotoToday, true);
   assertEquals(s.streakCurrent, 2, "ticket の日も継続日(DESIGN §5.4)");
-  assertEquals(s.plantStage, 2, "累計7日=双葉");
+  assertEquals(
+    s.plantStage,
+    1,
+    "ふたり達成は 6/8 の 1 回だけ(6/9 は ticket の日で数えない)= ふたば",
+  );
+  assertEquals(s.plantGrownDays, 1);
+  assertEquals(s.plantStageFloor, 1);
+  assertEquals(s.plantNextStageAt, 3);
   assertEquals(s.plantMood, "fidget");
   assertEquals(s.updatedAt, "2026-06-10T03:00:00.000Z");
 });
@@ -150,6 +158,13 @@ Deno.test("snapshot: ソロ状態は pairId null・土だけ", async () => {
   assertEquals(result.body.snapshot.pairId, null);
   assertEquals(result.body.snapshot.todayMeDone, true);
   assertEquals(result.body.snapshot.plantStage, 0);
+  assertEquals(result.body.snapshot.plantGrownDays, 0);
+  assertEquals(result.body.snapshot.plantStageFloor, 0);
+  assertEquals(
+    result.body.snapshot.plantNextStageAt,
+    null,
+    "ソロはゲージを出さない",
+  );
   assertEquals(result.body.snapshot.plantMood, "normal");
 });
 

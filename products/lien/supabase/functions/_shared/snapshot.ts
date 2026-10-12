@@ -3,9 +3,13 @@
 // 正本:
 //   - スキーマ: docs/DESIGN.md §3.4(schemaVersion = 1。キー名は一字一句一致。変更時は要レビュー
 //     +JOURNAL に互換性影響を明記 — DESIGN §9-7)
-//   - 植物の成長/表情: docs/REQUIREMENTS.md §3.9
-//       成長(ふたり達成の累計日数): 種(0)→芽(3)→双葉(7)→若葉(14)→つぼみ(30)→開花(60)
-//       表情: normal / happy(両者完了)/ fidget(片方未完)/ sad(2日連続未達成)。枯れない・後退しない
+//   - 植物の成長/表情: docs/REQUIREMENTS.md §3.9 / docs/GROWTH.md(成長ルール v2。2026-10-12 承認)
+//       成長 = ふたり達成日の累計回数。10段階 [0,1,3,7,14,21,30,45,66,100]
+//         (たね→ふたば→めばえ→わかば→よりそい→つぼみ→いろづき→ほころび→ふたりざき→みのり)
+//       回数は streak_days の kind='both' の行数から数える(plants.grown_days / stage は読まない — §7.2)
+//         + 昨日の仮判定(§7.3)+ 今日の先取り
+//       表情: normal / happy(両者完了)/ fidget(片方未完)/ sad(=「すやすや」。ふたり達成もお休みチケットも
+//         ない日が昨日まで2日以上続く)。枯れない・後退しない
 //   - ストリーク導出: docs/DESIGN.md §5.4(確定は close-day。表示はプレビュー値)
 //
 // 設計:
@@ -48,43 +52,114 @@ export interface PairSnapshot {
   partnerName: string | null;
   partnerPromiseTitle: string | null;
   partnerPromiseEmoji: string | null;
-  /** 0 = 種(ソロは pairId=null で土を描画)〜 5 = 開花 */
+  /** 0 = たね(ソロは pairId=null で土を描画)〜 9 = みのり。PLANT_STAGE_THRESHOLDS の添字 */
   plantStage: number;
+  /** 成長回数(ふたり達成日の累計 + 昨日の仮判定 + 今日の先取り)。ソロは 0 */
+  plantGrownDays: number;
+  /** 今の段階に入るのに必要だった回数(= PLANT_STAGE_THRESHOLDS[plantStage])。ソロは 0 */
+  plantStageFloor: number;
+  /** 次の段階に必要な回数。次の段階が無い(みのり)ときとソロは null */
+  plantNextStageAt: number | null;
   plantMood: PlantMood;
   plantName: string | null;
   hasPartnerPhotoToday: boolean;
 }
 
-// ---- 植物の導出(REQUIREMENTS §3.9) ----
+// ---- 植物の導出(REQUIREMENTS §3.9 / GROWTH §3) ----
 
-/** 成長段階のしきい値(累計ふたり達成日数 → stage)。降順に評価する */
-export const PLANT_STAGE_THRESHOLDS: ReadonlyArray<
-  { stage: number; minGrownDays: number }
-> = [
-  { stage: 5, minGrownDays: 60 }, // 開花
-  { stage: 4, minGrownDays: 30 }, // つぼみ
-  { stage: 3, minGrownDays: 14 }, // 若葉
-  { stage: 2, minGrownDays: 7 }, // 双葉
-  { stage: 1, minGrownDays: 3 }, // 芽
-  { stage: 0, minGrownDays: 0 }, // 種(見た目は土と同一 — assets/plant/mapping.md)
+/**
+ * 成長段階の閾値。添字 = 段階番号、値 = その段階に入るのに必要な成長回数(ふたり達成日の累計)。
+ * 段階名(たね〜みのり)はアプリ側(Strings)の表示で、サーバーは番号と回数だけを返す。
+ *
+ * 調整のルール(GROWTH §3.6)。snapshot_test.ts のラチェットテスト(凍結基準)が機械的に守る:
+ *   - 閾値は**下げる方向にだけ**動かす(上げると、到達済みのペアの植物が戻って見える)
+ *   - 段階は**末尾にだけ**足す(みのり(100回)はあとから延ばせない。延ばしたいときは段階を後ろに足す)
+ *   - 変更は2週間に1回まで。変えたら JOURNAL と REQUIREMENTS に記録する
+ */
+export const PLANT_STAGE_THRESHOLDS: readonly number[] = [
+  0, // 段階 0 たね(ペア成立。頭に小さな芽が2つ)
+  1, // 段階 1 ふたば(最初のふたり達成)
+  3, // 段階 2 めばえ
+  7, // 段階 3 わかば
+  14, // 段階 4 よりそい
+  21, // 段階 5 つぼみ
+  30, // 段階 6 いろづき
+  45, // 段階 7 ほころび
+  66, // 段階 8 ふたりざき(習慣化の目安 66日)
+  100, // 段階 9 みのり
 ];
 
-/** 累計ふたり達成日数 → 成長段階 0..5 */
-export function derivePlantStage(grownDays: number): number {
+function assertGrownDays(grownDays: number): void {
   if (!Number.isInteger(grownDays) || grownDays < 0) {
-    throw new Error(`grown_days が不正です: ${grownDays}`);
+    throw new Error(`成長回数が不正です: ${grownDays}`);
   }
-  for (const t of PLANT_STAGE_THRESHOLDS) {
-    if (grownDays >= t.minGrownDays) return t.stage;
+}
+
+/** 成長回数 → 成長段階 0..(段階数-1)。最後の段階(みのり)を超えても後退しない */
+export function derivePlantStage(grownDays: number): number {
+  assertGrownDays(grownDays);
+  for (let stage = PLANT_STAGE_THRESHOLDS.length - 1; stage > 0; stage--) {
+    if (grownDays >= PLANT_STAGE_THRESHOLDS[stage]) return stage;
   }
   return 0;
+}
+
+/** 成長回数から導く、植物の進み具合(snapshot の plantStage / plantGrownDays / plantStageFloor / plantNextStageAt) */
+export interface PlantProgress {
+  /** 成長回数(ふたり達成日の累計 + 昨日の仮判定 + 今日の先取り) */
+  grownDays: number;
+  stage: number;
+  /** 今の段階に入るのに必要な回数(PLANT_STAGE_THRESHOLDS[stage]) */
+  stageFloor: number;
+  /** 次の段階に必要な回数。最後の段階なら null */
+  nextStageAt: number | null;
+}
+
+/**
+ * 成長回数 → 進み具合。アプリは「あと (nextStageAt - grownDays) 回で つぎ」の文と、
+ * 区間の進み具合 (grownDays - stageFloor) / (nextStageAt - stageFloor) を、この3つの値だけで作れる
+ * (閾値の配列をアプリに持たせない=あとからサーバー側で閾値を下げても、古いアプリが追従する)。
+ */
+export function derivePlantProgress(grownDays: number): PlantProgress {
+  const stage = derivePlantStage(grownDays);
+  return {
+    grownDays,
+    stage,
+    stageFloor: PLANT_STAGE_THRESHOLDS[stage],
+    nextStageAt: PLANT_STAGE_THRESHOLDS[stage + 1] ?? null,
+  };
+}
+
+/**
+ * streak_days の行から「ふたり達成日(kind='both')」の数を数える(GROWTH §7.2)。
+ * - kind='ticket'(お休みチケットで守った日)は数えない: ストリークは守られるが、植物は育たない
+ * - 同じ日付の行は1日と数える(PK(pair_id, date_local) があるので通常は重複しないが、防御として)
+ * - asOfDateLocal を渡すと、その日までの行だけを数える。表示用の snapshot は「昨日まで」を渡す:
+ *   今日の分は「今日の先取り」で別に足すので、今日(以降)の行があっても二重に数えない
+ *   (クライアントの時計が少し遅れていて、確定済みの行が「今日」に見えるときなど)
+ */
+export function countBothDays(
+  days: readonly StreakDayRecord[],
+  asOfDateLocal?: string,
+): number {
+  const limit = asOfDateLocal === undefined
+    ? Number.POSITIVE_INFINITY
+    : dayNumber(asOfDateLocal);
+  const counted = new Set<number>();
+  for (const d of days) {
+    if (d.kind !== "both") continue;
+    const n = dayNumber(d.dateLocal); // 形式の検証も兼ねる
+    if (n <= limit) counted.add(n);
+  }
+  return counted.size;
 }
 
 /**
  * 植物の表情(REQUIREMENTS §3.9)。
  * - happy: 両者完了のキラキラ
  * - fidget: 片方未完のそわそわ
- * - sad: 2日連続未達成のしょんぼり(確定ベースで直近2日が未達成、かつ今日もまだ両者未完)
+ * - sad: 2日連続未達成(確定ベースで直近2日が未達成、かつ今日もまだ両者未完)。
+ *   アプリでは「すやすや」眠る絵で描く(GROWTH §13.1)。API の値は互換性のため sad のまま
  * - normal: それ以外(枯れ・後退の状態は存在しない)
  */
 export function derivePlantMood(params: {
@@ -170,15 +245,16 @@ export interface BuildPairSnapshotInput {
   todayLocal: string;
   /** pairs.started_on */
   startedOn: string;
-  /** streak_days の全行(順不同可) */
+  /**
+   * streak_days の全行(順不同可)。昨日の仮判定で足した行(provisionalYesterdayRow)を含めて渡す。
+   * ストリーク・すやすや(sad)の判定・成長回数のすべてが、この行だけから導かれる
+   */
   streakDays: readonly StreakDayRecord[];
   todayMeDone: boolean;
   todayPartnerDone: boolean;
   myPromise: PromiseSummary | null;
   partnerName: string;
   partnerPromise: PromiseSummary | null;
-  /** plants.grown_days(close-day 確定済みの累計ふたり達成日数) */
-  plantGrownDays: number;
   plantName: string | null;
   hasPartnerPhotoToday: boolean;
 }
@@ -188,8 +264,10 @@ export interface BuildPairSnapshotInput {
  *
  * プレビュー方針(DESIGN §5.4「確定は close-day。表示はプレビュー」):
  * - streakCurrent = 確定 current +(今日両者完了なら 1)
- * - plantStage も同様に、今日両者完了なら grown_days+1 で導出(翌朝の確定を先取りした表示。
- *   close-day は今日の行をまだ書いていないため二重加算は起きない)
+ * - 成長回数 = 昨日までの both の行数 +(今日両者完了なら 1)。翌朝の確定を先取りした表示
+ *   (close-day は今日の行をまだ書いていないため二重加算は起きない。今日以降の行は数えない)。
+ *   plants.grown_days / stage は読まない: 行から数え直すので、close-day の書き込みが欠けても
+ *   成長が欠けない(GROWTH §7.2)
  * - streakBest は確定 best とプレビュー current の大きい方(現在値が最高値を下回って見えないように)
  */
 export function buildPairSnapshot(input: BuildPairSnapshotInput): PairSnapshot {
@@ -198,7 +276,9 @@ export function buildPairSnapshot(input: BuildPairSnapshotInput): PairSnapshot {
   const { current, best } = deriveStreak(input.streakDays, yesterday);
   const bothToday = input.todayMeDone && input.todayPartnerDone;
   const streakCurrent = previewStreak(current, bothToday);
-  const previewGrownDays = input.plantGrownDays + (bothToday ? 1 : 0);
+  const plant = derivePlantProgress(
+    countBothDays(input.streakDays, yesterday) + (bothToday ? 1 : 0),
+  );
   const consecutiveMissedDays = countConsecutiveMissedDays({
     days: input.streakDays,
     asOfDateLocal: yesterday,
@@ -218,7 +298,10 @@ export function buildPairSnapshot(input: BuildPairSnapshotInput): PairSnapshot {
     partnerName: input.partnerName,
     partnerPromiseTitle: input.partnerPromise?.title ?? null,
     partnerPromiseEmoji: input.partnerPromise?.emoji ?? null,
-    plantStage: derivePlantStage(previewGrownDays),
+    plantStage: plant.stage,
+    plantGrownDays: plant.grownDays,
+    plantStageFloor: plant.stageFloor,
+    plantNextStageAt: plant.nextStageAt,
     plantMood: derivePlantMood({
       todayMeDone: input.todayMeDone,
       todayPartnerDone: input.todayPartnerDone,
@@ -229,7 +312,10 @@ export function buildPairSnapshot(input: BuildPairSnapshotInput): PairSnapshot {
   };
 }
 
-/** ソロ状態(ペア未成立)の snapshot。鉢は土だけ=クライアントは pairId=null で土を描画 */
+/**
+ * ソロ状態(ペア未成立)の snapshot。鉢は土だけ=クライアントは pairId=null で土を描画。
+ * 植物の進み具合は 0 / 0 / null(ゲージを出さない — GROWTH §5.1)
+ */
 export function buildSoloSnapshot(input: {
   updatedAtIso: string;
   todayMeDone: boolean;
@@ -249,10 +335,58 @@ export function buildSoloSnapshot(input: {
     partnerPromiseTitle: null,
     partnerPromiseEmoji: null,
     plantStage: 0,
+    plantGrownDays: 0,
+    plantStageFloor: 0,
+    plantNextStageAt: null,
     plantMood: "normal",
     plantName: null,
     hasPartnerPhotoToday: false,
   };
+}
+
+// ---- 昨日の仮判定(GROWTH §7.3 の最小版) ----
+
+/**
+ * 昨日の仮判定を試す価値があるか(= DB に昨日の checkin を問い合わせるか)。
+ * 昨日の streak_days 行が無く、かつ昨日がペア成立日(started_on)以降のときだけ true。
+ * 行があれば確定済み(二重に足さない)、成立前なら判定対象外。
+ */
+export function needsProvisionalYesterday(params: {
+  days: readonly StreakDayRecord[];
+  yesterdayLocal: string;
+  startedOn: string;
+}): boolean {
+  const yesterday = dayNumber(params.yesterdayLocal);
+  if (yesterday < dayNumber(params.startedOn)) return false;
+  return !params.days.some((d) => dayNumber(d.dateLocal) === yesterday);
+}
+
+/**
+ * 昨日の仮判定。0:00 から close-day(00:10 JST)が昨日の行を書くまでの間は昨日の行がまだ無く、
+ * そのまま数えるとストリークが 0 に見え、昨日の分で上がった段階が 1 つ戻り、
+ * すやすや(sad)が誤って出る。次の3つがそろえば、昨日を「ふたり達成(both)」とみなした行を返す
+ * (そろわなければ null):
+ *   1. 昨日の行がない
+ *   2. 昨日がペア成立日(started_on)以降
+ *   3. 2人とも昨日チェックインしている
+ * 確定結果と必ず一致する: 両者がチェックインしていれば close-day は必ず both を記録し、
+ * チェックインの取消は当日しかできないので、昨日のチェックインはもう動かない。
+ * 返した行は、ストリーク・すやすや・成長回数のすべてに使う(buildPairSnapshot の streakDays に足す)。
+ * 「片方だけチェックインしてチケットで守られる日」は仮判定できない(0:00〜0:10 の間だけ
+ * ストリークが 0 に見える)。close-day が送る ticket_used 通知の snapshot で直る(§7.3)
+ */
+export function provisionalYesterdayRow(params: {
+  days: readonly StreakDayRecord[];
+  yesterdayLocal: string;
+  startedOn: string;
+  meCheckedInYesterday: boolean;
+  partnerCheckedInYesterday: boolean;
+}): StreakDayRecord | null {
+  if (!needsProvisionalYesterday(params)) return null;
+  if (!params.meCheckedInYesterday || !params.partnerCheckedInYesterday) {
+    return null;
+  }
+  return { dateLocal: params.yesterdayLocal, kind: "both" };
 }
 
 // ---- 注入リポジトリ越しの組み立て(I/O は持たない。実装は各 function の index.ts) ----
@@ -279,6 +413,11 @@ export interface SnapshotCheckinRow {
 }
 
 export interface SnapshotPlantRow {
+  /**
+   * plants.grown_days(close-day が数え直して書く控え)。snapshot の組み立てでは**読まない**:
+   * 成長回数は streak_days の行から数える(GROWTH §7.2)。型を残しているのは、
+   * 各 function の index.ts(getPlant の実装)を変えずに済ませるため
+   */
   grownDays: number;
   name: string | null;
 }
@@ -335,8 +474,33 @@ export async function loadSnapshotForUser(
 
   const partnerPromise = await repo.getActivePromise(pair.partner.id);
   const partnerCheckin = await repo.getCheckin(pair.partner.id, todayLocal);
-  const streakDays = await repo.listStreakDays(pair.pairId);
+  const confirmedDays = await repo.listStreakDays(pair.pairId);
   const plant = await repo.getPlant(pair.pairId);
+
+  // 昨日の仮判定(GROWTH §7.3)。昨日の行がまだ無いとき(close-day 実行前の 0:00〜0:10 など)だけ、
+  // 昨日の checkin を2回(自分・相手)引く
+  const yesterdayLocal = addDaysLocal(todayLocal, -1);
+  let streakDays = confirmedDays;
+  if (
+    needsProvisionalYesterday({
+      days: confirmedDays,
+      yesterdayLocal,
+      startedOn: pair.startedOn,
+    })
+  ) {
+    const [meYesterday, partnerYesterday] = await Promise.all([
+      repo.getCheckin(params.userId, yesterdayLocal),
+      repo.getCheckin(pair.partner.id, yesterdayLocal),
+    ]);
+    const provisional = provisionalYesterdayRow({
+      days: confirmedDays,
+      yesterdayLocal,
+      startedOn: pair.startedOn,
+      meCheckedInYesterday: meYesterday !== null,
+      partnerCheckedInYesterday: partnerYesterday !== null,
+    });
+    if (provisional) streakDays = [...confirmedDays, provisional];
+  }
 
   return buildPairSnapshot({
     pairId: pair.pairId,
@@ -349,7 +513,6 @@ export async function loadSnapshotForUser(
     myPromise,
     partnerName: pair.partner.nickname,
     partnerPromise,
-    plantGrownDays: plant?.grownDays ?? 0,
     plantName: plant?.name ?? null,
     hasPartnerPhotoToday: partnerCheckin?.photoPath != null,
   });
