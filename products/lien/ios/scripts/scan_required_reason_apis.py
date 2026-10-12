@@ -102,18 +102,25 @@ def all_manifests(app):
 
 
 def scan_binary(executable):
-    """カテゴリ → {"symbols": [...], "strings": [...]}(見つかったものだけ)"""
+    """カテゴリ → {"symbols": [...], "strings": [...], "evidence": {文字列: [出どころの行, ...]}}(見つかったものだけ)。
+    evidence は strings の出力のうちその語を含む行(Swift の名前修飾に、使っているモジュール名が出る)"""
     undefined = run(["nm", "-u", executable]).splitlines()
-    text = run(["strings", "-a", executable])
+    lines = run(["strings", "-a", executable]).splitlines()
     result = {}
     for category, (symbol_pattern, tokens) in CATEGORIES.items():
         symbols = []
         if symbol_pattern:
             regex = re.compile(r"^(" + symbol_pattern + r")(\$.*)?$")
             symbols = sorted({s.strip() for s in undefined if regex.match(s.strip())})
-        strings = sorted(t for t in tokens if t in text)
+        strings = []
+        evidence = {}
+        for token in tokens:
+            matched = sorted({line.strip() for line in lines if token in line}, key=len)
+            if matched:
+                strings.append(token)
+                evidence[token] = matched[:3]
         if symbols or strings:
-            result[category] = {"symbols": symbols, "strings": strings}
+            result[category] = {"symbols": symbols, "strings": sorted(strings), "evidence": evidence}
     return result
 
 
@@ -170,6 +177,14 @@ def main(argv=None):
                     missing_high.append((name, category, hit["symbols"]))
             if hit["strings"]:
                 print(f"| {short(category)} | 低(文字列) | `{' '.join(hit['strings'])}` | {own_ok} | {any_ok} |")
+        print()
+        # 低い確度の検出は、どこから来たかを見て判断する(例: 依存パッケージのモジュール名が名前修飾に出る)
+        for category, hit in sorted(found.items()):
+            for token, samples in sorted(hit["evidence"].items()):
+                if token in ("UserDefaults", "NSUserDefaults"):
+                    continue  # 自前のコードが使っている(PrivacyManifestTests が宣言を検査する)
+                for line in samples:
+                    print(f"- `{token}` の出どころ: `{line[:150]}`")
         print()
 
     if missing_high:

@@ -74,12 +74,16 @@ xcodebuild test -project Lien.xcodeproj -scheme Lien \
 
 - アプリ・ウィジェット・NSE の各フォルダに 1 つずつ(`Lien/` `LienWidget/` `LienNSE/`)。`project.yml` の sources に含まれ、リソースとして同梱される
 - **トラッキングなし**(`NSPrivacyTracking = false`)。**分析 SDK なし**(D6)なので、収集データの用途は「アプリの機能」だけ
-- **必須理由 API の棚卸し**
+- **必須理由 API の棚卸し**(2026-10-13、Xcode 26.6 の Release archive で実測)
   - 自前のコード: `UserDefaults`(`PushTokenSync` の送信記録。アプリ自身だけが読む = 理由 `CA92.1`)だけ。ファイルのタイムスタンプ・起動時刻・ディスク容量・キーボードは使っていない
   - ウィジェット・NSE: App Group のファイルを読み書きするだけ。使っている必須理由 API なし
+  - 依存パッケージ: supabase-swift 2.55.3 は自前の PrivacyInfo.xcprivacy を持たない。バイナリには `FileManager.attributesOfItem` の参照がある
+    (ファイルのメタデータ。C の `stat` 系・`mach_absolute_time` などのシンボルは**無い**)。Apple の静的解析が拾う可能性に備えて、
+    アプリのマニフェストに `FileTimestamp` / `C617.1`(アプリのコンテナ内のファイルのメタデータ)を宣言してある。
+    swift-crypto は自前のマニフェストを持つ(必須理由 API の宣言なし)。supabase-swift が自前のマニフェストを持つ版になったら見直す
   - `LienTests/PrivacyManifestTests` が Swift ソースを走査し、**使っているのに宣言が無い API** を CI で検出する(コードを足したときの宣言忘れを止める)
-  - 依存パッケージ(supabase-swift とその推移依存)は静的にリンクされて実行ファイルに入る。`lien-release` の dry-run が
-    **出来上がったバイナリ**を `scripts/scan_required_reason_apis.py` で棚卸しし、step summary に表を出す
+  - 依存パッケージの分は、`lien-release` の dry-run が**出来上がったバイナリ**を `scripts/scan_required_reason_apis.py` で棚卸しして
+    step summary に表を出す。**C の関数そのもの(`_stat` など)を使っているのに宣言が無ければ失敗**にする(文字列だけの検出は表に出すだけ)
 - 収集データの宣言(ニックネーム・写真・約束や記録・匿名ユーザー ID・プッシュトークン)は `review-notes.md` §2.1 の草案どおり。
   App Store Connect の「アプリのプライバシー」の回答と突き合わせた最終確認は T30
 

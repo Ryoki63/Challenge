@@ -196,11 +196,13 @@ jobs:
           python3 scripts/verify_archive.py "$ARCHIVE_PATH" \
             --build-number "$BUILD_NUMBER" --supabase "$mode" $signed --summary "$GITHUB_STEP_SUMMARY"
 
-      # 依存パッケージ(supabase-swift など)は静的にリンクされて実行ファイルに入る。その必須理由 API を棚卸しする
+      # 依存パッケージ(supabase-swift など)は静的にリンクされて実行ファイルに入る。その必須理由 API を棚卸しする。
+      # C の関数そのもの(_stat・_mach_absolute_time など)を使っているのに宣言が無ければ、ここで失敗にする(ITMS-91053 を先に止める)。
+      # 文字列だけの検出(確度が低い)は表に出すだけ
       - name: Required-reason API inventory (built binaries)
         run: |
           set -o pipefail
-          python3 scripts/scan_required_reason_apis.py "$ARCHIVE_PATH/Products/Applications/Lien.app" | tee "$RUNNER_TEMP/privacy-scan.md"
+          python3 scripts/scan_required_reason_apis.py --strict-symbols "$ARCHIVE_PATH/Products/Applications/Lien.app" | tee "$RUNNER_TEMP/privacy-scan.md"
           cat "$RUNNER_TEMP/privacy-scan.md" >> "$GITHUB_STEP_SUMMARY"
 
       # 署名つきの経路は G0 の前には試せない。せめて、実行するコマンドの組み立てだけは毎回確かめる(実行はしない)

@@ -109,6 +109,19 @@ class VerifyArchiveTests(unittest.TestCase):
         archive = make_archive(self.tmp, app=app_info(SUPABASE_ANON_KEY=key))
         self.assertGreater(verify(archive, supabase="warn").errors, 0)
 
+    @unittest.skipUnless(shutil.which("strings"), "strings コマンドが必要")
+    def test_debug_only_code_in_the_binary_is_an_error(self):
+        archive = make_archive(self.tmp)
+        binary = os.path.join(archive, "Products", "Applications", "Lien.app", "Lien")
+        with open(binary, "wb") as fh:
+            fh.write(b"\x00\x01 plain release binary with no debug types \x00")
+        self.assertEqual(verify(archive).errors, 0)
+        with open(binary, "wb") as fh:
+            fh.write(b"\x00\x01 $s4Lien20DeviceTokenDebugViewV \x00")
+        report = verify(archive)
+        self.assertGreater(report.errors, 0)
+        self.assertIn("DeviceTokenDebugView", report.markdown())
+
     def test_not_an_app_archive(self):
         os.makedirs(os.path.join(self.tmp, "Empty.xcarchive"))
         self.assertGreater(verify(os.path.join(self.tmp, "Empty.xcarchive")).errors, 0)

@@ -6,9 +6,13 @@
 	     - 収集データ: review-notes §2.1 の草案どおり(ニックネーム・写真・約束や記録・匿名ユーザー ID・プッシュトークン)。
 	       分析 SDK は入れない(REQUIREMENTS §7 / D6)ので、用途はアプリの機能のみ。トラッキングなし。
 	       App Store Connect「アプリのプライバシー」の回答と突き合わせて T30 で確定する
-	     - 必須理由 API: UserDefaults(PushTokenSync の送信記録 = アプリ自身だけが読む情報。理由 CA92.1)。
+	     - 必須理由 API:
+	       * UserDefaults(PushTokenSync の送信記録 = アプリ自身だけが読む情報。理由 CA92.1)。自前のコード
+	       * FileTimestamp(理由 C617.1 = アプリのコンテナ内のファイルのメタデータ)。**依存パッケージ分**:
+	         supabase-swift 2.55.3 のバイナリが FileManager.attributesOfItem を参照する(lien-release の棚卸しで検出)。
+	         アプリ自身はファイルのタイムスタンプを読まない。supabase-swift が自前のマニフェストを持つ版になったら見直す
 	       ios/LienTests/PrivacyManifestTests が Swift ソースを走査し、使っているのに宣言が無い API を検出する。
-	       supabase-swift など依存パッケージ分は lien-release の dry-run が archive の中身から棚卸しする -->
+	       依存パッケージ分は lien-release の dry-run が archive の中身から棚卸しする(シンボルは宣言が無いと失敗) -->
 	<key>NSPrivacyTracking</key>
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>
@@ -84,6 +88,14 @@
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
 			</array>
 		</dict>
 	</array>

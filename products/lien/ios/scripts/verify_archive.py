@@ -80,6 +80,10 @@ class Report:
         return "\n".join(lines)
 
 
+# DEBUG ビルドにだけ入るコードの目印(型名)。Release の archive の実行ファイルに出てきたら、構成を取り違えている
+DEBUG_ONLY_MARKERS = ["DeviceTokenDebugView"]
+
+
 def sdk_major(name):
     match = re.match(r"^iphoneos(\d+)", name or "")
     return int(match.group(1)) if match else None
@@ -123,6 +127,24 @@ def check_bundle(report, label, bundle, expect_id, version, build, extension_poi
         except Exception as error:  # noqa: BLE001 - plist の壊れ方は多様
             report.fail(f"{label}: PrivacyInfo.xcprivacy", f"読めません: {error}")
     return info
+
+
+def check_release_configuration(report, binary):
+    """Release 構成の archive であること: DEBUG 専用コードが実行ファイルに入っていない。
+    (入っていると、Config が無いときの致命扱いも DEBUG 側(Stub に落ちる)になってしまう)"""
+    if not os.path.isfile(binary):
+        report.warn("Release 構成の確認", "実行ファイルが見つかりません")
+        return
+    try:
+        out = subprocess.run(["strings", "-a", binary], capture_output=True, text=True, errors="replace").stdout
+    except OSError:
+        report.warn("Release 構成の確認", "strings コマンドが使えません")
+        return
+    leaked = [m for m in DEBUG_ONLY_MARKERS if m in out]
+    report.check(
+        not leaked, "Release 構成(DEBUG 専用コードなし)", "DEBUG 専用の型は入っていない",
+        f"{', '.join(leaked)} が入っています。Release 構成の archive ではありません",
+    )
 
 
 def check_signed(report, app):
@@ -205,6 +227,8 @@ def verify(archive, build_number, supabase_mode, signed):
                 report.fail("Supabase 接続情報", message)
         else:
             report.warn("Supabase 接続情報", "; ".join(errors) + "(dry-run のため警告にとどめる。TestFlight にはアップロードしない)")
+
+    check_release_configuration(report, os.path.join(app, "Lien"))
 
     dsym = os.path.join(archive, "dSYMs", "Lien.app.dSYM")
     if os.path.isdir(dsym):

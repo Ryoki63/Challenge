@@ -164,6 +164,16 @@ final class PrivacyManifestTests: XCTestCase {
         ])
     }
 
+    func testAppDeclaresTheKnownRequiredReasonAPIs() throws {
+        // 自前のコード = UserDefaults(PushTokenSync の送信記録)/ 依存パッケージ = FileTimestamp
+        // (supabase-swift のバイナリが FileManager.attributesOfItem を参照する。lien-release の棚卸しで検出)。
+        // 増減したら、理由を確かめてからこの期待を更新する
+        let declared = try declaredAPIs(of: Self.bundles[0])
+        XCTAssertEqual(declared[Category.userDefaults], ["CA92.1"])
+        XCTAssertEqual(declared[Category.fileTimestamp], ["C617.1"])
+        XCTAssertEqual(Set(declared.keys), [Category.userDefaults, Category.fileTimestamp])
+    }
+
     func testAccessedAPIReasonsAreApprovedCodes() throws {
         for bundle in Self.bundles {
             for (category, reasons) in try declaredAPIs(of: bundle) {
