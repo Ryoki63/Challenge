@@ -14,6 +14,8 @@
   - テストのシミュレータは `iPhone 17`(macos-26 のイメージには iPhone 16 が無い)
 - ローカルに Xcode が無い環境でも、構文確認は `swiftc -parse`、リリース用スクリプトの単体テストは
   `python3 -m unittest discover -s scripts -p 'test_*.py'` でできる。ビルド・テストの検証は CI(lien-ios)で行う
+- さらに、Command Line Tools だけの Mac でも、UIKit・Supabase に依存しない部分のコンパイルと LienTests の実行、View の型検査は
+  `scripts/macos-check/check.sh` で約 30 秒でできる(push 前の下見。CI が正本。[scripts/macos-check/README.md](scripts/macos-check/README.md))
 
 ```sh
 cd products/lien/ios
@@ -150,6 +152,7 @@ gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false   # �
 | `verify_archive.py` | `.xcarchive` のアップロード前検査 |
 | `scan_required_reason_apis.py` | 出来上がったバイナリの必須理由 API の棚卸し |
 | `export_attachments.py` | xcresult のテスト添付(植物の実描画の一覧画像)を、読みやすい名前の PNG として取り出す(§10) |
+| `macos-check/check.sh` | Xcode 無しの Mac で、Foundation 系のコードの macOS ビルド・LienTests の実行・View の型検査をする push 前の下見(§1。[README](scripts/macos-check/README.md)) |
 | `test_*.py` | 上記の単体テスト(`python3 -m unittest discover -s scripts -p 'test_*.py'`。lien-ios でも毎回実行) |
 
 ## 10. 植物の描画と、実描画の一覧画像(issue #56)
