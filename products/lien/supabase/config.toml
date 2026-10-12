@@ -35,3 +35,9 @@ verify_jwt = false
 
 [functions.grant-tickets]
 verify_jwt = false
+
+[functions.nudge]
+verify_jwt = false
+
+[functions.react]
+verify_jwt = false
