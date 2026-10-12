@@ -154,9 +154,10 @@ final class ReloadCounter {
     var value = 0
 }
 
-/// 条件が成り立つまで(最大 timeout 秒)待つ。Task { ... } で投げ捨てた非同期処理の完了待ち用
+/// 条件が成り立つまで(最大 timeout 秒)待つ。Task { ... } で投げ捨てた非同期処理の完了待ち用。
+/// 成り立てば即座に返るので、上限は CI ランナーの一時的な遅さに耐えられる長さにしてある
 @MainActor
-func waitUntil(timeout: TimeInterval = 3, _ condition: () -> Bool) async {
+func waitUntil(timeout: TimeInterval = 15, _ condition: () -> Bool) async {
     let deadline = Date().addingTimeInterval(timeout)
     while !condition(), Date() < deadline {
         try? await Task.sleep(nanoseconds: 10_000_000)
