@@ -1,6 +1,8 @@
 # Lien iOS CI — xcodegen generate → xcodebuild(DESIGN §8)
-# CI 予算: macOS ランナーは10倍消費のため products/lien/ios/** 変更時のみ起動し、
-# 8分以内を目標にする(timeout-minutes: 20 は安全弁)
+# CI 予算: macOS ランナーは10倍消費のため products/lien/ios/** 変更時のみ起動する(timeout-minutes: 20 は安全弁)。
+# 所要の内訳(2026-10-13 の実測。ランナーによって 2〜3 倍ぶれる): 全体で 12〜13 分 = 準備 約 1 分 + シミュレータの
+# 初回起動 4〜6 分(データ移行。「Boot the iOS simulator」ステップ)+ ビルド 2〜4 分 + ビルドの終わりからテストの開始まで
+# 約 2 分 + テスト本体 約 15 秒 + 後片付け 約 0.5 分。当初の目標「8分以内」は、初回起動が入ると届かない(issue #66)
 #
 # Xcode は products/lien/ios/.xcode-version の版に固定(lien-release と共通 — issue #28)。
 # 2026-04-28 以降、App Store Connect へのアップロードは Xcode 26 / iOS 26 SDK 以上が必須なので、

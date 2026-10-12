@@ -79,14 +79,15 @@ def main(argv=None, devices=list_devices, boot=boot_and_wait, clock=time.monoton
         return 1
 
     label = f"{args.name} ({runtime})"
-    print(f"{label}: {udid}(いまの状態: {state})。起動して、終わるまで待ちます")
+    # simctl の進み具合(子プロセスの出力)とログの順序がずれないよう、こちらの出力はその場で吐き出す
+    print(f"{label}: {udid}(いまの状態: {state})。起動して、終わるまで待ちます", flush=True)
     started = clock()
     code = boot(udid)
     seconds = clock() - started
     if code != 0:
         print(f"::error::{label} の起動が失敗しました(simctl bootstatus の終了コード {code}、{seconds:.0f} 秒)")
         return 1
-    print(f"{label} の起動が終わりました({seconds:.0f} 秒)")
+    print(f"{label} の起動が終わりました({seconds:.0f} 秒)", flush=True)
 
     if args.github_output:
         with open(args.github_output, "a", encoding="utf-8") as fh:
