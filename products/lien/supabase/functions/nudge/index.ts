@@ -19,7 +19,7 @@ import type {
   SnapshotUserRow,
 } from "../_shared/snapshot.ts";
 import type { StreakDayKind, StreakDayRecord } from "../_shared/streak.ts";
-import { ApnsClient, loadApnsConfigFromEnv } from "../_shared/apns.ts";
+import { createPusher } from "../_shared/pusher.ts";
 
 // ---- Supabase リポジトリ実装(書き込みは service_role 経由のみ — DESIGN §5.2) ----
 
@@ -173,14 +173,10 @@ const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-// APNs 設定が未投入(G0 前)の間は push なしで運転する(処理自体は止めない)
-const apnsConfig = loadApnsConfigFromEnv((k) => Deno.env.get(k));
-const pusher: Pusher = apnsConfig ? new ApnsClient(apnsConfig) : {
-  send: () => {
-    console.warn("nudge: APNs 未設定のため push をスキップ(DESIGN §7 G0)");
-    return Promise.resolve({ ok: false });
-  },
-};
+// APNs 設定が未投入(G0 前)の間は push なしで運転する(処理自体は止めない)。
+// 設定済みなら、トークンごとに users.push_env で APNs の環境を選び、
+// 無効なトークン(410 / BadDeviceToken)は push_token を null にする(DESIGN §4 / issue #53)
+const pusher: Pusher = createPusher(adminClient, "nudge");
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {

@@ -4,11 +4,15 @@
 import {
   ApnsClient,
   type ApnsConfig,
+  type ApnsEnvironment,
   type ApnsHttpPost,
   type ApnsHttpResponse,
   buildVisiblePushPayload,
   createApnsJwt,
+  isInvalidTokenResponse,
   loadApnsConfigFromEnv,
+  type PushTokenStore,
+  TokenAwarePusher,
 } from "./apns.ts";
 import { buildSoloSnapshot } from "./snapshot.ts";
 
@@ -345,4 +349,329 @@ Deno.test("ApnsClient: JWT は45分間キャッシュされ、期限後に再発
     calls[2].headers.authorization !== calls[0].headers.authorization,
     "期限切れ後は再発行",
   );
+});
+
+// ---- APNs の環境はトークン単位(issue #53 / DESIGN §4) ----
+
+Deno.test("ApnsClient: opts.environment で送信先を上書きできる(省略時は設定の APNS_ENV)", async () => {
+  const { pem } = await makeTestKey();
+  const { calls, post } = mockTransport();
+  const sandboxDefault = new ApnsClient(makeConfig(pem, "sandbox"), { post });
+  await sandboxDefault.send("t1", {});
+  await sandboxDefault.send("t2", {}, { environment: "production" });
+  const productionDefault = new ApnsClient(makeConfig(pem, "production"), {
+    post,
+  });
+  await productionDefault.send("t3", {}, { environment: "sandbox" });
+  await productionDefault.send("t4", {});
+
+  assertEquals(calls.map((c) => c.url), [
+    "https://api.sandbox.push.apple.com/3/device/t1",
+    "https://api.push.apple.com/3/device/t2",
+    "https://api.sandbox.push.apple.com/3/device/t3",
+    "https://api.push.apple.com/3/device/t4",
+  ]);
+});
+
+Deno.test("isInvalidTokenResponse: 410 と 400 BadDeviceToken だけがトークン無効", () => {
+  const table: Array<[number, string, boolean]> = [
+    [410, '{"reason":"Unregistered"}', true],
+    [410, '{"reason":"ExpiredToken"}', true],
+    [410, "", true],
+    [400, '{"reason":"BadDeviceToken"}', true],
+    // トークンのせいとは限らない失敗は false(設定ミスで全員のトークンを消さない)
+    [400, '{"reason":"DeviceTokenNotForTopic"}', false],
+    [400, '{"reason":"BadTopic"}', false],
+    [400, '{"reason":"PayloadEmpty"}', false],
+    [400, "", false],
+    [400, "not json", false],
+    [400, "null", false],
+    [403, '{"reason":"InvalidProviderToken"}', false],
+    [403, '{"reason":"ExpiredProviderToken"}', false],
+    [404, '{"reason":"BadPath"}', false],
+    [413, '{"reason":"PayloadTooLarge"}', false],
+    [429, '{"reason":"TooManyRequests"}', false],
+    [500, '{"reason":"InternalServerError"}', false],
+    [503, '{"reason":"ServiceUnavailable"}', false],
+    [200, "", false],
+  ];
+  for (const [status, body, expected] of table) {
+    assertEquals(
+      isInvalidTokenResponse(status, body),
+      expected,
+      `${status} ${body}`,
+    );
+  }
+});
+
+Deno.test("ApnsClient: 失敗結果の invalidToken — 410 / BadDeviceToken は true、それ以外の失敗は false", async () => {
+  const { pem } = await makeTestKey();
+  const cases: Array<{
+    label: string;
+    script: Array<ApnsHttpResponse | Error>;
+    invalid: boolean;
+    attempts: number;
+  }> = [
+    {
+      label: "410 Unregistered",
+      script: [{ status: 410, body: '{"reason":"Unregistered"}' }],
+      invalid: true,
+      attempts: 1,
+    },
+    {
+      label: "400 BadDeviceToken",
+      script: [{ status: 400, body: '{"reason":"BadDeviceToken"}' }],
+      invalid: true,
+      attempts: 1,
+    },
+    {
+      label: "400 DeviceTokenNotForTopic",
+      script: [{ status: 400, body: '{"reason":"DeviceTokenNotForTopic"}' }],
+      invalid: false,
+      attempts: 1,
+    },
+    {
+      label: "403 ExpiredProviderToken",
+      script: [{ status: 403, body: '{"reason":"ExpiredProviderToken"}' }],
+      invalid: false,
+      attempts: 1,
+    },
+    {
+      label: "5xx が2回",
+      script: [{ status: 500, body: "e1" }, { status: 500, body: "e2" }],
+      invalid: false,
+      attempts: 2,
+    },
+    {
+      label: "送信例外が2回",
+      script: [new Error("down1"), new Error("down2")],
+      invalid: false,
+      attempts: 2,
+    },
+    {
+      label: "1回目 5xx → 2回目 410(リトライ後に無効と分かる)",
+      script: [
+        { status: 503, body: "" },
+        { status: 410, body: '{"reason":"Unregistered"}' },
+      ],
+      invalid: true,
+      attempts: 2,
+    },
+  ];
+  for (const c of cases) {
+    const { calls, post } = mockTransport([...c.script]);
+    const client = new ApnsClient(makeConfig(pem), { post });
+    const result = await client.send("tok", {});
+    if (result.ok) throw new Error(`${c.label}: 失敗するはず`);
+    assertEquals(result.invalidToken, c.invalid, c.label);
+    assertEquals(result.attempts, c.attempts, c.label);
+    assertEquals(calls.length, c.attempts, c.label);
+  }
+
+  // 成功には invalidToken が付かない
+  const ok = await new ApnsClient(makeConfig(pem), {
+    post: mockTransport().post,
+  })
+    .send("tok", {});
+  assertEquals(ok, { ok: true, status: 200, attempts: 1 });
+});
+
+// ---- TokenAwarePusher ----
+
+interface StoreOpts {
+  envs?: Record<string, ApnsEnvironment | null>;
+  getThrows?: boolean;
+  clearThrows?: boolean;
+}
+
+function makeStore(opts: StoreOpts = {}): {
+  store: PushTokenStore;
+  lookups: string[];
+  cleared: string[];
+} {
+  const lookups: string[] = [];
+  const cleared: string[] = [];
+  const store: PushTokenStore = {
+    getPushEnv: (token) => {
+      lookups.push(token);
+      if (opts.getThrows) return Promise.reject(new Error("db down"));
+      return Promise.resolve(opts.envs?.[token] ?? null);
+    },
+    clearPushToken: (token) => {
+      cleared.push(token);
+      if (opts.clearThrows) return Promise.reject(new Error("db down"));
+      return Promise.resolve();
+    },
+  };
+  return { store, lookups, cleared };
+}
+
+/** console.warn / console.error を捕まえて出力を静かにする */
+async function captureConsole<T>(
+  fn: () => Promise<T>,
+): Promise<{ value: T; logs: string[] }> {
+  const logs: string[] = [];
+  const origWarn = console.warn;
+  const origError = console.error;
+  console.warn = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+  console.error = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+  try {
+    return { value: await fn(), logs };
+  } finally {
+    console.warn = origWarn;
+    console.error = origError;
+  }
+}
+
+Deno.test("TokenAwarePusher: トークンごとに push_env で送信先を選び、未設定は APNS_ENV", async () => {
+  const { pem } = await makeTestKey();
+  for (const fallback of ["sandbox", "production"] as const) {
+    const { calls, post } = mockTransport();
+    const { store, lookups } = makeStore({
+      envs: { "tok-prod": "production", "tok-sb": "sandbox", "tok-null": null },
+    });
+    const pusher = new TokenAwarePusher(
+      new ApnsClient(makeConfig(pem, fallback), { post }),
+      store,
+    );
+
+    await pusher.send("tok-prod", {});
+    await pusher.send("tok-sb", {});
+    await pusher.send("tok-null", {}); // push_env 未設定 → APNS_ENV
+    await pusher.send("tok-unknown", {}); // 行が無い → APNS_ENV
+
+    const host = (env: ApnsEnvironment) =>
+      env === "production"
+        ? "https://api.push.apple.com/3/device/"
+        : "https://api.sandbox.push.apple.com/3/device/";
+    assertEquals(calls.map((c) => c.url), [
+      `${host("production")}tok-prod`,
+      `${host("sandbox")}tok-sb`,
+      `${host(fallback)}tok-null`,
+      `${host(fallback)}tok-unknown`,
+    ], `APNS_ENV=${fallback}`);
+    assertEquals(lookups, ["tok-prod", "tok-sb", "tok-null", "tok-unknown"]);
+  }
+});
+
+Deno.test("TokenAwarePusher: opts.environment を渡したら DB を引かず、pushType / priority もそのまま渡す", async () => {
+  const { pem } = await makeTestKey();
+  const { calls, post } = mockTransport();
+  const { store, lookups } = makeStore({ envs: { tok: "sandbox" } });
+  const pusher = new TokenAwarePusher(
+    new ApnsClient(makeConfig(pem, "sandbox"), { post }),
+    store,
+  );
+
+  const result = await pusher.send("tok", { aps: {} }, {
+    environment: "production",
+    pushType: "background",
+    priority: 5,
+  });
+
+  assertEquals(result, { ok: true, status: 200, attempts: 1 });
+  assertEquals(lookups, [], "環境指定があれば DB を引かない");
+  assertEquals(calls[0].url, "https://api.push.apple.com/3/device/tok");
+  assertEquals(calls[0].headers["apns-push-type"], "background");
+  assertEquals(calls[0].headers["apns-priority"], "5");
+});
+
+Deno.test("TokenAwarePusher: 410 / BadDeviceToken を受けたトークンだけ push_token を破棄する", async () => {
+  const { pem } = await makeTestKey();
+  const scenarios: Array<{
+    label: string;
+    script: Array<ApnsHttpResponse | Error>;
+    cleared: boolean;
+  }> = [
+    {
+      label: "410 Unregistered",
+      script: [{ status: 410, body: '{"reason":"Unregistered"}' }],
+      cleared: true,
+    },
+    {
+      label: "400 BadDeviceToken",
+      script: [{ status: 400, body: '{"reason":"BadDeviceToken"}' }],
+      cleared: true,
+    },
+    {
+      label: "400 DeviceTokenNotForTopic(設定ミスかもしれないので消さない)",
+      script: [{ status: 400, body: '{"reason":"DeviceTokenNotForTopic"}' }],
+      cleared: false,
+    },
+    {
+      label: "403 ExpiredProviderToken",
+      script: [{ status: 403, body: '{"reason":"ExpiredProviderToken"}' }],
+      cleared: false,
+    },
+    {
+      label: "5xx が2回",
+      script: [{ status: 500, body: "" }, { status: 500, body: "" }],
+      cleared: false,
+    },
+    {
+      label: "送信例外が2回",
+      script: [new Error("down"), new Error("down")],
+      cleared: false,
+    },
+    { label: "200 成功", script: [{ status: 200, body: "" }], cleared: false },
+  ];
+  for (const sc of scenarios) {
+    const { post } = mockTransport([...sc.script]);
+    const { store, cleared } = makeStore({
+      envs: { "token-abcdef123456": "production" },
+    });
+    const pusher = new TokenAwarePusher(
+      new ApnsClient(makeConfig(pem), { post }),
+      store,
+    );
+    const { value: result, logs } = await captureConsole(() =>
+      pusher.send("token-abcdef123456", {})
+    );
+
+    assertEquals(cleared, sc.cleared ? ["token-abcdef123456"] : [], sc.label);
+    assertEquals(result.ok, sc.label === "200 成功", sc.label);
+    if (sc.cleared) {
+      assertEquals(
+        logs.some((l) => l.includes("token-ab")),
+        true,
+        "ログにはトークンの先頭だけを残す",
+      );
+      assertEquals(
+        logs.some((l) => l.includes("token-abcdef123456")),
+        false,
+        "トークン全体はログに出さない",
+      );
+    }
+  }
+});
+
+Deno.test("TokenAwarePusher: 環境の取得・トークンの破棄に失敗しても throw せず、結果を返す", async () => {
+  const { pem } = await makeTestKey();
+
+  // push_env の取得失敗 → APNS_ENV(sandbox)で送る
+  const a = mockTransport();
+  const getFail = makeStore({ getThrows: true });
+  const p1 = new TokenAwarePusher(
+    new ApnsClient(makeConfig(pem, "sandbox"), { post: a.post }),
+    getFail.store,
+  );
+  const r1 = await captureConsole(() => p1.send("tok", {}));
+  assertEquals(r1.value.ok, true);
+  assertEquals(
+    a.calls[0].url,
+    "https://api.sandbox.push.apple.com/3/device/tok",
+  );
+  assertEquals(r1.logs.length > 0, true, "失敗はログに残す");
+
+  // 破棄の失敗 → 元の失敗結果をそのまま返す
+  const b = mockTransport([{ status: 410, body: '{"reason":"Unregistered"}' }]);
+  const clearFail = makeStore({ clearThrows: true });
+  const p2 = new TokenAwarePusher(
+    new ApnsClient(makeConfig(pem), { post: b.post }),
+    clearFail.store,
+  );
+  const r2 = await captureConsole(() => p2.send("tok", {}));
+  assertEquals(r2.value.ok, false);
+  assertEquals(clearFail.cleared, ["tok"], "破棄は試みる");
+  assertEquals(r2.logs.length > 0, true, "失敗はログに残す");
 });

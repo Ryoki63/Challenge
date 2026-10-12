@@ -13,6 +13,13 @@
 //   - JWT はキャッシュして使い回す(Apple の規定: 20分〜60分で更新。ここでは45分で再発行)
 //   - send() は決して throw しない。結果は ApnsSendResult で返し、push 失敗の扱い
 //     (成功扱いにする等)は呼び出し側のポリシーに委ねる
+//   - APNs の環境(sandbox / production)は**トークン単位**(issue #53 / DESIGN §4)。
+//     users.push_env をトークンごとに引いて送信先を選ぶ(TokenAwarePusher)。
+//     APNS_ENV は push_env が未設定のトークンのフォールバック(単一値での運用だと、
+//     開発ビルドと TestFlight が混在した瞬間に片方へ届かない)
+//   - APNs が「このトークンは無効」と返したとき(410 / 400 BadDeviceToken)は結果に
+//     invalidToken: true を付け、TokenAwarePusher が users.push_token を null にする
+//     (次回起動時にクライアントが再登録する)
 
 import type { PairSnapshot } from "./snapshot.ts";
 
@@ -27,7 +34,10 @@ export interface ApnsConfig {
   keyId: string;
   /** env: APPLE_TEAM_ID */
   teamId: string;
-  /** env: APNS_ENV(sandbox | production。TestFlight は production — DESIGN §10) */
+  /**
+   * env: APNS_ENV(sandbox | production)。users.push_env が未設定のトークンへの送信先
+   * (フォールバック)。トークンごとの環境は push_env が決める — DESIGN §4
+   */
   environment: ApnsEnvironment;
   /** apns-topic ヘッダ(= Bundle ID)。env: APNS_TOPIC */
   topic: string;
@@ -178,12 +188,52 @@ function base64UrlEncodeString(s: string): string {
 
 export type ApnsSendResult =
   | { ok: true; status: number; attempts: number }
-  | { ok: false; status?: number; attempts: number; reason: string };
+  | {
+    ok: false;
+    status?: number;
+    attempts: number;
+    reason: string;
+    /**
+     * APNs が「このデバイストークンはもう使えない」と返した(410 / 400 BadDeviceToken)。
+     * 呼び出し側は users.push_token を捨ててよい(TokenAwarePusher が行う)。
+     * 5xx・ネットワーク断・認証エラーなど、トークンのせいと言い切れない失敗は false
+     */
+    invalidToken: boolean;
+  };
+
+/** send() のオプション */
+export interface ApnsSendOptions {
+  pushType?: "alert" | "background";
+  priority?: number;
+  /**
+   * この送信だけ APNs の環境を指定する。省略時は ApnsConfig.environment(APNS_ENV)。
+   * 通常は TokenAwarePusher が users.push_env からトークンごとに決めて渡す
+   */
+  environment?: ApnsEnvironment;
+}
 
 const APNS_HOSTS: Record<ApnsEnvironment, string> = {
   sandbox: "api.sandbox.push.apple.com",
   production: "api.push.apple.com",
 };
+
+/**
+ * APNs の応答が「デバイストークンが無効」を意味するか。
+ *   - 410: Unregistered / ExpiredToken(端末側でアプリが削除された・トークンが失効した)
+ *   - 400 + reason BadDeviceToken: トークンが不正、またはトークンの環境と送信先の環境が違う
+ * DeviceTokenNotForTopic(別アプリのトークン / APNS_TOPIC の設定ミス)や 403(JWT の問題)、
+ * 429・5xx はトークンのせいとは限らないので false(誤って全員のトークンを消さない)
+ */
+export function isInvalidTokenResponse(status: number, body: string): boolean {
+  if (status === 410) return true;
+  if (status !== 400) return false;
+  try {
+    const parsed = JSON.parse(body) as { reason?: unknown };
+    return parsed?.reason === "BadDeviceToken";
+  } catch {
+    return false;
+  }
+}
 
 /** JWT 再発行までの時間(Apple 規定 20〜60 分の内側) */
 const JWT_TTL_MS = 45 * 60 * 1000;
@@ -208,23 +258,26 @@ export class ApnsClient {
 
   /**
    * デバイストークンへ payload を送信する。
+   * - 送信先の環境は opts.environment、省略時は ApnsConfig.environment(APNS_ENV)
    * - 失敗(送信例外・5xx)はリトライ1回まで(DESIGN §5.5)
-   * - 4xx(BadDeviceToken 等)はリトライしない
+   * - 4xx(BadDeviceToken 等)はリトライしない。トークン無効と判定できる応答は
+   *   結果に invalidToken: true を付けて返す(掃除は TokenAwarePusher の仕事)
    * - 決して throw しない。失敗しても呼び出し側の処理は成功扱いにできる
    *   (自己修復経路 GET /snapshot があるため — DESIGN §4)
    */
   async send(
     deviceToken: string,
     payload: Record<string, unknown>,
-    opts: { pushType?: "alert" | "background"; priority?: number } = {},
+    opts: ApnsSendOptions = {},
   ): Promise<ApnsSendResult> {
     let lastReason = "unknown";
     let lastStatus: number | undefined;
+    const environment = opts.environment ?? this.#config.environment;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
         const jwt = await this.#jwt();
         const url = `https://${
-          APNS_HOSTS[this.#config.environment]
+          APNS_HOSTS[environment]
         }/3/device/${deviceToken}`;
         const headers: Record<string, string> = {
           authorization: `bearer ${jwt}`,
@@ -246,6 +299,7 @@ export class ApnsClient {
             status: res.status,
             attempts: attempt,
             reason: lastReason,
+            invalidToken: isInvalidTokenResponse(res.status, res.body),
           };
         }
       } catch (e) {
@@ -258,6 +312,7 @@ export class ApnsClient {
       status: lastStatus,
       attempts: MAX_ATTEMPTS,
       reason: lastReason,
+      invalidToken: false,
     };
   }
 
@@ -277,5 +332,75 @@ export class ApnsClient {
     });
     this.#cachedJwt = { token, issuedAtMs: nowMs };
     return token;
+  }
+}
+
+// ---- トークン単位の環境選択と無効トークンの掃除(issue #53) ----
+
+/**
+ * users.push_token / push_env の永続層。実装は pusher.ts の makePushTokenStore(Supabase)。
+ * apns.ts を supabase-js から切り離す注入点で、テストはモックを渡す
+ */
+export interface PushTokenStore {
+  /** deviceToken を持つ users.push_env。行が無い・未設定は null(= APNS_ENV にフォールバック) */
+  getPushEnv(deviceToken: string): Promise<ApnsEnvironment | null>;
+  /**
+   * deviceToken を持つ users.push_token を null にする(無効トークンの掃除)。
+   * 条件は「いまの push_token が deviceToken と一致」にするので、
+   * 送信と同時にクライアントが再登録した新しいトークンは消さない
+   */
+  clearPushToken(deviceToken: string): Promise<void>;
+}
+
+/**
+ * ApnsClient を包み、①トークンごとに users.push_env で送信先の環境を選び、
+ * ②APNs が「トークン無効」と返したら users.push_token を null にする Pusher。
+ * 各 Function の core.ts が期待する Pusher(send(token, payload, opts))と互換。
+ *
+ * 決して throw しない。環境の取得・トークンの掃除に失敗しても、ログに残して処理を続ける
+ * (push は本処理を止めない — DESIGN §5.5。未設定の環境は APNS_ENV で送る)。
+ */
+export class TokenAwarePusher {
+  #client: Pick<ApnsClient, "send">;
+  #store: PushTokenStore;
+
+  constructor(client: Pick<ApnsClient, "send">, store: PushTokenStore) {
+    this.#client = client;
+    this.#store = store;
+  }
+
+  async send(
+    deviceToken: string,
+    payload: Record<string, unknown>,
+    opts: ApnsSendOptions = {},
+  ): Promise<ApnsSendResult> {
+    // 呼び出し側が環境を指定していればそれを優先(DB を引かない)
+    let environment: ApnsEnvironment | undefined = opts.environment;
+    if (environment === undefined) {
+      try {
+        environment = (await this.#store.getPushEnv(deviceToken)) ?? undefined;
+      } catch (e) {
+        console.error("apns: push_env の取得に失敗。APNS_ENV で送信する:", e);
+      }
+    }
+
+    const result = await this.#client.send(deviceToken, payload, {
+      ...opts,
+      environment,
+    });
+
+    if (!result.ok && result.invalidToken) {
+      try {
+        await this.#store.clearPushToken(deviceToken);
+        console.warn(
+          `apns: 無効なトークンを破棄した(token ${
+            deviceToken.slice(0, 8)
+          }…, env ${environment ?? "APNS_ENV"}): ${result.reason}`,
+        );
+      } catch (e) {
+        console.error("apns: 無効トークンの破棄に失敗:", e);
+      }
+    }
+    return result;
   }
 }

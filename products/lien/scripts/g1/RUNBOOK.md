@@ -44,7 +44,7 @@ supabase secrets set --project-ref lniheehfbtpfhglinfjm \
 ```
 
 - `APNS_AUTH_KEY` は .p8 の **PEM 全文**(ファイルパスではない)
-- `APNS_ENV`: Xcode から実機へ直接インストール(development ビルド)= **sandbox**。TestFlight 配布になったら **production** に変更(DESIGN §10)
+- `APNS_ENV`: **`users.push_env` が未設定のトークンへの送信先(フォールバック)**。APNs の環境はトークン単位で、`users.push_env`(sandbox | production)があるトークンはそちらで送る(migration 0005 / DESIGN §4)。Xcode から実機へ直接インストール(development ビルド)= **sandbox**、TestFlight = **production**。開発ビルドと TestFlight が混在しても、各端末が push_token と一緒に push_env を保存していれば両方に届く(アプリ側の自動保存は issue #55)。保存されるまでは `APNS_ENV` を実機の配布経路に合わせておく
 - `APNS_TOPIC` = Bundle ID `com.ryoki63.lien`(ios/Config/Base.xcconfig の `LIEN_BUNDLE_ID_BASE`)
 - `SERVICE_ROLE_KEY` の手動投入は不要(Edge Runtime が `SUPABASE_SERVICE_ROLE_KEY` を自動注入し、コードはそちらを先に読む)
 
@@ -129,7 +129,7 @@ curl -sS -X POST "https://lniheehfbtpfhglinfjm.supabase.co/functions/v1/checkin-
 
 **push トークンの取得と登録**(T08準備②のハーネス実装済み):
 - アプリは通知許可後に APNs 登録を行う(オンボの通知許可直後+許可済みなら毎起動時に再登録)。**DEBUG ビルドではオンボ完了後の画面(solo/paired)に「Device Token(G1計測用)」**が hex 文字列で表示される(未取得時は「未取得(通知許可後に表示)」)
-- 各端末で「コピー」を押してトークンを取得し、seed-pair.sh の引数(`bash seed-pair.sh <tokenA> <tokenB>`)か、seed 出力末尾の PATCH コマンドで `users.push_token` に設定する(hex 文字列をそのまま渡してよい)
+- 各端末で「コピー」を押してトークンを取得し、seed-pair.sh の引数(`PUSH_ENV=sandbox bash seed-pair.sh <tokenA> <tokenB>`。`PUSH_ENV` は Xcode 直インストール=sandbox / TestFlight=production)か、seed 出力末尾の PATCH コマンドで `users.push_token` と `users.push_env` に設定する(hex 文字列をそのまま渡してよい)
 - 計測に最低限必要なのは**デバイスB(観察側)のトークンのみ**(push は A→B 方向)
 
 **ウィジェット配置**: デバイスBのホーム画面長押し → 「+」→ Lien ウィジェット(S)を配置。
@@ -158,6 +158,6 @@ bash products/lien/scripts/g1/measure.sh
 | seed の signup が 422 `anonymous_provider_disabled` | 手順3(Anonymous sign-ins)が未実施 |
 | functions が 401 | JWT 失効(匿名セッション約1時間)→ refresh か seed やり直し |
 | checkin が 409 `no_promise` | promises 未作成 → `SUPABASE_SERVICE_ROLE_KEY` 付きで seed-pair.sh を再実行(promises への直接書き込みは service_role のみ。クライアント書き込みは RLS/GRANT で deny — migration 0001)。promise-set Function デプロイ済みならユーザーJWTで `POST /functions/v1/promise-set`(T12)でも作成できる |
-| push がデバイスBに届かない | ① `supabase secrets list` で APNs 5変数を確認 ② `APNS_ENV` の sandbox/production がビルド配布経路と一致しているか(Xcode直=sandbox) ③ `users.push_token` がデバイスBの最新トークンか ④ `supabase functions logs checkin` で送信結果を確認 |
+| push がデバイスBに届かない | ① `supabase secrets list` で APNs 5変数を確認 ② トークンの環境が配布経路と一致しているか: `users.push_env`(未設定なら `APNS_ENV`)の sandbox/production が Xcode直=sandbox / TestFlight=production と合っているか。環境違いだと APNs が 400 BadDeviceToken を返し、サーバーはそのトークンを破棄する(`users.push_token` が null になる。次回アプリ起動で再登録) ③ `users.push_token` がデバイスBの最新トークンか(null なら上の破棄済み) ④ `supabase functions logs checkin` で送信結果を確認 |
 | db push が失敗 | `SUPABASE_DB_PASSWORD` の誤り → Dashboard でリセットして GitHub secret も更新 |
 | close-day を手動で叩きたい | [../OPS.md](../OPS.md) の「取りこぼしの再実行」(`ops/run-cron-fn.sh`)を使う。Bearer は Edge Runtime が注入する `SUPABASE_SERVICE_ROLE_KEY` との**完全一致**が必要で、**このプロジェクトではその値は default の secret key(`sb_secret_...`)**。Dashboard の legacy `service_role`(`eyJ...`)では 401(2026-10-12 実測) |

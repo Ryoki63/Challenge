@@ -12,6 +12,11 @@
 #                              ※ promises への書き込みは service_role のみ(RLS/GRANT。
 #                                migration 0001)。未設定だと checkin が 409 no_promise に
 #                                なり measure.sh で計測できない
+#   PUSH_ENV                   (任意)push_token を渡すときの APNs 環境 sandbox | production。
+#                              Xcode 直インストール(development)= sandbox、TestFlight = production。
+#                              users.push_env に保存され、サーバーはトークンごとにこの環境の
+#                              APNs へ送る(migration 0005 / DESIGN §4)。未指定なら push_env は
+#                              未設定のままで、サーバーの APNS_ENV で送る
 #
 # 使い方:
 #   bash seed-pair.sh [push_token_A] [push_token_B]
@@ -26,6 +31,11 @@ SUPABASE_URL="${SUPABASE_URL:-https://lniheehfbtpfhglinfjm.supabase.co}"
 : "${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY を設定してください(Dashboard > Project Settings > API keys)}"
 PUSH_TOKEN_A="${1:-}"
 PUSH_TOKEN_B="${2:-}"
+PUSH_ENV="${PUSH_ENV:-}"
+case "$PUSH_ENV" in
+  "" | sandbox | production) ;;
+  *) echo "ERROR: PUSH_ENV は sandbox | production のいずれか: $PUSH_ENV" >&2; exit 1 ;;
+esac
 
 command -v curl > /dev/null || { echo "ERROR: curl が必要です" >&2; exit 1; }
 command -v python3 > /dev/null || { echo "ERROR: python3 が必要です(JSON解析)" >&2; exit 1; }
@@ -85,12 +95,14 @@ UID_B="$(json_get "$RES_B" user.id)"
 echo "    user B: $UID_B"
 
 # ---- 2. プロフィール更新(users は自分の行のみ・許可列のみ UPDATE 可)---------
-# migration 0001 の列レベル GRANT: nickname / avatar_emoji / timezone / remind_at /
-# push_token のみ authenticated が更新可。ここでは nickname と push_token だけ触る。
+# 列レベル GRANT(migration 0001 + 0005): nickname / avatar_emoji / timezone / remind_at /
+# push_token / push_env のみ authenticated が更新可。ここでは nickname と push_token(+ push_env)だけ触る。
 echo "==> 2/4 ニックネーム(+push_token)を設定"
 patch_user() { # jwt uid nickname push_token
   local body
-  if [ -n "$4" ]; then
+  if [ -n "$4" ] && [ -n "$PUSH_ENV" ]; then
+    body="$(printf '{"nickname":"%s","push_token":"%s","push_env":"%s"}' "$3" "$4" "$PUSH_ENV")"
+  elif [ -n "$4" ]; then
     body="$(printf '{"nickname":"%s","push_token":"%s"}' "$3" "$4")"
   else
     body="$(printf '{"nickname":"%s"}' "$3")"
@@ -179,7 +191,9 @@ cat << SUMMARY
    curl -sS -X PATCH "$SUPABASE_URL/rest/v1/users?id=eq.$UID_B" \\
      -H "apikey: \$SUPABASE_ANON_KEY" -H "Authorization: Bearer <JWT_B>" \\
      -H "content-type: application/json" -H "Prefer: return=representation" \\
-     -d '{"push_token":"<デバイスBのAPNsトークン>"}'
+     -d '{"push_token":"<デバイスBのAPNsトークン>","push_env":"<sandbox|production>"}'
+   ※ push_env は Xcode 直インストール=sandbox / TestFlight=production。トークンと必ずセットで更新する
+     (省略するとサーバーの APNS_ENV で送るので、環境が違うと届かない)
 
  2) スモーク(A がチェックイン → B に push が飛ぶ):
    curl -sS -X POST "$SUPABASE_URL/functions/v1/checkin" \\

@@ -169,6 +169,16 @@ B端末: LienNSE 起動(通知表示の前に実行される)
 - 通知を出さない更新(チェックイン取消など)は `content-available: 1` のサイレントプッシュ。ただし**サイレントは配送保証がない(OSスロットル)ため、フォールバック扱い**
 - 自己修復: アプリ本体はフォアグラウンド復帰時に必ず `GET /snapshot` で最新を取得し App Group を上書きする
 
+### 4.1 APNs の環境はトークン単位(2026-10-12 決定・issue #53)
+
+APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com`)でエンドポイントが別で、環境が違うトークンは `400 BadDeviceToken` になる。サーバー全体の `APNS_ENV` 1値で切り替えると、開発ビルド(Xcode 直インストール = sandbox)と TestFlight・App Store(= production)が混在した瞬間に片方へ届かない。そこでトークンごとに環境を持つ。
+
+- **保存**: `users.push_env`(`sandbox` | `production` | null。migration 0005)。クライアントは `push_token` と**同時に** `PATCH /rest/v1/users?id=eq.<uid>` で更新する(列 GRANT は本人の行の `push_token` / `push_env`。値は端末が自分の環境から決める。iOS 側の自動保存は issue #55 W1)
+- **送信先の選択**: 送信時にトークンごとに `users.push_env` を引き、その環境のエンドポイントへ送る。**null(未設定・古い行)は `APNS_ENV` にフォールバック**する(`APNS_ENV` は Supabase secrets のまま。5変数のうち1つでも欠ければ push 無効 — §7)
+- **無効トークンの掃除**: APNs が `410`(Unregistered / ExpiredToken)または `400 BadDeviceToken` を返したら、そのトークンを持つ `users.push_token` を null にする(`push_env` は診断用に残す)。次回の起動でクライアントが再登録する。`DeviceTokenNotForTopic`・`403`(JWT)・`429`・5xx はトークンのせいと言い切れないので消さない(設定ミスで全員のトークンを消さないため)。条件は「いまの `push_token` がそのトークンと一致」なので、送信と同時に再登録された新しいトークンは消えない
+- **失敗の扱いは従来どおり**(§5.5): 5xx・ネットワーク断はリトライ1回、失敗しても本処理は成功扱い。環境の取得や掃除の失敗も本処理を止めない(ログに残して `APNS_ENV` で送る)
+- **実装**: `_shared/apns.ts`(`ApnsClient.send` の `environment` 指定・失敗結果の `invalidToken`・`TokenAwarePusher`)と `_shared/pusher.ts`(Supabase 版の `PushTokenStore`・`createPusher`)。Function の `index.ts` は `createPusher(adminClient, "<関数名>")` を使う(新しい push 送信 Function もこれを使うこと)。テストは `apns_test.ts` / `pusher_test.ts`
+
 ## 5. バックエンド設計(Supabase)
 
 ### 5.1 マイグレーション
