@@ -14,18 +14,26 @@
 #   # grant-tickets: 取りこぼした月の付与。月の1日の日付を1つだけ渡す。確認の環境変数が必須
 #   CONFIRM_GRANT=yes bash products/lien/scripts/ops/run-cron-fn.sh grant-tickets 2026-11-01
 #
+# 通知(重要):
+#   close-day は **常に notify:false** で呼ぶ(リセット・チケット消費の通知を送らない)。
+#   リセットの日は streak_days に行が残らないので、再実行するとその日のリセット通知(「また今日から」)を
+#   もう一度送ってしまう。取りこぼした日の通知は、何時間も何日も遅れて届くと混乱するので送らない。
+#   データ(streak_days・チケット・植物)は通常どおり確定する。
+#
 # 注意:
-#   - close-day は冪等(確定済みの日は skipped になる)。迷ったら範囲を広めに取ってよい
-#     ただし必ず古い日から新しい日へ(ストリーク・チケットの判定が前日に依存するため。範囲指定はその順で実行)
-#   - grant-tickets は月の途中に動かしてはいけない(上限に達していたペアは冪等キーの ledger 行が残らず、
-#     チケットを使った後に再付与される — docs/GROWTH.md §7.1)。その月の付与を丸ごと取りこぼしたときだけ使う
+#   - close-day は冪等(確定済みの日は skipped になり、何も書かない・何も送らない)。ただし必ず古い日から
+#     新しい日へ(ストリーク・チケットの判定が前日に依存するため。範囲指定はその順で実行)
+#   - 確定できるのは終わった日だけ(JST の昨日まで)。今日・未来はサーバーが 400 で断る
+#   - **月をまたいで止まっていたとき**は、1回の範囲指定で通さず、OPS.md「月をまたぐ停止」の順に分ける
+#     (前月末日の前日まで close-day → grant-tickets → 残り)。付与は 00:05、前月末日の確定は 00:10 に
+#     動く(= 付与が先)ので、その順を再現しないと、付与で救えたはずのリセットが起きる
+#   - grant-tickets は月ごとの実行記録(ticket_grant_runs)で冪等。同月に処理済みのペアはスキップされるので、
+#     月の途中に動かしても二重付与しない。未来の月はサーバーが 400 で断る
 #
 # 認証:
-#   両関数は「Authorization: Bearer <Edge Function が見る SUPABASE_SERVICE_ROLE_KEY>」の完全一致で認証する。
-#   このプロジェクトではその値は default の secret key(sb_secret_...)で、legacy の service_role(eyJ...)
-#   ではない(2026-10-12 実測)。そこで Management API でプロジェクトの API キーを引き、
-#   secret(default 優先)→ legacy service_role の順に、401 にならないキーを使う。
-#   鍵は変数に入れて使うだけで、画面・ログには出さない。
+#   cron 専用シークレット LIEN_CRON_SECRET(Function secrets)と同じ値が Vault の lien_cron_secret にある。
+#   Management API 経由で Vault から読んで Bearer に使う(service role key は使わない・受け付けられない)。
+#   値は変数に入れて使うだけで、画面・ログには出さない。
 #
 # 環境変数:
 #   SUPABASE_ACCESS_TOKEN  (必須)sbp_...
@@ -78,49 +86,50 @@ start, end = parse_date(os.environ["FROM_DATE"]), parse_date(os.environ["TO_DATE
 if end < start:
     sys.exit("ERROR: to が from より前です")
 
+JST = datetime.timezone(datetime.timedelta(hours=9))
+today_jst = datetime.datetime.now(JST).date()
+
 if FN == "grant-tickets":
     if start != end or start.day != 1:
         sys.exit("ERROR: grant-tickets は「月の1日」の日付を1つだけ指定してください(例 2026-11-01)")
+    if start.replace(day=1) > today_jst.replace(day=1):
+        sys.exit("ERROR: 未来の月は付与できません(実行記録が残って、その月の本当の cron が空振りします)")
     if os.environ.get("CONFIRM_GRANT") != "yes":
-        sys.exit("ERROR: grant-tickets は月の途中に動かすと再付与が起きます。"
-                 "その月の付与を丸ごと取りこぼしたと確認できたら CONFIRM_GRANT=yes を付けて再実行してください")
+        sys.exit("ERROR: grant-tickets は「取りこぼした月の付与」専用です。その月の cron が動かなかったと確認できたら"
+                 " CONFIRM_GRANT=yes を付けて再実行してください(同月に処理済みのペアは実行記録でスキップされます)")
 else:
     if (end - start).days > 120:
         sys.exit("ERROR: 範囲が広すぎます(120日まで)。分けて実行してください")
+    if end >= today_jst:
+        sys.exit("ERROR: 確定できるのは終わった日だけです(JST の昨日 %s まで)" % (today_jst - datetime.timedelta(days=1)).isoformat())
 
-# 1. プロジェクトの API キー(候補)を取得: secret(default 優先)→ legacy service_role
-st, raw = http("GET", "https://api.supabase.com/v1/projects/%s/api-keys?reveal=true" % REF,
-               {"Authorization": "Bearer " + os.environ["SUPABASE_ACCESS_TOKEN"]})
-if st != 200:
-    sys.exit("ERROR: API キーの取得に失敗 (HTTP %d)" % st)
-keys = json.loads(raw)
-secrets = sorted([k for k in keys if k.get("type") == "secret"], key=lambda k: k.get("name") != "default")
-legacy = [k for k in keys if k.get("name") == "service_role"]
-candidates = [k["api_key"] for k in secrets + legacy if k.get("api_key")]
-if not candidates:
-    sys.exit("ERROR: 使える API キーが見つかりません")
+# 1. cron 専用シークレットを Vault から読む(Management API 経由。値は画面に出さない)
+st, raw = http("POST", "https://api.supabase.com/v1/projects/%s/database/query" % REF,
+               {"Authorization": "Bearer " + os.environ["SUPABASE_ACCESS_TOKEN"], "Content-Type": "application/json"},
+               json.dumps({"query": "select decrypted_secret from vault.decrypted_secrets where name = 'lien_cron_secret'"}))
+if st not in (200, 201):
+    sys.exit("ERROR: Vault の読み取りに失敗 (HTTP %d)" % st)
+rows = json.loads(raw)
+if not rows or not rows[0].get("decrypted_secret"):
+    sys.exit("ERROR: Vault に lien_cron_secret がありません。scripts/OPS.md の「鍵の更新」で作成してください")
+secret = rows[0]["decrypted_secret"]
 
 url = "https://%s.supabase.co/functions/v1/%s" % (REF, FN)
-def call(key, d):
-    return http("POST", url, {"Authorization": "Bearer " + key, "Content-Type": "application/json"},
-                json.dumps({"dateLocal": d.isoformat()}))
-
-# 2. 最初の日で 401 にならないキーを選ぶ(401 は何も処理されないので試して安全)
-day = start
-chosen = None
-for key in candidates:
-    st, body = call(key, day)
-    if st != 401:
-        chosen = key
-        break
-if chosen is None:
-    sys.exit("ERROR: どのキーも %s に認証されませんでした(401)。scripts/OPS.md「鍵」を参照" % FN)
+def call(d):
+    body = {"dateLocal": d.isoformat()}
+    if FN == "close-day":
+        body["notify"] = False  # 通知を再送しない(上の「通知」参照)
+    return http("POST", url, {"Authorization": "Bearer " + secret, "Content-Type": "application/json"},
+                json.dumps(body))
 
 failed = False
+day = start
 while day <= end:
-    if day != start:
-        st, body = call(chosen, day)
+    st, body = call(day)
     print("%s %s HTTP %d %s" % (FN, day.isoformat(), st, body))
+    if st == 401:
+        print("  → 認証に失敗しました。Vault の lien_cron_secret と Function secrets の LIEN_CRON_SECRET が"
+              "違う可能性があります。scripts/OPS.md の「鍵の更新」を参照", file=sys.stderr)
     if st != 200:
         failed = True
         break

@@ -37,6 +37,13 @@
 --   書けないため。月の途中に動かしてはいけない(上限に達していたペアには冪等キーの
 --   ledger 行が残らず、チケットを使った後に再付与されてしまう — GROWTH.md §7.1)
 --
+-- 【注意】本番プロジェクト(lniheehfbtpfhglinfjm)の URL を直書きしている:
+--   別のプロジェクト(staging など)へ適用すると、そのプロジェクトの pg_cron が本番の Function を呼ぶ。
+--   別プロジェクトに適用するときは、先にジョブの URL を差し替えること。
+--   ※ 2つのジョブは migration 0007 で置き換え済み(認証を cron 専用シークレット lien_cron_secret に変更。
+--     スケジュールと URL は同じ)。現行の定義は 0007。このファイルの Vault の lien_service_role_key は
+--     もう使わない(Function が service role key を受け付けなくなった — issue #60)
+--
 -- 冪等性: 拡張は if not exists。cron.schedule は同名ジョブがあれば更新するので、
 --   この migration を再実行してもジョブは重複しない
 --

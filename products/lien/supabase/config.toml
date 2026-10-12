@@ -6,9 +6,10 @@
 #
 # verify_jwt = false の理由(全関数共通):
 #   各 function は内部で自己認証する(ユーザー系は adminClient.auth.getUser(token)、
-#   cron 系の close-day / grant-tickets は SERVICE_ROLE_KEY との完全一致比較)。
-#   gateway の JWT 検証を有効にすると、新キー体系(sb_secret_...)は JWT ではないため
-#   cron 系が 401 になる。検証は関数内の自己認証に一本化する。
+#   cron 系の close-day / grant-tickets は cron 専用シークレット LIEN_CRON_SECRET との
+#   完全一致比較 — _shared/cron_http.ts。issue #60 で service role key から替えた)。
+#   cron の秘密は JWT ではないため、gateway の JWT 検証を有効にすると cron 系が 401 になる。
+#   検証は関数内の自己認証に一本化する。
 
 project_id = "lniheehfbtpfhglinfjm"
 
