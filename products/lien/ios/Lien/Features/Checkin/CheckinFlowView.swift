@@ -112,9 +112,12 @@ struct CheckinFlowView: View {
 
         HStack(spacing: LienSpacing.s) {
             if viewModel.canAttachPhoto || viewModel.isAttachingPhoto {
+                // PhotosPicker の label は MainActor 隔離でないクロージャ。@MainActor の ViewModel を中で読まず、値を先に取り出す
+                // (Swift 6 言語モードではエラーになる参照 — issue #28)
+                let isSending = viewModel.isAttachingPhoto
                 PhotosPicker(selection: $photoItem, matching: .images) {
                     Group {
-                        if viewModel.isAttachingPhoto {
+                        if isSending {
                             Label(Strings.Checkin.attachPhotoSending, systemImage: "photo")
                         } else {
                             Label(Strings.Checkin.attachPhotoButton, systemImage: "photo")

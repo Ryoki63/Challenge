@@ -56,7 +56,7 @@ final class CheckinService: CheckinPerforming, CheckinCanceling, PhotoAttaching,
         queue: PendingOpsQueue,
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .current,
-        processPhoto: @escaping @Sendable (Data) throws -> ProcessedPhoto = PhotoProcessor.process
+        processPhoto: @escaping @Sendable (Data) throws -> ProcessedPhoto = { try PhotoProcessor.process($0) }
     ) {
         self.api = api
         self.queue = queue
