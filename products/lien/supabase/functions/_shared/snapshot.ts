@@ -7,7 +7,7 @@
 //       成長 = ふたり達成日の累計回数。10段階 [0,1,3,7,14,21,30,45,66,100]
 //         (たね→ふたば→めばえ→わかば→よりそい→つぼみ→いろづき→ほころび→ふたりざき→みのり)
 //       回数は streak_days の kind='both' の行数から数える(plants.grown_days / stage は読まない — §7.2)
-//         + 昨日の仮判定(§7.3)+ 今日の先取り
+//         + 昨日の仮判定(§7.3。close-day が昨日を確定する前の 0:00〜1:00 だけ)+ 今日の先取り
 //       表情: normal / happy(両者完了)/ fidget(片方未完)/ sad(=「すやすや」。ふたり達成もお休みチケットも
 //         ない日が昨日まで2日以上続く)。枯れない・後退しない
 //   - ストリーク導出: docs/DESIGN.md §5.4(確定は close-day。表示はプレビュー値)
@@ -230,6 +230,88 @@ function formatDateLocal(now: Date, timeZone: string): string {
   }).format(now);
 }
 
+// ---- close-day の確定が済むまでの窓(昨日の仮判定・クライアントの「今日」の上書きに使う) ----
+
+/**
+ * close-day が昨日を確定し終えたとみなす時刻(ユーザーのタイムゾーンの「今日」の何時か)。
+ * cron は 00:10 JST。実行の遅れや再試行を見込んで 1:00 とする(GROWTH §7.3・T19 の完全版と同じ窓)。
+ * 昨日の行が「無い」ことは、確定前と、確定して**リセットされた**後(リセットの日は行を作らない)の
+ * どちらでも起きる。この時刻より前だけ「確定前」とみなし、後は行だけを信じる。
+ */
+export const CLOSE_DAY_SETTLE_HOUR = 1;
+
+/** now のユーザーTZでの現地の日付("YYYY-MM-DD")と時(0〜23)。不正な timeZone は既定 Asia/Tokyo */
+export function localDateAndHour(
+  now: Date,
+  timeZone: string,
+): { dateLocal: string; hour: number } {
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = formatLocalParts(now, timeZone);
+  } catch {
+    parts = formatLocalParts(now, DEFAULT_TIMEZONE);
+  }
+  const value = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  const dateLocal = `${value("year")}-${value("month")}-${value("day")}`;
+  assertDateLocal(dateLocal);
+  return { dateLocal, hour: Number(value("hour")) % 24 };
+}
+
+function formatLocalParts(
+  now: Date,
+  timeZone: string,
+): Intl.DateTimeFormatPart[] {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23", // 0 時を "24" と出す環境がある。0〜23 に固定する
+  }).formatToParts(now);
+}
+
+/** now が、ユーザーTZの「dateLocal の hour 時ちょうど」以降か(日付をまたいだ比較に対応) */
+export function isAtOrAfterLocalHour(params: {
+  now: Date;
+  timeZone: string;
+  dateLocal: string;
+  hour: number;
+}): boolean {
+  const current = localDateAndHour(params.now, params.timeZone);
+  const currentDay = dayNumber(current.dateLocal);
+  const targetDay = dayNumber(params.dateLocal);
+  if (currentDay !== targetDay) return currentDay > targetDay;
+  return current.hour >= params.hour;
+}
+
+/**
+ * 実効の「今日」(date_local)を決める。
+ *  - override 未指定 → now をユーザーTZで date_local 化した日付
+ *  - override あり、その日がまだ確定前(翌日の 1:00 より前) → override をそのまま使う。
+ *    深夜0時前後のクライアント/サーバー時計ずれや、送信キューの再送を吸収する
+ *  - override あり、その日の確定を過ぎている → override は捨てて本当の今日を使う。
+ *    close-day が確定した後にキューから届いた「昨日付け」の checkin が、確定済みの昨日を「今日」として
+ *    扱い、先取りの +1(段階アップを含む)を一瞬見せて、次の GET /snapshot で戻る、を防ぐ
+ */
+export function resolveTodayLocal(params: {
+  now: Date;
+  timeZone: string;
+  override?: string;
+}): string {
+  const actual = dateLocalInTimeZone(params.now, params.timeZone);
+  if (params.override === undefined) return actual;
+  assertDateLocal(params.override);
+  const settled = isAtOrAfterLocalHour({
+    now: params.now,
+    timeZone: params.timeZone,
+    dateLocal: addDaysLocal(params.override, 1),
+    hour: CLOSE_DAY_SETTLE_HOUR,
+  });
+  return settled ? actual : params.override;
+}
+
 // ---- snapshot 組み立て(純粋関数) ----
 
 export interface PromiseSummary {
@@ -348,29 +430,56 @@ export function buildSoloSnapshot(input: {
 
 /**
  * 昨日の仮判定を試す価値があるか(= DB に昨日の checkin を問い合わせるか)。
- * 昨日の streak_days 行が無く、かつ昨日がペア成立日(started_on)以降のときだけ true。
- * 行があれば確定済み(二重に足さない)、成立前なら判定対象外。
+ * 次の3つがそろったときだけ true:
+ *   1. いまが close-day の確定前の時間帯(実効の今日 = yesterdayLocal の翌日 の 1:00・ユーザーTZ より前)
+ *   2. 昨日の streak_days 行が無い(行があれば確定済み。二重に足さない)
+ *   3. 昨日がペア成立日(started_on)以降(成立前は判定対象外)
+ * 1 が肝心。昨日の行が無いのは「まだ確定していない」だけでなく「確定してリセットされた」ときも同じで、
+ * しかも昨日付けの checkin は close-day の後からでも足せる(checkin は ±1日を許し、iOS の送信キューは
+ * 日付をまたいで前日分を再送する)。窓の外で仮判定すると、リセット済みの昨日を「ふたり達成」と見せて
+ * 翌日に取り消すことになる(REQUIREMENTS §3.9 / GROWTH §3.2「回数は減らない」に反する)。
  */
 export function needsProvisionalYesterday(params: {
   days: readonly StreakDayRecord[];
   yesterdayLocal: string;
   startedOn: string;
+  /** いま(窓の判定に使う) */
+  now: Date;
+  /** ユーザーのタイムゾーン(窓の判定に使う) */
+  timeZone: string;
 }): boolean {
   const yesterday = dayNumber(params.yesterdayLocal);
   if (yesterday < dayNumber(params.startedOn)) return false;
-  return !params.days.some((d) => dayNumber(d.dateLocal) === yesterday);
+  if (params.days.some((d) => dayNumber(d.dateLocal) === yesterday)) {
+    return false;
+  }
+  return !isAtOrAfterLocalHour({
+    now: params.now,
+    timeZone: params.timeZone,
+    dateLocal: addDaysLocal(params.yesterdayLocal, 1),
+    hour: CLOSE_DAY_SETTLE_HOUR,
+  });
 }
 
 /**
  * 昨日の仮判定。0:00 から close-day(00:10 JST)が昨日の行を書くまでの間は昨日の行がまだ無く、
  * そのまま数えるとストリークが 0 に見え、昨日の分で上がった段階が 1 つ戻り、
- * すやすや(sad)が誤って出る。次の3つがそろえば、昨日を「ふたり達成(both)」とみなした行を返す
+ * すやすや(sad)が誤って出る。次の4つがそろえば、昨日を「ふたり達成(both)」とみなした行を返す
  * (そろわなければ null):
- *   1. 昨日の行がない
- *   2. 昨日がペア成立日(started_on)以降
- *   3. 2人とも昨日チェックインしている
- * 確定結果と必ず一致する: 両者がチェックインしていれば close-day は必ず both を記録し、
+ *   1. いまが close-day の確定前の時間帯(実効の今日の 1:00 より前。CLOSE_DAY_SETTLE_HOUR)
+ *   2. 昨日の行がない
+ *   3. 昨日がペア成立日(started_on)以降
+ *   4. 2人とも昨日チェックインしている
+ * 窓の中(確定前)なら、確定結果と一致する: 両者がチェックインしていれば close-day は必ず both を記録し、
  * チェックインの取消は当日しかできないので、昨日のチェックインはもう動かない。
+ * 窓の外では一致を保証できないので仮判定しない: 行が無い昨日は「リセット済み」かもしれず、
+ * close-day の後に届いた遅れた checkin を数えると、翌日に取り消すことになる(上の needsProvisionalYesterday)。
+ * 窓の外は行だけを信じる。close-day が一晩動かなかったときも、行が書かれる(OPS §4 の再実行)まで
+ * 確定前の分は数えない=書かれていない日を勝手に増やさない側に倒す。
+ * 残る誤差(窓の中の端): close-day が動いた 0:10 以降〜 1:00 の間に、キュー経由で昨日付けの checkin が
+ * 届くと、1:00 までは「ふたり達成」と見え、1:00 に消える。極めてまれ。完全に消すには checkins.created_at
+ * (その日の 24:00 より前に作られたものだけを数える)が要り、全関数の getCheckin が返す変更になるので、
+ * T19 の完全版で扱う。
  * 返した行は、ストリーク・すやすや・成長回数のすべてに使う(buildPairSnapshot の streakDays に足す)。
  * 「片方だけチェックインしてチケットで守られる日」は仮判定できない(0:00〜0:10 の間だけ
  * ストリークが 0 に見える)。close-day が送る ticket_used 通知の snapshot で直る(§7.3)
@@ -379,6 +488,8 @@ export function provisionalYesterdayRow(params: {
   days: readonly StreakDayRecord[];
   yesterdayLocal: string;
   startedOn: string;
+  now: Date;
+  timeZone: string;
   meCheckedInYesterday: boolean;
   partnerCheckedInYesterday: boolean;
 }): StreakDayRecord | null {
@@ -443,6 +554,8 @@ export interface SnapshotRepo {
  * todayLocalOverride: checkin 直後の組み立てでは、リクエストの dateLocal を「今日」として
  * 使う(深夜0時前後のクライアント/サーバー時計ずれで todayMeDone が false に見えるのを防ぐ)。
  * 未指定なら now をユーザーの timezone で date_local 化する。
+ * ただし override の日がすでに確定済み(翌日の 1:00 を過ぎている)なら捨てて、本当の今日を使う
+ * (resolveTodayLocal。close-day の後にキューから届いた昨日付けの checkin に、先取りの +1 を見せない)。
  * ※ ペアは国内(同一TZ)前提(REQUIREMENTS §3.4。時差ペアの厳密対応は v2+)
  */
 export async function loadSnapshotForUser(
@@ -455,8 +568,11 @@ export async function loadSnapshotForUser(
       `loadSnapshotForUser: user が見つからない: ${params.userId}`,
     );
   }
-  const todayLocal = params.todayLocalOverride ??
-    dateLocalInTimeZone(params.now, user.timezone);
+  const todayLocal = resolveTodayLocal({
+    now: params.now,
+    timeZone: user.timezone,
+    override: params.todayLocalOverride,
+  });
   assertDateLocal(todayLocal);
   const updatedAtIso = params.now.toISOString();
 
@@ -477,8 +593,8 @@ export async function loadSnapshotForUser(
   const confirmedDays = await repo.listStreakDays(pair.pairId);
   const plant = await repo.getPlant(pair.pairId);
 
-  // 昨日の仮判定(GROWTH §7.3)。昨日の行がまだ無いとき(close-day 実行前の 0:00〜0:10 など)だけ、
-  // 昨日の checkin を2回(自分・相手)引く
+  // 昨日の仮判定(GROWTH §7.3)。close-day が昨日を確定する前の時間帯(実効の今日の 1:00 より前)で、
+  // 昨日の行がまだ無いときだけ、昨日の checkin を2回(自分・相手)引く
   const yesterdayLocal = addDaysLocal(todayLocal, -1);
   let streakDays = confirmedDays;
   if (
@@ -486,6 +602,8 @@ export async function loadSnapshotForUser(
       days: confirmedDays,
       yesterdayLocal,
       startedOn: pair.startedOn,
+      now: params.now,
+      timeZone: user.timezone,
     })
   ) {
     const [meYesterday, partnerYesterday] = await Promise.all([
@@ -496,6 +614,8 @@ export async function loadSnapshotForUser(
       days: confirmedDays,
       yesterdayLocal,
       startedOn: pair.startedOn,
+      now: params.now,
+      timeZone: user.timezone,
       meCheckedInYesterday: meYesterday !== null,
       partnerCheckedInYesterday: partnerYesterday !== null,
     });

@@ -6,17 +6,21 @@ import {
   addDaysLocal,
   buildPairSnapshot,
   buildSoloSnapshot,
+  CLOSE_DAY_SETTLE_HOUR,
   countBothDays,
   countConsecutiveMissedDays,
   dateLocalInTimeZone,
   derivePlantMood,
   derivePlantProgress,
   derivePlantStage,
+  isAtOrAfterLocalHour,
   loadSnapshotForUser,
+  localDateAndHour,
   needsProvisionalYesterday,
   type PairSnapshot,
   PLANT_STAGE_THRESHOLDS,
   provisionalYesterdayRow,
+  resolveTodayLocal,
   type SnapshotCheckinRow,
   type SnapshotPairRow,
   type SnapshotPlantRow,
@@ -520,6 +524,101 @@ Deno.test("dateLocalInTimeZone: 不正TZは既定 Asia/Tokyo にフォールバ�
   );
 });
 
+// ---- 確定の窓(close-day が昨日を確定し終えるまで): 現地の日付と時・窓の判定・実効の今日 ----
+
+Deno.test("localDateAndHour: ユーザーTZの現地の日付と時(0時は 24 でなく 0)", () => {
+  const at = (iso: string, tz: string) => localDateAndHour(new Date(iso), tz);
+  assertEquals(at("2026-06-10T15:00:00Z", "Asia/Tokyo"), {
+    dateLocal: "2026-06-11",
+    hour: 0,
+  });
+  assertEquals(at("2026-06-10T15:05:00Z", "Asia/Tokyo"), {
+    dateLocal: "2026-06-11",
+    hour: 0,
+  });
+  assertEquals(at("2026-06-10T14:59:59Z", "Asia/Tokyo"), {
+    dateLocal: "2026-06-10",
+    hour: 23,
+  });
+  assertEquals(at("2026-06-10T16:00:00Z", "Asia/Tokyo"), {
+    dateLocal: "2026-06-11",
+    hour: 1,
+  });
+  // 日付がずれる TZ(ホノルル = UTC-10)
+  assertEquals(at("2026-06-10T03:00:00Z", "Pacific/Honolulu"), {
+    dateLocal: "2026-06-09",
+    hour: 17,
+  });
+  assertEquals(at("2026-06-10T10:00:00Z", "Pacific/Honolulu"), {
+    dateLocal: "2026-06-10",
+    hour: 0,
+  });
+  // 不正な TZ は既定 Asia/Tokyo
+  assertEquals(at("2026-06-10T15:05:00Z", "Mars/Olympus"), {
+    dateLocal: "2026-06-11",
+    hour: 0,
+  });
+});
+
+Deno.test("isAtOrAfterLocalHour: ちょうどの時刻から true。日付をまたいだ比較にも対応", () => {
+  const check = (iso: string, dateLocal: string, hour = 1) =>
+    isAtOrAfterLocalHour({
+      now: new Date(iso),
+      timeZone: "Asia/Tokyo",
+      dateLocal,
+      hour,
+    });
+  // 2026-06-11 の 1:00 JST = 2026-06-10T16:00:00Z
+  assertEquals(check("2026-06-10T15:59:59Z", "2026-06-11"), false, "0:59:59");
+  assertEquals(check("2026-06-10T16:00:00Z", "2026-06-11"), true, "1:00:00");
+  assertEquals(check("2026-06-10T15:00:00Z", "2026-06-11"), false, "0:00");
+  assertEquals(check("2026-06-11T03:00:00Z", "2026-06-11"), true, "12:00");
+  assertEquals(check("2026-06-11T03:00:00Z", "2026-06-12"), false, "前日");
+  assertEquals(check("2026-06-12T15:00:00Z", "2026-06-11"), true, "翌々日");
+  assertEquals(
+    check("2026-06-10T15:00:00Z", "2026-06-11", 0),
+    true,
+    "0 時ちょうど",
+  );
+  assertEquals(CLOSE_DAY_SETTLE_HOUR, 1, "窓は 1:00(close-day は 00:10 JST)");
+});
+
+Deno.test("resolveTodayLocal: override が無ければ実際の今日、確定前の日の override はそのまま、確定を過ぎた override は捨てる", () => {
+  const today = (iso: string, override?: string, timeZone = "Asia/Tokyo") =>
+    resolveTodayLocal({ now: new Date(iso), timeZone, override });
+  // JST 2026-06-11 12:00(= 03:00Z)
+  assertEquals(today("2026-06-11T03:00:00Z"), "2026-06-11", "override なし");
+  assertEquals(today("2026-06-11T03:00:00Z", "2026-06-11"), "2026-06-11");
+  // 時計が進んだ端末(翌日付け)は使う
+  assertEquals(today("2026-06-11T03:00:00Z", "2026-06-12"), "2026-06-12");
+  // 昨日付け: JST 6/11 0:30 はまだ昨日(6/10)の確定前 → 使う(時計の遅れ・直前のキュー再送)
+  assertEquals(today("2026-06-10T15:30:00Z", "2026-06-10"), "2026-06-10");
+  assertEquals(
+    today("2026-06-10T15:59:59Z", "2026-06-10"),
+    "2026-06-10",
+    "0:59:59",
+  );
+  // 1:00 を過ぎたら 6/10 は確定済み → 捨てて本当の今日(6/11)
+  assertEquals(
+    today("2026-06-10T16:00:00Z", "2026-06-10"),
+    "2026-06-11",
+    "1:00:00",
+  );
+  assertEquals(today("2026-06-11T03:00:00Z", "2026-06-10"), "2026-06-11", "昼");
+  // 古い override(キューに溜まった数日前の分)も捨てる
+  assertEquals(today("2026-06-11T03:00:00Z", "2026-06-07"), "2026-06-11");
+  // TZ が違えば窓も変わる(ホノルル: 2026-06-11 の 1:00 HST = 11:00Z)
+  assertEquals(
+    today("2026-06-11T10:59:59Z", "2026-06-10", "Pacific/Honolulu"),
+    "2026-06-10",
+  );
+  assertEquals(
+    today("2026-06-11T11:00:00Z", "2026-06-10", "Pacific/Honolulu"),
+    "2026-06-11",
+  );
+  assertThrows(() => today("2026-06-11T03:00:00Z", "2026-6-10"), "形式不正");
+});
+
 // ---- snapshot 組み立て(DESIGN §3.4。キー名一字一句一致) ----
 
 /** DESIGN §3.4 schemaVersion=1 の全19キー(成長ルール v2 でキー3つを足した: 16 → 19) */
@@ -755,66 +854,104 @@ Deno.test("buildSoloSnapshot: ソロ状態は pairId null・土だけ・約束�
 });
 
 // ---- 昨日の仮判定(GROWTH §7.3 の最小版。純粋関数) ----
+//
+// 窓: 実効の今日(yesterdayLocal の翌日)の 1:00(ユーザーTZ)より前だけ。
+// 昨日 = 2026-06-10 のとき、今日 = 6/11。JST 6/11 1:00 = 2026-06-10T16:00:00Z
 
-Deno.test("needsProvisionalYesterday: 昨日の行が無く、昨日が成立日以降のときだけ true", () => {
-  const rows = days("2026-06-08");
+/** JST 2026-06-11 0:05。close-day(0:10)の前 = 窓の中 */
+const IN_WINDOW = {
+  now: new Date("2026-06-10T15:05:00Z"),
+  timeZone: "Asia/Tokyo",
+};
+
+Deno.test("needsProvisionalYesterday: 窓の中で、昨日の行が無く、昨日が成立日以降のときだけ true", () => {
+  const base = {
+    yesterdayLocal: "2026-06-10",
+    startedOn: "2026-06-01",
+    ...IN_WINDOW,
+  };
   assertEquals(
-    needsProvisionalYesterday({
-      days: rows,
-      yesterdayLocal: "2026-06-09",
-      startedOn: "2026-06-01",
-    }),
+    needsProvisionalYesterday({ ...base, days: days("2026-06-09") }),
     true,
     "昨日の行が無い",
   );
   assertEquals(
-    needsProvisionalYesterday({
-      days: days("2026-06-09"),
-      yesterdayLocal: "2026-06-09",
-      startedOn: "2026-06-01",
-    }),
+    needsProvisionalYesterday({ ...base, days: days("2026-06-10") }),
     false,
     "both の行がある = 確定済み",
   );
   assertEquals(
     needsProvisionalYesterday({
-      days: [{ dateLocal: "2026-06-09", kind: "ticket" }],
-      yesterdayLocal: "2026-06-09",
-      startedOn: "2026-06-01",
+      ...base,
+      days: [{ dateLocal: "2026-06-10", kind: "ticket" }],
     }),
     false,
     "ticket の行がある = 確定済み",
   );
   assertEquals(
-    needsProvisionalYesterday({
-      days: [],
-      yesterdayLocal: "2026-06-09",
-      startedOn: "2026-06-10",
-    }),
+    needsProvisionalYesterday({ ...base, days: [], startedOn: "2026-06-11" }),
     false,
     "昨日はペア成立前",
   );
   assertEquals(
-    needsProvisionalYesterday({
-      days: [],
-      yesterdayLocal: "2026-06-09",
-      startedOn: "2026-06-09",
-    }),
+    needsProvisionalYesterday({ ...base, days: [], startedOn: "2026-06-10" }),
     true,
     "成立日当日は対象(started_on 以降)",
   );
 });
 
-Deno.test("provisionalYesterdayRow: 2人とも昨日チェックイン済みなら both の行を返す", () => {
+Deno.test("needsProvisionalYesterday: 窓の境目 — 0:00〜0:59:59 は true、1:00:00 以降は false(行が無くても)", () => {
+  const at = (iso: string, timeZone = "Asia/Tokyo") =>
+    needsProvisionalYesterday({
+      days: [],
+      yesterdayLocal: "2026-06-10",
+      startedOn: "2026-06-01",
+      now: new Date(iso),
+      timeZone,
+    });
+  assertEquals(at("2026-06-10T15:00:00Z"), true, "JST 0:00:00");
+  assertEquals(at("2026-06-10T15:10:00Z"), true, "JST 0:10(close-day の起動)");
+  assertEquals(at("2026-06-10T15:59:59Z"), true, "JST 0:59:59");
+  assertEquals(at("2026-06-10T16:00:00Z"), false, "JST 1:00:00");
+  assertEquals(at("2026-06-11T03:00:00Z"), false, "JST 昼");
+  assertEquals(at("2026-06-11T14:00:00Z"), false, "JST 夜");
+  assertEquals(at("2026-06-12T15:05:00Z"), false, "2日後の 0:05 でも窓の外");
+  // 時計が進んだ端末: サーバーの now が実効の今日(6/11)より前でも true
+  assertEquals(at("2026-06-10T14:59:30Z"), true, "JST 6/10 23:59:30");
+  // 窓はユーザーのタイムゾーンで決まる
+  assertEquals(
+    at("2026-06-11T04:59:59Z", "America/New_York"),
+    true,
+    "NY 6/11 0:59:59",
+  );
+  assertEquals(
+    at("2026-06-11T05:00:00Z", "America/New_York"),
+    false,
+    "NY 6/11 1:00:00",
+  );
+  assertEquals(
+    at("2026-06-11T10:59:59Z", "Pacific/Honolulu"),
+    true,
+    "ホノルル 6/11 0:59:59",
+  );
+  assertEquals(
+    at("2026-06-11T11:00:00Z", "Pacific/Honolulu"),
+    false,
+    "ホノルル 6/11 1:00:00",
+  );
+});
+
+Deno.test("provisionalYesterdayRow: 窓の中で2人とも昨日チェックイン済みなら both の行を返す", () => {
   assertEquals(
     provisionalYesterdayRow({
       days: [],
-      yesterdayLocal: "2026-06-09",
+      yesterdayLocal: "2026-06-10",
       startedOn: "2026-06-01",
+      ...IN_WINDOW,
       meCheckedInYesterday: true,
       partnerCheckedInYesterday: true,
     }),
-    { dateLocal: "2026-06-09", kind: "both" },
+    { dateLocal: "2026-06-10", kind: "both" },
   );
 });
 
@@ -823,8 +960,9 @@ Deno.test("provisionalYesterdayRow: 片方だけ・どちらもなら null(ふ�
     assertEquals(
       provisionalYesterdayRow({
         days: [],
-        yesterdayLocal: "2026-06-09",
+        yesterdayLocal: "2026-06-10",
         startedOn: "2026-06-01",
+        ...IN_WINDOW,
         meCheckedInYesterday: me,
         partnerCheckedInYesterday: partner,
       }),
@@ -837,9 +975,10 @@ Deno.test("provisionalYesterdayRow: 片方だけ・どちらもなら null(ふ�
 Deno.test("provisionalYesterdayRow: 行があるときは足さない(二重に数えない)・成立前も null", () => {
   assertEquals(
     provisionalYesterdayRow({
-      days: days("2026-06-09"),
-      yesterdayLocal: "2026-06-09",
+      days: days("2026-06-10"),
+      yesterdayLocal: "2026-06-10",
       startedOn: "2026-06-01",
+      ...IN_WINDOW,
       meCheckedInYesterday: true,
       partnerCheckedInYesterday: true,
     }),
@@ -848,13 +987,38 @@ Deno.test("provisionalYesterdayRow: 行があるときは足さない(二重に�
   assertEquals(
     provisionalYesterdayRow({
       days: [],
-      yesterdayLocal: "2026-06-09",
-      startedOn: "2026-06-10",
+      yesterdayLocal: "2026-06-10",
+      startedOn: "2026-06-11",
+      ...IN_WINDOW,
       meCheckedInYesterday: true,
       partnerCheckedInYesterday: true,
     }),
     null,
   );
+});
+
+Deno.test("provisionalYesterdayRow: 窓の外(1:00 以降)は、2人とも昨日チェックイン済みでも null(行が無い昨日はリセット済みかもしれない)", () => {
+  for (
+    const iso of [
+      "2026-06-10T16:00:00Z", // JST 1:00:00
+      "2026-06-11T03:00:00Z", // JST 昼
+      "2026-06-11T14:59:00Z", // JST 23:59
+    ]
+  ) {
+    assertEquals(
+      provisionalYesterdayRow({
+        days: [],
+        yesterdayLocal: "2026-06-10",
+        startedOn: "2026-06-01",
+        now: new Date(iso),
+        timeZone: "Asia/Tokyo",
+        meCheckedInYesterday: true,
+        partnerCheckedInYesterday: true,
+      }),
+      null,
+      iso,
+    );
+  }
 });
 
 // ---- loadSnapshotForUser(fake repo で受信者視点の組み立てを検証) ----
@@ -1291,21 +1455,167 @@ Deno.test("昨日の仮判定: 昨日がペア成立前なら対象外(問い合
   assertEquals(s2.streakCurrent, 1);
 });
 
-Deno.test("昨日の仮判定: todayLocalOverride の前日を「昨日」にする", async () => {
-  // now は JST 6/11 12:00 だが、override で 6/10 を今日として扱う → 昨日は 6/9
+// ---- 窓の外では行だけを信じる(close-day の後に届いた遅れた checkin を数えない) ----
+
+Deno.test("昨日の仮判定: 窓の境目 — JST 0:59:59 は昨日を数え、1:00:00 は数えない", async () => {
+  // 昨日(6/10)の行は無く、2人とも 6/10 にチェックイン済み。確定済みの行は 6/9 まで
+  const world = pairWorld({
+    checkins: {
+      "user-a|2026-06-10": { photoPath: null },
+      "user-b|2026-06-10": { photoPath: null },
+    },
+    streakDays: days("2026-06-08", "2026-06-09"),
+  });
+  const inside = await loadSnapshotForUser(makeFakeRepo(world), {
+    userId: "user-a",
+    now: new Date("2026-06-10T15:59:59Z"), // JST 6/11 0:59:59
+  });
+  assertEquals(inside.plantGrownDays, 3, "窓の中 = 昨日を数える(2 + 1)");
+  assertEquals(inside.streakCurrent, 3);
+
+  const calls: string[] = [];
+  const outside = await loadSnapshotForUser(makeFakeRepo(world, calls), {
+    userId: "user-a",
+    now: new Date("2026-06-10T16:00:00Z"), // JST 6/11 1:00:00
+  });
+  assertEquals(outside.plantGrownDays, 2, "窓の外 = 行だけ(昨日は数えない)");
+  assertEquals(outside.streakCurrent, 0, "昨日の行が無い = 途切れ");
+  assertEquals(
+    calls.filter((c) => c.endsWith("|2026-06-10")),
+    [],
+    "窓の外では昨日の checkin を問い合わせもしない",
+  );
+});
+
+Deno.test("昨日の仮判定: close-day の後に届いた遅れたチェックイン(リセット済みの昨日)は、その日いっぱい数えない", async () => {
+  // 6/7 に A だけチェックイン → 6/8 0:10 の close-day でリセット(行なし)→ 6/8 8:00 に B の遅れた 6/7 付けが届いた状態。
+  // 6/1〜6/6 の 6 回(めばえ)。窓(6/8 1:00)の後は、行が無い 6/7 を「ふたり達成」と見せない
+  const world = pairWorld({
+    pair: {
+      pairId: "pair-1",
+      startedOn: "2026-06-01",
+      memberIds: ["user-a", "user-b"],
+    },
+    checkins: {
+      "user-a|2026-06-07": { photoPath: null },
+      "user-b|2026-06-07": { photoPath: null },
+    },
+    streakDays: days(
+      "2026-06-01",
+      "2026-06-02",
+      "2026-06-03",
+      "2026-06-04",
+      "2026-06-05",
+      "2026-06-06",
+    ),
+  });
+  const times = {
+    "6/8 08:00": "2026-06-07T23:00:00Z",
+    "6/8 23:59": "2026-06-08T14:59:00Z",
+    "6/9 12:00": "2026-06-09T03:00:00Z",
+    "6/10 12:00": "2026-06-10T03:00:00Z",
+  };
+  for (const [label, iso] of Object.entries(times)) {
+    const snapshot = await loadSnapshotForUser(makeFakeRepo(world), {
+      userId: "user-a",
+      now: new Date(iso),
+    });
+    assertEquals(snapshot.plantGrownDays, 6, `${label}: 回数は 6 のまま`);
+    assertEquals(
+      snapshot.plantStage,
+      2,
+      `${label}: めばえのまま(上がって戻らない)`,
+    );
+    assertEquals(snapshot.streakCurrent, 0, `${label}: 6/7 はリセット済み`);
+  }
+});
+
+Deno.test("todayLocalOverride: 確定前の日は使い、その前日(確定済み)は仮判定しない", async () => {
+  // JST 6/11 0:30。クライアントはまだ 6/10 のつもり(override = 6/10)。6/10 は close-day(0:10)が済んだ頃で
+  // 窓(6/11 1:00)の中なので override を使う。その前日 6/9 は昨日の昼に確定済み(行が無ければリセット)
+  // なので、2人とも 6/9 にチェックインしていても数えない
   const repo = makeFakeRepo(pairWorld({
     checkins: {
       "user-a|2026-06-09": { photoPath: null },
       "user-b|2026-06-09": { photoPath: null },
+      "user-a|2026-06-10": { photoPath: null },
     },
     streakDays: days("2026-06-07", "2026-06-08"),
   }));
   const snapshot = await loadSnapshotForUser(repo, {
     userId: "user-a",
-    now: new Date("2026-06-11T03:00:00Z"),
+    now: new Date("2026-06-10T15:30:00Z"),
     todayLocalOverride: "2026-06-10",
   });
-  assertEquals(snapshot.plantGrownDays, 3);
+  assertEquals(snapshot.todayMeDone, true, "override の 6/10 を今日として読む");
+  assertEquals(snapshot.todayPartnerDone, false);
+  assertEquals(snapshot.plantGrownDays, 2, "6/9(行なし)は数えない");
+  assertEquals(snapshot.streakCurrent, 0);
+});
+
+Deno.test("todayLocalOverride: 確定を過ぎた日は捨てて本当の今日を使う(遅れて届いた昨日付けの checkin に先取りの +1 を出さない)", async () => {
+  // JST 6/11 12:00。キューから届いた B の 6/10 付けの checkin(override = 6/10)。6/10 は close-day で確定済み
+  // (A だけだったのでリセット = 行なし)。override を使うと「今日 6/10 はふたり達成」の先取り +1 が出て、
+  // 次の GET /snapshot(本当の今日 6/11)で消える → 捨てて本当の今日で組み立てる
+  const world = pairWorld({
+    checkins: {
+      "user-a|2026-06-10": { photoPath: null },
+      "user-b|2026-06-10": { photoPath: null }, // 遅れて届いた分
+    },
+    streakDays: days(
+      "2026-06-02",
+      "2026-06-03",
+      "2026-06-04",
+      "2026-06-05",
+      "2026-06-06",
+      "2026-06-07",
+    ),
+  });
+  const now = new Date("2026-06-11T03:00:00Z");
+  const withStaleOverride = await loadSnapshotForUser(makeFakeRepo(world), {
+    userId: "user-b",
+    now,
+    todayLocalOverride: "2026-06-10",
+  });
+  const plain = await loadSnapshotForUser(makeFakeRepo(world), {
+    userId: "user-b",
+    now,
+  });
+  assertEquals(
+    withStaleOverride,
+    plain,
+    "確定済みの override は無かったことになる",
+  );
+  assertEquals(withStaleOverride.todayMeDone, false, "本当の今日 6/11 はまだ");
+  assertEquals(
+    withStaleOverride.plantGrownDays,
+    6,
+    "先取りの +1 も昨日の仮判定も無い",
+  );
+  assertEquals(withStaleOverride.plantStage, 2);
+  assertEquals(withStaleOverride.streakCurrent, 0);
+});
+
+Deno.test("todayLocalOverride: 時計が進んだ端末(翌日付け)は使い、サーバーの今日を「昨日」として仮判定する", async () => {
+  // JST 6/10 23:59:30。端末の時計が少し進んでいて、checkin の dateLocal が 6/11(override = 6/11)。
+  // 実効の今日 = 6/11 の窓(6/11 1:00)の中なので、昨日 = 6/10(サーバーの今日。まだ未確定)を仮判定する。
+  // 6/10 は2人ともチェックイン済み → 数える
+  const repo = makeFakeRepo(pairWorld({
+    checkins: {
+      "user-a|2026-06-10": { photoPath: null },
+      "user-b|2026-06-10": { photoPath: null },
+      "user-a|2026-06-11": { photoPath: null }, // いま入れたチェックイン
+    },
+    streakDays: days("2026-06-08", "2026-06-09"),
+  }));
+  const snapshot = await loadSnapshotForUser(repo, {
+    userId: "user-a",
+    now: new Date("2026-06-10T14:59:30Z"),
+    todayLocalOverride: "2026-06-11",
+  });
+  assertEquals(snapshot.todayMeDone, true, "override の 6/11 を今日として読む");
+  assertEquals(snapshot.todayPartnerDone, false);
+  assertEquals(snapshot.plantGrownDays, 3, "6/8・6/9 + 仮判定の 6/10");
   assertEquals(snapshot.streakCurrent, 3);
 });
 
