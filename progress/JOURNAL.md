@@ -261,3 +261,15 @@
 - 整理: BACKLOG を第1波の計画で作り直し(T10〜T14 の残骸を削除)。DONE に T08準備①②・T10〜T14 の追記漏れを補完(JOURNAL の事実のみ)
 - 次: 第1波を並列実行 — backend(#51→#52→#53→#54、Sonnet)∥ docs(#58、Sonnet)∥ ios-serial(#55、Sonnet)。各ステップ後に Opus でレビュー→必要なら修正。サブエージェントは JOURNAL に直接書かず、オーケストレータが集約して記録する
 - 第1波 起動(Workflow wf_1eabad77-d26): backend(#51 cron → #52 写真パス → #53 push_env → #54 成長ルール)∥ docs(#58)∥ ios-serial(#55 W1)。実行 Sonnet max、各ステップ後に Opus max レビュー → must_fix があれば Sonnet で修正。本番変更は D4 の範囲(cron・migration 0003〜0005・関数の一括デプロイ)。進捗は完了時にここへ集約して記録する
+
+## 2026-10-13 01:10 (対話/Opus) — 第1波 完了の集約(Workflow wf_1eabad77-d26・10エージェント・約6.7時間)
+- **#51 cron(本番)**: pg_cron 1.6.4 / pg_net 0.20.3 を導入し lien-close-day(00:10 JST)・lien-grant-tickets(毎日 00:05 JST 起動・1日だけ呼ぶ)を登録。鍵は Vault 参照(migration に書かない)。発見: Edge Function が見る鍵は legacy(eyJ…)ではなく default secret key(sb_secret_…)— Vault はこちらに更新。scripts/OPS.md・ops/*.sh 追加(6062884)
+- **初回の定期実行を本番で確認(オーケストレータ・読み取りのみ)**: 2026-10-13 00:10 JST close-day = HTTP 200(dateLocal 10-12・pairs 6・recordedBoth 2・recordedTicket 4・errors 空)/ 00:05 grant-tickets = 0 rows(1日でないので呼ばない=設計どおり)。成長・ストリークが本番で進むようになった
+- **#52 写真パス(本番)**: pairs/<pair>/<date>/<user_id>/… に変更、migration 0004 で本人の区画以外への書き込みを RLS で拒否。スモーク27項目全通過(8fdba73)
+- **#53 push_env(本番)**: migration 0005(users.push_env+列 GRANT)、apns.ts でトークン単位の環境選択と 410/BadDeviceToken 時の push_token 掃除(e0e5380)。deno 206 緑
+- **#54 成長ルール v2(本番)**: 10段階・streak_days の both 行数から数える・昨日の仮判定・plant-name 新設・11関数を一括デプロイ。スモーク55項目 PASS(949c6ea ほか)。**Opus レビューで must_fix 2件** → 修正: ①react の push は最初の1回だけ・相手の当日判定は相手のTZ ②昨日の仮判定を close-day 確定前(現地 1:00 前)に限定(1日中かかると、確定後に届いた昨日付けチェックインで数字が戻る不具合)。再デプロイ+スモーク35項目 PASS(〜793527d)。契約フィクスチャのずれ検査を lien-ci に組み込み。deno 285 緑
+- **#58 仕様改定**: REQUIREMENTS/TASKPLAN §9/CONCEPT/E2E-M1/ストア説明文を決定どおりに(d3f8103)。Opus レビュー must_fix 1件=「v1.0 で相手の写真を当日ホームで見せる」担当が不在 → **#59 PV を起票**して解消(cc9e4e4〜9cadad1)
+- **#55 W1 アプリ結線**: Live/Stub ファクトリ・accessToken・Invite/Snapshot/NudgeReact の Live・自己修復同期・push_token/push_env 自動保存・AppRouter(4状態)・ソロモード・契約フィクスチャ16件+検査。lien-ios 緑(261テスト 0失敗)(30ead91〜d9a787f)。Opus レビュー ok(改善提案11件は第2波へ)
+- 本番のテストデータ: 台帳を OPS.md §8 に記録(KPI 集計から除外する SQL つき)
+- 持ち越し(第2波へ): OPS の再実行手順の誤り(リセット通知の再送・grant-tickets の判定)/ 監視の自動化(毎朝 00:40 JST の Actions)/ cron 専用シークレット・net の権限 revoke / Release ビルドで Config 欠落時に Stub へ黙って落ちる / supabase-swift の版固定 / push_token のコールドスタート再送 / review-notes §1.1・§1.2 と実装のずれ5点 / DESIGN §3.3・§3.6・§5.6・§7・§10 の更新
+- 次(第2波): backend 堅牢化 B3 ∥ docs 整合 DOC2 ∥ ios-serial(W1 手直し+罰なし lint → T28準備 → PA 新イラスト取込)。順序変更: 新イラストを最初の内部 TestFlight(10/23 目標)に載せるため PA を PV・T23 の前へ(PA は PV・T23 に依存しない)
