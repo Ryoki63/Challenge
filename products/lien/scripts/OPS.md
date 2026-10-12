@@ -15,7 +15,7 @@ G0〜G1 の人間作業は [g1/RUNBOOK.md](g1/RUNBOOK.md)。本書は「公開�
 - 秘密はジョブの SQL に書いていない。実行のたびに Vault から引く
 - 本文: cron は `{}`(close-day は昨日・通知あり、grant-tickets は今月)。手動の再実行は `dateLocal`(close-day はさらに `notify:false`)を付ける。許すキーはこれだけで、知らないキー・壊れた JSON・型違いは 400(打ち間違いを既定値で動かさない)
 - 時刻: 00:05 に grant-tickets(付与)→ 00:10 に close-day(確定)の順。月初は付与が先に入る
-- 現行の定義: migration `0007_cron_secret.sql`(0003 のジョブを置き換えたもの)。スケジュール・「JST の1日だけ」の条件・呼び先・鍵は、静的テスト `ops/cron_static_test.ts` が検査する(`lien-cron-watch` の ops-tests ジョブ)
+- 現行の定義: migration `0007_cron_secret.sql`(0003 のジョブを置き換えたもの)。スケジュール・「JST の1日だけ」の条件・呼び先・鍵・本文 `{}` は、静的テスト `ops/cron_static_test.ts` が migration の文面を検査する(`lien-cron-watch` の ops-tests ジョブ)。**本番の `cron.job` が migration のとおりか**は、毎朝の監視(`job:*`)が検査する
 - 設定値(本番で確認): `cron.timezone = GMT` / `pg_net.ttl = 6 hours`(HTTP 応答の保存期間)/ pg_cron 1.6.4 / pg_net 0.20.3
 
 ### 鍵(重要)
@@ -40,15 +40,19 @@ bash products/lien/scripts/ops/check-cron.sh      # 自動確認と同じ検査�
 | 検査 | 赤になる条件 |
 |---|---|
 | `project` | プロジェクトが `ACTIVE_HEALTHY` でない(無料枠の自動停止。§5) |
-| `job:*` | `lien-close-day` / `lien-grant-tickets` が登録されていない・無効 |
-| `close-day:run` | 最後の起動が `succeeded` でない / 26 時間より前(毎日 00:10 に動くはず) |
+| `job:*` | `lien-close-day` / `lien-grant-tickets` が登録されていない・無効・**定義が migration 0007 とずれている**(スケジュール・呼び先・Vault の `lien_cron_secret`・本文 `{}`・「JST の1日だけ」の条件。誰かが手で書き換えて、通知が止まる・毎晩同じ日を確定するのに起動は `succeeded` のまま、を防ぐ) |
+| `job:unexpected` | 想定外のジョブが登録されている(スモークの一時ジョブの消し忘れなど。毎分本番の Function を呼び続ける。§10) |
+| `close-day:run` | **直近の予定の回(JST 00:10。猶予 5 分)の起動の記録が無い**(前夜の起動が抜けた)/ 起動が `succeeded` でない |
 | `close-day:response` | 起動に対応する HTTP 応答が 200 でない・`errors` が空でない・確定した日が起動日の前日でない・応答が無い(起動から 5.5 時間以内なのに) |
-| `grant-tickets:run` | 月初(JST の1日)の起動が `1 row` でない / 月初以外の起動が `0 rows` でない / 月初の応答が 200・`errors` 空でない |
+| `grant-tickets:run` | **直近の予定の回(JST 00:05)の起動の記録が無い**(その日が月初なら、月次付与が抜けた)/ 起動が `succeeded` でない / 月初(JST の1日)の起動が `1 row` でない / 月初以外の起動が `0 rows` でない |
+| `grant-tickets:response` | 月初の起動の応答が 200 でない・`errors` が空でない・応答が無い(起動から 5.5 時間以内なのに) |
 | `grant-tickets:stray` | 保存期間内の応答に、JST の1日でない日の grant-tickets の応答がある(月の途中に呼ばれた) |
 | `net:queue` | `net.http_request_queue` に処理待ちが残っている(pg_net のワーカー停止) |
 | `vault:*` / `secrets:sync` | Vault に `lien_cron_secret` が無い・万能鍵 `lien_service_role_key` が残っている・Vault と Function secrets の値が違う |
 | `exposure` | PostgREST の公開スキーマに `net` / `cron` / `vault` が入っている、または `pg_graphql` 拡張が有効(§9) |
 
+- **「起動したか」は経過時間でなく予定の回で見る**: 「最後の起動が N 時間以内」では、前夜の回が丸ごと抜けても(最後の起動 = 前々夜 = 24.5 時間前)通ってしまい、月初 00:05 の付与が抜けても最後の起動は前日の `0 rows`(1日でない日の正常な起動)に見える。そこで now から「もう起動しているはずの直近の予定時刻」(close-day は JST 00:10、grant-tickets は JST 00:05。予定から 5 分は猶予)を求め、その時刻以降の起動の記録を必須にしている。日中に手で実行しても赤にならない(予定の回は次の 00:05 / 00:10 まで変わらない)。起動していない回の応答は探さない
+- `MAX_AGE_HOURS`(workflow の `max_age_hours`)は最後の起動の許容経過時間の上限(既定 26)。通常は上の予定の回の検査が先に働くので、**0 を入れて必ず赤にする動作確認**のためのもの
 - 黄(WARN)は「起動から 5.5 時間を過ぎて pg_net の応答が消えていて、中身を確認できない」。朝の自動確認(起動の 30 分後)では出ない。昼に手で実行したときに出る
 - **このリポジトリは公開なので、Actions のログとジョブサマリは誰でも読める**。Actions 上では件数(ペア数・達成数など)・ペア ID・応答の本文を出さない(`redact`。判定は同じ)。件数や `errors` の中身を見たいときは、手元の `check-cron.sh`(redact なし)か、Function のログ(`supabase functions logs close-day`)で見る
 - **失敗時に赤になることの確認**: Actions の「Run workflow」で `max_age_hours` に `0` を入れる(ローカルは `MAX_AGE_HOURS=0 bash .../check-cron.sh`)。最後の起動が「0 時間より古い」ので必ず赤になる。本番の状態は変えない
@@ -125,7 +129,7 @@ select cron.alter_job((select jobid from cron.job where jobname = 'lien-close-da
 
 ## 4. 取りこぼしの再実行
 
-cron が動かなかった日(自動停止・障害・鍵の不一致)を埋める。
+cron が動かなかった日(自動停止・障害・鍵の不一致)を埋める。動作確認のために本番の close-day / grant-tickets を呼ぶときは §10 の作法に従う(空の本文で呼ぶと、昨日が通知つきで実際に確定する)。
 
 ```bash
 set -a; source .env; set +a
@@ -173,7 +177,7 @@ where p.status = 'active'
   and not exists (
     select 1 from ticket_grant_runs r
     where r.pair_id = p.id and r.month_start = date_trunc('month', (now() at time zone 'Asia/Tokyo'))::date)
-  and not exists (   -- 実行記録を入れる前(migration 0006 より前)の付与の印
+  and not exists (   -- 旧来の印: 同月の ledger monthly 行(0006 より前の付与。invite-accept の初期付与もこれで、今も増える)
     select 1 from ticket_ledger l
     where l.pair_id = p.id and l.reason = 'monthly'
       and l.date_local >= date_trunc('month', (now() at time zone 'Asia/Tokyo'))::date);
@@ -191,6 +195,7 @@ CONFIRM_GRANT=yes bash products/lien/scripts/ops/run-cron-fn.sh grant-tickets 20
 
 - 未来の月はサーバーが 400 `future_month` で断る(実行記録が残って、その月の本当の cron が空振りになるため)。月をまたぐ停止での順序は上の「月をまたいで止まっていたとき」
 - 付与は `ticket_ledger` の `reason = 'monthly'` にも残る(上限のペアは行なし)。月初の朝に (c) の応答が残っていれば、`granted / alreadyGranted / unchanged` の内訳が見える
+- **同月の ledger の monthly 行は、実行記録とは別の「処理済み」の印として今も必要**: ペアを作ると invite-accept が初期付与を `reason = 'monthly'`・`date_local = started_on` で ledger に書く(実行記録は作らない)。ペアを作った月は、この初期付与がその月の付与にあたるので、grant-tickets は印を見て上乗せしない(月初 00:05 の直前にできた premium ペアに +5 が重ならない。月の途中の再実行でも同じ)。0006 より前の付与のための互換だけではないので、「旧来の印だから」と消さない(`ops/cron_static_test.ts` が検査する)
 
 ## 5. 自動停止(無料枠)
 
@@ -257,7 +262,7 @@ PY
 | 2026-10-12 18:29 | 検証: ジョブの SQL を手で実行 → 200。一時ジョブ(毎分)で pg_cron の実行 → `succeeded` / 200 を確認し、一時ジョブは削除。初回の close-day(2026-10-11)で test ペア2組が確定(チケット消費) |
 | 2026-10-12 22:04 | issue #54 のレビュー修正を本番へ: snapshot を使う Edge Functions 9 本を再デプロイ(checkin v6 / checkin-cancel v3 / close-day v3 / invite-accept v3 / nudge v2 / plant-name v2 / promise-set v3 / react v2 / snapshot v3。verify_jwt はすべて false のまま)。migration の追加なし。内容は react の push を最初の1回だけに・昨日の仮判定を close-day の確定前の窓(0:00〜1:00)だけに・リクエスト本文 `null` を 400 に・plant-name の書式文字の拒否 |
 | 2026-10-13 00:10 | **初回の定期実行**(pg_cron → close-day v3)。2026-10-12 を確定: `pairs 6 / recordedBoth 2 / recordedTicket 4 / reset 0 / skipped 0 / errors []`(HTTP 200)。P1(`d38fda60-…`)は both が記録され `plants.grown_days = 1`・`stage = 0` のまま(stage は書かない設計どおり)。grant-tickets(00:05)は 1日ではないので `0 rows` |
-| 2026-10-13 01:43〜01:50 | **issue #60(堅牢化)を本番へ**。① migration 0006(`ticket_grant_runs` と RPC `apply_monthly_ticket_grant`。service_role 専用)と 0007(cron の認証を `lien_cron_secret` に)を適用し、`supabase_migrations.schema_migrations` にも記録。0006 は先に本番で強制ロールバックのドライランをして、RPC の各分岐(granted / unchanged / already / 負の残数 / 不正な月・日付)と権限を確認 ② cron 専用シークレットを作成: Vault の `lien_cron_secret` を DB の中の乱数(64 文字)で作り、同じ値を Function secrets の `LIEN_CRON_SECRET` に入れた(§6 のスクリプトそのまま。SHA-256 が一致)③ Edge Functions 11 本を再デプロイ(checkin v8 / checkin-cancel v5 / close-day v5 / grant-tickets v4 / invite-accept v5 / invite-create v4 / nudge v4 / plant-name v4 / promise-set v5 / react v4 / snapshot v5。verify_jwt はすべて false のまま)④ Vault の `lien_service_role_key`(万能鍵)を削除(判断は §6)。内容は close-day の `notify`・今日以降を確定しない、grant-tickets の月単位の実行記録・未来の月を断る、cron 専用シークレットでの認証、`push_env` を getUser と一緒に読む(送信のたびの逆引きをやめた) |
+| 2026-10-13 01:43〜01:50 | **issue #60(堅牢化)を本番へ**。① migration 0006(`ticket_grant_runs` と RPC `apply_monthly_ticket_grant`。service_role 専用)と 0007(cron の認証を `lien_cron_secret` に)を適用し、`supabase_migrations.schema_migrations` にも記録。0006 は先に本番で強制ロールバックのドライランをして、RPC の各分岐(granted / unchanged / already / 負の残数 / 不正な月・日付)と権限を確認 ② cron 専用シークレットを作成: Vault の `lien_cron_secret` を DB の中の乱数(64 文字)で作り、同じ値を Function secrets の `LIEN_CRON_SECRET` に入れた(§6 のスクリプトそのまま。SHA-256 が一致)③ Edge Functions 11 本を再デプロイ(checkin v9 / checkin-cancel v6 / close-day v6 / grant-tickets v5 / invite-accept v6 / invite-create v5 / nudge v5 / plant-name v5 / promise-set v6 / react v5 / snapshot v6。更新は 01:43〜01:44。verify_jwt はすべて false のまま。※ 当初この行は各 1 小さい版数を書いていた。2026-10-13 に Management API の実測で訂正)④ Vault の `lien_service_role_key`(万能鍵)を削除(判断は §6)。内容は close-day の `notify`・今日以降を確定しない、grant-tickets の月単位の実行記録・未来の月を断る、cron 専用シークレットでの認証、`push_env` を getUser と一緒に読む(送信のたびの逆引きをやめた) |
 | 2026-10-13 01:46〜01:50 | **#60 のスモーク(本番)**: 関数 29 項目 PASS(405 / 認証なし・別の秘密・**万能鍵が 401** / 壊れた JSON・知らないキー・型違い・今日と明日の確定・未来の月が 400 / `{"dateLocal":"2026-03-31","notify":false}` が 200 で `notify:false`・対象 0 ペア / RPC を service role で呼ぶと FK 違反 23503 = 結線 OK、anon では 401 / 表は anon から読めない)。cron の経路は一時ジョブ(毎分。本番ジョブの command をそのまま使用。確認後に削除)で確認: close-day は `succeeded` / `1 row` → pg_net の応答 200(`notify:false`・errors 空)、**grant-tickets の command は 1日でない日なので `succeeded` / `0 rows` で、pg_net の応答は増えない**(= 呼ばれない)。`ops/run-cron-fn.sh close-day 2026-03-30 2026-03-31` が Vault の秘密で 200・`notify:false`(引数の検査も確認: 今日・確認なしの grant-tickets・未来の月・1日でない日付は断る)。Function が流す問い合わせの形(`USER_COLUMNS` / `PARTNER_SELECT` の select・`ticket_grant_runs`・`db.rpc`)を supabase-js で本番に対して確認(読み取りと、必ず失敗する RPC だけ)。**意図しない変更が1つ**: スモークの「空の本文」(cron の素朴な POST)の確認で、既定の「昨日 = 2026-10-12」が実際に確定された。00:10 の cron が閉じなかったテストペア P3(`c33b5d9c-…`)・P4(`7ef8edd2-…`)の 10/12 に `both` が1行ずつ入り、`plants.grown_days` が数え直された(通知は出ていない: push_token を持つユーザーがいない・APNs 未設定)。テストペアなので影響はないが、台帳(§8)の値は 10/12 の分だけ進んでいる |
 | 2026-10-13 01:48〜01:49 | 監視の確認: `ops/check-cron.sh`(手元)と、GitHub Actions の `lien-cron-watch` の手動実行(workflow_dispatch。run 38279962642)が全項目 OK(`secrets:sync` で Vault と Function secrets が一致、`vault:master-key` で万能鍵なし、`exposure` で公開スキーマに net なし)。失敗時の動作確認: `max_age_hours=0` で手動実行(run 38280031567)すると `watch` ジョブが `failure`(FAIL: close-day:run / grant-tickets:run)になり、赤になることを確認。本番の状態は変えていない。続けて §6 の鍵の更新スクリプトを実行して**更新の経路**も確認: Vault の値が変わり、直後の最初の呼び出しから新しい値で 200(Function の再デプロイ不要)、`secrets:sync` も OK。なお上の2つの run(38279962642・38280031567)は、公開ログへの件数の出力をやめる前なので、ログにテストペアの件数が出ている。以降の run(redact 版。例 38280878109 = 緑)は件数・ペア ID・応答の本文を出さない |
 
@@ -310,9 +315,28 @@ select count(*) from users u where u.id not in (select id from test_users);   --
 
 issue #60 では「anon / authenticated から `net.http_post` の EXECUTE と `net.http_request_queue` / `net._http_response` の SELECT を revoke する」としていたが、**postgres ロール(Management API と migration が使うロール)からは絞れなかった**(2026-10-13 実測)。
 
+**この代わりの守りで受け入れるかはユーザーの判断**(issue #63。急ぎではなく、v1.0 の公開はブロックしない。決まるまでは下の代わりの守りのまま)。
+
 - pg_net の関数・表は `supabase_admin` 所有で、`PUBLIC`(全ロール)に EXECUTE / SELECT などが付いている(schema `net` の USAGE も PUBLIC)。anon / authenticated への個別の GRANT ではなく PUBLIC 経由なので、`revoke ... from anon, authenticated` を書いても何も変わらない
 - `revoke execute on function net.http_post(...) from public` を postgres で実行しても、エラーにならず何も変わらなかった(所有者でも supabase_admin のメンバーでもないため。DO ブロックの中で実行して結果を確認し、全体を巻き戻したので本番は変わっていない)。migration に効かない revoke を書くと、塞いだように見えてしまうので書かない
 - 代わりに次で守る:
   1. **公開 API から net に届かない**。PostgREST の公開スキーマは `public, graphql_public` だけ(`Accept-Profile: net` を付けた anon のリクエストは 406 `Invalid schema: net`)、pg_graphql は無効(GraphQL は "pg_graphql extension is not enabled")。anon / authenticated が SQL を直接流す経路はない。監視の `exposure` が、公開スキーマに `net` / `cron` / `vault` が入っていないこと、`pg_graphql` が無効なことを毎朝確認する(`pg_graphql` を有効にすると、PUBLIC に SELECT が付いた net の表が GraphQL の API に出る恐れがあるので、有効にするなら net が出ないことを確かめてから)
   2. **万能鍵を net のキューに載せない**(§1・§6)。キュー(`net.http_request_queue`。処理されるまでの短い間だけヘッダが入る)に載るのは cron 専用シークレットだけ。漏れても DB の読み書きには使えない
 - 将来、Supabase が net の所有や権限を変えて postgres から絞れるようになったら、migration に `revoke execute on function net.http_post(...) from public` と `revoke select on net.http_request_queue, net._http_response from public` を足し、cron が使うロール(`postgres`)と `service_role` に EXECUTE / INSERT / シーケンスの USAGE を明示的に GRANT する。**外すと cron が全部止まる**ので、適用前に一時ジョブで確かめること
+
+## 10. 本番でのスモークの作法(やってはいけない呼び方)
+
+本番に対して動作確認で close-day / grant-tickets を呼ぶときの決まり。#60 のスモークで一度これを破り、本番のデータが動いた(§7 の 2026-10-13 01:46〜01:50 の「意図しない変更」)。
+
+- **close-day を「空の本文」や日付なしで呼ばない**。本文を省く・`{}` にすると、cron と同じ既定 = **昨日(JST)を確定する・通知あり(`notify:true`)**。実ユーザーがいる状態で呼ぶと、本物のチケット消費・リセット・通知が起き、取り消せない(まだチェックインしていない人を未達として確定する)。#60 のスモークでは、これでテストペア P3・P4 の 10/12 が実際に確定した
+- 確認は **過去の日付 + `notify:false`** に限る。`bash products/lien/scripts/ops/run-cron-fn.sh close-day 2026-03-31` は、どのペアの `started_on` よりも前の日付なので対象 0 ペアで何も変わらず、常に `notify:false`(§6)。認証の疎通を見るだけなら、これで 200 が返れば足りる。スモークのスクリプトを書くときも、close-day の正常系は同じ形(過去の日付・`notify:false`)だけにする
+- 副作用なしで確かめられるもの(認証・本文の検査で止まり、DB に触らない): メソッド違い(405)、認証なし・別の秘密・万能鍵(401)、壊れた JSON・知らないキー・型違い・今日以降の日付(`date_not_closable`)・未来の月(`future_month`)(400)。「正常系の 200」を本番で確かめたいときだけ、上の過去の日付を使う
+- **grant-tickets は、本番で 200 になる呼び方をしない**(月次付与は実行記録が残って取り消せない)。確認は上の 400 系までにする。付与そのものの確認は、本番での強制ロールバックのドライラン(0006 でやったように、DO ブロックの中で RPC を呼び、最後に例外を投げて全体を巻き戻す)か、月初の本物の cron(翌 00:40 の監視の `grant-tickets:response`)で行う
+- cron のジョブを一時的に作って確かめるときは、確認後に必ず `select cron.unschedule('<名前>')` で消す(消し忘れは監視の `job:unexpected` が赤にする)。一時ジョブの本文も、`notify:false` と過去の日付を入れたものにする(本番ジョブの command をそのまま毎分で動かすと、昨日の確定が通知つきで走る)
+
+## 11. 規模が増えたときの注意(今の規模では問題ない。公開後の増え方を見て直す)
+
+Opus レビュー(2026-10-13)の指摘。いまはペアが数組で起きないが、ペアが増えると効いてくるもの。**v1.0 の公開前には要らない**。公開後に Function のログで実行時間を見て、必要になったら直す(issue #64。on-hold)。
+
+- **close-day の残数の更新は「絶対値で書く」**: 最初に読んだ残数から計算した値(`balance - 1` など)をそのまま書くので、読んでから書くまでの間に別の処理が残数を変えると、その変更を上書きする(lost update)。たとえば grant-tickets の付与が 00:10 までに終わらない規模になると、付与を上書きしてしまう。いまは 00:05 の付与が数秒で終わり、00:10 の確定の前に必ず済む。直し方: 残数の増減を DB 側の原子的な更新(RPC。`apply_monthly_ticket_grant` のように1トランザクション)にする
+- **grant-tickets はペアごとに約 5 往復の問い合わせを順に行う**(実行記録の確認・ledger の確認・メンバー2人の `premium_until`・RPC)。pg_net の timeout は 60 秒(`0007_cron_secret.sql` の `timeout_milliseconds`)で、見積もりではペアが数百組になると超える。超えると応答は `timed_out` になり(監視の `grant-tickets:response` が赤になる)、Function 自体は最後まで動くが、結果は pg_net 経由では見えない。直し方: ペア・`premium_until`・実行記録を `in (...)` でまとめて読み、書き込みだけを RPC にする

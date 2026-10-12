@@ -14,7 +14,10 @@
 //     行を残せず(delta<>0 の制約)、再実行で二重付与しえた
 //   - 実行記録・残高・ledger は RPC apply_monthly_ticket_grant の1トランザクションで書く
 //     (記録だけ残って付与されない、付与されたのに記録が無い、を作らない)
-//   - 旧来の印(同月の ledger monthly 行)も「処理済み」と見る(実行記録を入れる前の付与の互換)
+//   - 旧来の印(同月の ledger monthly 行)も「処理済み」と見る。これは 0006 より前の付与との互換だけのものではない:
+//     invite-accept の初期付与(reason='monthly'・date_local = started_on。実行記録は作らない)が、今も同じ印を残す。
+//     ペアを作った月は、その初期付与がその月の付与にあたる(たとえば月初の 00:05 の直前にできた premium ペアに
+//     +5 を上乗せしない。月の途中に付与を再実行しても同じ)。**「旧来の印だから」と消さない**
 //   - 未来の月は付与できない(400)。月の付与は実行記録に残って取り消せないので、
 //     打ち間違いの dateLocal で先食いして、その月の本当の cron を空振りさせない
 
@@ -87,6 +90,7 @@ export interface GrantTicketsRepo {
    * このペアの今月分は処理済みか(再実行の冪等キー)。
    * 実行記録(ticket_grant_runs の pair_id × month_start)がある、または
    * 同月(monthStart <= date_local < nextMonthStart)に reason='monthly' の ledger 行がある
+   * (後者は 0006 より前の付与と、invite-accept の初期付与。どちらも実行記録を作らない)
    */
   hasMonthlyGrantInMonth(
     pairId: string,

@@ -290,7 +290,7 @@ Deno.test("grant-tickets: 上限到達で 0 付与だったペアも、月の途
   assertEquals(world.applied.length, 1, "再実行では RPC を呼ばない");
 });
 
-Deno.test("grant-tickets: 旧来の印(同月の ledger monthly 行。実行記録を入れる前の付与)も処理済みと見る", async () => {
+Deno.test("grant-tickets: 旧来の印(同月の ledger monthly 行。0006 より前の付与)も処理済みと見る", async () => {
   const world = makeWorld({ pairs: [pair("pair-1", 1)] });
   world.ledger.push({
     pairId: "pair-1",
@@ -306,6 +306,53 @@ Deno.test("grant-tickets: 旧来の印(同月の ledger monthly 行。実行記�
   assertEquals(result.body.alreadyGranted, 1);
   assertEquals(world.applied.length, 0);
   assertEquals(world.pairs[0].ticketBalance, 1);
+});
+
+Deno.test("grant-tickets: invite-accept の初期付与(reason='monthly'・date_local = started_on。実行記録なし)も処理済みと見る — 月初の直前にできた premium ペアに +5 を上乗せしない", async () => {
+  // premium のペアが、月初の cron(7/1 00:05 JST)の直前の 00:03 にできた。invite-accept が初期付与 +5(残数 0 → 5)を
+  // ledger に reason='monthly'・date_local = started_on(7/1)で書き、実行記録(ticket_grant_runs)は作らない。
+  // 旧来の印の判定が無いと、この cron が +5 を上乗せして 10 になる
+  const world = makeWorld({
+    pairs: [pair("pair-new", 5)],
+    premiumUntil: { "user-a": "2027-01-01T00:00:00Z" },
+  });
+  world.ledger.push({
+    pairId: "pair-new",
+    delta: 5,
+    reason: "monthly",
+    dateLocal: "2026-07-01",
+  });
+
+  const result = await handleGrantTickets(deps(world), {});
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.alreadyGranted, 1, "初期付与がその月の付与");
+  assertEquals(result.body.granted, 0);
+  assertEquals(world.applied.length, 0, "RPC を呼ばない");
+  assertEquals(world.pairs[0].ticketBalance, 5, "上乗せしない");
+});
+
+Deno.test("grant-tickets: 月の途中にできたペア(初期付与がその月の別の日付)は、その月の付与を再実行しても上乗せされない", async () => {
+  // 7/15 にできた free ペア(初期付与 +2 を 7/15 付けで ledger に)。その後チケットを 1 枚使って残数 1。
+  // 7 月分の付与を再実行(取りこぼしの手当てなど)しても、初期付与が 7 月分なので +1 しない
+  const world = makeWorld({ pairs: [pair("pair-mid", 1)] });
+  world.ledger.push({
+    pairId: "pair-mid",
+    delta: 2,
+    reason: "monthly",
+    dateLocal: "2026-07-15",
+  });
+
+  const result = await handleGrantTickets(deps(world), {
+    dateLocal: "2026-07-01",
+  });
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.alreadyGranted, 1);
+  assertEquals(world.applied.length, 0);
+  assertEquals(world.pairs[0].ticketBalance, 1, "使った1枚を取り戻さない");
 });
 
 Deno.test("grant-tickets: 事前チェックをすり抜けた並行実行も RPC が 'already' で止める(二重に増えない)", async () => {

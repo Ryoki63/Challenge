@@ -73,7 +73,9 @@ function makeRepo(db: SupabaseClient): GrantTicketsRepo {
       if (runsError) throw runsError;
       if ((runs ?? []).length > 0) return true;
 
-      // 2. 旧来の印(実行記録を入れる前の付与。同月の ledger monthly 行)
+      // 2. 旧来の印(同月の ledger monthly 行)。実行記録を入れる前(0006 より前)の付与のほか、invite-accept の
+      //    初期付与(reason='monthly'・date_local = started_on。実行記録は作らない)も今この印を残す。後者は
+      //    これからも増えるので「旧来だから」と消さない(消すと、ペアを作った月の付与が上乗せされる)
       const { data, error } = await db
         .from("ticket_ledger")
         .select("id")
