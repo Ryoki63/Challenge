@@ -2,7 +2,7 @@
 
 - Status: **DRAFT** (T30準備 / issue #30 — prepared ahead of full backend deploy; see "状態" per section)
 - Last updated: 2026-10-13
-- Related issues: #30 (this task) / #8 (Supabase deploy, G0 待ち) / #23 (settings/report/delete UI, 未着手) / #28 (release build, 未着手) / #55 (W1: ソロモード・招待シート。完了) / #61 (§1.1・§1.2 を W1 の実装に合わせた)
+- Related issues: #30 (this task) / #8 (Supabase deploy, G0 待ち) / #23 (settings/report/delete UI, 未着手) / #28 (release build, 未着手) / #55 (W1: ソロモード・招待シート。完了) / #61 (§1.1・§1.2 を W1 の実装に合わせた) / #65 (§1.1 の約束の編集の記述・ソロの植物の記述、§1.2 手順5の前提を実装に合わせた)
 - 正本の優先順位: `docs/REQUIREMENTS.md` → `docs/DESIGN.md` → `docs/CONCEPT.md`(矛盾時はこの順で優先)
 
 > このファイルは2段構えです。**今回のコミット(T30準備)は「草案」**であり、TBDプレースホルダを含みます。T23(設定画面)・T08(G0後の本番デプロイ)・T28(TestFlightビルド)が完了した後、別コミットでTBDを実値に差し替えて完成させます(issue #30 の進め方コメントに記載された2段構え)。
@@ -16,10 +16,10 @@
 Lien is a 2-person habit-tracking app, but **the app is fully usable before a pair is formed.** A new user can finish onboarding, set their own daily promise and check in without ever inviting anyone. One device is enough for everything in this section.
 
 - New-install flow: onboarding (3 screens: concept → nickname + emoji icon → notification permission) → **promise setup (a screen of its own, shown right after onboarding)** → **Home in the "solo" state**. There is no sign-in screen (see §1.2).
-- **Promise setup**: type a promise title (up to 20 characters), pick an emoji, optionally set a daily reminder time, then tap "この約束にする" (Set this promise). The promise can be edited later.
-- **Home in the solo state** shows the user's own promise, the check-in button "できた!" (Done!), a pot of bare soil with a short caption saying the plant starts to grow once a pair is formed, and an invite button ("相手を招待する", i.e. "Invite your partner").
+- **Promise setup**: type a promise title (up to 20 characters), pick an emoji, optionally set a daily reminder time, then tap "この約束にする" (Set this promise).
+- **Home in the solo state** shows the user's own promise, the check-in button "できた!" (Done!), a pot in which the small seed character ("タネの子") sleeps in the soil, with a short caption ("ペアになると、タネの子が目をさますよ", i.e. "When you pair up, the seed character wakes up"), and an invite button ("相手を招待する", i.e. "Invite your partner").
 - **Checking in works in solo.** Tapping "できた!" records today's check-in; the button is replaced by the label "今日のぶんは完了" (Today's done) and an "取り消す" (Undo) button appears for same-day mis-taps. No pairing prompt blocks any of this.
-- Deliberately **not available in solo** (these appear only once a pair exists): the shared streak, the partner's status, nudges, reactions and **photo attachment**. A photo is shared only with the paired partner, so in solo there is nothing to share it with and the "写真を添える" (Attach a photo) button is not shown. The plant also stays as bare soil in solo; it grows from the days on which both partners complete their promise.
+- Deliberately **not available in solo** (these appear only once a pair exists): the shared streak, the partner's status, nudges, reactions and **photo attachment**. A photo is shared only with the paired partner, so in solo there is nothing to share it with and the "写真を添える" (Attach a photo) button is not shown. The seed character keeps sleeping in the soil in solo (the soil glows softly after the user checks in); it wakes up and grows from the days on which both partners complete their promise.
 - The "ふたりストリーク" (shared streak) starts counting from the day a pair is formed; it does not block any core action beforehand.
 - Inviting is optional. The invite button on Home opens a sheet (title "ふたりをつなぐ") that can be closed at any time with "あとで" (Later).
 - Reviewer verification steps:
@@ -35,12 +35,13 @@ Lien is a 2-person habit-tracking app, but **the app is fully usable before a pa
 |---|---|---|
 | ① | Home で約束を設定する | オンボの後に**約束設定の独立画面**があり、保存すると Home に進む |
 | ② | 写真を任意で添えられる(ペアなしでも) | **ソロでは写真を添えられない**(「写真を添える」は出ない。端末側で止めており、サーバーも photoPath 付きのソロの checkin を 400 `no_pair` で拒否する) |
-| ③ | 植物が反応する | **ソロの植物は土のまま**(チェックインしても絵は変わらない。土がほのかに光る演出とソロの一言の差し替えは PA #56 / PB #57) |
+| ③ | 植物が反応する | **ソロの鉢は、土の中で眠るタネの子**(`solo_seed`+zzz。PA #56 で描画)。自分がチェックインした日は土がほのかに光る(`fx_soil_glow`)が、葉や表情の変化(ふたりの葉・にっこり)はペア後。一言は「ペアになると、タネの子が目をさますよ」(`Strings.Widget.soloCaption` をホームと共有) |
 | ④ | Settings を開いて招待を発行する | **招待は Home のボタン**から開くシート(設定画面は T23 で、まだ無い) |
 
 実ビルドでの最終確認は T28a の内部 TestFlight 以降(T30)。そのとき合わせるもの:
-- PA(#56)・PB(#57)が入ったら、土の見た目と一言(現行の文言は「ペアになると種がまかれるよ」)を見て、英文の「bare soil」「short caption」の記述を確かめる
-- 招待ボタンのラベルは、#62 が「パートナーを招待する」から「相手を招待する」に変える(CONCEPT §5-2: カップル限定にしない)。英文のボタン名は変更後のラベルで書いた。実ビルドで合っているか確かめる
+- PA(#56)は入った。ソロの鉢は「土の中で眠るタネの子」で、一言の現行の文言は「ペアになると、タネの子が目をさますよ」(旧文言「ペアになると種がまかれるよ」は#56 で置き換わった)。英文はこれに合わせて書き直した(#65)。実ビルドで、眠る絵・zzz・チェックイン後の土の光り方と一言が英文の記述どおりかを確かめる。PB(#57)が入った後も同じ記述でよいか見直す
+- 招待ボタンのラベルは、#62 で「パートナーを招待する」から「相手を招待する」に変わった(実装済み。CONCEPT §5-2: カップル限定にしない)。英文のボタン名は変更後のラベルで書いてある。実ビルドで合っているか確かめる
+- **約束の編集の入口**: 2026-10-13 時点で、約束設定の画面は「現役の約束が無いとき」の独立画面としてしか開かず、保存したあとに約束を編集する入口がアプリに無い(設定画面は T23)。入口の無い機能を審査員に説明しないよう、英文から「The promise can be edited later.」を外した(#65)。編集の入口(設定画面など)が入ったら、実ビルドで確かめてから英文に戻すか決める。なお約束設定画面の副題(`Strings.PromiseSetup.subtitle`)は「あとからいつでも変えられます」と書いているので、入口が入らないまま出荷する場合は T27 で文言を直す
 - PV(#59)が機能凍結(11/8)に間に合わず、写真を v1.0.1 に移す場合は、写真に触れる記述(本節の「写真を添える」・§1.4 の UGC)をそろえて外す(TASKPLAN §9.4)
 
 ### 1.2 No demo account is required — authentication is anonymous
@@ -54,9 +55,9 @@ Lien v1.0 uses **anonymous authentication only** (Supabase anonymous sign-in). T
   1. **Device A**, on Home: tap the invite button ("相手を招待する"), then "招待をつくる" (Create invite). A QR code, an 8-character alphanumeric invite code (case-sensitive, e.g. "AbCd2345") and a share-link button ("リンクをおくる") appear. An invite is valid for 72 hours and can be used once.
   2. **Device B**, on Home: tap the invite button, scroll to the "コードを入力" (Enter a code) section, type the 8-character code from Device A and tap "ペアになる" (Pair up).
      - Alternative: open the invite link on Device B. The "アプリで開く" (Open in app) button of the invite web page starts the app through `lien://invite/<code>`, and the same sheet opens with the code already filled in. The user still has to tap "ペアになる"; the app never pairs automatically.
-  3. Both devices now show the paired Home screen. Device A's invite sheet closes by itself (while the sheet is open, Device A re-checks with the server every few seconds; the app also refreshes at launch and whenever it returns to the foreground).
+  3. Both devices now show the paired Home screen. Device A's invite sheet closes by itself (while the sheet is open, Device A re-checks with the server at intervals that grow from 4 to 30 seconds; the app also refreshes at launch and whenever it returns to the foreground).
   4. Confirm that each device shows the other's nickname and promise (emoji + title) on Home, together with the shared streak and the plant. The icon emoji picked during onboarding is not shown to the partner in v1.0.
-  5. Check in on Device A ("できた!"). Device B receives a push notification and its Home screen (and widget, if installed) update. The target is within about a minute; opening the app on Device B also refreshes it.
+  5. Check in on Device A ("できた!"). Device B receives a push notification and its Home screen (and widget, if installed) update. The target is within about a minute. **This assumes that Device B is a physical iPhone and that its user allowed notifications** (tapped "通知を許可する" on the onboarding notification screen and accepted the iOS permission dialog): a device that has not allowed notifications is never registered for push, so neither the notification nor the push-driven widget update arrives. Without the permission, Device B's Home still updates when the app is opened or returns to the foreground.
 
 **状態: 2026-10-13 に W1(#55)の実装に合わせて書き直した(#61)。** 草案からの変更点:
 - 招待コードは「8桁」ではなく**8文字英数**(大文字小文字を区別。紛らわしい 0/O/1/l は使わない — DESIGN §5.1)
@@ -68,6 +69,7 @@ Lien v1.0 uses **anonymous authentication only** (Supabase anonymous sign-in). T
 実ビルドでの最終確認は T28a の内部 TestFlight 以降(T30)。確認点:
 - 招待ページ(`web/invite`)を Pages で公開した後に、「アプリで開く」の経路を実機で通す(G3 の前までに公開する)
 - オンボの注意書き(`Strings.Onboarding.anonymousStartNote`)は「あとから Apple ID 連携(設定画面)が必要」と読める。SIWA が v1.0.1 に移った(D3)ので、T27 で「機種変更で記録を引き継げない場合がある」に直す。直ったら、英文の該当の一文も合わせる
+- 手順5は、受け取る側の端末が**通知を許可していることが前提**(許可しないと APNs 登録が始まらず、push もウィジェットの更新も届かない)。英文に明記した(#65)。審査員がオンボで「あとで」を選んだ場合に push が来ないのは仕様で、アプリを開く・前面に戻すと Home は追いつく。§1.1 の手順1は「許可」「あとで」のどちらでも進める書き方のままなので、2台のペアの確認をお願いするときは、先に許可してもらう案内を §1.3 に足すか(T30)
 - 端末1台の審査員向けに、開発者が操作する相手役の招待コード(期限を延ばしたもの)を §1.3 に用意する(T30)。用意できたら本節の末尾に1行足す
 - 相手の写真の表示は PV(#59)の担当。PV の後に、ペア後の写真の手順(添付 → 相手のホームに表示)を足す
 
