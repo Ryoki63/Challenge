@@ -27,9 +27,30 @@ iOS は同じ JSON を `LienTests` のリソースとして読み、アプリが
 クライアントが専用 case にマップしたコードがサーバーに実在すること、サーバーに増えたコードをクライアントが
 取りこぼしていないことを `ContractFixtureTests` が検査する。
 
+## 手書きのフィクスチャ(PostgREST / Storage の応答)
+
+上の表のフィクスチャは Edge Function の実ハンドラから作る。次の4つは、Edge Function ではなく **PostgREST と Storage の応答**
+(相手の今日の写真をホームに出す経路 — PV #59)なので、`generate.ts` では作れず、**手書き**している。
+中身は応答の本文そのもの(補足のキーは足さない。iOS は本番と同じデコーダで読む)。
+
+| ファイル | 要求 | 応答 | iOS 側の受け口 |
+|---|---|---|---|
+| `partner-checkin.photo.json` | `GET {base}/rest/v1/checkins?select=id,photo_path&date_local=eq.<今日>&user_id=neq.<自分の user_id>&limit=1`(`apikey: <anon キー>` + `Authorization: Bearer <利用者の JWT>`) | 200 / 相手が今日、写真を添えた行(`photo_path` = 原寸のパス `pairs/<pair_id>/<date>/<user_id>/photo.jpg`) | `PartnerCheckinRow`(→ `PartnerCheckin`。`PostgRESTPartnerCheckinResolver`) |
+| `partner-checkin.no-photo.json` | 同上 | 200 / 相手の行はあるが `photo_path` が `null`(写真なし) | 同上 |
+| `partner-checkin.none.json` | 同上 | 200 / `[]`(相手がまだチェックインしていない・RLS で読めない = ペア解消後など) | 同上 |
+| `storage-sign.ok.json` | `POST {base}/storage/v1/object/sign/photos/<photo_path または photo_thumb.jpg のパス>`(本文 `{"expiresIn": 3600}`。`apikey` + `Authorization: Bearer <利用者の JWT>`) | 200 / `{ "signedURL": "/object/sign/photos/<path>?token=<署名>" }`(ルート相対。`{base}/storage/v1` を前に付けて取りに行く)。token は目印の文字列(実物の署名ではない) | `StorageSignResponse`(→ `StoragePhotoURLSigner`) |
+
+- 署名付き URL の取得は `GET {base}/storage/v1/object/sign/photos/<path>?token=<署名>`(認証ヘッダなし)。200 は JPEG の本文。署名の失効・無効は 400 系
+  (アプリは 400 / 401 / 403 を「失効」として署名からやり直し、404 は「無い・読めない」として扱う)
+- **これらは手書きで、本番の実応答との突き合わせは未完了**。backend レーンの API E2E(#67)が、本番で2ユーザーの
+  シナリオを流して実応答を取り、キー・型・ステータスをここと照合する(ペアの相手は署名付き URL を取れる / ペア外のユーザーは取れない、の RLS の実挙動も)。
+  ずれが見つかったら、この表とフィクスチャ、`PartnerPhotoContractTests` を実応答に合わせる
+- `contracts_test.ts` の `HAND_WRITTEN` が、この4つを「生成物ではない JSON」として認める一覧。足したら表と両方を直す
+- 署名付き URL の寿命は `StoragePhotoURLSigner.expiresInSeconds`(3600 秒)。Storage の応答に寿命は含まれないので、アプリは要求した値から期限を数える
+
 ## 再生成と検査
 
-JSON は手で編集しない。サーバーの応答形(`_shared/snapshot.ts` など)を変えたら再生成する:
+上の表のフィクスチャ(生成物)は手で編集しない。サーバーの応答形(`_shared/snapshot.ts` など)を変えたら再生成する:
 
 ```sh
 # 再生成(リポジトリルートから)
