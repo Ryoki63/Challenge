@@ -1,0 +1,250 @@
+# Lien release — TestFlight に上げる archive を作る(T28準備 / issue #28)
+#
+# 手動起動のみ(workflow_dispatch)。push・タグでは走らない(macOS の課金が大きいので勝手に回さない)。
+#
+#   dry_run = true(既定): 無署名の archive まで。secrets は不要。次を検査して止める:
+#       Xcode 26 / iOS 26 SDK・版とビルド番号・AppIcon・PrivacyInfo.xcprivacy・Info.plist の Supabase 接続情報。
+#       署名つきの経路(クラウド署名 archive・書き出し+アップロード)は、実行せずコマンドだけを表示する
+#   dry_run = false      : ASC API キーでクラウド署名して archive → 書き出し → TestFlight へアップロード。
+#       下の secrets が 1 つでも未登録なら、最初のステップで理由を出して止まる(黙ってスキップしない)
+#
+# 必要な GitHub secrets(リポジトリ Settings > Secrets and variables > Actions。G0 のあとに人間が登録 — ios/README.md):
+#   ASC_KEY_P8          App Store Connect API キー(.p8)の中身(BEGIN PRIVATE KEY … 。base64 にしたものでも可)
+#   ASC_KEY_ID          同じキーの Key ID
+#   ASC_ISSUER_ID       Issuer ID
+#   APPLE_TEAM_ID       Apple Developer の Team ID(10 桁の英数字)
+#   SUPABASE_URL        https://<project-ref>.supabase.co
+#   SUPABASE_ANON_KEY   anon(publishable)キー。service_role / secret キーは入れない(検査で拒否する)
+#
+# ビルド番号(CFBundleVersion)= github.run_number。この workflow を作り直す(ファイル名を変える)と 1 に戻るので注意。
+# Xcode は products/lien/ios/.xcode-version(lien-ios と共通)。
+#
+# 【action は commit SHA で固定する】署名キーを渡す workflow なので、lien-deploy と同じ方針。第三者の action を足さない
+# (xcodegen は brew、署名と書き出しは xcodebuild、検査は ios/scripts の Python)
+name: lien-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "true = 無署名 archive まで(署名・アップロードしない)/ false = 署名して TestFlight へアップロード"
+        type: boolean
+        default: true
+
+concurrency:
+  group: lien-release
+  cancel-in-progress: false # リリースの同時実行・途中キャンセルはしない
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    name: ${{ inputs.dry_run && 'archive (dry-run / unsigned)' || 'archive + upload to TestFlight' }}
+    runs-on: macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: products/lien/ios
+    env:
+      DRY_RUN: ${{ inputs.dry_run }}
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # 何が登録済みかを確かめる(値は表示しない)。dry_run=false で足りなければここで止める
+      - name: Preflight (mode and secrets)
+        id: preflight
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          missing_asc=""
+          for name in ASC_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID APPLE_TEAM_ID; do
+            [ -n "${!name:-}" ] || missing_asc="$missing_asc $name"
+          done
+          missing_supabase=""
+          for name in SUPABASE_URL SUPABASE_ANON_KEY; do
+            [ -n "${!name:-}" ] || missing_supabase="$missing_supabase $name"
+          done
+          has_asc=false; [ -z "$missing_asc" ] && has_asc=true
+          has_supabase=false; [ -z "$missing_supabase" ] && has_supabase=true
+          echo "has_asc=$has_asc" >> "$GITHUB_OUTPUT"
+          echo "has_supabase=$has_supabase" >> "$GITHUB_OUTPUT"
+          # 以降のステップが共通で使う archive の場所(release.sh の既定と同じ。runner コンテキストは job 直下の env で使えない)
+          echo "ARCHIVE_PATH=$RUNNER_TEMP/Lien.xcarchive" >> "$GITHUB_ENV"
+
+          {
+            echo "## lien-release"
+            echo
+            echo "| 項目 | 状態 |"
+            echo "|---|---|"
+            echo "| モード | $([ "$DRY_RUN" = "true" ] && echo 'dry-run(無署名 archive まで)' || echo '署名して TestFlight へアップロード') |"
+            echo "| ビルド番号 (run_number) | $BUILD_NUMBER |"
+            echo "| ASC API キー系の secrets | $([ "$has_asc" = "true" ] && echo '登録済み' || echo "未登録:$missing_asc") |"
+            echo "| Supabase の secrets | $([ "$has_supabase" = "true" ] && echo '登録済み' || echo "未登録:$missing_supabase") |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$DRY_RUN" != "true" ]; then
+            if [ "$has_asc" != "true" ] || [ "$has_supabase" != "true" ]; then
+              echo "::error::dry_run=false ですが secrets が未登録です:${missing_asc}${missing_supabase}"
+              echo "::error::登録方法は products/lien/ios/README.md「TestFlight へのアップロード」。登録前は dry_run=true で実行してください"
+              exit 1
+            fi
+          else
+            [ "$has_asc" = "true" ] || echo "::notice::ASC API キーの secrets が未登録のため、署名・アップロードの経路はスキップします(dry-run)"
+            [ "$has_supabase" = "true" ] || echo "::notice::Supabase の secrets が未登録のため、archive の接続情報は空です(検査は警告にとどめます)"
+          fi
+
+      # ios/.xcode-version の Xcode に切り替え、iOS 26 SDK 以上であることを確かめる(lien-ios と共通)
+      - name: Select Xcode (pinned) + iOS 26 SDK check
+        run: scripts/select-xcode.sh
+
+      - name: Release script unit tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Install XcodeGen
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: brew install xcodegen
+
+      # Supabase の接続情報を Secrets.xcconfig(gitignore 済み)にして archive の Info.plist へ入れる(DESIGN §7)。
+      # 形式を検証し、service_role / secret キーなら拒否する。値は表示しない
+      - name: Write Config/Secrets.xcconfig from GitHub Secrets
+        if: steps.preflight.outputs.has_supabase == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python3 scripts/supabase_config.py write-xcconfig
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Pin Swift packages (Package.resolved)
+        run: scripts/pin-packages.sh
+
+      # ASC API キー(.p8)をランナーの一時領域へ書く。権限は本人のみ。ログには出さず、最後に必ず消す
+      - name: Prepare the App Store Connect API key
+        if: env.DRY_RUN != 'true' && steps.preflight.outputs.has_asc == 'true'
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          umask 077
+          key_path="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          if printf '%s' "$ASC_KEY_P8" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s\n' "$ASC_KEY_P8" > "$key_path"
+          else
+            printf '%s' "$ASC_KEY_P8" | python3 -c 'import base64, sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$key_path"
+          fi
+          if ! grep -q "BEGIN PRIVATE KEY" "$key_path"; then
+            rm -f "$key_path"
+            echo "::error::ASC_KEY_P8 が .p8 の中身(または、その base64)ではありません"
+            exit 1
+          fi
+          echo "ASC_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+
+      - name: Archive (dry-run - unsigned)
+        if: env.DRY_RUN == 'true'
+        run: |
+          set -o pipefail
+          scripts/release.sh archive-unsigned 2>&1 | tee "$RUNNER_TEMP/archive.log"
+
+      - name: Archive (signed - cloud signing with the ASC API key)
+        if: env.DRY_RUN != 'true' && steps.preflight.outputs.has_asc == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          scripts/release.sh archive-signed 2>&1 | tee "$RUNNER_TEMP/archive.log"
+
+      # 自分たちのソースが出した警告(Swift 6.x コンパイラ)。依存パッケージのものは除く
+      - name: Compiler warnings from our sources
+        if: always()
+        run: |
+          log="$RUNNER_TEMP/archive.log"
+          [ -f "$log" ] || exit 0
+          grep -E "/products/lien/ios/.*: warning:" "$log" | sed -E 's#^.*/products/lien/ios/##' | sort -u > "$RUNNER_TEMP/warnings.txt" || true
+          count=$(wc -l < "$RUNNER_TEMP/warnings.txt" | tr -d ' ')
+          {
+            echo "## Swift コンパイラの警告(自前のソース)"
+            echo
+            echo "${count} 件"
+            if [ "$count" -gt 0 ]; then echo; echo '```'; cat "$RUNNER_TEMP/warnings.txt"; echo '```'; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/warnings.txt"
+
+      # アップロード前の検査。dry-run で secrets が無いときだけ、Supabase 接続情報の欠落を警告にとどめる
+      - name: Verify the archive
+        env:
+          HAS_SUPABASE: ${{ steps.preflight.outputs.has_supabase }}
+        run: |
+          mode=strict
+          if [ "$DRY_RUN" = "true" ] && [ "$HAS_SUPABASE" != "true" ]; then mode=warn; fi
+          signed=""
+          if [ "$DRY_RUN" != "true" ]; then signed="--signed"; fi
+          python3 scripts/verify_archive.py "$ARCHIVE_PATH" \
+            --build-number "$BUILD_NUMBER" --supabase "$mode" $signed --summary "$GITHUB_STEP_SUMMARY"
+
+      # 依存パッケージ(supabase-swift など)は静的にリンクされて実行ファイルに入る。その必須理由 API を棚卸しする
+      - name: Required-reason API inventory (built binaries)
+        run: |
+          set -o pipefail
+          python3 scripts/scan_required_reason_apis.py "$ARCHIVE_PATH/Products/Applications/Lien.app" | tee "$RUNNER_TEMP/privacy-scan.md"
+          cat "$RUNNER_TEMP/privacy-scan.md" >> "$GITHUB_STEP_SUMMARY"
+
+      # 署名つきの経路は G0 の前には試せない。せめて、実行するコマンドの組み立てだけは毎回確かめる(実行はしない)
+      - name: Preview the signed path (print only - nothing is executed)
+        if: env.DRY_RUN == 'true'
+        env:
+          RELEASE_PRINT_ONLY: "1"
+          ASC_KEY_PATH: /nonexistent/AuthKey_DRYRUN.p8
+          ASC_KEY_ID: DRYRUN0000
+          ASC_ISSUER_ID: 00000000-0000-0000-0000-000000000000
+          APPLE_TEAM_ID: ABCDE12345
+        run: |
+          scripts/release.sh archive-signed
+          scripts/release.sh export-upload
+
+      - name: Export and upload to TestFlight
+        if: env.DRY_RUN != 'true' && steps.preflight.outputs.has_asc == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          scripts/release.sh export-upload 2>&1 | tee "$RUNNER_TEMP/export.log"
+
+      # 署名キーと接続情報のファイルを必ず消す(失敗しても、キャンセルされても)
+      - name: Cleanup secrets on disk
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP"/AuthKey_*.p8 Config/Secrets.xcconfig
+
+      - name: Summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo
+            echo "## 結果"
+            if [ "$JOB_STATUS" != "success" ]; then
+              echo "- ジョブは ${JOB_STATUS} です。上のステップのログを確認してください(TestFlight には何もアップロードされていない可能性があります)"
+            elif [ "$DRY_RUN" = "true" ]; then
+              echo "- dry-run: 無署名 archive と検査まで。署名・アップロードは**していません**"
+            else
+              echo "- 署名して TestFlight へアップロードしました(App Store Connect の「TestFlight」でビルド ${BUILD_NUMBER} の処理完了を待つ)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
