@@ -18,6 +18,7 @@ iOS は同じ JSON を `LienTests` のリソースとして読み、アプリが
 | `promise-set.ok.json` | `POST /promise-set` | `PromiseSetResponse` |
 | `invite-create.ok.json` / `invite-accept.ok.json` | `POST /invite-create` / `/invite-accept` | `InviteCreateResponse` / `InviteAcceptResponse` |
 | `nudge.ok.json` / `react.ok.json` | `POST /nudge` / `/react` | `NudgeResponse` / `ReactResponse` |
+| `plant-name.ok.json` / `plant-name.already-named.json` | `POST /plant-name`(`plant-name/core.ts`)。最初に名前を付ける `{ name, snapshot }` / すでに名前がある鉢への first の 409 `{ error: "already_named", name }` | (iOS 側は未実装 — 植物 v2-b の PlantNaming の Live 結線で追加。#57) |
 | `push.visible.json` / `push.silent.json` | 相手へ送る APNs ペイロード(可視 / サイレント)。`lien.snapshot` を NSE・アプリが読む | `AppGroupStore.saveSnapshotData` |
 | `stamps.json` | `_shared/messages.ts` のスタンプ語彙(順序つき) | `NudgeStamp` / `ReactionStamp` |
 | `errors.json` | 各 function の `core.ts` / `index.ts` が返しうる `{ "error": "<code>" }` と HTTP ステータス | `InviteClientError` ほか各エラーマップ |
@@ -45,6 +46,9 @@ deno test --allow-read products/lien/contracts/tools/
 ## 運用上の注意
 
 - `lien-ios` ワークフローは `products/lien/contracts/**` の変更でも起動する(フィクスチャは `LienTests` のリソース)。
+- 成長ルール v2(#54)で snapshot に `plantGrownDays` / `plantStageFloor` / `plantNextStageAt` の3キーが足された
+  (ソロは 0 / 0 / null。最後の段階も `plantNextStageAt` は null。DESIGN §3.4)。iOS の `PairSnapshot` が
+  これらを省略可で受けるようになったら(#56・#57)、`ContractFixtureTests` で値まで検査する。
 - 前方互換: サーバーが snapshot に未知のキーを足しても、古いアプリは無視して動く
   (`ContractFixtureTests.testSnapshotDecodingToleratesNewServerKeys`)。キーの**削除・型変更・改名**は
   互換性を壊すので、DESIGN §9-7 に従い JOURNAL に互換性影響を明記する。

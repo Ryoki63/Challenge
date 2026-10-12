@@ -13,6 +13,9 @@
     "partnerPromiseTitle": "ランニング",
     "partnerPromiseEmoji": "🏃",
     "plantStage": 2,
+    "plantGrownDays": 6,
+    "plantStageFloor": 3,
+    "plantNextStageAt": 7,
     "plantMood": "fidget",
     "plantName": "みどり",
     "hasPartnerPhotoToday": true

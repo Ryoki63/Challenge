@@ -23,6 +23,9 @@
       "partnerPromiseTitle": "筋トレ",
       "partnerPromiseEmoji": "💪",
       "plantStage": 3,
+      "plantGrownDays": 7,
+      "plantStageFloor": 7,
+      "plantNextStageAt": 14,
       "plantMood": "happy",
       "plantName": "みどり",
       "hasPartnerPhotoToday": false

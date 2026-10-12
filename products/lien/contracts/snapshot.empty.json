@@ -13,6 +13,9 @@
     "partnerPromiseTitle": null,
     "partnerPromiseEmoji": null,
     "plantStage": 0,
+    "plantGrownDays": 0,
+    "plantStageFloor": 0,
+    "plantNextStageAt": null,
     "plantMood": "normal",
     "plantName": null,
     "hasPartnerPhotoToday": false

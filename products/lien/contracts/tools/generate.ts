@@ -21,6 +21,7 @@ import { handleInviteCreate } from "../../supabase/functions/invite-create/core.
 import { handleInviteAccept } from "../../supabase/functions/invite-accept/core.ts";
 import { handleNudge } from "../../supabase/functions/nudge/core.ts";
 import { handleReact } from "../../supabase/functions/react/core.ts";
+import { handlePlantName } from "../../supabase/functions/plant-name/core.ts";
 import {
   NUDGE_STAMPS,
   REACTION_STAMPS,
@@ -70,6 +71,8 @@ interface WorldInit {
   partnerDone: boolean;
   /** 相手の今日のチェックインに写真があるか */
   partnerPhoto: boolean;
+  /** ペア成立時の植物の名前(null = まだ名前が無い)。ペアのときだけ使う */
+  plantName: string | null;
 }
 
 class World {
@@ -126,7 +129,8 @@ class World {
         "2026-06-10",
       ]
         .map((dateLocal) => ({ dateLocal, kind: "both" as const }));
-      this.plant = { grownDays: 13, name: "みどり" };
+      // grown_days は close-day が書く控え(streak_days の both の行数)。snapshot は読まず行から数える
+      this.plant = { grownDays: this.streakDays.length, name: init.plantName };
     }
     if (init.meDone) {
       this.checkins.push({
@@ -303,6 +307,17 @@ class World {
     this.plant = { grownDays: 0, name: null };
     return Promise.resolve();
   }
+
+  // -- PlantNameRepo --
+  setPlantNameIfUnset(_pairId: string, name: string) {
+    if (!this.plant || this.plant.name !== null) return Promise.resolve(false);
+    this.plant.name = name;
+    return Promise.resolve(true);
+  }
+  setPlantName(_pairId: string, name: string) {
+    if (this.plant) this.plant.name = name;
+    return Promise.resolve();
+  }
   getPremiumUntil() {
     return Promise.resolve(null);
   }
@@ -334,6 +349,7 @@ function world(overrides: Partial<WorldInit> = {}): World {
     meDone: false,
     partnerDone: false,
     partnerPhoto: false,
+    plantName: "みどり",
     ...overrides,
   });
 }
@@ -569,6 +585,40 @@ export async function buildFixtures(): Promise<Map<string, unknown>> {
     );
   }
 
+  // POST /plant-name -----------------------------------------------------------
+  {
+    // 最初に付ける(first): 名前が無い鉢に「みどり」。応答は { name, snapshot }(snapshot.plantName が入る)
+    const w = world({ plantName: null });
+    const { pusher } = capturingPusher();
+    out.set(
+      "plant-name.ok",
+      must200(
+        "plant-name.ok",
+        await handlePlantName(
+          { repo: w as AnyRepo, pusher, now: clock },
+          { userId: USER_ME, name: "みどり", mode: "first" },
+        ),
+      ),
+    );
+  }
+  {
+    // 先に付けた人の名前に決まる: すでに名前がある鉢への first は 409 already_named + 今の名前
+    const w = world(); // 名前は「みどり」
+    const { pusher } = capturingPusher();
+    const result = await handlePlantName(
+      { repo: w as AnyRepo, pusher, now: clock },
+      { userId: USER_ME, name: "さくら", mode: "first" },
+    );
+    if (result.status !== 409) {
+      throw new Error(
+        `plant-name.already-named: 409 を期待したが ${result.status}: ${
+          JSON.stringify(result.body)
+        }`,
+      );
+    }
+    out.set("plant-name.already-named", result.body);
+  }
+
   // 語彙(スタンプ)------------------------------------------------------------
   out.set("stamps", {
     nudge: [...NUDGE_STAMPS],
@@ -592,6 +642,7 @@ const FUNCTIONS = [
   "checkin-cancel",
   "nudge",
   "react",
+  "plant-name",
 ] as const;
 
 /**
