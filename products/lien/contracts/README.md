@@ -53,4 +53,6 @@ deno test --allow-read products/lien/contracts/tools/
   (`ContractFixtureTests.testSnapshotDecodingToleratesNewServerKeys`)。キーの**削除・型変更・改名**は
   互換性を壊すので、DESIGN §9-7 に従い JOURNAL に互換性影響を明記する。
 - `deno test`(`lien-ci` の `products/lien/supabase/functions` 配下)は、この `tools/` を含まない。
-  サーバーを変更するときは上の `--check` を手元で走らせる(CI への組み込みは backend レーンの判断)。
+  そのため `lien-ci` の `deno-test` ジョブに、上の `--check` と `deno test --allow-read products/lien/contracts/tools/`
+  を別の step として組み込んである(2026-10-12・#54 のレビュー指摘)。サーバーの応答形を変えて再生成を忘れると
+  CI が落ちる。手元でも、サーバーを変更したら先に走らせておく。

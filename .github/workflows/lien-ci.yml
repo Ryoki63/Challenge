@@ -25,6 +25,15 @@ jobs:
       - name: Run deno test
         run: deno test
 
+      # 契約フィクスチャ(products/lien/contracts/*.json)がサーバー実装の現在の出力と一致するか。
+      # 上の `deno test` は contracts/tools を含まないので別に回す。ずれたまま放置すると、iOS の
+      # ContractFixtureTests が古い形を前提にデコードを検証し続ける(contracts/README.md)。
+      # 差分が出たら generate.ts で再生成し、レビューしてからコミットする
+      - name: Contract fixtures match the server handlers
+        run: |
+          deno run --allow-read ../../contracts/tools/generate.ts --check
+          deno test --allow-read ../../contracts/tools/
+
   plant-assets:
     name: plant sprites (generate + verify)
     runs-on: ubuntu-latest
