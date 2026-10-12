@@ -215,3 +215,8 @@
 - 検証: `deno test`(products/lien/supabase/functions)で**188 passed, 0 failed**(直前baseline 157 → messages 10件・nudge 12件・react 9件の計31件追加)。`deno lint` 全クリア(0 problems)。`deno fmt` は新規/編集ファイル8本に適用済み(既存 checkin/core_test.ts の1件未整形は本タスクが触れていない既存コードのためスコープ外として放置)
 - ドキュメント: `docs/DESIGN.md §5.3` に1行追記(ワンタップ返事の記録APIはT15では実装せず、`nudges.replied` 列は先行確保のまま未使用、実装はT16/issue #16へ)。issue #16へ文言オーナーシップの引き継ぎコメントを実際に投稿済み(messages.ts冒頭コメントの記述と整合)
 - 残作業: iOS側(NudgeReactService相当のcapability protocol + LocalEchoCheckinServiceへのmock実装追加、Strings.swift追加、HomeView/HomeViewModel結線、NudgeReactTests)→ commit2 → push → lien-ci/lien-ios CI確認 → BACKLOG/DONE更新 → issue #15 完了コメント+close
+
+## 2026-10-12 14:05 (対話/オーケストレータ) — #49 F本制作サブエージェントの中断処理
+- 状況: #49担当サブエージェントがコンテキスト上限で途中終了。指示(スタイルFの48×64ドット絵で13枚)から逸れ、**SVGベクターの新案 v4「タネの子」13枚+花色違い3+アイコン3案**を v4_drafts/ に制作した状態で止まっていた(本番 png/・xcassets は未変更、F版13枚は未着手)
+- 判断: v4 は G2 で選ばれた F と別スタイルのため、勝手に本番差し替えはしない。v4_drafts/ を下書きとして保存コミットし、ユーザーに「F で進める / v4 に切り替える」を確認する
+- 申し送り: PlantSprite.swift / PixelImage.swift は 16×24 を固定値で持つ → どちらのスタイルでも iOS 側の寸法対応(ios-serial レーン、T15 の後)が必要
