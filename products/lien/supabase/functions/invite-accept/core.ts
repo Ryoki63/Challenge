@@ -19,7 +19,7 @@ import {
   type PairSnapshot,
   type SnapshotRepo,
 } from "../_shared/snapshot.ts";
-import { buildVisiblePushPayload } from "../_shared/apns.ts";
+import { buildVisiblePushPayload, sendOptionsFor } from "../_shared/apns.ts";
 import { pairEstablishedBody, pushDisplayName } from "../_shared/messages.ts";
 import { grantMonthlyTickets } from "../_shared/tickets.ts";
 import { derivePairPlan } from "../grant-tickets/core.ts";
@@ -174,7 +174,7 @@ export async function handleInviteAccept(
         type: "pair_update",
         snapshot,
       });
-      await deps.pusher.send(user.pushToken, payload);
+      await deps.pusher.send(user.pushToken, payload, sendOptionsFor(user));
     } catch (e) {
       console.error("invite-accept: push 送信に失敗:", e);
     }

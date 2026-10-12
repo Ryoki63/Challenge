@@ -4,9 +4,11 @@
 //
 // 各 Function の index.ts は `createPusher(adminClient, "<関数名>")` を呼ぶだけでよい:
 //   - APNs の secrets が未投入(G0 前)なら push をスキップする no-op を返す(処理は止めない)
-//   - 投入済みなら TokenAwarePusher(apns.ts)を返す。トークンごとに users.push_env で
-//     送信先の環境(sandbox / production)を選び、APNs が 410 / BadDeviceToken を返した
-//     トークンは users.push_token を null にする(issue #53)
+//   - 投入済みなら TokenAwarePusher(apns.ts)を返す。送信先の環境(sandbox / production)は
+//     呼び出し側が send のオプション(environment)で渡す — 送り先の users 行を読むときに
+//     push_token と一緒に push_env も読み、sendOptionsFor(user) で作る(issue #60: 送信のたびに
+//     push_token から users を逆引きしない)。渡されなければ APNS_ENV。
+//     APNs が 410 / BadDeviceToken を返したトークンは users.push_token を null にする(issue #53)
 //
 // supabase-js はここでは import しない(テストをネットワーク不要に保つ — DESIGN §8)。
 // db は from() だけを持つ構造的型 PushStoreDb で受け、index.ts では SupabaseClient をそのまま渡せる
@@ -14,7 +16,6 @@
 
 import {
   ApnsClient,
-  type ApnsEnvironment,
   type ApnsHttpPost,
   type ApnsSendOptions,
   loadApnsConfigFromEnv,
@@ -22,7 +23,7 @@ import {
   TokenAwarePusher,
 } from "./apns.ts";
 
-// ---- Supabase 版の PushTokenStore ----
+// ---- Supabase 版の PushTokenStore(無効トークンの掃除) ----
 
 /**
  * supabase-js のクライアントのうち使う部分(from)だけの構造的型。
@@ -35,30 +36,14 @@ export interface PushStoreDb {
   from(table: string): any;
 }
 
-interface PushEnvQueryResult {
-  data: Array<{ push_env: string | null }> | null;
-  error: unknown;
-}
-
 /**
- * users.push_token / push_env を引く・消す実装(service_role の client を渡す)。
- * - 同じトークンを持つ行が複数あっても(同じ端末で匿名ユーザーが作り直された等)、
- *   トークンは同じ端末のものなので環境は同じ。先頭の1行を使う
- * - 掃除は push_token = そのトークン の行すべて。送信と同時に再登録された新しいトークンは消えない
+ * users.push_token を消す実装(service_role の client を渡す)。
+ * - 掃除は push_token = そのトークン の行すべて。同じトークンを持つ行が複数あっても
+ *   (同じ端末で匿名ユーザーが作り直された等)すべて消す。送信と同時に再登録された新しいトークンは消えない
+ * - push_env は消さない(診断用に残す。次回の登録で push_token と同時に上書きされる)
  */
 export function makePushTokenStore(db: PushStoreDb): PushTokenStore {
   return {
-    async getPushEnv(deviceToken: string): Promise<ApnsEnvironment | null> {
-      const { data, error }: PushEnvQueryResult = await db
-        .from("users")
-        .select("push_env")
-        .eq("push_token", deviceToken)
-        .limit(1);
-      if (error) throw error;
-      const env = data?.[0]?.push_env;
-      return env === "sandbox" || env === "production" ? env : null;
-    },
-
     async clearPushToken(deviceToken: string): Promise<void> {
       const { error }: { error: unknown } = await db
         .from("users")

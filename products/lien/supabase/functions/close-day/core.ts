@@ -47,7 +47,11 @@ import {
   loadSnapshotForUser,
   type SnapshotRepo,
 } from "../_shared/snapshot.ts";
-import { buildVisiblePushPayload, type LienPushType } from "../_shared/apns.ts";
+import {
+  buildVisiblePushPayload,
+  type LienPushType,
+  sendOptionsFor,
+} from "../_shared/apns.ts";
 import {
   streakResetBody,
   systemPushTitle,
@@ -337,7 +341,7 @@ async function pushToMembers(
         type: message.type,
         snapshot,
       });
-      await deps.pusher.send(user.pushToken, payload);
+      await deps.pusher.send(user.pushToken, payload, sendOptionsFor(user));
     } catch (e) {
       console.error("close-day: push 送信に失敗:", e);
     }

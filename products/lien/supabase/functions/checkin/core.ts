@@ -25,7 +25,11 @@ import {
   type PairSnapshot,
   type SnapshotRepo,
 } from "../_shared/snapshot.ts";
-import { buildVisiblePushPayload } from "../_shared/apns.ts";
+import {
+  type ApnsSendOptions,
+  buildVisiblePushPayload,
+  sendOptionsFor,
+} from "../_shared/apns.ts";
 import {
   partnerCheckinBody,
   photoAttachedBody,
@@ -114,6 +118,8 @@ export interface Pusher {
   send(
     deviceToken: string,
     payload: Record<string, unknown>,
+    /** environment は受信者の users.push_env(sendOptionsFor)。未設定は APNS_ENV */
+    opts?: ApnsSendOptions,
   ): Promise<{ ok: boolean }>;
 }
 
@@ -249,7 +255,11 @@ export async function handleCheckin(
         snapshot: partnerSnapshot,
       });
       // 送信失敗(ok: false)でも本処理は成功扱い(DESIGN §5.5)
-      await deps.pusher.send(pair.partner.pushToken, payload);
+      await deps.pusher.send(
+        pair.partner.pushToken,
+        payload,
+        sendOptionsFor(pair.partner),
+      );
     } catch (e) {
       // pusher が throw しても checkin 自体は成功させる(自己修復経路がある)
       console.error("checkin: push 送信に失敗:", e);

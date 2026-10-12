@@ -17,6 +17,8 @@ import type {
 } from "../_shared/snapshot.ts";
 import type { StreakDayRecord } from "../_shared/streak.ts";
 
+import type { ApnsSendOptions } from "../_shared/apns.ts";
+
 // ---- 自作 assert ヘルパ(外部モジュールを使わない) ----
 
 function deepEqual(a: unknown, b: unknown): boolean {
@@ -110,7 +112,7 @@ function makeRepo(world: World): PlantNameRepo {
 interface SentPush {
   deviceToken: string;
   payload: Record<string, unknown>;
-  opts?: { pushType?: "alert" | "background"; priority?: number };
+  opts?: ApnsSendOptions;
 }
 
 function makePusher(
@@ -751,4 +753,35 @@ Deno.test("plant-name: first が負けたとき(409)は push しない・rename 
   assertEquals(sent.length, 2);
   assertEquals(sent.map((s) => s.deviceToken), ["token-b", "token-a"]);
   assertEquals(world.plants.get("pair-1")?.name, "さくら");
+});
+
+Deno.test("plant-name: 相手の push_env を、サイレント push の送信オプション(pushType / priority)と一緒に environment へ載せる(issue #60)", async () => {
+  const cases = [
+    ["production", {
+      pushType: "background",
+      priority: 5,
+      environment: "production",
+    }],
+    ["sandbox", {
+      pushType: "background",
+      priority: 5,
+      environment: "sandbox",
+    }],
+    [null, { pushType: "background", priority: 5 }],
+    [undefined, { pushType: "background", priority: 5 }],
+  ] as const;
+  for (const [pushEnv, expected] of cases) {
+    const world = makeWorld({ users: [userA, { ...userB, pushEnv }] });
+    const { sent, pusher } = makePusher();
+
+    await handlePlantName(deps(world, pusher), {
+      userId: "user-a",
+      name: "みどり",
+      mode: "first",
+    });
+
+    assertEquals(sent.length, 1, `push_env=${pushEnv}`);
+    assertEquals(sent[0].deviceToken, "token-b");
+    assertEquals(sent[0].opts, expected, `push_env=${pushEnv}`);
+  }
 });

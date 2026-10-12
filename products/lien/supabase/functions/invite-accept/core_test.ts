@@ -15,6 +15,8 @@ import type {
 } from "../_shared/snapshot.ts";
 import type { Pusher } from "../checkin/core.ts";
 
+import type { ApnsSendOptions } from "../_shared/apns.ts";
+
 // ---- 自作 assert ヘルパ(外部モジュールを使わない) ----
 
 function deepEqual(a: unknown, b: unknown): boolean {
@@ -147,6 +149,7 @@ function makeRepo(world: World): InviteAcceptRepo {
 interface SentPush {
   deviceToken: string;
   payload: Record<string, unknown>;
+  opts?: ApnsSendOptions;
 }
 
 function makePusher(): { sent: SentPush[]; pusher: Pusher } {
@@ -154,8 +157,8 @@ function makePusher(): { sent: SentPush[]; pusher: Pusher } {
   return {
     sent,
     pusher: {
-      send: (deviceToken, payload) => {
-        sent.push({ deviceToken, payload });
+      send: (deviceToken, payload, opts) => {
+        sent.push({ deviceToken, payload, opts });
         return Promise.resolve({ ok: true });
       },
     },
@@ -467,4 +470,36 @@ Deno.test("invite-accept: ユーザー不在は 404", async () => {
   assertEquals(result.status, 404);
   if (result.status !== 404) throw new Error("unreachable");
   assertEquals(result.body.error, "user_not_found");
+});
+
+Deno.test("invite-accept: 両者それぞれの push_env を、その人への push の environment に載せる(発行者 sandbox・受諾者 production など)(issue #60)", async () => {
+  const cases: Array<
+    [WorldUser["pushEnv"], WorldUser["pushEnv"], unknown, unknown]
+  > = [
+    ["sandbox", "production", { environment: "sandbox" }, {
+      environment: "production",
+    }],
+    ["production", null, { environment: "production" }, {}],
+    [undefined, "sandbox", {}, { environment: "sandbox" }],
+  ];
+  for (const [inviterEnv, accepterEnv, toInviter, toAccepter] of cases) {
+    const world = makeWorld({
+      users: [
+        { ...inviter, pushEnv: inviterEnv },
+        { ...accepter, pushEnv: accepterEnv },
+      ],
+    });
+    const { sent, pusher } = makePusher();
+
+    await handleInviteAccept(deps(world, pusher), {
+      userId: "user-b",
+      token: TOKEN,
+    });
+
+    assertEquals(sent.length, 2, `${inviterEnv} / ${accepterEnv}`);
+    assertEquals(sent[0].deviceToken, "token-a");
+    assertEquals(sent[0].opts, toInviter, `発行者 push_env=${inviterEnv}`);
+    assertEquals(sent[1].deviceToken, "token-b");
+    assertEquals(sent[1].opts, toAccepter, `受諾者 push_env=${accepterEnv}`);
+  }
 });

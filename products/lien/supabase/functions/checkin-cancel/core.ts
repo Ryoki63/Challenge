@@ -25,7 +25,11 @@ import {
   type PairSnapshot,
   type SnapshotRepo,
 } from "../_shared/snapshot.ts";
-import type { LienPushType } from "../_shared/apns.ts";
+import {
+  type ApnsSendOptions,
+  type LienPushType,
+  sendOptionsFor,
+} from "../_shared/apns.ts";
 
 export interface CheckinCancelRepo extends SnapshotRepo {
   /**
@@ -43,7 +47,8 @@ export interface Pusher {
   send(
     deviceToken: string,
     payload: Record<string, unknown>,
-    opts?: { pushType?: "alert" | "background"; priority?: number },
+    /** pushType / priority(サイレント)と、受信者の users.push_env(sendOptionsFor)。未設定は APNS_ENV */
+    opts?: ApnsSendOptions,
   ): Promise<{ ok: boolean }>;
 }
 
@@ -140,7 +145,11 @@ export async function handleCheckinCancel(
         snapshot: partnerSnapshot,
       });
       // 送信失敗(ok: false)でも本処理は成功扱い(サイレントはフォールバック — DESIGN §4)
-      await deps.pusher.send(pair.partner.pushToken, payload, SILENT_PUSH_OPTS);
+      await deps.pusher.send(
+        pair.partner.pushToken,
+        payload,
+        sendOptionsFor(pair.partner, SILENT_PUSH_OPTS),
+      );
     } catch (e) {
       // pusher が throw しても取り消し自体は成功させる(自己修復経路がある)
       console.error("checkin-cancel: push 送信に失敗:", e);

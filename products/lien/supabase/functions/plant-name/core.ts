@@ -25,7 +25,11 @@ import {
   type PairSnapshot,
   type SnapshotRepo,
 } from "../_shared/snapshot.ts";
-import type { LienPushType } from "../_shared/apns.ts";
+import {
+  type ApnsSendOptions,
+  type LienPushType,
+  sendOptionsFor,
+} from "../_shared/apns.ts";
 
 /** 名前の最大字数(Unicode コードポイント。ニックネームと同じ 8 字 — REQUIREMENTS §3.2・§5) */
 export const PLANT_NAME_MAX_LENGTH = 8;
@@ -47,7 +51,8 @@ export interface Pusher {
   send(
     deviceToken: string,
     payload: Record<string, unknown>,
-    opts?: { pushType?: "alert" | "background"; priority?: number },
+    /** pushType / priority(サイレント)と、受信者の users.push_env(sendOptionsFor)。未設定は APNS_ENV */
+    opts?: ApnsSendOptions,
   ): Promise<{ ok: boolean }>;
 }
 
@@ -220,7 +225,11 @@ export async function handlePlantName(
         type: "pair_update",
         snapshot: partnerSnapshot,
       });
-      await deps.pusher.send(pair.partner.pushToken, payload, SILENT_PUSH_OPTS);
+      await deps.pusher.send(
+        pair.partner.pushToken,
+        payload,
+        sendOptionsFor(pair.partner, SILENT_PUSH_OPTS),
+      );
     } catch (e) {
       // 名前の保存自体は成功させる(自己修復経路 GET /snapshot がある — DESIGN §4)
       console.error("plant-name: push 送信に失敗:", e);

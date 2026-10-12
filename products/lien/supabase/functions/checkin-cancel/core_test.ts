@@ -17,6 +17,8 @@ import type {
 } from "../_shared/snapshot.ts";
 import type { StreakDayRecord } from "../_shared/streak.ts";
 
+import type { ApnsSendOptions } from "../_shared/apns.ts";
+
 // ---- 自作 assert ヘルパ(外部モジュールを使わない) ----
 
 function deepEqual(a: unknown, b: unknown): boolean {
@@ -88,7 +90,7 @@ function makeRepo(world: World): CheckinCancelRepo {
 interface SentPush {
   deviceToken: string;
   payload: Record<string, unknown>;
-  opts?: { pushType?: "alert" | "background"; priority?: number };
+  opts?: ApnsSendOptions;
 }
 
 function makePusher(
@@ -447,4 +449,35 @@ Deno.test("checkin-cancel: 約束をアーカイブ済みでも当日checkinの�
   assertEquals(result.body.alreadyCanceled, false);
   assertEquals(result.body.snapshot.myPromiseTitle, null);
   assertEquals(sent.length, 1, "ペアは健在なのでサイレント push は送る");
+});
+
+Deno.test("checkin-cancel: 相手の push_env を、サイレント push の送信オプション(pushType / priority)と一緒に environment へ載せる(issue #60)", async () => {
+  const cases = [
+    ["production", {
+      pushType: "background",
+      priority: 5,
+      environment: "production",
+    }],
+    ["sandbox", {
+      pushType: "background",
+      priority: 5,
+      environment: "sandbox",
+    }],
+    [null, { pushType: "background", priority: 5 }],
+    [undefined, { pushType: "background", priority: 5 }],
+  ] as const;
+  for (const [pushEnv, expected] of cases) {
+    const world = makeWorld({ users: [userA, { ...userB, pushEnv }] });
+    world.checkins.set(`user-a|${TODAY}`, { photoPath: null });
+    const { sent, pusher } = makePusher();
+
+    await handleCheckinCancel(deps(world, pusher), {
+      userId: "user-a",
+      dateLocal: TODAY,
+    });
+
+    assertEquals(sent.length, 1, `push_env=${pushEnv}`);
+    assertEquals(sent[0].deviceToken, "token-b");
+    assertEquals(sent[0].opts, expected, `push_env=${pushEnv}`);
+  }
 });

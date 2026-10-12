@@ -30,7 +30,11 @@ import {
   type PairSnapshot,
   type SnapshotRepo,
 } from "../_shared/snapshot.ts";
-import type { LienPushType } from "../_shared/apns.ts";
+import {
+  type ApnsSendOptions,
+  type LienPushType,
+  sendOptionsFor,
+} from "../_shared/apns.ts";
 
 /** title の最大字数(Unicode コードポイント = Postgres char_length と同じ数え方) */
 export const PROMISE_TITLE_MAX_LENGTH = 20;
@@ -68,7 +72,8 @@ export interface Pusher {
   send(
     deviceToken: string,
     payload: Record<string, unknown>,
-    opts?: { pushType?: "alert" | "background"; priority?: number },
+    /** pushType / priority(サイレント)と、受信者の users.push_env(sendOptionsFor)。未設定は APNS_ENV */
+    opts?: ApnsSendOptions,
   ): Promise<{ ok: boolean }>;
 }
 
@@ -166,7 +171,11 @@ export async function handlePromiseSet(
         type: "pair_update",
         snapshot: partnerSnapshot,
       });
-      await deps.pusher.send(pair.partner.pushToken, payload, SILENT_PUSH_OPTS);
+      await deps.pusher.send(
+        pair.partner.pushToken,
+        payload,
+        sendOptionsFor(pair.partner, SILENT_PUSH_OPTS),
+      );
     } catch (e) {
       // pusher が throw しても約束の保存自体は成功させる(自己修復経路がある)
       console.error("promise-set: push 送信に失敗:", e);

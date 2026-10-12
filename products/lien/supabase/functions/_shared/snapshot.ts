@@ -507,6 +507,12 @@ export interface SnapshotUserRow {
   nickname: string;
   timezone: string;
   pushToken: string | null;
+  /**
+   * pushToken が属する APNs 環境(users.push_env。null / 省略 = 未設定 → 送信時は APNS_ENV)。
+   * push_token と一緒に読み、pusher.send の environment に渡す(sendOptionsFor — issue #60)。
+   * snapshot の組み立て自体は使わない
+   */
+  pushEnv?: "sandbox" | "production" | null;
 }
 
 export interface SnapshotPromiseRow extends PromiseSummary {

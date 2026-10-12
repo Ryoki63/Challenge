@@ -19,7 +19,11 @@ import {
   type PairSnapshot,
   type SnapshotRepo,
 } from "../_shared/snapshot.ts";
-import { buildVisiblePushPayload } from "../_shared/apns.ts";
+import {
+  type ApnsSendOptions,
+  buildVisiblePushPayload,
+  sendOptionsFor,
+} from "../_shared/apns.ts";
 import {
   pushDisplayName,
   REACTION_STAMPS,
@@ -51,6 +55,8 @@ export interface Pusher {
   send(
     deviceToken: string,
     payload: Record<string, unknown>,
+    /** environment は受信者の users.push_env(sendOptionsFor)。未設定は APNS_ENV */
+    opts?: ApnsSendOptions,
   ): Promise<{ ok: boolean }>;
 }
 
@@ -149,7 +155,11 @@ export async function handleReact(
         type: "reaction",
         snapshot: partnerSnapshot,
       });
-      await deps.pusher.send(pair.partner.pushToken, payload);
+      await deps.pusher.send(
+        pair.partner.pushToken,
+        payload,
+        sendOptionsFor(pair.partner),
+      );
     } catch (e) {
       console.error("react: push 送信に失敗:", e);
     }

@@ -20,6 +20,12 @@ import type {
 } from "../_shared/snapshot.ts";
 import type { StreakDayKind, StreakDayRecord } from "../_shared/streak.ts";
 import { createPusher } from "../_shared/pusher.ts";
+import {
+  PARTNER_SELECT,
+  toSnapshotUser,
+  USER_COLUMNS,
+  type UserDbRow,
+} from "../_shared/user_rows.ts";
 
 // ---- Supabase リポジトリ実装(書き込みは service_role 経由のみ — DESIGN §5.2) ----
 
@@ -28,17 +34,12 @@ function makeRepo(db: SupabaseClient): CheckinRepo {
     async getUser(userId: string): Promise<SnapshotUserRow | null> {
       const { data, error } = await db
         .from("users")
-        .select("id, nickname, timezone, push_token")
+        .select(USER_COLUMNS)
         .eq("id", userId)
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
-      return {
-        id: data.id,
-        nickname: data.nickname ?? "",
-        timezone: data.timezone ?? "Asia/Tokyo",
-        pushToken: data.push_token ?? null,
-      };
+      return toSnapshotUser(data);
     },
 
     async getActivePromise(userId: string): Promise<SnapshotPromiseRow | null> {
@@ -69,27 +70,16 @@ function makeRepo(db: SupabaseClient): CheckinRepo {
       };
       const { data: partnerRow, error: e2 } = await db
         .from("pair_members")
-        .select("user_id, users!inner(id, nickname, timezone, push_token)")
+        .select(PARTNER_SELECT)
         .eq("pair_id", membership.pair_id)
         .neq("user_id", userId)
         .maybeSingle();
       if (e2) throw e2;
       if (!partnerRow) return null;
-      const partner = partnerRow.users as unknown as {
-        id: string;
-        nickname: string | null;
-        timezone: string | null;
-        push_token: string | null;
-      };
       return {
         pairId: pair.id,
         startedOn: pair.started_on,
-        partner: {
-          id: partner.id,
-          nickname: partner.nickname ?? "",
-          timezone: partner.timezone ?? "Asia/Tokyo",
-          pushToken: partner.push_token ?? null,
-        },
+        partner: toSnapshotUser(partnerRow.users as unknown as UserDbRow),
       };
     },
 
@@ -197,7 +187,8 @@ const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 });
 
 // APNs 設定が未投入(G0 前)の間は push なしで運転する(処理自体は止めない)。
-// 設定済みなら、トークンごとに users.push_env で APNs の環境を選び、
+// 設定済みなら、送り先の users.push_env で APNs の環境を選び(getUser / getActivePair が push_token と
+// 一緒に読んだものを、各 core が送信オプションの environment に渡す。逆引きはしない — issue #60)、
 // 無効なトークン(410 / BadDeviceToken)は push_token を null にする(DESIGN §4 / issue #53)
 const pusher: Pusher = createPusher(adminClient, "checkin");
 

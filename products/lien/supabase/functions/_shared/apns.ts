@@ -14,8 +14,10 @@
 //   - send() は決して throw しない。結果は ApnsSendResult で返し、push 失敗の扱い
 //     (成功扱いにする等)は呼び出し側のポリシーに委ねる
 //   - APNs の環境(sandbox / production)は**トークン単位**(issue #53 / DESIGN §4)。
-//     users.push_env をトークンごとに引いて送信先を選ぶ(TokenAwarePusher)。
-//     APNS_ENV は push_env が未設定のトークンのフォールバック(単一値での運用だと、
+//     送信先の環境は、呼び出し側が users 行の push_env を push_token と一緒に読み、
+//     送信オプション(environment)で渡す(sendOptionsFor)。送信のたびに push_token から
+//     users を逆引きしない(issue #60: 逆引きは users の全件走査になる)。
+//     APNS_ENV は push_env が未設定(null)のトークンのフォールバック(単一値での運用だと、
 //     開発ビルドと TestFlight が混在した瞬間に片方へ届かない)
 //   - APNs が「このトークンは無効」と返したとき(410 / 400 BadDeviceToken)は結果に
 //     invalidToken: true を付け、TokenAwarePusher が users.push_token を null にする
@@ -207,9 +209,30 @@ export interface ApnsSendOptions {
   priority?: number;
   /**
    * この送信だけ APNs の環境を指定する。省略時は ApnsConfig.environment(APNS_ENV)。
-   * 通常は TokenAwarePusher が users.push_env からトークンごとに決めて渡す
+   * 通常は呼び出し側が、読んだ users 行の push_env から渡す(sendOptionsFor)
    */
   environment?: ApnsEnvironment;
+}
+
+/**
+ * users.push_env の値(DB からは string | null で来る)を ApnsEnvironment | null に直す。
+ * 想定外の値(空文字・将来の別の値など)は null = 未設定扱い(APNS_ENV にフォールバック)
+ */
+export function normalizePushEnv(value: unknown): ApnsEnvironment | null {
+  return value === "sandbox" || value === "production" ? value : null;
+}
+
+/**
+ * pusher.send に渡す送信オプションを作る。受信者の users 行の push_env(getUser /
+ * getActivePair が push_token と一緒に読んだもの)があれば environment に載せる。
+ * 未設定(null / undefined)なら environment を付けない = APNS_ENV で送る。
+ * base(サイレントプッシュの pushType / priority など)はそのまま残す
+ */
+export function sendOptionsFor(
+  user: { pushEnv?: ApnsEnvironment | null },
+  base: ApnsSendOptions = {},
+): ApnsSendOptions {
+  return user.pushEnv ? { ...base, environment: user.pushEnv } : { ...base };
 }
 
 const APNS_HOSTS: Record<ApnsEnvironment, string> = {
@@ -335,15 +358,13 @@ export class ApnsClient {
   }
 }
 
-// ---- トークン単位の環境選択と無効トークンの掃除(issue #53) ----
+// ---- トークン単位の環境選択と無効トークンの掃除(issue #53・#60) ----
 
 /**
- * users.push_token / push_env の永続層。実装は pusher.ts の makePushTokenStore(Supabase)。
+ * users.push_token の掃除の永続層。実装は pusher.ts の makePushTokenStore(Supabase)。
  * apns.ts を supabase-js から切り離す注入点で、テストはモックを渡す
  */
 export interface PushTokenStore {
-  /** deviceToken を持つ users.push_env。行が無い・未設定は null(= APNS_ENV にフォールバック) */
-  getPushEnv(deviceToken: string): Promise<ApnsEnvironment | null>;
   /**
    * deviceToken を持つ users.push_token を null にする(無効トークンの掃除)。
    * 条件は「いまの push_token が deviceToken と一致」にするので、
@@ -353,12 +374,17 @@ export interface PushTokenStore {
 }
 
 /**
- * ApnsClient を包み、①トークンごとに users.push_env で送信先の環境を選び、
+ * ApnsClient を包み、①opts.environment(呼び出し側が users.push_env から渡す)の環境へ送り、
  * ②APNs が「トークン無効」と返したら users.push_token を null にする Pusher。
  * 各 Function の core.ts が期待する Pusher(send(token, payload, opts))と互換。
  *
- * 決して throw しない。環境の取得・トークンの掃除に失敗しても、ログに残して処理を続ける
- * (push は本処理を止めない — DESIGN §5.5。未設定の環境は APNS_ENV で送る)。
+ * **環境を DB から引き直さない**(issue #60): 以前は送信のたびに push_token で users を逆引きして
+ * push_env を取っていたが、push_token には索引が無く、users の全件走査になる。各 Function は
+ * 送り先の users 行を push_token と一緒に読んでいる(getUser / getActivePair)ので、
+ * push_env もそこで読み、environment として渡す。渡されなければ(未設定)APNS_ENV で送る。
+ *
+ * 決して throw しない。トークンの掃除に失敗しても、ログに残して処理を続ける
+ * (push は本処理を止めない — DESIGN §5.5)。
  */
 export class TokenAwarePusher {
   #client: Pick<ApnsClient, "send">;
@@ -374,20 +400,7 @@ export class TokenAwarePusher {
     payload: Record<string, unknown>,
     opts: ApnsSendOptions = {},
   ): Promise<ApnsSendResult> {
-    // 呼び出し側が環境を指定していればそれを優先(DB を引かない)
-    let environment: ApnsEnvironment | undefined = opts.environment;
-    if (environment === undefined) {
-      try {
-        environment = (await this.#store.getPushEnv(deviceToken)) ?? undefined;
-      } catch (e) {
-        console.error("apns: push_env の取得に失敗。APNS_ENV で送信する:", e);
-      }
-    }
-
-    const result = await this.#client.send(deviceToken, payload, {
-      ...opts,
-      environment,
-    });
+    const result = await this.#client.send(deviceToken, payload, opts);
 
     if (!result.ok && result.invalidToken) {
       try {
@@ -395,7 +408,7 @@ export class TokenAwarePusher {
         console.warn(
           `apns: 無効なトークンを破棄した(token ${
             deviceToken.slice(0, 8)
-          }…, env ${environment ?? "APNS_ENV"}): ${result.reason}`,
+          }…, env ${opts.environment ?? "APNS_ENV"}): ${result.reason}`,
         );
       } catch (e) {
         console.error("apns: 無効トークンの破棄に失敗:", e);

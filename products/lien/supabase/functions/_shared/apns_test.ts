@@ -11,7 +11,9 @@ import {
   createApnsJwt,
   isInvalidTokenResponse,
   loadApnsConfigFromEnv,
+  normalizePushEnv,
   type PushTokenStore,
+  sendOptionsFor,
   TokenAwarePusher,
 } from "./apns.ts";
 import { buildSoloSnapshot } from "./snapshot.ts";
@@ -476,34 +478,62 @@ Deno.test("ApnsClient: 失敗結果の invalidToken — 410 / BadDeviceToken は
   assertEquals(ok, { ok: true, status: 200, attempts: 1 });
 });
 
+// ---- normalizePushEnv / sendOptionsFor ----
+
+Deno.test("normalizePushEnv: sandbox / production だけ通し、それ以外は null(未設定 = APNS_ENV)", () => {
+  assertEquals(normalizePushEnv("sandbox"), "sandbox");
+  assertEquals(normalizePushEnv("production"), "production");
+  for (
+    const v of [null, undefined, "", "prod", "Production", "staging", 1, {}]
+  ) {
+    assertEquals(normalizePushEnv(v), null, String(v));
+  }
+});
+
+Deno.test("sendOptionsFor: 受信者の push_env を environment に載せる。未設定なら載せず、base はそのまま残す", () => {
+  assertEquals(sendOptionsFor({ pushEnv: "production" }), {
+    environment: "production",
+  });
+  assertEquals(sendOptionsFor({ pushEnv: "sandbox" }), {
+    environment: "sandbox",
+  });
+  // 未設定(null / 省略)は environment を付けない = ApnsClient が APNS_ENV で送る
+  assertEquals(sendOptionsFor({ pushEnv: null }), {});
+  assertEquals(sendOptionsFor({}), {});
+  // サイレント push の pushType / priority は保つ
+  const silent = { pushType: "background", priority: 5 } as const;
+  assertEquals(sendOptionsFor({ pushEnv: "production" }, silent), {
+    pushType: "background",
+    priority: 5,
+    environment: "production",
+  });
+  assertEquals(sendOptionsFor({ pushEnv: null }, silent), {
+    pushType: "background",
+    priority: 5,
+  });
+  // base を書き換えない(定数の SILENT_PUSH_OPTS を共有しているため)
+  assertEquals(silent, { pushType: "background", priority: 5 });
+});
+
 // ---- TokenAwarePusher ----
 
 interface StoreOpts {
-  envs?: Record<string, ApnsEnvironment | null>;
-  getThrows?: boolean;
   clearThrows?: boolean;
 }
 
 function makeStore(opts: StoreOpts = {}): {
   store: PushTokenStore;
-  lookups: string[];
   cleared: string[];
 } {
-  const lookups: string[] = [];
   const cleared: string[] = [];
   const store: PushTokenStore = {
-    getPushEnv: (token) => {
-      lookups.push(token);
-      if (opts.getThrows) return Promise.reject(new Error("db down"));
-      return Promise.resolve(opts.envs?.[token] ?? null);
-    },
     clearPushToken: (token) => {
       cleared.push(token);
       if (opts.clearThrows) return Promise.reject(new Error("db down"));
       return Promise.resolve();
     },
   };
-  return { store, lookups, cleared };
+  return { store, cleared };
 }
 
 /** console.warn / console.error を捕まえて出力を静かにする */
@@ -523,22 +553,25 @@ async function captureConsole<T>(
   }
 }
 
-Deno.test("TokenAwarePusher: トークンごとに push_env で送信先を選び、未設定は APNS_ENV", async () => {
+Deno.test("TokenAwarePusher: opts.environment の環境へ送り、渡されなければ APNS_ENV(送信のたびに DB を引かない)", async () => {
   const { pem } = await makeTestKey();
   for (const fallback of ["sandbox", "production"] as const) {
     const { calls, post } = mockTransport();
-    const { store, lookups } = makeStore({
-      envs: { "tok-prod": "production", "tok-sb": "sandbox", "tok-null": null },
-    });
+    // ストアには clearPushToken しか無い = push_env を逆引きする手段がそもそも無い
+    const { store, cleared } = makeStore();
     const pusher = new TokenAwarePusher(
       new ApnsClient(makeConfig(pem, fallback), { post }),
       store,
     );
 
-    await pusher.send("tok-prod", {});
-    await pusher.send("tok-sb", {});
-    await pusher.send("tok-null", {}); // push_env 未設定 → APNS_ENV
-    await pusher.send("tok-unknown", {}); // 行が無い → APNS_ENV
+    await pusher.send(
+      "tok-prod",
+      {},
+      sendOptionsFor({ pushEnv: "production" }),
+    );
+    await pusher.send("tok-sb", {}, sendOptionsFor({ pushEnv: "sandbox" }));
+    await pusher.send("tok-null", {}, sendOptionsFor({ pushEnv: null })); // 未設定 → APNS_ENV
+    await pusher.send("tok-noopts", {}); // オプションなし → APNS_ENV
 
     const host = (env: ApnsEnvironment) =>
       env === "production"
@@ -548,16 +581,16 @@ Deno.test("TokenAwarePusher: トークンごとに push_env で送信先を選�
       `${host("production")}tok-prod`,
       `${host("sandbox")}tok-sb`,
       `${host(fallback)}tok-null`,
-      `${host(fallback)}tok-unknown`,
+      `${host(fallback)}tok-noopts`,
     ], `APNS_ENV=${fallback}`);
-    assertEquals(lookups, ["tok-prod", "tok-sb", "tok-null", "tok-unknown"]);
+    assertEquals(cleared, [], "成功した送信ではトークンを消さない");
   }
 });
 
-Deno.test("TokenAwarePusher: opts.environment を渡したら DB を引かず、pushType / priority もそのまま渡す", async () => {
+Deno.test("TokenAwarePusher: pushType / priority も opts のままクライアントへ渡す", async () => {
   const { pem } = await makeTestKey();
   const { calls, post } = mockTransport();
-  const { store, lookups } = makeStore({ envs: { tok: "sandbox" } });
+  const { store } = makeStore();
   const pusher = new TokenAwarePusher(
     new ApnsClient(makeConfig(pem, "sandbox"), { post }),
     store,
@@ -570,7 +603,6 @@ Deno.test("TokenAwarePusher: opts.environment を渡したら DB を引かず、
   });
 
   assertEquals(result, { ok: true, status: 200, attempts: 1 });
-  assertEquals(lookups, [], "環境指定があれば DB を引かない");
   assertEquals(calls[0].url, "https://api.push.apple.com/3/device/tok");
   assertEquals(calls[0].headers["apns-push-type"], "background");
   assertEquals(calls[0].headers["apns-priority"], "5");
@@ -617,15 +649,17 @@ Deno.test("TokenAwarePusher: 410 / BadDeviceToken を受けたトークンだけ
   ];
   for (const sc of scenarios) {
     const { post } = mockTransport([...sc.script]);
-    const { store, cleared } = makeStore({
-      envs: { "token-abcdef123456": "production" },
-    });
+    const { store, cleared } = makeStore();
     const pusher = new TokenAwarePusher(
       new ApnsClient(makeConfig(pem), { post }),
       store,
     );
     const { value: result, logs } = await captureConsole(() =>
-      pusher.send("token-abcdef123456", {})
+      pusher.send(
+        "token-abcdef123456",
+        {},
+        sendOptionsFor({ pushEnv: "production" }),
+      )
     );
 
     assertEquals(cleared, sc.cleared ? ["token-abcdef123456"] : [], sc.label);
@@ -641,37 +675,25 @@ Deno.test("TokenAwarePusher: 410 / BadDeviceToken を受けたトークンだけ
         false,
         "トークン全体はログに出さない",
       );
+      assertEquals(
+        logs.some((l) => l.includes("env production")),
+        true,
+        "どの環境で無効と返されたかを残す(BadDeviceToken は環境違いでも出る)",
+      );
     }
   }
 });
 
-Deno.test("TokenAwarePusher: 環境の取得・トークンの破棄に失敗しても throw せず、結果を返す", async () => {
+Deno.test("TokenAwarePusher: トークンの破棄に失敗しても throw せず、元の失敗結果を返す", async () => {
   const { pem } = await makeTestKey();
-
-  // push_env の取得失敗 → APNS_ENV(sandbox)で送る
-  const a = mockTransport();
-  const getFail = makeStore({ getThrows: true });
-  const p1 = new TokenAwarePusher(
-    new ApnsClient(makeConfig(pem, "sandbox"), { post: a.post }),
-    getFail.store,
-  );
-  const r1 = await captureConsole(() => p1.send("tok", {}));
-  assertEquals(r1.value.ok, true);
-  assertEquals(
-    a.calls[0].url,
-    "https://api.sandbox.push.apple.com/3/device/tok",
-  );
-  assertEquals(r1.logs.length > 0, true, "失敗はログに残す");
-
-  // 破棄の失敗 → 元の失敗結果をそのまま返す
   const b = mockTransport([{ status: 410, body: '{"reason":"Unregistered"}' }]);
   const clearFail = makeStore({ clearThrows: true });
-  const p2 = new TokenAwarePusher(
+  const pusher = new TokenAwarePusher(
     new ApnsClient(makeConfig(pem), { post: b.post }),
     clearFail.store,
   );
-  const r2 = await captureConsole(() => p2.send("tok", {}));
-  assertEquals(r2.value.ok, false);
+  const r = await captureConsole(() => pusher.send("tok", {}));
+  assertEquals(r.value.ok, false);
   assertEquals(clearFail.cleared, ["tok"], "破棄は試みる");
-  assertEquals(r2.logs.length > 0, true, "失敗はログに残す");
+  assertEquals(r.logs.length > 0, true, "失敗はログに残す");
 });

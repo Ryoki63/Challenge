@@ -19,6 +19,8 @@ import type {
 import type { StreakDayKind, StreakDayRecord } from "../_shared/streak.ts";
 import type { Pusher } from "../checkin/core.ts";
 
+import type { ApnsSendOptions } from "../_shared/apns.ts";
+
 // ---- 自作 assert ヘルパ(外部モジュールを使わない) ----
 
 function deepEqual(a: unknown, b: unknown): boolean {
@@ -154,6 +156,7 @@ function makeRepo(world: World): CloseDayRepo {
 interface SentPush {
   deviceToken: string;
   payload: Record<string, unknown>;
+  opts?: ApnsSendOptions;
 }
 
 function makePusher(): { sent: SentPush[]; pusher: Pusher } {
@@ -161,8 +164,8 @@ function makePusher(): { sent: SentPush[]; pusher: Pusher } {
   return {
     sent,
     pusher: {
-      send: (deviceToken, payload) => {
-        sent.push({ deviceToken, payload });
+      send: (deviceToken, payload, opts) => {
+        sent.push({ deviceToken, payload, opts });
         return Promise.resolve({ ok: true });
       },
     },
@@ -804,4 +807,29 @@ Deno.test("parseCloseDayRequest: dateLocal と notify だけ許す・型違い�
     ok: false,
     error: "unknown_field",
   });
+});
+
+Deno.test("close-day: 両メンバーそれぞれの push_env を、その人への push の environment に載せる(issue #60)", async () => {
+  const world = makeWorld({
+    users: [
+      { ...userA, pushEnv: "sandbox" },
+      { ...userB, pushEnv: "production" },
+    ],
+  });
+  world.checkins.add(`user-a|${D}`); // B が未達 → チケット消費の ticket_used を両者へ
+  const { sent, pusher } = makePusher();
+
+  await handleCloseDay(deps(world, pusher), {});
+
+  assertEquals(sent.length, 2);
+  const byToken = Object.fromEntries(sent.map((s) => [s.deviceToken, s.opts]));
+  assertEquals(byToken["token-a"], { environment: "sandbox" });
+  assertEquals(byToken["token-b"], { environment: "production" });
+
+  // push_env が未設定(null / 省略)のユーザーには environment を付けない = APNS_ENV
+  const unset = makeWorld({ users: [{ ...userA, pushEnv: null }, userB] });
+  unset.checkins.add(`user-a|${D}`);
+  const second = makePusher();
+  await handleCloseDay(deps(unset, second.pusher), {});
+  assertEquals(second.sent.map((s) => s.opts), [{}, {}]);
 });

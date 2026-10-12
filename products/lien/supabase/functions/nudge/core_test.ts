@@ -16,6 +16,8 @@ import type {
 } from "../_shared/snapshot.ts";
 import type { StreakDayRecord } from "../_shared/streak.ts";
 
+import type { ApnsSendOptions } from "../_shared/apns.ts";
+
 // ---- 自作 assert ヘルパ(外部モジュールを使わない) ----
 
 function assertEquals(actual: unknown, expected: unknown, msg = ""): void {
@@ -92,6 +94,7 @@ function makeRepo(world: World): NudgeRepo {
 interface SentPush {
   deviceToken: string;
   payload: Record<string, unknown>;
+  opts?: ApnsSendOptions;
 }
 
 function makePusher(
@@ -101,8 +104,8 @@ function makePusher(
   return {
     sent,
     pusher: {
-      send: (deviceToken, payload) => {
-        sent.push({ deviceToken, payload });
+      send: (deviceToken, payload, opts) => {
+        sent.push({ deviceToken, payload, opts });
         if (behavior === "throw") {
           return Promise.reject(new Error("apns down"));
         }
@@ -370,5 +373,29 @@ Deno.test("nudge: 自分と相手のレート制限は独立(相手が3回送っ
   assertEquals(result.status, 200);
   if (result.status === 200) {
     assertEquals(result.body.remainingToday, NUDGE_DAILY_LIMIT - 1);
+  }
+});
+
+Deno.test("nudge: 受信者(相手)の push_env を送信オプションの environment に載せる — 未設定は載せず APNS_ENV に任せる(issue #60)", async () => {
+  const cases = [
+    ["production", { environment: "production" }],
+    ["sandbox", { environment: "sandbox" }],
+    [null, {}],
+    [undefined, {}],
+  ] as const;
+  for (const [pushEnv, expected] of cases) {
+    const world = makeWorld({ users: [userA, { ...userB, pushEnv }] });
+    const { sent, pusher } = makePusher("ok");
+
+    await handleNudge(deps(world, pusher), { userId: "user-a", stamp: "👋" });
+
+    assertEquals(sent.length, 1, `push_env=${pushEnv}`);
+    assertEquals(sent[0].deviceToken, "token-b");
+    // このファイルの assertEquals は Object.is なので、オブジェクトは JSON で比べる
+    assertEquals(
+      JSON.stringify(sent[0].opts),
+      JSON.stringify(expected),
+      `push_env=${pushEnv}`,
+    );
   }
 });

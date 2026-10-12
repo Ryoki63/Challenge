@@ -1,7 +1,11 @@
 // pusher_test.ts — pusher.ts の deno test(DB・APNs はモック。ネットワーク・実キー不要)
 // 正本: docs/DESIGN.md §4(APNs の環境はトークン単位・無効トークンの掃除)/ §5.5 / §7
 
-import type { ApnsHttpPost, ApnsHttpResponse } from "./apns.ts";
+import {
+  type ApnsHttpPost,
+  type ApnsHttpResponse,
+  sendOptionsFor,
+} from "./apns.ts";
 import {
   createPusher,
   makePushTokenStore,
@@ -58,22 +62,16 @@ function assertThrows(fn: () => unknown, msg = ""): void {
   }
 }
 
-// ---- 偽の supabase クライアント(使う部分だけ)----
+// ---- 偽の supabase クライアント(使う部分だけ。DB に触るのは無効トークンの掃除の update だけ)----
 
 interface DbCall {
   table: string;
   op: "select" | "update";
   arg: unknown;
   filters: Array<[string, unknown]>;
-  limit?: number;
 }
 
-interface DbResponses {
-  select?: { data: Array<{ push_env: string | null }> | null; error: unknown };
-  update?: { error: unknown };
-}
-
-function fakeDb(responses: DbResponses = {}): {
+function fakeDb(responses: { update?: { error: unknown } } = {}): {
   db: PushStoreDb;
   calls: DbCall[];
 } {
@@ -81,6 +79,7 @@ function fakeDb(responses: DbResponses = {}): {
   const db: PushStoreDb = {
     from(table: string) {
       return {
+        // 送信のたびの push_token からの逆引き(select)は無くなった。呼ばれたら検出できるよう記録する
         select(columns: string) {
           const call: DbCall = {
             table,
@@ -94,11 +93,8 @@ function fakeDb(responses: DbResponses = {}): {
               call.filters.push([column, value]);
               return chain;
             },
-            limit(count: number) {
-              call.limit = count;
-              return Promise.resolve(
-                responses.select ?? { data: [], error: null },
-              );
+            limit() {
+              return Promise.resolve({ data: [], error: null });
             },
           };
           return chain;
@@ -126,42 +122,12 @@ function fakeDb(responses: DbResponses = {}): {
 
 // ---- makePushTokenStore ----
 
-Deno.test("makePushTokenStore.getPushEnv: users.push_token = token の push_env を引く", async () => {
-  for (const env of ["sandbox", "production"] as const) {
-    const { db, calls } = fakeDb({
-      select: { data: [{ push_env: env }], error: null },
-    });
-    const result = await makePushTokenStore(db).getPushEnv("tok-1");
-    assertEquals(result, env);
-    assertEquals(calls, [{
-      table: "users",
-      op: "select",
-      arg: "push_env",
-      filters: [["push_token", "tok-1"]],
-      limit: 1,
-    }]);
-  }
-});
-
-Deno.test("makePushTokenStore.getPushEnv: 行なし・未設定・不正な値は null(= APNS_ENV にフォールバック)", async () => {
-  const cases: Array<
-    { data: Array<{ push_env: string | null }> | null; label: string }
-  > = [
-    { data: [], label: "行なし" },
-    { data: null, label: "data が null" },
-    { data: [{ push_env: null }], label: "未設定" },
-    { data: [{ push_env: "staging" }], label: "不正な値" },
-    { data: [{ push_env: "" }], label: "空文字" },
-  ];
-  for (const c of cases) {
-    const { db } = fakeDb({ select: { data: c.data, error: null } });
-    assertEquals(await makePushTokenStore(db).getPushEnv("tok"), null, c.label);
-  }
-});
-
-Deno.test("makePushTokenStore.getPushEnv: DB エラーは throw(呼び出し側 TokenAwarePusher が握る)", async () => {
-  const { db } = fakeDb({ select: { data: null, error: new Error("boom") } });
-  await assertRejects(() => makePushTokenStore(db).getPushEnv("tok"));
+Deno.test("makePushTokenStore: 環境を引く口(getPushEnv)は持たない — push_env は呼び出し側が users 行から渡す(issue #60)", () => {
+  const store = makePushTokenStore(fakeDb().db) as unknown as Record<
+    string,
+    unknown
+  >;
+  assertEquals(Object.keys(store).sort(), ["clearPushToken"]);
 });
 
 Deno.test("makePushTokenStore.clearPushToken: push_token を null にする(条件は push_token = そのトークン)", async () => {
@@ -256,52 +222,53 @@ Deno.test("createPusher: APNS_ENV が不正値なら throw(設定ミスは起動
   );
 });
 
-Deno.test("createPusher: 設定済み — users.push_env でトークンごとに送信先を選ぶ(APNS_ENV はフォールバック)", async () => {
+Deno.test("createPusher: 設定済み — 呼び出し側が渡した environment で送る。渡されなければ APNS_ENV。DB は引かない", async () => {
   const env = await fullEnv("sandbox");
-  const { db, calls } = fakeDb({
-    select: { data: [{ push_env: "production" }], error: null },
-  });
+  const { db, calls } = fakeDb();
   const { urls, post } = mockPost();
   const pusher = createPusher(db, "nudge", { getEnv: (k) => env[k], post });
 
-  const result = await pusher.send("tok-prod", { aps: {} });
-
+  // 受信者の users.push_env = production(getUser / getActivePair が push_token と一緒に読んだもの)
+  const result = await pusher.send(
+    "tok-prod",
+    { aps: {} },
+    sendOptionsFor({ pushEnv: "production" }),
+  );
   assertEquals(result.ok, true);
-  assertEquals(urls, ["https://api.push.apple.com/3/device/tok-prod"]);
-  assertEquals(calls.length, 1);
-  assertEquals(calls[0].filters, [["push_token", "tok-prod"]]);
+  // push_env が未設定(null)のトークンは APNS_ENV(sandbox)で送る
+  await pusher.send("tok-unset", {}, sendOptionsFor({ pushEnv: null }));
+  await pusher.send("tok-noopts", {});
 
-  // push_env が未設定のトークンは APNS_ENV(sandbox)で送る
-  const unset = fakeDb({ select: { data: [{ push_env: null }], error: null } });
-  const second = mockPost();
-  const p2 = createPusher(unset.db, "nudge", {
-    getEnv: (k) => env[k],
-    post: second.post,
-  });
-  await p2.send("tok-unset", {});
-  assertEquals(second.urls, [
+  assertEquals(urls, [
+    "https://api.push.apple.com/3/device/tok-prod",
     "https://api.sandbox.push.apple.com/3/device/tok-unset",
+    "https://api.sandbox.push.apple.com/3/device/tok-noopts",
   ]);
+  assertEquals(
+    calls,
+    [],
+    "送信のたびに push_token から users を逆引きしない(全件走査になる)",
+  );
 });
 
 Deno.test("createPusher: APNs が 410 を返したトークンは users.push_token を null にする", async () => {
   const env = await fullEnv("production");
-  const { db, calls } = fakeDb({
-    select: { data: [{ push_env: "production" }], error: null },
-  });
+  const { db, calls } = fakeDb();
   const { post } = mockPost([
     { status: 410, body: '{"reason":"Unregistered"}' },
   ]);
   const pusher = createPusher(db, "react", { getEnv: (k) => env[k], post });
 
-  const result = await quiet(() => pusher.send("tok-dead", {}));
+  const result = await quiet(() =>
+    pusher.send("tok-dead", {}, sendOptionsFor({ pushEnv: "production" }))
+  );
 
   assertEquals(result.ok, false);
-  const update = calls.find((c) => c.op === "update");
-  assertEquals(update, {
+  // DB に触るのは掃除の update だけ(逆引きの select は無い)
+  assertEquals(calls, [{
     table: "users",
     op: "update",
     arg: { push_token: null },
     filters: [["push_token", "tok-dead"]],
-  });
+  }]);
 });

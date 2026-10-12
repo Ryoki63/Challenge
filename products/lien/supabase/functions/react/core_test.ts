@@ -19,6 +19,8 @@ import type {
 } from "../_shared/snapshot.ts";
 import type { StreakDayRecord } from "../_shared/streak.ts";
 
+import type { ApnsSendOptions } from "../_shared/apns.ts";
+
 // ---- 自作 assert ヘルパ(外部モジュールを使わない) ----
 
 function assertEquals(actual: unknown, expected: unknown, msg = ""): void {
@@ -106,6 +108,7 @@ function makeRepo(world: World): ReactRepo {
 interface SentPush {
   deviceToken: string;
   payload: Record<string, unknown>;
+  opts?: ApnsSendOptions;
 }
 
 function makePusher(
@@ -115,8 +118,8 @@ function makePusher(
   return {
     sent,
     pusher: {
-      send: (deviceToken, payload) => {
-        sent.push({ deviceToken, payload });
+      send: (deviceToken, payload, opts) => {
+        sent.push({ deviceToken, payload, opts });
         if (behavior === "throw") {
           return Promise.reject(new Error("apns down"));
         }
@@ -449,4 +452,32 @@ Deno.test("react: 相手にpush_tokenが無ければpushせず成功", async () 
   });
   assertEquals(result.status, 200);
   assertEquals(sent.length, 0);
+});
+
+Deno.test("react: 受信者(相手)の push_env を送信オプションの environment に載せる — 未設定は載せず APNS_ENV に任せる(issue #60)", async () => {
+  const cases = [
+    ["production", { environment: "production" }],
+    ["sandbox", { environment: "sandbox" }],
+    [null, {}],
+    [undefined, {}],
+  ] as const;
+  for (const [pushEnv, expected] of cases) {
+    const world = makeWorld({ users: [userA, { ...userB, pushEnv }] });
+    const { sent, pusher } = makePusher("ok");
+
+    await handleReact(deps(world, pusher), {
+      userId: "user-a",
+      checkinId: "checkin-b-1",
+      stamp: "❤️",
+    });
+
+    assertEquals(sent.length, 1, `push_env=${pushEnv}`);
+    assertEquals(sent[0].deviceToken, "token-b");
+    // このファイルの assertEquals は Object.is なので、オブジェクトは JSON で比べる
+    assertEquals(
+      JSON.stringify(sent[0].opts),
+      JSON.stringify(expected),
+      `push_env=${pushEnv}`,
+    );
+  }
 });
