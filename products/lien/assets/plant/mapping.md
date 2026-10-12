@@ -137,7 +137,7 @@ imageset 名は **`plant_` + レイヤー名**(例: `plant_pot_back`)。iOS の 
 | `ios/Lien/Core/DesignSystem/PlantLayers.swift` | 状態(段階・自分と相手の完了・表情・ソロ・のぞき・ダーク)→ 重ねるレイヤーの並びを返す純粋関数。snapshot からの状態の導出(§5)もここ。Foundation だけに依存(ウィジェットとシェア画像でも使う) |
 | `ios/Lien/Core/DesignSystem/PlantCharacterView.swift` | ZStack で全レイヤーを同じキャンバスに重ねる。右は x 方向反転・花は着色・のぞきは offset・3:4 を保つ。SwiftUI と Foundation だけ |
 | `ios/LienTests/PlantLayersTests.swift` | 全段階 × 葉の4通り × 表情・ソロ・ダーク・知らない段階。`layer_stacks.json`・`peek_offsets.json` との突き合わせ。カタログに34点が実在することも確かめる |
-| `ios/LienTests/PlantRenderTests.swift` | ImageRenderer で全組み合わせの一覧画像を描き、XCTAttachment で保存する。lien-ios が xcresult から PNG を取り出して artifact(`plant-render-sheets`)にする |
+| `ios/LienTests/PlantRenderTests.swift` | ImageRenderer で全組み合わせの一覧画像(7枚)を描き、`ios/build/plant-render/` に書き出し、XCTAttachment(xcresult)にも保存する。lien-ios が artifact にする: `plant-render-sheets`(書き出した PNG)・`plant-render-sheets-xcresult`(xcresult から取り出した同じ画像)・`xcresult` |
 
 - ウィジェット(LienWidget)も同じ `PlantAssets.xcassets` と上の2ファイルをソース共有する(project.yml)
 - **ウィジェットのメモリ**: S サイズで1レイヤーあたり約1MB・10枚前後が目安(GROWTH.md §9.5)。収まらないときの代わりの案は、ウィジェット用だけ「段階 × 葉の状態」をあらかじめ1枚に合成した画像を持つこと(T17a で実機確認)
@@ -147,6 +147,6 @@ imageset 名は **`plant_` + レイヤー名**(例: `plant_pot_back`)。iOS の 
 
 | # | 基準 | 状態 |
 |---|---|---|
-| 1〜8 | 40pt で段階を見分けられる / 段階0と段階1の朝 / たたんだ葉 / 顔 / 2本・2つ・2輪 / 汗・涙なし / ダーク / 形での区別 | 下書き(`v4_drafts/README.md`)で自己チェック済み。**iOS で実際に描いた一覧画像(CI の artifact `plant-render-sheets`)で承認をもらう** |
+| 1〜8 | 40pt で段階を見分けられる / 段階0と段階1の朝 / たたんだ葉 / 顔 / 2本・2つ・2輪 / 汗・涙なし / ダーク / 形での区別 | 下書き(`v4_drafts/README.md`)で自己チェック済み。**iOS で実際に描いた一覧画像(lien-ios の artifact `plant-render-sheets`。2026-10-13 の初回は run 38294218739)で承認をもらう** |
 | 9 | 許可した SVG の要素だけ | CI で自動チェック(`tools/verify_assets.py`) |
-| 10 | iOS の描画と下書きのプレビューに目立つ差がない | CI の実描画一覧で確認。重ね順は `layer_stacks.json` で機械的に一致を確かめる |
+| 10 | iOS の描画と下書きのプレビューに目立つ差がない | 実装側の目視確認は済み(2026-10-13、エージェント): iOS(Xcode 26.6 のシミュレータ)の実描画と、Chrome の下書きプレビュー(`v4_drafts/preview_states.png` など)を、全段階 × 今日の状態・ダーク・花の着色・のぞきで見比べて、目立つ差は見つからなかった。重ね順は `layer_stacks.json` で機械的にも一致を確かめている。**承認は人が一覧画像を見て #40 で行う**。ウィジェットの実機(メモリ・色合い表示)は T17a で確認する |

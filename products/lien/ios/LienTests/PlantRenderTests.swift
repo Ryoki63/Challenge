@@ -8,6 +8,7 @@
 //   plant_03_sizes_light / plant_04_sizes_dark     毎朝の既定を 40 / 60 / 80pt(高さ)で。ソロ+段階0〜9+段階9(ひらいた葉)
 //   plant_05_expressions_light / _06_..._dark      表情6種・ソロ・ソロでチェックイン・段階0・のぞき・知らない段階
 //   plant_07_flower_colors                         花の色(左=自分・右=相手で別の色に着色できること)
+//   plant_00_check_morning_strip                   「空のシートを保存できただけで通さない」確認用の1枚(朝の既定 × 段階0〜9)
 //
 // 保存先は2つ(どちらかが失敗しても残るように):
 //   1. XCTAttachment(.keepAlways)— xcresult に入る。lien-ios が xcrun xcresulttool export attachments で取り出して artifact にする

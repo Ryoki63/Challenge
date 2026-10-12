@@ -101,6 +101,12 @@ jobs:
         run: |
           echo "--- ios/build/plant-render/"; ls -la build/plant-render 2>&1 || true
           echo "--- exported from the xcresult"; ls -la "$RUNNER_TEMP/plant-render-xcresult" 2>&1 || true
+          {
+            echo "### 植物の実描画の一覧画像(GROWTH §9.5 の承認ゲート)"
+            echo "この実行の artifact: \`plant-render-sheets\`(テストが書いた PNG)/ \`plant-render-sheets-xcresult\`(xcresult から取り出した同じ画像)/ \`xcresult\`"
+            echo
+            ls -1 build/plant-render 2>/dev/null | sed 's/^/- /' || true
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload plant render sheets (written by the tests)
         if: always()
