@@ -242,4 +242,23 @@ enum Strings {
         static let sentNote = "リアクションしました"
         static let errorMessage = "通信がうまくいきませんでした。もう一度お試しください"
     }
+
+    /// 相手の今日の写真(ホームのカードと、タップで開く全画面 — REQUIREMENTS §3.11 / PV #59)。
+    /// 読み込みに失敗したとき・写真が無い日には何も出さない(罰なし・責めない — §3.5)ので、その文言は置かない
+    enum PartnerPhoto {
+        /// カードの下の一言であり、VoiceOver が読む名前
+        static func caption(_ partnerName: String) -> String {
+            "\(partnerName)の今日の写真"
+        }
+        /// カード(ボタン)の VoiceOver のヒント
+        static let openHint = "タップで大きく見ます"
+        /// 読み込み中の枠の VoiceOver 名
+        static let loadingLabel = "写真を読み込んでいます"
+        /// 全画面の写真の VoiceOver 名
+        static func viewerLabel(_ partnerName: String) -> String {
+            "\(partnerName)の今日の写真(大きい表示)"
+        }
+        /// 全画面を閉じるボタンの VoiceOver 名
+        static let viewerCloseButton = "とじる"
+    }
 }

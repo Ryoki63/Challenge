@@ -333,7 +333,7 @@ final class PostgRESTPartnerCheckinResolverTests: XCTestCase {
         let query = Dictionary(
             uniqueKeysWithValues: (components?.queryItems ?? []).map { ($0.name, $0.value ?? "") }
         )
-        XCTAssertEqual(query["select"], "id")
+        XCTAssertEqual(query["select"], "id,photo_path", "react の対象 id と、相手の今日の写真の photo_path を同じ行から読む")
         XCTAssertEqual(query["date_local"], "eq.2026-06-11")
         XCTAssertEqual(query["user_id"], "neq.11111111-2222-3333-4444-555555555555", "自分以外の行 = 相手")
         XCTAssertEqual(query["limit"], "1")
@@ -409,13 +409,14 @@ private final class MockNudgeReactAPI: NudgeReactAPIClient {
 
 private final class MockResolver: PartnerCheckinResolving {
     var checkinID: String?
+    var photoPath: String?
     var error: Error?
     private(set) var requestedDates: [String] = []
 
-    func partnerCheckinID(dateLocal: String) async throws -> String? {
+    func partnerCheckin(dateLocal: String) async throws -> PartnerCheckin? {
         requestedDates.append(dateLocal)
         if let error { throw error }
-        return checkinID
+        return checkinID.map { PartnerCheckin(id: $0, photoPath: photoPath) }
     }
 }
 

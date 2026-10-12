@@ -1,7 +1,9 @@
 // HomeView.swift — ホーム画面(T13+T14 / REQUIREMENTS §3.4, §3.5, §3.9, §3.10 / §6)
 //
-// 構成: 植物(SVG レイヤーの重ね合わせ+名前)/ ストリーク / ふたりの今日(自分・相手チップ)/
+// 構成: 植物(SVG レイヤーの重ね合わせ+名前)/ ストリーク / ふたりの今日(自分・相手チップ+相手の今日の写真)/
 //       チェックインフロー(CheckinFlowView — 1タップ完了+写真添付+当日取消)。
+// 相手の今日の写真(PV #59)は、相手が写真を添えた日だけ出る(PartnerPhotoView.swift)。写真が無い日・
+// 取得に失敗したときは何も出さない。タップで原寸を全画面で見る。
 // 文言は Strings.Home / Strings.Checkin、色・余白は DesignSystem の定数に集約(DESIGN §3.8)。
 // 表示原則(§3.10)はウィジェット(LienWidgetEntryView)と揃える:
 //   自分未完 = 自分側グレー / 相手が先に完了 =「(名前)が待ってるよ」。
@@ -52,6 +54,14 @@ struct HomeView: View {
         }
         .onAppear { viewModel.load() }
         .task { await viewModel.flushPendingOps() }
+        // 前面に出したまま日付が変わったら、相手の写真を消す(PV #59。View が消えるとキャンセルされる)
+        .task { await viewModel.partnerPhoto?.watchDayChanges() }
+        // 相手の写真をタップしたときの全画面(PV #59)
+        .background {
+            if let photo = viewModel.partnerPhoto {
+                PartnerPhotoViewerHost(model: photo, partnerName: viewModel.snapshot?.partnerName)
+            }
+        }
         .onChange(of: reloadToken) { viewModel.load() }
         .onChange(of: scenePhase) {
             // フォアグラウンド復帰時の再送(DESIGN §3.7。snapshot 表示も読み直す)
@@ -220,6 +230,9 @@ private struct TodayArea: View {
                     .font(.headline)
                     .foregroundStyle(LienColors.done)
             }
+
+            // 相手が今日添えた写真(§3.11 / PV #59)。写真が無い日・取得に失敗したときは何も出ない
+            PartnerPhotoArea(model: viewModel.partnerPhoto, partnerName: snapshot.partnerName)
 
             // 相手の今日のチェックインにスタンプ1つ(§3.8 / T15)
             ReactionArea(viewModel: viewModel)

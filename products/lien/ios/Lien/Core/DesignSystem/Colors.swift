@@ -16,4 +16,8 @@ enum LienColors {
     static let gentleAlert = Color.orange
     /// 今日の状態チップの背景
     static let chipBackground = Color(uiColor: .secondarySystemBackground)
+    /// 相手の写真を全画面で見るときの背景(写真の周りを暗くする)
+    static let photoBackdrop = Color.black
+    /// 全画面の写真に重ねる操作(閉じるボタン・読み込み中の表示)の色
+    static let photoControl = Color.white
 }

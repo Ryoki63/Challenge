@@ -15,6 +15,7 @@
 // react は相手のチェックイン行の id(checkinId)を要求するが、snapshot は id を持たない。
 // 相手の「今日の」チェックイン行は RLS(checkins_select_pair)で現役ペアのメンバーに読めるため、
 // PostgREST で自分以外の行を引いて解決する(PartnerCheckinResolving)。
+// 同じ行の photo_path は、ホームに出す「相手の今日の写真」(PV #59 — PartnerPhotoService)が使う。
 
 import Foundation
 
@@ -153,11 +154,37 @@ final class EdgeFunctionNudgeReactClient: NudgeReactAPIClient {
     }
 }
 
-// MARK: - 相手のチェックイン行 id の解決(react の対象)
+// MARK: - 相手のチェックイン行の解決(react の対象 / 相手の今日の写真)
+
+/// 相手の当日のチェックイン行(PostgREST の checkins から読む列だけ)
+struct PartnerCheckin: Equatable, Sendable {
+    let id: String
+    /// 添えた写真の原寸のパス('pairs/<pair_id>/<date_local>/<user_id>/photo.jpg')。写真が無ければ nil
+    let photoPath: String?
+}
+
+/// PostgREST `GET /rest/v1/checkins?select=id,photo_path&…` が返す行
+/// (契約フィクスチャ: contracts/partner-checkin.*.json。列名は DB のまま)
+struct PartnerCheckinRow: Decodable, Equatable, Sendable {
+    let id: String
+    let photoPath: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case photoPath = "photo_path"
+    }
+}
 
 protocol PartnerCheckinResolving: AnyObject {
-    /// 相手の `dateLocal` のチェックイン行 id(まだ無ければ nil)
-    func partnerCheckinID(dateLocal: String) async throws -> String?
+    /// 相手の `dateLocal` のチェックイン行(まだ無ければ nil)。photo_path つき
+    func partnerCheckin(dateLocal: String) async throws -> PartnerCheckin?
+}
+
+extension PartnerCheckinResolving {
+    /// 相手の `dateLocal` のチェックイン行 id(react の対象。まだ無ければ nil)
+    func partnerCheckinID(dateLocal: String) async throws -> String? {
+        try await partnerCheckin(dateLocal: dateLocal)?.id
+    }
 }
 
 /// PostgREST(`/rest/v1/checkins`)で自分以外の当日の行を引く。
@@ -165,9 +192,8 @@ protocol PartnerCheckinResolving: AnyObject {
 /// (解消後・成立前の行は読めない)ので、自分以外の1行 = 現在のパートナーの行になる。
 /// PostgREST は `apikey` ヘッダ(anon / publishable key)が必須で、Edge Functions とは認証の要件が違う
 final class PostgRESTPartnerCheckinResolver: PartnerCheckinResolving {
-    private struct CheckinIDRow: Decodable {
-        let id: String
-    }
+    /// 通信が不安定でも、ホームの読み込み表示(相手の写真)やリアクションを長く待たせない
+    static let requestTimeout: TimeInterval = 15
 
     private let baseURL: URL
     private let apiKey: String
@@ -189,14 +215,14 @@ final class PostgRESTPartnerCheckinResolver: PartnerCheckinResolving {
         self.session = session
     }
 
-    func partnerCheckinID(dateLocal: String) async throws -> String? {
+    func partnerCheckin(dateLocal: String) async throws -> PartnerCheckin? {
         guard let myID = currentUserID() else { throw AuthServiceError.notSignedIn }
         var components = URLComponents(
             url: baseURL.appendingPathComponent("rest/v1/checkins"),
             resolvingAgainstBaseURL: false
         )
         components?.queryItems = [
-            URLQueryItem(name: "select", value: "id"),
+            URLQueryItem(name: "select", value: "id,photo_path"),
             URLQueryItem(name: "date_local", value: "eq.\(dateLocal)"),
             URLQueryItem(name: "user_id", value: "neq.\(myID.uuidString.lowercased())"),
             URLQueryItem(name: "limit", value: "1"),
@@ -206,6 +232,7 @@ final class PostgRESTPartnerCheckinResolver: PartnerCheckinResolving {
         }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+        request.timeoutInterval = Self.requestTimeout
         request.setValue(apiKey, forHTTPHeaderField: "apikey")
         let token = try await tokenProvider()
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -224,9 +251,9 @@ final class PostgRESTPartnerCheckinResolver: PartnerCheckinResolving {
         guard http.statusCode == 200 else {
             throw NudgeReactClientError.server(code: "http_\(http.statusCode)")
         }
-        guard let rows = try? JSONDecoder().decode([CheckinIDRow].self, from: data) else {
+        guard let rows = try? JSONDecoder().decode([PartnerCheckinRow].self, from: data) else {
             throw NudgeReactClientError.server(code: "invalid_response")
         }
-        return rows.first?.id
+        return rows.first.map { PartnerCheckin(id: $0.id, photoPath: $0.photoPath) }
     }
 }

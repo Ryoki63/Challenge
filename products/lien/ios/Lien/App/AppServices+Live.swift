@@ -46,6 +46,7 @@ extension AppServices {
         store: AppGroupStore,
         pushAuthorizer: PushAuthorizing,
         session: URLSession = .shared,
+        photoSession: URLSession? = nil,
         reloadWidgets: @escaping () -> Void
     ) -> AppServices {
         let supabase = SupabaseService(config: config)
@@ -61,19 +62,33 @@ extension AppServices {
             ),
             queue: queue
         )
+        // 相手の当日の checkins 行(PostgREST)。リアクションの対象 id と、相手の今日の写真の photo_path の両方に使う
+        let partnerCheckins = PostgRESTPartnerCheckinResolver(
+            baseURL: baseURL,
+            apiKey: config.supabaseAnonKey,
+            tokenProvider: tokenProvider,
+            currentUserID: { supabase.currentUserID },
+            session: session
+        )
         let nudgeReact = LiveNudgeReactService(
             api: EdgeFunctionNudgeReactClient(
                 baseURL: baseURL,
                 tokenProvider: tokenProvider,
                 session: session
             ),
-            partnerCheckins: PostgRESTPartnerCheckinResolver(
+            partnerCheckins: partnerCheckins
+        )
+        // 相手の今日の写真(PV #59): 署名付き URL はクライアントが RLS の範囲で作る(新しい関数は増やさない)。
+        // 画像は専用の ephemeral セッションで取る(photoSession を省くと、ディスクにもキャッシュにも残さない)
+        let partnerPhotos = LivePartnerPhotoService(
+            checkins: partnerCheckins,
+            signer: StoragePhotoURLSigner(
                 baseURL: baseURL,
                 apiKey: config.supabaseAnonKey,
                 tokenProvider: tokenProvider,
-                currentUserID: { supabase.currentUserID },
                 session: session
-            )
+            ),
+            loader: URLSessionPartnerPhotoLoader(session: photoSession)
         )
 
         return AppServices(
@@ -105,7 +120,8 @@ extension AppServices {
                 currentUserID: { supabase.currentUserID },
                 ledger: UserDefaultsPushRegistrationLedger()
             ),
-            reloadWidgets: reloadWidgets
+            reloadWidgets: reloadWidgets,
+            partnerPhotos: partnerPhotos
         )
     }
 }

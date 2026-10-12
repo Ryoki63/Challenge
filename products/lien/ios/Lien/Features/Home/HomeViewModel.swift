@@ -8,6 +8,8 @@
 //   LocalEchoCheckinService 注入時は従来どおりチェックインのみ)
 // - WidgetCenter.reloadAllTimelines はクロージャ注入(テストでは観測用に差し替え。
 //   reload のトリガーはアプリ本体と NSE のみ — DESIGN §3.5)
+// - 相手の今日の写真(PV #59)は PartnerPhotoModel が持つ。snapshot を表示用に読み直す/反映するたびに
+//   snapshotDidChange で知らせる(取りに行くか・消すかはそちらが決める)。nil のとき(Stub 構成)は写真を扱わない
 
 import Foundation
 import Observation
@@ -95,15 +97,20 @@ final class HomeViewModel {
     private let nudgeService: NudgeSending?
     private let reactionService: Reacting?
 
+    /// 相手の今日の写真(PV #59。ホームのカードと、タップで開く全画面)。nil のときは写真を扱わない
+    let partnerPhoto: PartnerPhotoModel?
+
     init(
         store: AppGroupStore?,
         checkinService: CheckinPerforming,
         nudgeService: NudgeSending? = nil,
         reactionService: Reacting? = nil,
+        partnerPhoto: PartnerPhotoModel? = nil,
         reloadWidgets: @escaping () -> Void = { WidgetCenter.shared.reloadAllTimelines() }
     ) {
         self.store = store
         self.checkinService = checkinService
+        self.partnerPhoto = partnerPhoto
         self.reloadWidgets = reloadWidgets
         self.cancelService = checkinService as? CheckinCanceling
         self.photoService = checkinService as? PhotoAttaching
@@ -119,6 +126,7 @@ final class HomeViewModel {
     /// (GET /snapshot)は AppModel / SnapshotSynchronizer が行い、結果は App Group 経由で届く
     func load() {
         snapshot = store?.loadSnapshot()
+        partnerPhoto?.snapshotDidChange(snapshot)
     }
 
     // MARK: 表示分岐(REQUIREMENTS §3.9 / §3.10)
@@ -298,6 +306,7 @@ final class HomeViewModel {
         snapshot = updated
         try? store?.saveSnapshot(updated)
         reloadWidgets()
+        partnerPhoto?.snapshotDidChange(updated)
     }
 
     private func clearMessages() {

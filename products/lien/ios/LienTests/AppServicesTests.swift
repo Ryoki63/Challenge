@@ -66,6 +66,7 @@ final class AppServicesTests: XCTestCase {
         XCTAssertTrue(services.snapshotClient is StubSnapshotClient)
         XCTAssertTrue(services.checkinService is LocalEchoCheckinService)
         XCTAssertNil(services.pendingOps, "スタブ構成にオフラインキューは無い")
+        XCTAssertNil(services.partnerPhotos, "スタブ構成に相手の写真は無い(ホームは写真を扱わない — PV #59)")
     }
 
     func testLocalFallbackStoreLivesInApplicationSupport() {
@@ -103,6 +104,7 @@ final class AppServicesTests: XCTestCase {
         XCTAssertTrue(services.checkinService is CheckinService)
         XCTAssertTrue(services.nudgeService is LiveNudgeReactService)
         XCTAssertTrue(services.reactionService is LiveNudgeReactService)
+        XCTAssertTrue(services.partnerPhotos is LivePartnerPhotoService, "相手の今日の写真(PV #59)")
         XCTAssertNotNil(services.pendingOps)
         XCTAssertEqual(services.store?.containerURL, temp.store.containerURL)
         XCTAssertTrue(
@@ -125,7 +127,10 @@ final class AppServicesTests: XCTestCase {
         }
         await assertFails("snapshot の取得") { _ = try await services.snapshotClient.fetchSnapshot() }
         await assertFails("つつく") { try await services.nudgeService?.sendNudge(stamp: .wave) }
-        XCTAssertEqual(StubURLProtocol.captured.count, 0, "トークンが無い間は Edge Function を呼ばない")
+        await assertFails("相手の写真") {
+            _ = try await services.partnerPhotos?.loadThumbnail(pairID: PartnerPhotoFixtures.pairID, dateLocal: PartnerPhotoFixtures.today)
+        }
+        XCTAssertEqual(StubURLProtocol.captured.count, 0, "トークンが無い間は Edge Function も PostgREST も Storage も呼ばない")
     }
 
     func testLiveCheckinQueueIsTheOneTheSynchronizerGuards() async throws {

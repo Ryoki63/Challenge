@@ -30,6 +30,9 @@ struct AppServices {
     let store: AppGroupStore?
     let pushTokenSync: PushTokenSync
     let reloadWidgets: () -> Void
+    /// 相手の今日の写真の取得(PV #59)。Live 構成だけ。Stub 構成は nil で、ホームは写真を出さない
+    /// (末尾に既定値つきで足したので、これを渡さない既存の組み立てはそのまま動く)
+    var partnerPhotos: PartnerPhotoProviding?
 }
 
 extension AppServices {

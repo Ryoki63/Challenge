@@ -42,6 +42,8 @@ struct RootView: View {
                         checkinService: model.services.checkinService,
                         nudgeService: model.services.nudgeService,
                         reactionService: model.services.reactionService,
+                        // 相手の今日の写真(PV #59)。Live 構成だけ。T23 が長押しメニュー(通報・ブロック)の項目を渡す
+                        partnerPhoto: model.services.partnerPhotos.map { PartnerPhotoModel(provider: $0) },
                         reloadWidgets: model.services.reloadWidgets
                     ),
                     reloadToken: model.snapshotRevision,

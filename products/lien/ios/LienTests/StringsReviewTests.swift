@@ -215,6 +215,15 @@ enum StringsCatalog {
         add("Reaction.sentNote", Strings.Reaction.sentNote)
         add("Reaction.errorMessage", Strings.Reaction.errorMessage)
 
+        // PartnerPhoto(相手の今日の写真 — PV #59)
+        add("PartnerPhoto.openHint", Strings.PartnerPhoto.openHint)
+        add("PartnerPhoto.loadingLabel", Strings.PartnerPhoto.loadingLabel)
+        add("PartnerPhoto.viewerCloseButton", Strings.PartnerPhoto.viewerCloseButton)
+        for name in representativeNames {
+            add("PartnerPhoto.caption(\(name))", Strings.PartnerPhoto.caption(name))
+            add("PartnerPhoto.viewerLabel(\(name))", Strings.PartnerPhoto.viewerLabel(name))
+        }
+
         return items
     }
 }
@@ -336,6 +345,8 @@ final class StringsReviewTests: XCTestCase {
         for name in StringsCatalog.representativeNames {
             XCTAssertTrue(Strings.Widget.partnerWaiting(name).contains(name))
             XCTAssertTrue(Strings.Home.partnerWaiting(name).contains(name))
+            XCTAssertTrue(Strings.PartnerPhoto.caption(name).contains(name))
+            XCTAssertTrue(Strings.PartnerPhoto.viewerLabel(name).contains(name))
         }
         for days in StringsCatalog.representativeDays {
             XCTAssertTrue(Strings.Widget.streakDays(days).contains("\(days)"))
