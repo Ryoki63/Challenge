@@ -3,6 +3,7 @@
 // 手順の流れ・守ること・登場人物は scenario.ts。共有の型と道具は scenario_lib.ts。
 
 import { decodeJwtPayload } from "./client.ts";
+import { E2E_EMOJI } from "./marker.ts";
 import { Abort } from "./report.ts";
 import {
   addDays,
@@ -11,8 +12,10 @@ import {
   type Ctx,
   expectError,
   expectFields,
+  getSnapshot,
   INVITE_TOKEN_RE,
   ISO_RE,
+  NEVER_ISSUED_INVITE_TOKEN,
   obj,
   PROMISES,
   UUID_RE,
@@ -178,7 +181,7 @@ export async function stepsSetup(c: Ctx, w: World): Promise<void> {
         const r = await api.rest(u.jwt, "PATCH", `users?id=eq.${u.id}`, {
           json: {
             nickname: u.nickname,
-            avatar_emoji: "🧪",
+            avatar_emoji: E2E_EMOJI,
             timezone: "Asia/Tokyo",
           },
           prefer: "return=representation",
@@ -187,7 +190,7 @@ export async function stepsSetup(c: Ctx, w: World): Promise<void> {
         rep.check(
           `${label}: nickname / avatar_emoji / timezone を更新できる(自分の行・1 行)`,
           r.status === 200 && arr(r.json).length === 1 &&
-            row.nickname === u.nickname && row.avatar_emoji === "🧪" &&
+            row.nickname === u.nickname && row.avatar_emoji === E2E_EMOJI &&
             row.timezone === "Asia/Tokyo",
           brief(r),
         );
@@ -262,7 +265,7 @@ export async function stepsSetup(c: Ctx, w: World): Promise<void> {
 
     // 編集 = 同じ promise_id への UPDATE(created: false)。remindAt は null にできる
     const firstId = a.promiseId;
-    a.promise = { title: "E2E 散歩(更新)", emoji: "🚶" };
+    a.promise = { title: `${PROMISES.A.title}(更新)`, emoji: "🚶" };
     const edit = await api.fn(a.jwt, "promise-set", "POST", {
       json: { title: a.promise.title, emoji: a.promise.emoji, remindAt: null },
     });
@@ -487,6 +490,21 @@ export async function stepsSetup(c: Ctx, w: World): Promise<void> {
         `expiresAt=${inv.expiresAt}`,
       );
 
+      // ペア外の C がいるときだけ、A がペア成立前にもう 1 つ招待を作っておく(招待は発行しても失効しない)。
+      // ペア成立後に C がこれを受けると、発行者 A が既ペアなので 409 partner_already_paired になる(下で確かめる)
+      let spareToken: string | null = null;
+      if (users.C) {
+        const spare = await api.fn(a.jwt, "invite-create", "POST");
+        const t = String(obj(spare.json).token);
+        if (
+          rep.check(
+            "A: ペア成立前に 2 つ目の招待も作れる(最初の招待とは別の token)",
+            spare.status === 200 && INVITE_TOKEN_RE.test(t) && t !== token,
+            brief(spare),
+          )
+        ) spareToken = t;
+      }
+
       // 受諾の失敗系(いずれもペアを作らない)
       const acc = (jwt: string, payload: { json?: unknown; raw?: string }) =>
         api.fn(jwt, "invite-accept", "POST", payload);
@@ -506,8 +524,8 @@ export async function stepsSetup(c: Ctx, w: World): Promise<void> {
       );
       expectError(
         c,
-        "B: 存在しない token → 404 invite_not_found",
-        await acc(b.jwt, { json: { token: "ZZZZzzzz" } }),
+        "B: 存在しない token(形式は正しい。サーバーの生成器が出さない文字を含む)→ 404 invite_not_found",
+        await acc(b.jwt, { json: { token: NEVER_ISSUED_INVITE_TOKEN } }),
         "invite-accept",
         "invite_not_found",
       );
@@ -585,6 +603,41 @@ export async function stepsSetup(c: Ctx, w: World): Promise<void> {
           await acc(cu.jwt, { json: { token } }),
           "invite-accept",
           "invite_already_used",
+        );
+
+        // 1 ユーザー 1 ペアの不変条件。どちらの 409 も claim(used_at の打刻)の前に返るので、ペアも招待の状態も変わらない
+        // = 本番で安全に起こせる。C は未ペアなので、C の招待を作って、ペア済みの B に受けさせる
+        const cInvite = await api.fn(cu.jwt, "invite-create", "POST");
+        const cToken = String(obj(cInvite.json).token);
+        if (
+          rep.check(
+            "C(未ペア): POST /invite-create → 200(ペア済みの B に受けさせる招待)",
+            cInvite.status === 200 && INVITE_TOKEN_RE.test(cToken),
+            brief(cInvite),
+          )
+        ) {
+          expectError(
+            c,
+            "B(ペア済み): 未ペアの C の招待を受けようとする → 409 already_paired",
+            await acc(b.jwt, { json: { token: cToken } }),
+            "invite-accept",
+            "already_paired",
+          );
+        }
+        if (spareToken !== null) {
+          expectError(
+            c,
+            "C(未ペア): ペア済みの A が成立前に作った 2 つ目の招待を受けようとする → 409 partner_already_paired",
+            await acc(cu.jwt, { json: { token: spareToken } }),
+            "invite-accept",
+            "partner_already_paired",
+          );
+        }
+        expectFields(
+          c,
+          "C: 2 つの 409 のあとも未ペアのまま(ペアは作られない)",
+          await getSnapshot(c, cu, "C"),
+          { pairId: null },
         );
       }
       expectError(

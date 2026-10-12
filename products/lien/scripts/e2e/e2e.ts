@@ -14,21 +14,24 @@
 //   bash products/lien/scripts/e2e/run.sh run --cleanup              # 通しテスト → 最後に片付ける
 //   bash products/lien/scripts/e2e/run.sh cleanup --dry-run          # 直近の実行の後片付けの予定だけ見る
 //   bash products/lien/scripts/e2e/run.sh cleanup                    # 直近の実行が作ったデータを削除
-//   bash products/lien/scripts/e2e/run.sh cleanup --user <uuid> ...  # ID を指定して削除(E2E-A/B/C のものだけ)
-//   bash products/lien/scripts/e2e/run.sh list                       # 残っている通しテストのユーザーを一覧(SELECT のみ)
+//   bash products/lien/scripts/e2e/run.sh cleanup --user <uuid> ...  # ID を指定して削除(通しテストの目印がそろったものだけ)
+//   bash products/lien/scripts/e2e/run.sh list                       # 残っている通しテストのものらしいユーザーを一覧(SELECT のみ)
 //
-// オプション(run): --cleanup / --no-outsider(C を作らない)/ --no-db-checks(最後の DB の SELECT を省く)/
+// オプション(run): --cleanup(SUPABASE_ACCESS_TOKEN が要る。無ければ何も作らずに止まる)/ --no-outsider(C を作らない)/
+//                 --no-db-checks(最後の DB の SELECT を省く)/
 //                 --force-time(JST 23:50〜00:15 の実行制限を無視する。cron と重なるので勧めない)
 // 環境変数: SUPABASE_ACCESS_TOKEN(キー取得・DB 確認・後片付けに必要)/ SUPABASE_ANON_KEY(任意。指定すれば
 //   Management API なしで run できる)/ PROJECT_REF(既定 lniheehfbtpfhglinfjm)/ E2E_STATE_DIR(状態ファイルの置き場所)
-// 終了コード: 0 = すべて PASS / 1 = FAIL あり(または後片付けの失敗)/ 2 = 使い方・環境の誤り
+// 終了コード: 0 = すべて PASS / 1 = FAIL、または契約フィクスチャとのずれが 1 件でもある(または後片付けの失敗)/
+//   2 = 使い方・環境の誤り
 //
 // 守っていること: close-day / grant-tickets は呼ばない(OPS §10)/ 鍵・JWT は表示しない / CI(CI=true)では
 //   E2E_ALLOW_CI=1 が無い限り動かない / JST 23:50〜00:15 は動かない(cron の 00:05・00:10 と日付の変わり目を避ける)
 
-import { listMarked, MARKER_RE, runCleanup } from "./cleanup.ts";
+import { listE2eUsers, runCleanup } from "./cleanup.ts";
 import { Api, requestLog } from "./client.ts";
 import { loadFixtures } from "./fixtures.ts";
+import { E2E_EMOJI, E2E_META_KEY, E2E_NICKNAME_RE } from "./marker.ts";
 import { Mgmt } from "./mgmt.ts";
 import { Abort, redact, Reporter } from "./report.ts";
 import { runScenario } from "./scenario.ts";
@@ -50,15 +53,17 @@ const USAGE = `使い方: run.sh <コマンド> [オプション]
         --no-outsider      ペア外のユーザー C を作らない
         --no-db-checks     最後の DB の SELECT を省く
         --force-time       JST 23:50〜00:15 の実行制限を無視する(勧めない)
+                           ※ --cleanup には SUPABASE_ACCESS_TOKEN が要る(無ければ何も作らずに止まる)
   cleanup [--dry-run]      直近の run が作ったデータを削除する(--dry-run は予定を出すだけ)
         --state <file>     状態ファイルを指定する
-        --user <uuid>      ID を指定する(複数可。ニックネームが E2E-A/B/C の匿名ユーザーだけ)
-  list                     残っている通しテストのユーザーを一覧する(SELECT のみ)
+        --user <uuid>      ID を指定する(複数可。通しテストの目印がそろった匿名ユーザーだけ。
+                           --state とは同時に指定できない・空の値は誤りとして止める)
+  list                     残っている通しテストのものらしいユーザーを一覧する(SELECT のみ)
 
 環境変数: SUPABASE_ACCESS_TOKEN / SUPABASE_ANON_KEY(任意)/ PROJECT_REF / E2E_STATE_DIR
 `;
 
-interface Args {
+export interface Args {
   cmd: "run" | "check" | "cleanup" | "list" | "help";
   cleanupAfter: boolean;
   outsider: boolean;
@@ -69,7 +74,7 @@ interface Args {
   userIds: string[];
 }
 
-function parseArgs(argv: string[]): Args {
+export function parseArgs(argv: string[]): Args {
   const a: Args = {
     cmd: "run",
     cleanupAfter: false,
@@ -104,20 +109,54 @@ function parseArgs(argv: string[]): Args {
     else if (f === "--force-time") a.forceTime = true;
     else if (f === "--dry-run") a.dryRun = true;
     else if (f === "--state" || f.startsWith("--state=")) {
-      a.stateFile = value("--state");
+      const v = value("--state").trim();
+      if (v === "") {
+        throw new UsageError("--state にはファイルのパスが要る(空だった)");
+      }
+      a.stateFile = v;
     } else if (f === "--user" || f.startsWith("--user=")) {
-      a.userIds.push(
-        ...value("--user").split(",").map((s) => s.trim().toLowerCase()).filter(
-          Boolean,
-        ),
-      );
+      const ids = value("--user").split(",").map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+      // 空の値を黙って捨てると、ID を指定したつもりで「直近の状態ファイルを消す」に切り替わってしまう
+      if (ids.length === 0) {
+        throw new UsageError(
+          "--user には UUID が要る(空だった。直近の状態ファイルの削除に切り替えることはしない)",
+        );
+      }
+      a.userIds.push(...ids);
     } else if (f === "-h" || f === "--help") a.cmd = "help";
     else throw new UsageError(`知らないオプション: ${f}`);
+  }
+  if (a.userIds.length > 0 && a.stateFile !== null) {
+    throw new UsageError(
+      "--user と --state は同時に指定できない(どちらを消すのか曖昧になる)",
+    );
   }
   return a;
 }
 
-class UsageError extends Error {}
+export class UsageError extends Error {}
+
+/**
+ * run の前提を、本番に何かを作る前に確かめる(純粋関数。環境変数の読み取りは呼び出し側)。
+ * --cleanup は後片付けに Management API を使うので、トークンが無いまま流すと、本番にデータを作ったあとで
+ * 「後片付けできない」(終了コード 2)で終わってしまう。それを S01 の前に止める
+ */
+export function checkRunPrerequisites(
+  args: Pick<Args, "cleanupAfter">,
+  have: { accessToken: boolean; anonKey: boolean },
+): void {
+  if (!have.accessToken && !have.anonKey) {
+    throw new UsageError(
+      "SUPABASE_ACCESS_TOKEN か SUPABASE_ANON_KEY が要る(set -a; source .env; set +a)",
+    );
+  }
+  if (args.cleanupAfter && !have.accessToken) {
+    throw new UsageError(
+      "--cleanup には SUPABASE_ACCESS_TOKEN が要る(後片付けは Management API を使う)。このまま流すと本番にデータを作ったあとで片付けられないので、何も作らずに止める(set -a; source .env; set +a)",
+    );
+  }
+}
 
 function color(): boolean {
   try {
@@ -229,6 +268,10 @@ async function cmdCheck(): Promise<number> {
 async function cmdRun(args: Args): Promise<number> {
   guardCi();
   const env = readEnv();
+  checkRunPrerequisites(args, {
+    accessToken: env.mgmt !== null,
+    anonKey: Boolean(Deno.env.get("SUPABASE_ANON_KEY")),
+  });
   const now = jstNow();
   if (inQuietWindow(now.hour, now.minute) && !args.forceTime) {
     throw new UsageError(
@@ -323,7 +366,8 @@ async function cmdRun(args: Args): Promise<number> {
     `  Storage に置いた写真: ${state.data.storagePaths.length} 件(pairs/<ペア>/ 以下)`,
   );
 
-  let code = rep.failed > 0 || aborted ? 1 : 0;
+  // FAIL だけでなく、契約フィクスチャとのずれ(rep.deviations)が 1 件でもあれば失敗として終わる
+  let code = rep.hasProblems || aborted ? 1 : 0;
   if (args.cleanupAfter) {
     console.log("");
     console.log("==== 後片付け(--cleanup) ====");
@@ -409,7 +453,7 @@ async function cmdCleanup(args: Args): Promise<number> {
         pairIds: [],
         strict: true,
         source:
-          `--user 指定(ニックネームが ${MARKER_RE.source} の匿名ユーザーのみ)`,
+          `--user 指定(目印 ${E2E_META_KEY}・ニックネーム ${E2E_NICKNAME_RE.source}・絵文字 ${E2E_EMOJI}・約束 E2E 接頭辞がそろった匿名ユーザーのみ)`,
       },
       { dryRun: args.dryRun, log: (l) => console.log(l) },
     );
@@ -432,20 +476,27 @@ async function cmdList(): Promise<number> {
     console.log("SUPABASE_ACCESS_TOKEN が要る(set -a; source .env; set +a)");
     return 2;
   }
-  const rows = await listMarked(env.mgmt);
+  const rows = await listE2eUsers(env.mgmt);
   if (rows.length === 0) {
-    console.log("通しテストのユーザー(E2E-A/B/C の匿名ユーザー)は残っていない");
+    console.log(
+      "通しテストのものらしいユーザー(目印か E2E-A/B/C のニックネームを持つ匿名ユーザー)は残っていない",
+    );
     return 0;
   }
-  console.log(`通しテストのユーザーが ${rows.length} 人残っている:`);
+  console.log(`通しテストのものらしいユーザーが ${rows.length} 人残っている:`);
   for (const r of rows) {
+    const blocked = r.problems.length === 0
+      ? ""
+      : `  ← --user では消せない: ${r.problems.join("・")}`;
     console.log(
-      `  ${r.id}  ${r.nickname}  作成 ${r.createdJst} JST  ペア ${
-        r.pairId ?? "(なし)"
-      }`,
+      `  ${r.id}  ${
+        r.nickname || "(ニックネーム空)"
+      }  作成 ${r.createdJst} JST  ペア ${r.pairId ?? "(なし)"}${blocked}`,
     );
   }
-  console.log("片付けるには: run.sh cleanup --user <uuid> [--user <uuid> ...]");
+  console.log(
+    "片付けるには: run.sh cleanup --user <uuid> [--user <uuid> ...](「--user では消せない」と出たものは、中身を確かめて手で判断する)",
+  );
   return 0;
 }
 

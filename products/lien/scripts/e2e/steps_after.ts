@@ -1,7 +1,9 @@
-// steps_after.ts — S17〜S21: 植物の名前・取消とやり直し・push 登録の経路(PushTokenSync)・書き込み権限の境界・DB の中身
+// steps_after.ts — S17〜S22: 植物の名前・取消とやり直し・push 登録の経路(PushTokenSync)・書き込み権限の境界・DB の中身・
+//   ペア外 / 未ログインから見えない表(RLS)
 //
 // 手順の流れ・守ること・登場人物は scenario.ts。共有の型と道具は scenario_lib.ts。
 
+import { E2E_META_KEY } from "./marker.ts";
 import { Abort, redact } from "./report.ts";
 import { jsonEqual } from "./shape.ts";
 import {
@@ -17,6 +19,7 @@ import {
   type Label,
   obj,
   partnerRowsQuery,
+  type User,
   UUID_RE,
   viaSignedUrl,
   type World,
@@ -640,9 +643,11 @@ export async function stepsAfter(c: Ctx, w: World): Promise<void> {
         (select count(*) from public.checkins where user_id = any(${idArr})) as checkins,
         (select count(*) from public.reactions where from_user = any(${idArr})) as reactions,
         (select count(*) from public.invites where from_user = any(${idArr}) and used_at is not null) as invites_used,
+        (select count(*) from public.invites where from_user = any(${idArr}) and used_at is null) as invites_unused,
         (select count(*) from public.promises where user_id = any(${idArr}) and archived_at is null) as promises,
         (select count(*) from storage.objects where bucket_id = 'photos' and name like 'pairs/${pid}/%') as photo_objects,
-        (select count(*) from auth.users where id = any(${idArr}) and is_anonymous) as anon_users
+        (select count(*) from auth.users where id = any(${idArr}) and is_anonymous) as anon_users,
+        (select count(*) from auth.users where id = any(${idArr}) and is_anonymous and raw_user_meta_data ->> '${E2E_META_KEY}' = 'true') as marked_users
     `);
       const r = rows[0] ?? {};
       const n = (k: string) => Number(r[k]);
@@ -683,10 +688,13 @@ export async function stepsAfter(c: Ctx, w: World): Promise<void> {
         n("reactions") === 0,
         `reactions=${r.reactions}`,
       );
+      // 未使用の招待: A がペア成立前に作った 2 つ目と、C が作った 1 つ(どちらも 409 で弾かれ、使われていない)
+      const expectedUnused = users.C ? 2 : 0;
       rep.check(
-        "招待は使用済み 1 件・現役の約束は人数分",
-        n("invites_used") === 1 && n("promises") === ids.length,
-        `invites=${r.invites_used} promises=${r.promises}`,
+        `招待は使用済み 1 件・未使用 ${expectedUnused} 件(409 で弾かれた招待は使われていない)・現役の約束は人数分`,
+        n("invites_used") === 1 && n("invites_unused") === expectedUnused &&
+          n("promises") === ids.length,
+        `used=${r.invites_used} unused=${r.invites_unused} promises=${r.promises}`,
       );
       rep.check(
         "Storage: photos に A の原寸とサムネの 2 オブジェクト(取消後も残る = S18 の NOTE)",
@@ -694,10 +702,131 @@ export async function stepsAfter(c: Ctx, w: World): Promise<void> {
         `objects=${r.photo_objects}`,
       );
       rep.check(
-        "作ったユーザーはすべて匿名ユーザー",
-        n("anon_users") === ids.length,
-        `anon=${r.anon_users}`,
+        "作ったユーザーはすべて匿名ユーザーで、サインアップの目印(lien_e2e)が入っている(後片付け・一覧の安全装置の前提)",
+        n("anon_users") === ids.length && n("marked_users") === ids.length,
+        `anon=${r.anon_users} marked=${r.marked_users}`,
       );
+    },
+  );
+
+  // ------------------------------------------------------------------
+  await rep.run(
+    "S22",
+    "ペア外・未ログインから A–B ペアの表が見えない(RLS・GRANT。メンバーの読み取りを対照にする)",
+    async () => {
+      const a = need("A");
+      const b = need("B");
+      const cu = users.C;
+      const pid = d.pairId as string;
+      if (!UUID_RE.test(pid)) throw new Abort("pairId が UUID でない");
+
+      // 表ごとに、A–B ペアの行だけを名指しした同じ問い合わせを 3 者で流す:
+      //   メンバー(対照): 読める = 問い合わせが正しく、行も実在する(でなければ「0 件」は何も証明しない)
+      //   C(ペア外・ログイン済み): 200 で 0 件(RLS が行を落とす)
+      //   未ログイン(anon キーだけ): 行が返らない(GRANT を外してあるので 401 / 403 でもよい)
+      // users / checkins / Storage は S12・S19、reactions は取消の CASCADE で消える前の S14 で確かめた。
+      // 本文は出さない(invites の token など)。見せるのは件数だけ
+      interface Case {
+        table: string;
+        query: string;
+        reader: User;
+        /** 対照として読めるはずの最小の行数。0 は「行がまだ無い表」(下の注記) */
+        minRows: number;
+        note?: string;
+      }
+      const cases: Case[] = [
+        {
+          table: "promises",
+          query: `promises?select=id&user_id=in.(${a.id},${b.id})`,
+          reader: b,
+          minRows: 1,
+        },
+        {
+          table: "pairs",
+          query: `pairs?select=id&id=eq.${pid}`,
+          reader: b,
+          minRows: 1,
+        },
+        {
+          table: "pair_members",
+          query: `pair_members?select=user_id&pair_id=eq.${pid}`,
+          reader: b,
+          minRows: 1,
+        },
+        {
+          table: "plants",
+          query: `plants?select=pair_id&pair_id=eq.${pid}`,
+          reader: b,
+          minRows: 1,
+        },
+        {
+          table: "nudges",
+          query: `nudges?select=id&pair_id=eq.${pid}`,
+          reader: b,
+          minRows: 1,
+        },
+        {
+          table: "ticket_ledger",
+          query: `ticket_ledger?select=id&pair_id=eq.${pid}`,
+          reader: b,
+          minRows: 1,
+        },
+        {
+          table: "streak_days",
+          query: `streak_days?select=date_local&pair_id=eq.${pid}`,
+          reader: b,
+          minRows: 0,
+          note:
+            "close-day を呼んでいないので表に行が無く、メンバーの対照も 0 件。問い合わせが通ること(200)と GRANT の確認にとどまる",
+        },
+        {
+          // 自分の招待だけ読める(invites_select_own)。対照は持ち主の A。ペアの相手の B も読めない(次の確認)
+          table: "invites",
+          query: `invites?select=token&from_user=eq.${a.id}`,
+          reader: a,
+          minRows: 1,
+        },
+      ];
+
+      for (const t of cases) {
+        const member = await api.rest(t.reader.jwt, "GET", t.query);
+        const memberRows = arr(member.json).length;
+        const outsider = cu ? await api.rest(cu.jwt, "GET", t.query) : null;
+        const outsiderRows = outsider ? arr(outsider.json).length : 0;
+        const anon = await api.rest(null, "GET", t.query);
+        const anonRows = arr(anon.json).length;
+        const memberOk = member.status === 200 && memberRows >= t.minRows;
+        const outsiderOk = outsider === null ||
+          (outsider.status === 200 && outsiderRows === 0);
+        const anonOk = !(anon.status === 200 && anonRows > 0);
+        rep.check(
+          `${t.table}: メンバー(${t.reader.label})は読める・${
+            cu ? "C(ペア外)は 0 件・" : ""
+          }未ログインには返らない`,
+          memberOk && outsiderOk && anonOk,
+          `メンバー HTTP ${member.status} ${memberRows} 行(${t.minRows} 行以上のはず) / C ${
+            outsider ? `HTTP ${outsider.status} ${outsiderRows} 行` : "省略"
+          } / 未ログイン HTTP ${anon.status} ${anonRows} 行`,
+          `メンバー ${memberRows} 行${
+            outsider ? ` / C ${outsiderRows} 行` : ""
+          } / 未ログイン HTTP ${anon.status}${t.note ? `。${t.note}` : ""}`,
+        );
+      }
+
+      // invites は「ペアの相手にも」見えない(invites_select_own: 自分が発行したものだけ)
+      const peer = await api.rest(
+        b.jwt,
+        "GET",
+        `invites?select=token&from_user=eq.${a.id}`,
+      );
+      rep.check(
+        "invites: ペアの相手 B から A の招待は 0 件(自分が発行したものだけ読める)",
+        peer.status === 200 && arr(peer.json).length === 0,
+        `HTTP ${peer.status} ${arr(peer.json).length} 行`,
+      );
+      if (!cu) {
+        rep.skip("C(ペア外)からの確認", "--no-outsider のため省略");
+      }
     },
   );
 }

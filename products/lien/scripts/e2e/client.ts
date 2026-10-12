@@ -9,6 +9,8 @@
 //
 // 秘密(JWT・鍵)は戻り値にもログにも出さない。リクエストログにはパスだけを残す(UUID は :id に置き換え)。
 
+import { E2E_META_KEY, E2E_META_VALUE } from "./marker.ts";
+
 export interface Resp {
   status: number;
   /** リクエストの所要時間(ミリ秒) */
@@ -103,14 +105,18 @@ export interface FnPayload {
 export class Api {
   constructor(readonly base: string, readonly anonKey: string) {}
 
-  /** POST /auth/v1/signup — 匿名サインイン(supabase-swift の signInAnonymously と同じ) */
+  /**
+   * POST /auth/v1/signup — 匿名サインイン(supabase-swift の signInAnonymously と同じ)。
+   * アプリと違うのは data に通しテストの印(lien_e2e = true → raw_user_meta_data)を入れる点だけ。
+   * 後片付け・一覧が「実ユーザーでない」ことを確かめる目印のひとつ(marker.ts)
+   */
   signup(): Promise<Resp> {
     return request("POST", `${this.base}/auth/v1/signup`, {
       headers: {
         apikey: this.anonKey,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ data: {} }),
+      body: JSON.stringify({ data: { [E2E_META_KEY]: E2E_META_VALUE } }),
     });
   }
 

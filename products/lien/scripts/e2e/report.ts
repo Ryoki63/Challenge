@@ -6,6 +6,10 @@
 //   NOTE  失敗ではないが、仕様の前提や運用上、知っておくべき観測(例: APNs が未設定、取消後に写真の実体が残る)
 //   SKIP  前提が満たされず確認できなかった(例: ペア外ユーザーを使わない指定)
 //
+// 契約フィクスチャとのずれ(deviations)は、FAIL とは別に最後へまとめて見せる。ずれが 1 件でもあれば、FAIL が 0 件でも
+// 「問題あり」(hasProblems = 終了コード 1)にする。「ずれ N 件」と出ているのに結果が PASS(終了コード 0)になる、
+// という食い違いを作らないため。ずれは情報として流さない。
+//
 // 表示にはキー・JWT を出さない(redact)。公開リポジトリの issue / ログに貼る前提で、詳細は短く保つ。
 
 import {
@@ -104,7 +108,11 @@ export class Reporter {
     this.add("skip", name, detail);
   }
 
-  /** 契約とのずれを 1 件記録する(最後の「契約フィクスチャとのずれ」に出る。FAIL の記録は別に行う) */
+  /**
+   * 契約とのずれを 1 件記録する(最後の「契約フィクスチャとのずれ」に出る)。
+   * shape() / values() / expectError は、FAIL の記録と一緒にこれを呼ぶ。単独で呼んでも、
+   * hasProblems が true になる(= 終了コード 1)ので、ずれを見逃したまま PASS にはならない
+   */
   deviation(message: string): void {
     this.deviations.push(`[${this.step}] ${message}`);
   }
@@ -180,6 +188,11 @@ export class Reporter {
 
   get failed(): number {
     return this.count("fail");
+  }
+
+  /** FAIL が 1 件でもある、または契約フィクスチャとのずれが 1 件でもある(終了コードを 1 にする条件) */
+  get hasProblems(): boolean {
+    return this.failed > 0 || this.deviations.length > 0;
   }
 
   /** 手順ごとの集計と、全体の結果 */

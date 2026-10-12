@@ -6,6 +6,7 @@
 
 import type { Api, Resp } from "./client.ts";
 import type { Fixtures } from "./fixtures.ts";
+import { E2E_PROMISE_PREFIX } from "./marker.ts";
 import type { Mgmt } from "./mgmt.ts";
 import { Abort, redact, type Reporter } from "./report.ts";
 import { jsonEqual } from "./shape.ts";
@@ -50,8 +51,19 @@ export const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const ISO_RE =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
-/** 招待コード: 8 文字英数、紛らわしい 0 / O / 1 / l を除く(DESIGN §5.1) */
-export const INVITE_TOKEN_RE = /^[A-HJ-NP-Za-km-z2-9]{8}$/;
+/**
+ * 招待コード: 8 文字英数、紛らわしい 0 / O / 1 / l **だけ**を除く(DESIGN §5.1・REQUIREMENTS §3.2)。
+ * 大文字の I は除かれない(サーバーの INVITE_TOKEN_ALPHABET の 58 文字に入っている)。
+ * サーバーの文字集合とのずれは scenario_lib_test.ts が止める(以前は I も除いていて、約 13% のトークンで偽の FAIL が出た)
+ */
+export const INVITE_TOKEN_RE = /^[A-NP-Za-km-z2-9]{8}$/;
+
+/**
+ * 「存在しない招待」に使う token。形式(8 文字英数)は正しいので invite-accept の形式検査を通り、
+ * 「0」を含むのでサーバーの生成器(0 を出さない)が作る token とは決して一致しない → 必ず 404 invite_not_found になる
+ * (公開後に、実ユーザーの有効な招待と偶然一致して、テストユーザーが実ユーザーとペアになることがない)
+ */
+export const NEVER_ISSUED_INVITE_TOKEN = "ZZZZ0000";
 
 export const obj = (v: unknown): J =>
   v !== null && typeof v === "object" && !Array.isArray(v) ? (v as J) : {};
@@ -145,12 +157,63 @@ export async function viaSignedUrl(
   return { sign, get: await c.api.signedGet(url), signedUrl: url };
 }
 
+/** 署名の発行(POST sign)の失敗の HTTP ステータス。404 ではなく 400 で返る(本番の実測。contracts/README.md) */
+export const SIGN_FAILURE_STATUS = 400;
+
+/**
+ * 署名の発行が失敗したときの応答が、手書きフィクスチャ(storage-sign.not-found.json)の契約どおりか。
+ * 契約: HTTP 400・本文の statusCode と error がフィクスチャと同じ(message は文字列であればよい。アプリは前の 2 つだけ読む)。
+ * 返すのは食い違いの説明(空なら契約どおり)
+ */
+export function signFailureProblems(
+  status: number,
+  body: unknown,
+  fixture: J,
+): string[] {
+  const problems: string[] = [];
+  if (status !== SIGN_FAILURE_STATUS) {
+    problems.push(`HTTP ${status}(契約は ${SIGN_FAILURE_STATUS})`);
+  }
+  const b = obj(body);
+  for (const key of ["statusCode", "error"]) {
+    if (!jsonEqual(b[key], fixture[key])) {
+      problems.push(
+        `${key}: 期待 ${JSON.stringify(fixture[key])} / 実際 ${
+          JSON.stringify(b[key])
+        }`,
+      );
+    }
+  }
+  if (typeof b.message !== "string") problems.push("message が文字列でない");
+  return problems;
+}
+
+/**
+ * 署名付き URL の署名を 1 文字だけ変えた URL を返す(改ざんの確認用)。token が無ければ null。
+ * 変えるのは署名部の末尾から 10 文字目。**最後の文字は変えない**: HS256 の署名(32 バイト = base64url の 43 文字)の
+ * 最後の文字は下位 2 ビットが詰め物で、'A' → 'B' のように詰め物のビットだけが変わる置き換えは、寛容な復号では
+ * 同じ署名バイトになり、改ざんにならない(以前は URL の最後の文字を変えていて、末尾が 'A' のとき偽の FAIL がありえた)
+ */
+export function tamperSignedUrl(url: string): string | null {
+  const m = /([?&]token=)([^&#]+)/.exec(url);
+  if (!m) return null;
+  const token = m[2];
+  const sigStart = token.lastIndexOf(".") + 1;
+  if (sigStart === 0 || token.length - sigStart < 20) return null; // JWT の署名部として短すぎる
+  const i = token.length - 10;
+  const changed = token[i] === "A" ? "B" : "A";
+  const tampered = token.slice(0, i) + changed + token.slice(i + 1);
+  return url.slice(0, m.index) + m[1] + tampered +
+    url.slice(m.index + m[0].length);
+}
+
 // ---- 手順をまたいで共有するもの ----
 
+/** 約束のタイトルは「E2E 」で始める(後片付けが、これに合わない約束を持つユーザーを対象外にする。marker.ts) */
 export const PROMISES: Record<Label, { title: string; emoji: string }> = {
-  A: { title: "E2E 散歩", emoji: "🚶" },
-  B: { title: "E2E 水やり", emoji: "🌿" },
-  C: { title: "E2E 読書", emoji: "📚" },
+  A: { title: `${E2E_PROMISE_PREFIX}散歩`, emoji: "🚶" },
+  B: { title: `${E2E_PROMISE_PREFIX}水やり`, emoji: "🌿" },
+  C: { title: `${E2E_PROMISE_PREFIX}読書`, emoji: "📚" },
 };
 
 /** 手順をまたいで受け渡す値と、作ったユーザー */

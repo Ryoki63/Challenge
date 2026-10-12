@@ -14,6 +14,8 @@ import {
   getSnapshot,
   obj,
   partnerRowsQuery,
+  signFailureProblems,
+  tamperSignedUrl,
   UUID_RE,
   viaSignedUrl,
   type World,
@@ -387,16 +389,22 @@ export async function stepsFlow(c: Ctx, w: World): Promise<void> {
           await sha256Hex(full.get.bytes) === await sha256Hex(PHOTO_2),
           `${full.get.bytes.length} バイト(期待 ${PHOTO_2.length})`,
         );
-        // 署名が検証される(トークンを 1 文字変えたら通らない)
-        const url = full.signedUrl as string;
-        const tampered = url.slice(0, -1) + (url.endsWith("A") ? "B" : "A");
-        const bad = await api.signedGet(tampered);
-        rep.check(
-          "署名付き URL のトークンを改ざんすると取れない(200 にならない)",
-          bad.status !== 200,
-          `HTTP ${bad.status}`,
-          `HTTP ${bad.status}`,
-        );
+        // 署名が検証される(署名部の途中の 1 文字を変えたら通らない。最後の文字は詰め物のビットなので変えない)
+        const tampered = tamperSignedUrl(full.signedUrl as string);
+        if (tampered === null) {
+          rep.fail(
+            "署名付き URL の署名を改ざんできない(token が JWT の形でない)",
+            "signedURL に token= が無い、または署名部が短い",
+          );
+        } else {
+          const bad = await api.signedGet(tampered);
+          rep.check(
+            "署名付き URL の署名を 1 文字変えると取れない(200 にならない)",
+            bad.status !== 200,
+            `HTTP ${bad.status}`,
+            `HTTP ${bad.status}`,
+          );
+        }
       }
 
       // サムネ(ホームに出すのはこちら。パスは原寸の photo.jpg を photo_thumb.jpg に読み替えたもの)
@@ -431,7 +439,7 @@ export async function stepsFlow(c: Ctx, w: World): Promise<void> {
         rep.fail("寿命 1 秒の署名付き URL を作れない", brief(shortLived));
       }
 
-      // 「無い」オブジェクト(同じペアの、存在しないファイル)の署名。アプリは 404 を「無い・読めない」とみなす
+      // 「無い」オブジェクト(同じペアの、存在しないファイル)の署名の発行
       const missing = await viaSignedUrl(
         c,
         b.jwt,
@@ -445,15 +453,35 @@ export async function stepsFlow(c: Ctx, w: World): Promise<void> {
           JSON.stringify(obj(missing.sign.json).statusCode)
         }`,
       );
-      if (fx.storageSign && missing.sign.status !== 404) {
+      // 署名の発行の失敗の契約は HTTP 400 + 本文 { statusCode: "404", error: "not_found", ... }
+      // (contracts/storage-sign.not-found.json。404 ではない)。ずれたら FAIL(+ 契約とのずれ)
+      if (fx.storageSignNotFound) {
+        const problems = signFailureProblems(
+          missing.sign.status,
+          missing.sign.json,
+          fx.storageSignNotFound,
+        );
+        if (
+          !rep.check(
+            "B: 署名の発行の失敗が storage-sign.not-found.json の契約どおり(HTTP 400・本文の statusCode / error が一致)",
+            problems.length === 0,
+            problems.join(" / "),
+            `HTTP ${missing.sign.status}`,
+          )
+        ) {
+          rep.deviation(
+            `署名の発行(POST sign)の失敗が storage-sign.not-found.json と違う: ${
+              problems.join(" / ")
+            }`,
+          );
+        }
+      } else if (fx.storageSign && missing.sign.status !== 404) {
+        // 手書きのフィクスチャが無い間: 署名の発行の失敗は 404 でなく 400 で返る(本番の実測)ので、契約が未整備
         rep.deviation(
           `署名の発行(POST sign)の「無い・読めない」は HTTP ${missing.sign.status}(本文の statusCode は ${
             JSON.stringify(obj(missing.sign.json).statusCode)
-          })。手書きのフィクスチャの説明(contracts/README.md)は HTTP 404 を想定している`,
-        );
-        rep.note(
-          '署名の発行(POST sign)の失敗は HTTP 404 ではなく 400 で返る(本文の statusCode が "404")',
-          "ペア外・存在しないオブジェクト・未ログインのいずれも同じ。StoragePhotoURLSigner は 404 だけを notFound にするので、実際は .server(400) になる(サムネが無いときの原寸への切り替えは .server でも働くので、見た目の結果は同じ)",
+          })で、契約のフィクスチャ(contracts/storage-sign.not-found.json)が無い。` +
+            "HTTP 404 を想定した説明(contracts/README.md)と StoragePhotoURLSigner の写像は、実際の 400 とずれている",
         );
       }
 
@@ -666,6 +694,31 @@ export async function stepsFlow(c: Ctx, w: World): Promise<void> {
         "A: reactions を読める。B の 1 件だけで、最後のスタンプ",
         rowsA.json,
         [{ checkin_id: checkinId, from_user: b.id, stamp: last }],
+      );
+
+      // ペア外(C)・未ログインには見えない(reactions_select_pair)。上の A の読み取りが対照(同じ問い合わせで 1 件見える)。
+      // reactions は S18 の取消で CASCADE で消えるので、表の中身が残っているうちのここで確かめる(S22 は reactions を除く)
+      const reactionsQuery =
+        `reactions?select=checkin_id,from_user,stamp&checkin_id=eq.${checkinId}`;
+      if (cu) {
+        const q = await api.rest(cu.jwt, "GET", reactionsQuery);
+        rep.check(
+          "C(ペア外): A のチェックインへの reactions は 0 件(RLS)",
+          q.status === 200 && arr(q.json).length === 0,
+          `HTTP ${q.status} ${arr(q.json).length} 行`,
+        );
+      } else {
+        rep.skip(
+          "C(ペア外)から reactions は見えない",
+          "--no-outsider のため省略",
+        );
+      }
+      const anonQ = await api.rest(null, "GET", reactionsQuery);
+      rep.check(
+        "未ログイン(anon キーだけ): reactions は何も返らない",
+        !(anonQ.status === 200 && arr(anonQ.json).length > 0),
+        `HTTP ${anonQ.status} ${arr(anonQ.json).length} 行`,
+        `HTTP ${anonQ.status}`,
       );
     },
   );

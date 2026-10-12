@@ -5,7 +5,9 @@
 // 「サーバーとフィクスチャのどちらが正か」を判断して issue にする。
 //
 // 手書きのフィクスチャ(PostgREST / Storage の応答。PV #59 が足したもの: partner-checkin.*.json /
-// storage-sign.ok.json)は **あれば** 突き合わせる。無ければ該当の確認を SKIP にする(必須ファイルではない)。
+// storage-sign.ok.json / storage-sign.not-found.json)は **あれば** 突き合わせる。無ければ該当の確認を SKIP にする
+// (必須ファイルではない)。storage-sign.not-found.json が無い間は、署名の発行の失敗が HTTP 400 で返ることを
+// 契約とのずれとして扱う(steps_flow.ts の S12)。
 
 import { type Schema, schemaFrom } from "./shape.ts";
 
@@ -41,6 +43,12 @@ export interface Fixtures {
   partnerCheckin?: Schema;
   /** Storage の署名付き URL の発行(`{ signedURL }`)。フィクスチャが無ければ undefined */
   storageSign?: Schema;
+  /**
+   * 署名の発行の失敗の本文(`{ statusCode, error, message }`。HTTP は 404 でなく 400)。そのままの JSON。
+   * アプリが読むのは statusCode と error だけで、本文にほかのキーがあってもよいので、形(Schema)でなく値を比べる。
+   * フィクスチャが無ければ undefined
+   */
+  storageSignNotFound?: J;
   /** 関数名 → エラーコード → 許す HTTP ステータス */
   errors: Record<string, Record<string, number[]>>;
   stamps: { nudge: string[]; reaction: string[] };
@@ -95,6 +103,7 @@ export const OPTIONAL_FILES = [
   "partner-checkin.no-photo.json",
   "partner-checkin.none.json",
   "storage-sign.ok.json",
+  "storage-sign.not-found.json",
 ] as const;
 
 /** 読み込み済みの JSON から、応答系統ごとの形を作る(ファイルを読まない純粋な部分。テストはこちらを使う) */
@@ -118,6 +127,12 @@ export function buildFixtures(
   const storageSign = "storage-sign.ok.json" in optional
     ? schemaFrom(optional["storage-sign.ok.json"])
     : undefined;
+  const notFound = optional["storage-sign.not-found.json"];
+  const storageSignNotFound =
+    notFound !== null && typeof notFound === "object" &&
+      !Array.isArray(notFound)
+      ? (notFound as J)
+      : undefined;
 
   return {
     raw,
@@ -143,6 +158,7 @@ export function buildFixtures(
     plantNameAlreadyNamed: family("plant-name.already-named.json"),
     partnerCheckin,
     storageSign,
+    storageSignNotFound,
     errors: raw["errors.json"] as unknown as Fixtures["errors"],
     stamps: { nudge: stamps.nudge, reaction: stamps.reaction },
   };

@@ -20,10 +20,11 @@
 #   PROJECT_REF            (任意)既定 lniheehfbtpfhglinfjm
 #   E2E_STATE_DIR          (任意)作ったデータの ID を書く状態ファイルの置き場所。既定 ${TMPDIR:-/tmp}/lien-e2e
 #
-# 終了コード: 0 = すべて PASS / 1 = FAIL あり / 2 = 使い方・環境の誤り
+# 終了コード: 0 = すべて PASS / 1 = FAIL または契約フィクスチャとのずれが 1 件でもある / 2 = 使い方・環境の誤り
 #
 # 注意: 本番に書き込む(匿名ユーザー・ペア・チェックイン・写真)。close-day / grant-tickets は呼ばない(OPS §10)。
-#       鍵・JWT は表示しない。作ったデータは --cleanup か cleanup コマンドで消す。
+#       鍵・JWT は表示しない。作ったデータは --cleanup か cleanup コマンドで消す(--cleanup には SUPABASE_ACCESS_TOKEN が要る。
+#       無ければ、何も作らずに終了コード 2 で止まる)。
 
 set -euo pipefail
 
@@ -46,8 +47,11 @@ fi
 
 mkdir -p "$STATE_DIR"
 
-# 権限は必要最小限: 本番の API と Management API だけに通信、状態ファイルの置き場所だけに書く
+# 権限は必要最小限: 本番の API と Management API だけに通信、状態ファイルの置き場所だけに書く。
+# --no-prompt: 足りない権限を対話の許可プロンプトで聞かない(TTY で「許可」されると、--state が E2E_STATE_DIR の外を
+# 読めてしまうなど、上の制限が崩れる)。足りなければ、その場でエラーにする
 exec "$DENO" run \
+  --no-prompt \
   --allow-net="${REF}.supabase.co,api.supabase.com" \
   --allow-env=SUPABASE_ACCESS_TOKEN,SUPABASE_ANON_KEY,PROJECT_REF,E2E_STATE_DIR,TMPDIR,CI,E2E_ALLOW_CI,NO_COLOR \
   --allow-read="$CONTRACTS_DIR,$STATE_DIR" \

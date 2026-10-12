@@ -112,6 +112,7 @@ Deno.test("任意の手書きフィクスチャが無くても読める(その�
   const withoutOptional = buildFixtures(fx.raw, {});
   assertEquals(withoutOptional.partnerCheckin, undefined);
   assertEquals(withoutOptional.storageSign, undefined);
+  assertEquals(withoutOptional.storageSignNotFound, undefined);
   // 必須のものは変わらず使える
   assertEquals(diffShape(fx.raw["nudge.ok.json"], withoutOptional.nudge), []);
 });
@@ -131,6 +132,11 @@ Deno.test("手書きフィクスチャ(PostgREST / Storage)があれば、行・
     "partner-checkin.no-photo.json": noPhotoRow,
     "partner-checkin.none.json": [],
     "storage-sign.ok.json": { signedURL: "/object/sign/photos/p?token=t" },
+    "storage-sign.not-found.json": {
+      statusCode: "404",
+      error: "not_found",
+      message: "Object not found",
+    },
   });
   const rows = built.partnerCheckin;
   const sign = built.storageSign;
@@ -158,6 +164,23 @@ Deno.test("手書きフィクスチャ(PostgREST / Storage)があれば、行・
     "extra",
     "missing",
   ]);
+  // 署名の発行の失敗の本文は、そのままの JSON(値を比べる。形ではない)
+  assertEquals(built.storageSignNotFound, {
+    statusCode: "404",
+    error: "not_found",
+    message: "Object not found",
+  });
+  // オブジェクトでないもの(配列・null)は、フィクスチャとして扱わない
+  assertEquals(
+    buildFixtures(fx.raw, { "storage-sign.not-found.json": [] })
+      .storageSignNotFound,
+    undefined,
+  );
+  assertEquals(
+    buildFixtures(fx.raw, { "storage-sign.not-found.json": null })
+      .storageSignNotFound,
+    undefined,
+  );
 });
 
 Deno.test("OPTIONAL_FILES と REQUIRED_FILES は重ならない", () => {

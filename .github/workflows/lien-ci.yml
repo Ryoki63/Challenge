@@ -2,6 +2,7 @@
 # iOS ビルドジョブは T06 で別ワークフロー(products/lien/ios/** 変更時のみ起動)として追加する
 #
 # ジョブ: deno-test(Edge Functions とその契約フィクスチャ)/ ops-tests(ファイルを読む運用の静的テスト — issue #66)/
+#         e2e-tests(本番に対する API 通しテストの単体テストと型検査 — issue #67。通しテスト本体は CI で動かさない)/
 #         plant-assets(植物の SVG レイヤーの再生成と検査)/ store-metadata(ストア文言の文字数と禁止ワード)
 #
 # action は commit SHA で固定する(タグは付け替えられる。lien-deploy・lien-ios などと同じ方針)。
@@ -59,6 +60,31 @@ jobs:
 
       - name: Run ops tests
         run: deno test --allow-read products/lien/scripts/ops/
+
+  # 本番に対する API 通しテスト(products/lien/scripts/e2e/。issue #67)の単体テストと型検査。通しテスト本体(run.sh)は
+  # 本番にテスト用の匿名ユーザーを作る手動実行専用なので、ここでは動かさない(CI=true では E2E_ALLOW_CI=1 が無いと止まる)。
+  # 単体テストはネットワークを使わない(--allow-net を付けない): 後片付けの安全装置(本番のユーザーを誤って消さない)・
+  # 招待 token の形(サーバーの文字集合との一致 — invite-create/core.ts を import して比べる)・契約フィクスチャとの形の突き合わせ・
+  # 引数の解釈。型検査は e2e.ts から辿れる全モジュール(手順 S01〜S22 を含む)に効く。
+  # 以前は、これらが CI で一度も走っていなかった(ops-tests の対象は scripts/ops/ だけ)
+  e2e-tests:
+    name: e2e tests (unit + type check; no network)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+
+      - name: Run e2e unit tests
+        run: deno test --allow-read products/lien/scripts/e2e/
+
+      - name: Type check the e2e runner
+        run: deno check products/lien/scripts/e2e/e2e.ts
 
   plant-assets:
     name: plant layers (generate + verify)

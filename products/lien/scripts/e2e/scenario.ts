@@ -1,6 +1,7 @@
 // scenario.ts — 本番に対する 2 ユーザーの API 通しテストの手順(issue #67)の順序
 //
-// 登場人物(いずれも新しい匿名ユーザー。ニックネームは E2E-A / E2E-B / E2E-C で目印にする):
+// 登場人物(いずれも新しい匿名ユーザー。サインアップの印 lien_e2e・ニックネーム E2E-A / E2E-B / E2E-C・絵文字 🧪・
+//   約束の「E2E 」接頭辞が、後片付けの安全装置の目印になる。marker.ts):
 //   A = 招待する側 / B = 招待を受ける側 … ペアになる 2 人
 //   C = ペア外のユーザー … ソロのチェックインと、ペア外から見えてはいけないものの確認に使う
 //
@@ -10,6 +11,7 @@
 //   S11 snapshot(片方だけ完了)  S12 相手が写真を読む経路(#59 PV)  S13 nudge  S14 react  S15 ふたり達成
 //   S16 snapshot の整合  S17 植物の名前  S18 チェックイン取消→やり直し  S19 push 登録の経路(PushTokenSync)
 //   S20 クライアントの書き込み権限の境界  S21 DB の中身(Management API で SELECT)
+//   S22 ペア外(C)・未ログインから A–B ペアの表が見えない(RLS。reactions だけは取消で消える前の S14 で確かめる)
 //
 // 守ること:
 //   - close-day / grant-tickets は呼ばない(OPS §10)。新しいペアの started_on は今日なので、昨日の確定の対象にも入らない
@@ -18,7 +20,7 @@
 //   - 失敗しても、作ったデータの ID は state に残る(後片付けできる)
 //
 // 構成: 型と道具は scenario_lib.ts、手順は steps_setup.ts(S01〜S08)/ steps_flow.ts(S09〜S16)/
-//   steps_after.ts(S17〜S21)。手順を足すときは該当ファイルに rep.run("S22", ...) の形で足し、ここの一覧にも書く。
+//   steps_after.ts(S17〜S22)。手順を足すときは該当ファイルに rep.run("S23", ...) の形で足し、ここの一覧にも書く。
 
 import { stepsAfter } from "./steps_after.ts";
 import { stepsFlow } from "./steps_flow.ts";
