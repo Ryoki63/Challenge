@@ -158,7 +158,8 @@ function makeRepo(db: SupabaseClient): ReactRepo {
       params: { checkinId: string; fromUserId: string; stamp: string },
     ): Promise<void> {
       // reactions_one_per_user_per_checkin UNIQUE(checkin_id, from_user) に対する upsert
-      // (同一スタンプ再送は実質 no-op、別スタンプは更新 — core.ts が changed を判定済み)
+      // (同一スタンプ再送は実質 no-op、別スタンプは更新。push は最初の1回だけで、その要否は
+      //  core.ts が既存行の有無で判定済み — スタンプの付け替えでは送らない)
       const { error } = await db
         .from("reactions")
         .upsert(
@@ -213,10 +214,15 @@ Deno.serve(async (req: Request) => {
     return json(401, { error: "unauthorized" });
   }
 
-  let payload: { checkinId?: unknown; stamp?: unknown };
+  let payload: { checkinId?: unknown; stamp?: unknown } | null;
   try {
     payload = await req.json();
   } catch {
+    return json(400, { error: "invalid_json" });
+  }
+  // JSON の `null` など、オブジェクトでない本文は 400。null のまま payload.x を読むと
+  // TypeError になり、JSON でない 500 が返ってしまう
+  if (typeof payload !== "object" || payload === null) {
     return json(400, { error: "invalid_json" });
   }
   if (

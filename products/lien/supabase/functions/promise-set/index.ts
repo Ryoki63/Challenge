@@ -245,10 +245,15 @@ Deno.serve(async (req: Request) => {
     return json(401, { error: "unauthorized" });
   }
 
-  let payload: { title?: unknown; emoji?: unknown; remindAt?: unknown };
+  let payload: { title?: unknown; emoji?: unknown; remindAt?: unknown } | null;
   try {
     payload = await req.json();
   } catch {
+    return json(400, { error: "invalid_json" });
+  }
+  // JSON の `null` など、オブジェクトでない本文は 400。null のまま payload.x を読むと
+  // TypeError になり、JSON でない 500 が返ってしまう
+  if (typeof payload !== "object" || payload === null) {
     return json(400, { error: "invalid_json" });
   }
   if (typeof payload.title !== "string") {
