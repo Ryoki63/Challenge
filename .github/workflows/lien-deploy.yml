@@ -5,6 +5,11 @@
 #   SUPABASE_ACCESS_TOKEN — https://supabase.com/dashboard/account/tokens で発行
 #   SUPABASE_DB_PASSWORD  — プロジェクト作成時の DB パスワード(db push に必要)
 # project ref は products/lien/supabase/config.toml に固定(env PROJECT_REF で上書き可)。
+#
+# 【action は commit SHA で固定する】この workflow は全権の SUPABASE_ACCESS_TOKEN と DB パスワードを渡す。
+#   リポジトリは公開で、タグやブランチ(v4・v1 など)は後から別のコミットに付け替えられる。第三者の action が
+#   細工されると、トークンやパスワードが流出しうる。そのため SHA で固定し、末尾のコメントにバージョンを書く。
+#   更新するときは新しいバージョンのタグが指す commit を確かめてから(gh api repos/<owner>/<repo>/git/ref/tags/<tag>)差し替える
 name: lien-deploy
 
 on:
@@ -26,10 +31,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
         with:
           version: 2.105.0 # config.toml のスキーマ準拠バージョンに固定
 

@@ -3,8 +3,12 @@
 # 毎朝 00:40 JST(= 15:40 UTC。close-day の 00:10 JST の30分後)に本番 DB を **読むだけ** で確認し、
 # 失敗があれば workflow を赤にする(GitHub から失敗の通知が届く)。確認する内容は
 # products/lien/scripts/ops/cron_check.ts(判定は evaluate。フィクスチャ付きの deno test あり):
+#   - 前夜の回(close-day は 00:10 JST・grant-tickets は 00:05 JST)の cron が **起動した** こと
+#     (起動の記録が予定の時刻以降にある。前夜の回が丸ごと抜けたら赤。月初の付与の回が抜けても赤)
 #   - 前夜の close-day の応答が 200 で errors が空・確定した日が昨日(pg_net の応答は6時間で消えるので朝に見る)
-#   - cron.job_run_details が succeeded で、1日以上止まっていない / 月初は grant-tickets を呼び、それ以外の日は呼んでいない
+#   - cron.job_run_details が succeeded で、月初(JST の1日)は grant-tickets が 1 row で応答も 200・errors 空、
+#     それ以外の日は呼んでいない
+#   - ジョブの定義が migration 0007 のとおり(スケジュール・呼び先・鍵・本文)で、想定外のジョブ(一時ジョブの消し忘れ)が無い
 #   - Vault の cron 専用シークレットと Function secrets が同じ値・Vault に万能鍵が無い・pg_net のキューが空
 #   - プロジェクトが ACTIVE_HEALTHY(無料枠の自動停止 = D5)・公開 API から net / cron / vault に届かない
 # このリポジトリは公開で Actions のログ・ジョブサマリは誰でも読めるので、ここでは件数(ペア数など)・ペア ID・応答の本文を出さない
@@ -14,9 +18,16 @@
 # 失敗時に赤になることの確認(テスト用の入力): Actions の「Run workflow」で max_age_hours に 0 を入れる
 #   (最後の起動が「0 時間より古い」ので必ず赤になる)。本番の状態は変えない
 #
+# 【action は commit SHA で固定する】この workflow は全権の SUPABASE_ACCESS_TOKEN を毎日の schedule 実行に渡す。
+#   リポジトリは公開で、タグやブランチ(v4・v2 など)は後から別のコミットに付け替えられる。第三者の action が
+#   細工されると、トークンが流出しうる。そのため SHA で固定し、末尾のコメントにバージョンを書く。更新するときは
+#   新しいバージョンのタグが指す commit を確かめてから(gh api repos/<owner>/<repo>/git/ref/tags/<tag>)差し替える
+#
 # ops-tests ジョブは push のたびに(関係するファイルが変わったときだけ)、cron の静的テスト
-# (スケジュール・JST の1日だけの条件・呼び先・鍵)と監視の判定ロジックのテストを回す。
-# lien-ci の `deno test` は --allow-read を付けないので、ファイルを読むこれらのテストはここで回す
+# (スケジュール・JST の1日だけの条件・呼び先・鍵・本文)、push_env の読み忘れの静的テスト(push を送る
+# Function の index.ts / core.ts と _shared)、監視の判定ロジックのテストを回す。
+# lien-ci の `deno test` は --allow-read を付けないので、ファイルを読むこれらのテストはここで回す。
+# push を送る Function は 8 つあるので、functions/ 配下のどの変更でも回す
 name: lien-cron-watch
 
 on:
@@ -25,7 +36,7 @@ on:
   workflow_dispatch:
     inputs:
       max_age_hours:
-        description: "最後の close-day / grant-tickets の起動の許容経過時間(時間)。既定 26。0 にすると必ず赤になる(失敗時の動作確認用)"
+        description: "最後の close-day / grant-tickets の起動の許容経過時間(時間)の上限。既定 26(通常は予定の回の検査が先に働く)。0 にすると必ず赤になる(失敗時の動作確認用)"
         type: string
         default: "26"
   push:
@@ -34,8 +45,7 @@ on:
       - "products/lien/scripts/ops/**"
       - "products/lien/supabase/migrations/**"
       - "products/lien/supabase/config.toml"
-      - "products/lien/supabase/functions/close-day/index.ts"
-      - "products/lien/supabase/functions/grant-tickets/index.ts"
+      - "products/lien/supabase/functions/**"
 
 permissions:
   contents: read
@@ -46,16 +56,16 @@ concurrency:
 
 jobs:
   ops-tests:
-    name: ops tests (cron static + check logic)
+    name: ops tests (cron static + push_env static + check logic)
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: v2.x
 
@@ -69,10 +79,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: v2.x
 
