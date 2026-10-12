@@ -10,9 +10,10 @@
 //   - **変化時だけ送る**: 最後に送信に成功した (userID, token, env) を覚え、同じなら送らない。
 //     ユーザーが変わった(再インストールで匿名ユーザーが作り直された)ときは同じトークンでも再送する
 //   - 送信失敗(オフライン等)は保留のまま。次のトリガー(前面復帰・トークン更新・セッション確立)で再送する
-//   - push_env は DEBUG ビルド = sandbox / それ以外 = production。Xcode 直インストールの development 署名は
-//     sandbox の APNs、TestFlight / App Store は production の APNs に登録されるため、トークンごとに
-//     サーバーが送信先のエンドポイントを選べるように環境も一緒に保存する(#53)
+//   - push_env は署名の aps-environment から決める(APNsEnvironment.swift。issue #28)。Xcode 直インストールの
+//     development 署名は sandbox の APNs、TestFlight / App Store は production の APNs に登録されるため、
+//     トークンごとにサーバーが送信先のエンドポイントを選べるように環境も一緒に保存する(#53)。
+//     コンパイル設定(DEBUG / Release)では決めない — Release を development 署名で入れた端末を取り違えるため
 //   - **サーバー側のずれを直す**(issue #62): サーバーは APNs が 410 / BadDeviceToken を返したトークンの
 //     users.push_token を null にする(apns.ts)。端末の記録(ledger)は「送信済み」のままなので、変化時だけ送る
 //     仕組みだけでは二度と戻らない。そこで、記録の上では送信済みのときに限り、プロセスの最初の1回と
@@ -23,19 +24,11 @@
 
 import Foundation
 
-/// このトークンが属する APNs 環境(users.push_env — migration 0005 の check と同じ語彙)
+/// このトークンが属する APNs 環境(users.push_env — migration 0005 の check と同じ語彙)。
+/// このビルドの環境(`PushEnvironment.current`)の判定は APNsEnvironment.swift
 enum PushEnvironment: String, Equatable, Sendable, Codable {
     case sandbox
     case production
-
-    /// このビルドの APNs 環境(DEBUG = sandbox / それ以外 = production)
-    static var current: PushEnvironment {
-        #if DEBUG
-        return .sandbox
-        #else
-        return .production
-        #endif
-    }
 }
 
 /// users 行に今入っている APNs 登録(自分の行を読んだ結果)

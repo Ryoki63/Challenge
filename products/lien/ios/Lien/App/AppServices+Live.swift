@@ -8,13 +8,34 @@ import Foundation
 import WidgetKit
 
 extension AppServices {
-    /// 標準構成: Config(Supabase URL / anon key)があれば Live、無ければ Stub
-    static func make(bundle: Bundle = .main) -> AppServices {
+    /// 標準構成: Config(Supabase URL / anon key)があれば Live。
+    /// 無いときは policy に従う — Debug は Stub、**Release は起動時に明示エラーで止まる**(issue #28。
+    /// 接続情報の無い Stub のビルドを TestFlight / App Store に出さない)
+    static func make(
+        bundle: Bundle = .main,
+        whenConfigMissing policy: Config.MissingPolicy = .buildDefault
+    ) -> AppServices {
+        do {
+            return try makeChecked(bundle: bundle, whenConfigMissing: policy)
+        } catch {
+            fatalError("[Lien] \(error)")
+        }
+    }
+
+    /// `make` の本体。Config が無く policy が `.fatal` のときは `Config.MissingError` を投げる
+    /// (fatalError にするのは make だけ。テストはこちらを呼んで致命の経路を確かめる)
+    static func makeChecked(
+        bundle: Bundle = .main,
+        whenConfigMissing policy: Config.MissingPolicy
+    ) throws -> AppServices {
+        let loadedConfig = Config.load(bundle: bundle)
+        if loadedConfig == nil, policy == .fatal { throw Config.MissingError() }
+
         let pushAuthorizer = PushManager()
         let reloadWidgets: () -> Void = { WidgetCenter.shared.reloadAllTimelines() }
         // App Group が解決できない署名なしビルドでも、アプリ本体は動き続ける(ウィジェット・NSE とは共有されない)
         let store = AppGroupStore.standard(bundle: bundle) ?? AppGroupStore.localFallback()
-        guard let config = Config.load(bundle: bundle) else {
+        guard let config = loadedConfig else {
             return stub(store: store, pushAuthorizer: pushAuthorizer, reloadWidgets: reloadWidgets)
         }
         return live(config: config, store: store, pushAuthorizer: pushAuthorizer, reloadWidgets: reloadWidgets)

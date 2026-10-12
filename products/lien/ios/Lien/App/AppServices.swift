@@ -3,7 +3,8 @@
 // LienApp.swift に散らばっていた生成処理をここへ集約する。
 //   - Config(Supabase URL / anon key)があれば Live(AppServices+Live.swift の make / live)
 //   - 無ければ Stub(本ファイルの stub)。CI(Secrets.xcconfig が無い環境)や、まだ Supabase に
-//     つなぎたくない開発ビルドでも、ネットワークを一切使わずに画面遷移まで動く
+//     つなぎたくない開発ビルドでも、ネットワークを一切使わずに画面遷移まで動く。
+//     ただし Release ビルドでは Stub に落とさず、起動時に明示エラーで止まる(Config.MissingPolicy — issue #28)
 //
 // View / ViewModel は個々のプロトコル(AuthServicing / InviteClient / ...)だけを知り、
 // どちらの構成かを意識しない。差し替えはこのファイルの組み立てだけで完結する。

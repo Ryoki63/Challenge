@@ -167,16 +167,20 @@ final class AppServicesTests: XCTestCase {
     }
 
     func testMakeBuildsLiveServicesWhenConfigIsPresent() {
-        let services = AppServices.make(bundle: ConfiguredBundle())
-        XCTAssertTrue(services.isLive)
-        XCTAssertTrue(services.auth is SupabaseService)
+        // 接続情報があれば、ポリシー(Release の致命 / Debug の Stub)に関係なく Live
+        for policy in [Config.MissingPolicy.fallBackToStub, .fatal] {
+            let services = AppServices.make(bundle: ConfiguredBundle(), whenConfigMissing: policy)
+            XCTAssertTrue(services.isLive)
+            XCTAssertTrue(services.auth is SupabaseService)
+        }
     }
 
     func testMakeFallsBackToStubServicesWhenConfigIsMissing() {
         final class EmptyKeysBundle: Bundle, @unchecked Sendable {
             override func object(forInfoDictionaryKey key: String) -> Any? { "" }
         }
-        let services = AppServices.make(bundle: EmptyKeysBundle())
+        // ビルド構成の既定(Release は致命)に左右されないよう、ポリシーを明示する(致命側は ConfigTests)
+        let services = AppServices.make(bundle: EmptyKeysBundle(), whenConfigMissing: .fallBackToStub)
         XCTAssertFalse(services.isLive)
         XCTAssertTrue(services.auth is StubAuthService)
     }

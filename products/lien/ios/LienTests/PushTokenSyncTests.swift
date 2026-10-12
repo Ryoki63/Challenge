@@ -5,7 +5,7 @@
 //   - セッションが先でも、トークン取得で送る(セッション→トークンの順)
 //   - 変化時だけ送る(同じ内容は再送しない / トークン変更・ユーザー変更では再送する)
 //   - 送信失敗は保留のまま、次のトリガーで再送する
-//   - push_env は注入した環境(DEBUG ビルドの既定は sandbox)
+//   - push_env は注入した環境(このビルドの環境を署名から決める判定は PushEnvironmentTests)
 //   - サーバー側のずれの検知(issue #62): サーバーが 410 / BadDeviceToken で push_token を null にした後でも、
 //     コールドスタート時と(間隔をあけた)前面復帰時に自分の users 行を読んで、ずれていれば送り直す
 
@@ -440,19 +440,11 @@ final class PushTokenSyncTests: XCTestCase {
         XCTAssertEqual(registrar.fetchCount, 2, "時計が戻っても確認が止まり続けない")
     }
 
-    // MARK: 環境(DEBUG = sandbox / それ以外 = production)
+    // MARK: 環境の語彙(判定そのものは PushEnvironmentTests)
 
     func testPushEnvironmentRawValuesMatchServerCheckConstraint() {
         // users.push_env の check(push_env in ('sandbox','production')) — migration 0005 / issue #53
         XCTAssertEqual(PushEnvironment.sandbox.rawValue, "sandbox")
         XCTAssertEqual(PushEnvironment.production.rawValue, "production")
-    }
-
-    func testCurrentEnvironmentFollowsBuildConfiguration() {
-        #if DEBUG
-        XCTAssertEqual(PushEnvironment.current, .sandbox, "DEBUG ビルド(Xcode 直インストール)は sandbox")
-        #else
-        XCTAssertEqual(PushEnvironment.current, .production, "Release(TestFlight / App Store)は production")
-        #endif
     }
 }
