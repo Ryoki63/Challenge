@@ -60,11 +60,6 @@ export class StateStore {
       await this.save();
     }
   }
-
-  async markCleaned(at: string): Promise<void> {
-    this.data.cleanedAt = at;
-    await this.save();
-  }
 }
 
 export function isRunStateData(v: unknown): v is RunStateData {
@@ -81,6 +76,18 @@ export async function readState(file: string): Promise<RunStateData> {
     throw new Error(`状態ファイルの形式が違う: ${file}`);
   }
   return parsed;
+}
+
+/** 後片付けが済んだ状態ファイルに、その時刻を書く(もう一度 cleanup しても害はないが、済みの目印になる) */
+export async function markStateCleaned(
+  file: string,
+  at: string,
+): Promise<void> {
+  const st = await readState(file);
+  st.cleanedAt = at;
+  const tmp = `${file}.tmp`;
+  await Deno.writeTextFile(tmp, JSON.stringify(st, null, 2) + "\n");
+  await Deno.rename(tmp, file);
 }
 
 /** 状態ファイルのうち一番新しいもの(ファイル名の先頭が時刻なので、名前順の最後) */

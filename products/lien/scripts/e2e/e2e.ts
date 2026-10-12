@@ -32,7 +32,12 @@ import { loadFixtures } from "./fixtures.ts";
 import { Mgmt } from "./mgmt.ts";
 import { Abort, redact, Reporter } from "./report.ts";
 import { runScenario } from "./scenario.ts";
-import { latestStateFile, readState, StateStore } from "./state.ts";
+import {
+  latestStateFile,
+  markStateCleaned,
+  readState,
+  StateStore,
+} from "./state.ts";
 
 const DEFAULT_REF = "lniheehfbtpfhglinfjm";
 const UUID_RE =
@@ -188,7 +193,7 @@ function slowest(n: number): string {
   return top.map((r) => `${r.label} ${r.ms}ms`).join(" / ");
 }
 
-async function cmdCheck(args: Args): Promise<number> {
+async function cmdCheck(): Promise<number> {
   guardCi();
   const env = readEnv();
   const now = jstNow();
@@ -218,7 +223,6 @@ async function cmdCheck(args: Args): Promise<number> {
     console.log(`公開キー: ${k.kind}(値は表示しない)`);
   }
   console.log(`状態ファイルの置き場所: ${stateDir()}`);
-  void args;
   return 0;
 }
 
@@ -380,10 +384,7 @@ async function doCleanupFromState(
     },
     { dryRun, log: (l) => console.log(l) },
   );
-  if (r.ok && !dryRun) {
-    st.cleanedAt = new Date().toISOString();
-    await Deno.writeTextFile(file, JSON.stringify(st, null, 2) + "\n");
-  }
+  if (r.ok && !dryRun) await markStateCleaned(file, new Date().toISOString());
   return r.ok ? 0 : 1;
 }
 
@@ -463,7 +464,7 @@ async function main(): Promise<number> {
         console.log(USAGE);
         return 0;
       case "check":
-        return await cmdCheck(args);
+        return await cmdCheck();
       case "run":
         return await cmdRun(args);
       case "cleanup":
