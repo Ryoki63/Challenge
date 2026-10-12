@@ -57,3 +57,16 @@ jobs:
           done
           echo "validated $count Contents.json files"
           test "$count" -eq 14  # ルート1 + imageset13
+
+  store-metadata:
+    name: store metadata (verify character limits + banned words)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/lien/marketing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "Verify store_metadata/ja (T32準備: 文字数制限 + 罰なし原則)"
+        run: python3 tools/verify_metadata.py

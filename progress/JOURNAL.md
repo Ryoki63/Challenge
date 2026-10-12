@@ -220,3 +220,7 @@
 - 状況: #49担当サブエージェントがコンテキスト上限で途中終了。指示(スタイルFの48×64ドット絵で13枚)から逸れ、**SVGベクターの新案 v4「タネの子」13枚+花色違い3+アイコン3案**を v4_drafts/ に制作した状態で止まっていた(本番 png/・xcassets は未変更、F版13枚は未着手)
 - 判断: v4 は G2 で選ばれた F と別スタイルのため、勝手に本番差し替えはしない。v4_drafts/ を下書きとして保存コミットし、ユーザーに「F で進める / v4 に切り替える」を確認する
 - 申し送り: PlantSprite.swift / PixelImage.swift は 16×24 を固定値で持つ → どちらのスタイルでも iOS 側の寸法対応(ios-serial レーン、T15 の後)が必要
+
+- 文言確定: aso.md(T26案)から表示名A×サブタイトルBの組み合わせを採用し `store_metadata/ja/{name,subtitle,keywords,promotional_text,description,release_notes}.txt` を新規作成。keywords/promotional_text/descriptionはPairy依存語を外し新年(新年/正月)・習慣化訴求を優先する確定値に調整(表示名・サブタイトルはaso.mdの推奨組み合わせをそのまま採用、変更なし)。不採用案・Pairy系キーワードの商標/審査リスク(ガイドライン2.3.7, 要確認扱い)は `store_metadata/alternatives.md` に記録(aso.md自体は編集していない)
+- `tools/verify_metadata.py`(Python3標準ライブラリのみ)作成: 必須ファイル存在+文字数上限(name/subtitle<=30, keywords<=100, promotional_text<=170, description/release_notes<=4000, コードポイント数とUTF-16コードユニット数の大きい方で判定する保守的カウント)+罰なし原則禁止語(`_shared/messages_test.ts`のBANNED_PATTERNと同一語を複製、同ファイルは編集せず)+keywords形式(カンマ区切り/空白なし/重複なし)を検証。ローカルで green 確認後、name.txtを35字に・promotional_text.txtに「サボ」を混入する一時改変でそれぞれ red(exit 1)になることを確認し、即座に元の確定値へ復元(git statusで余分な差分が残っていないことも確認済み)
+- `.github/workflows/lien-ci.yml` に `store-metadata` ジョブを追加(既存 deno-test/plant-assets は無変更、diffは追加18行のみ)。PyYAMLでパースし3ジョブとも正しく読めることを確認(ステップ名のコロンでYAML構文エラーが出たため name をクオートして修正済み)。pushしてlien-ci run緑化を確認する
