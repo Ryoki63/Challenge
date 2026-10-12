@@ -10,7 +10,8 @@
 //     「自分が付けたか」の記録が消えても誤表示にならないため — GROWTH §5.3)。
 //     同時に2人が first を送っても書けるのは1人だけ(repo の条件付き更新 WHERE name IS NULL で一意に決着)
 //   - rename: 上書き。名前が変わったときだけ相手へ知らせる(同じ名前への rename は何も起きない)
-//   - name: 前後の空白を除いて 1〜8字(Unicode コードポイント)。改行などの制御文字を含まない
+//   - name: 前後の空白を除いて 1〜8字(Unicode コードポイント)。改行などの制御文字・書式文字
+//     (双方向制御・ゼロ幅スペースなど。絵文字をつなぐ ZWJ だけ許す)を含まない
 //   - 有効なペア(active)が必須。ソロには鉢が無い(409 no_pair)
 //   - 相手へは snapshot 同梱のサイレント push(pair_update)で知らせる。相手名義の可視通知
 //     (「ゆうき: 『みどり』と名づけたよ」)は P1 で、messages.ts の文言を T16 と調整してから(GROWTH §5.3)。
@@ -100,6 +101,25 @@ export const SILENT_PUSH_OPTS = {
 /** 名前に使えない文字: 制御文字(改行・タブ・NUL など)・行/段落区切り・対になっていないサロゲート */
 const FORBIDDEN_CHARS = /[\p{Cc}\p{Zl}\p{Zp}\p{Cs}]/u;
 
+/** 書式文字(Cf): 双方向制御・ゼロ幅スペース・BOM・ソフトハイフンなど、画面に見えない文字 */
+const FORMAT_CHAR = /\p{Cf}/u;
+
+/**
+ * 書式文字(Cf)のうち名前に許すもの。絵文字をつなぐ ZWJ(U+200D。「👨‍👩‍👧‍👦」「🏳️‍🌈」など)だけ。
+ * ほかは拒否する: 双方向制御(U+202A〜202E・U+2066〜2069 など)は相手の画面で表示を崩したり別の名前に
+ * 見せかけたりでき、ゼロ幅スペース(U+200B)・語結合子(U+2060)・BOM(U+FEFF)・ソフトハイフン(U+00AD)は
+ * 見えないまま「同じ見た目の別の名前」を作れる。絵文字の異体字セレクタ VS16(U+FE0F。「❤️」)は書式文字(Cf)
+ * でなく結合記号(Mn)なので、そのまま通る。地域旗のタグ文字(U+E0020〜E007F。🏴󠁧󠁢󠁥󠁮󠁧󠁿 など)は Cf なので使えない(まれ)。
+ */
+const ALLOWED_FORMAT_CHARS: ReadonlySet<string> = new Set(["\u200D"]);
+
+function hasForbiddenFormatChar(name: string): boolean {
+  for (const ch of name) {
+    if (FORMAT_CHAR.test(ch) && !ALLOWED_FORMAT_CHARS.has(ch)) return true;
+  }
+  return false;
+}
+
 /** 空白・制御・書式文字(ゼロ幅スペースなど)だけの名前を弾く: 見える文字が1つは要る */
 const VISIBLE_CHAR = /[^\p{Cc}\p{Cf}\p{Z}]/u;
 
@@ -111,13 +131,14 @@ function codePointLength(s: string): number {
 /**
  * 名前を検査して整える。使えない名前なら null。
  * 前後の空白を除き(途中の空白は残す)、NFC に正規化する(濁点の分解形などで字数を誤って数えず、
- * 見た目が同じ名前を同じ文字列にそろえる)。
+ * 見た目が同じ名前を同じ文字列にそろえる)。制御文字・書式文字(ZWJ を除く)・見える文字が1つも無い名前は拒否。
  */
 export function normalizePlantName(raw: string): string | null {
   const name = raw.normalize("NFC").trim();
   if (name.length === 0) return null;
   if (codePointLength(name) > PLANT_NAME_MAX_LENGTH) return null;
   if (FORBIDDEN_CHARS.test(name)) return null;
+  if (hasForbiddenFormatChar(name)) return null;
   if (!VISIBLE_CHAR.test(name)) return null;
   return name;
 }

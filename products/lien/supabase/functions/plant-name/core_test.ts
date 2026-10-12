@@ -522,8 +522,55 @@ Deno.test("normalizePlantName: 拒否する名前 — 空・空白だけ・改�
   }
 });
 
+Deno.test("normalizePlantName: 書式文字は ZWJ だけ許す — 双方向制御・ゼロ幅・BOM などは拒否、絵文字の ZWJ 結合と VS16 は通す", () => {
+  // 拒否: 名前の中に1つでもあれば(見える文字が他にあっても)
+  const forbidden: Array<[string, string]> = [
+    ["\u202e", "RLO(右から左への上書き)"],
+    ["\u202d", "LRO(左から右への上書き)"],
+    ["\u202a", "LRE"],
+    ["\u202b", "RLE"],
+    ["\u202c", "PDF"],
+    ["\u2066", "LRI"],
+    ["\u2067", "RLI"],
+    ["\u2068", "FSI"],
+    ["\u2069", "PDI"],
+    ["\u200b", "ゼロ幅スペース"],
+    ["\u200c", "ZWNJ(ゼロ幅非結合子)"],
+    ["\u200e", "LRM"],
+    ["\u200f", "RLM"],
+    ["\u061c", "ALM"],
+    ["\u2060", "語結合子"],
+    ["\ufeff", "BOM / ZWNBSP"],
+    ["\u00ad", "ソフトハイフン"],
+  ];
+  for (const [ch, label] of forbidden) {
+    assertEquals(normalizePlantName(`み${ch}どり`), null, `${label}(途中)`);
+    if (ch === "\ufeff") {
+      // BOM(U+FEFF)は JavaScript の空白として前後を trim で除かれる(途中のものは上で拒否している)
+      assertEquals(normalizePlantName(`${ch}みどり${ch}`), "みどり", label);
+      continue;
+    }
+    assertEquals(normalizePlantName(`${ch}みどり`), null, `${label}(先頭)`);
+    assertEquals(normalizePlantName(`みどり${ch}`), null, `${label}(末尾)`);
+  }
+  // 許す: 絵文字をつなぐ ZWJ(U+200D)と、絵文字表示の VS16(U+FE0F)
+  assertEquals(normalizePlantName("\u2764\ufe0f"), "\u2764\ufe0f", "❤️(VS16)");
+  assertEquals(
+    normalizePlantName("\u{1f3f3}\ufe0f\u200d\u{1f308}"),
+    "\u{1f3f3}\ufe0f\u200d\u{1f308}",
+    "🏳️‍🌈(VS16 + ZWJ)",
+  );
+  assertEquals(
+    normalizePlantName("\u{1f469}\u{1f3fd}\u200d\u{1f4bb}"),
+    "\u{1f469}\u{1f3fd}\u200d\u{1f4bb}",
+    "👩🏽‍💻(肌の色 + ZWJ)",
+  );
+});
+
 Deno.test("plant-name: 使えない名前は 400 invalid_name — DB を引く前に弾く(書かない・push しない)", async () => {
-  for (const name of ["", "   ", "123456789", "み\nどり", "​"]) {
+  for (
+    const name of ["", "   ", "123456789", "み\nどり", "\u200b", "み\u202eどり"]
+  ) {
     const world = makeWorld();
     const { sent, pusher } = makePusher();
     for (const mode of ["first", "rename"]) {
