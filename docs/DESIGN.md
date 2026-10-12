@@ -183,7 +183,10 @@ B端末: LienNSE 起動(通知表示の前に実行される)
   - users: 自分の行のみ select / update
   - pairs, plants, streak_days, ticket_ledger: メンバーのみ select。書き込みは Function のみ
   - checkins, nudges, reactions: メンバーのみ select。書き込みは Function のみ
-  - 写真(Storage): パスを `pairs/<pair_id>/...` とし、メンバーのみ読める署名付きURLで配布
+  - 写真(Storage): パスは **`pairs/<pair_id>/<date_local>/<user_id>/photo.jpg`**(サムネは同じ区画の `photo_thumb.jpg`)。**本人単位**(2026-10-12 決定・issue #52。旧 `pairs/<pair_id>/<date_local>/photo.jpg` はペア×日付単位で、同じ日に2人目が付けると上書きできた)
+    - 読み取り(select): 現役ペアのメンバーのみ。署名付きURLで配布。`pairs/<pair_id>/` 配下なら新旧どちらの形式でも読める(既存の旧パスの写真は読めるまま)
+    - 書き込み(insert / update): 現役ペアのメンバーで、かつ**パスの `<user_id>` 区画が `auth.uid()` と一致**するときだけ(migration 0004 の `is_valid_own_photo_upload`)。他人の区画・旧形式のパスへは書けない。delete はクライアントに許さない
+    - checkin Function は署名付きアップロードURLを**本人の区画にだけ**発行し、`photoPath` も本人の原寸写真パス(`.../<user_id>/photo.jpg`)でなければ 400 `invalid_photo_path`。§5.6 の経路・手順は変わらない(§5.6 に書かれたパス `pairs/<pair_id>/<date>/photo.jpg` は本項の規約に読み替える)
 
 ### 5.3 Edge Functions 一覧(すべて deno / TypeScript)
 

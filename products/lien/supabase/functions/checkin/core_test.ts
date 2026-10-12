@@ -1,7 +1,13 @@
 // core_test.ts — checkin/core.ts の deno test(リポジトリ/プッシャーはモック。ネットワーク不要)
 // 正本: docs/DESIGN.md §5.3(checkin)/ §5.5(冪等性)/ §4(ペイロード)/ REQUIREMENTS §3.4
 
-import { type CheckinRepo, handleCheckin, type Pusher } from "./core.ts";
+import {
+  type CheckinRepo,
+  handleCheckin,
+  isOwnPhotoPath,
+  photoUploadPaths,
+  type Pusher,
+} from "./core.ts";
 import type {
   PairSnapshot,
   SnapshotCheckinRow,
@@ -297,7 +303,7 @@ Deno.test("checkin: 完了後の写真添付 — 写真を更新し photo 文言
   const result = await handleCheckin(d, {
     userId: "user-a",
     dateLocal: TODAY,
-    photoPath: "pairs/pair-1/2026-06-10/a.jpg",
+    photoPath: "pairs/pair-1/2026-06-10/user-a/photo.jpg",
   });
 
   assertEquals(result.status, 200);
@@ -317,27 +323,97 @@ Deno.test("checkin: 完了後の写真添付 — 写真を更新し photo 文言
   );
 });
 
-Deno.test("checkin: 写真パスはペア規約 'pairs/<pair_id>/...' 以外を拒否", async () => {
+Deno.test("checkin: 写真パスは本人の区画 'pairs/<pair_id>/<date>/<user_id>/photo.jpg' 以外を拒否(issue #52)", async () => {
   const world = makeWorld();
   const { sent, pusher } = makePusher();
 
-  const wrongPair = await handleCheckin(deps(world, pusher), {
-    userId: "user-a",
-    dateLocal: TODAY,
-    photoPath: "pairs/other-pair/photo.jpg",
-  });
-  assertEquals(wrongPair.status, 400);
-  if (wrongPair.status !== 400) throw new Error("unreachable");
-  assertEquals(wrongPair.body.error, "invalid_photo_path");
+  const bad: Array<[string, string]> = [
+    ["他ペア", "pairs/other-pair/2026-06-10/user-a/photo.jpg"],
+    ["相手(user-b)の区画", "pairs/pair-1/2026-06-10/user-b/photo.jpg"],
+    ["旧形式(user_id 区画なし)", "pairs/pair-1/2026-06-10/photo.jpg"],
+    ["サムネのパス", "pairs/pair-1/2026-06-10/user-a/photo_thumb.jpg"],
+    ["別のファイル名", "pairs/pair-1/2026-06-10/user-a/a.jpg"],
+    ["日付区画が不正", "pairs/pair-1/2026-6-10/user-a/photo.jpg"],
+    ["階層が深い(..)", "pairs/pair-1/2026-06-10/user-a/../user-b/photo.jpg"],
+    ["階層が深い", "pairs/pair-1/2026-06-10/user-a/x/photo.jpg"],
+    ["先頭が pairs でない", "other/pair-1/2026-06-10/user-a/photo.jpg"],
+    ["pair 直下", "pairs/pair-1/photo.jpg"],
+  ];
+  for (const [label, photoPath] of bad) {
+    const result = await handleCheckin(deps(world, pusher), {
+      userId: "user-a",
+      dateLocal: TODAY,
+      photoPath,
+    });
+    assertEquals(result.status, 400, label);
+    if (result.status !== 400) throw new Error("unreachable");
+    assertEquals(result.body.error, "invalid_photo_path", label);
+  }
+  assertEquals(world.checkins.size, 0, "拒否時はチェックインも記録しない");
+  assertEquals(sent.length, 0);
 
   const soloWorld = makeWorld({ pair: null });
   const soloPhoto = await handleCheckin(deps(soloWorld, pusher), {
     userId: "user-a",
     dateLocal: TODAY,
-    photoPath: "pairs/pair-1/photo.jpg",
+    photoPath: "pairs/pair-1/2026-06-10/user-a/photo.jpg",
   });
   assertEquals(soloPhoto.status, 400, "ソロ状態の写真は置き場所(ペア)がない");
   assertEquals(sent.length, 0);
+});
+
+Deno.test("checkin: 本人の区画のパスは受理される(新規チェックインと同時 / 後から添付)", async () => {
+  const world = makeWorld();
+  const { pusher } = makePusher();
+  const d = deps(world, pusher);
+
+  const withPhoto = await handleCheckin(d, {
+    userId: "user-a",
+    dateLocal: TODAY,
+    photoPath: "pairs/pair-1/2026-06-10/user-a/photo.jpg",
+  });
+  assertEquals(withPhoto.status, 200);
+  assertEquals(
+    world.checkins.get(`user-a|${TODAY}`)?.photoPath,
+    "pairs/pair-1/2026-06-10/user-a/photo.jpg",
+  );
+
+  // 相手(B)も同じ日・同じペアで、自分の区画なら受理され、A の写真は上書きされない
+  const bPhoto = await handleCheckin(d, {
+    userId: "user-b",
+    dateLocal: TODAY,
+    photoPath: "pairs/pair-1/2026-06-10/user-b/photo.jpg",
+  });
+  assertEquals(bPhoto.status, 200);
+  assertEquals(
+    world.checkins.get(`user-a|${TODAY}`)?.photoPath,
+    "pairs/pair-1/2026-06-10/user-a/photo.jpg",
+    "A の写真は B のチェックインで変わらない",
+  );
+  assertEquals(
+    world.checkins.get(`user-b|${TODAY}`)?.photoPath,
+    "pairs/pair-1/2026-06-10/user-b/photo.jpg",
+  );
+});
+
+Deno.test("isOwnPhotoPath / photoUploadPaths: 発行したパスは検査を通り、他人・旧形式は通らない", () => {
+  const mine = photoUploadPaths("pair-1", "2026-06-10", "user-a");
+  assertEquals(mine, {
+    photo: "pairs/pair-1/2026-06-10/user-a/photo.jpg",
+    thumb: "pairs/pair-1/2026-06-10/user-a/photo_thumb.jpg",
+  });
+  assertEquals(isOwnPhotoPath(mine.photo, "pair-1", "user-a"), true);
+  assertEquals(
+    isOwnPhotoPath(mine.thumb, "pair-1", "user-a"),
+    false,
+    "原寸のみ",
+  );
+  assertEquals(isOwnPhotoPath(mine.photo, "pair-1", "user-b"), false, "他人");
+  assertEquals(isOwnPhotoPath(mine.photo, "pair-2", "user-a"), false, "他ペア");
+  // 同じ日でも本人ごとにパスが違う(上書きし合わない)
+  const theirs = photoUploadPaths("pair-1", "2026-06-10", "user-b");
+  assertEquals(theirs.photo !== mine.photo, true);
+  assertEquals(theirs.thumb !== mine.thumb, true);
 });
 
 Deno.test("checkin: ソロ状態 — pairId null の snapshot・push なし", async () => {
@@ -451,7 +527,7 @@ Deno.test("checkin: push 失敗(ok:false / throw)でも処理は成功扱い(DES
 
 // ---- 署名付きアップロードURL(DESIGN §5.6 — issue #48 / T14) ----
 
-Deno.test("checkin: requestPhotoUpload — 原寸+サムネ2本の {path, token} を同梱(パス規約 pairs/<pairId>/<date>/)", async () => {
+Deno.test("checkin: requestPhotoUpload — 原寸+サムネ2本の {path, token} を同梱(パス規約 pairs/<pairId>/<date>/<userId>/)", async () => {
   const world = makeWorld();
   const { pusher } = makePusher();
 
@@ -463,22 +539,83 @@ Deno.test("checkin: requestPhotoUpload — 原寸+サムネ2本の {path, token}
 
   assertEquals(result.status, 200);
   if (result.status !== 200) throw new Error("unreachable");
-  assertEquals(result.body.alreadyCheckedIn, false, "チェックイン自体も実行される");
-  assertEquals(result.body.photoUpload, {
-    photo: { path: "pairs/pair-1/2026-06-10/photo.jpg", token: "tok-1" },
-    thumb: { path: "pairs/pair-1/2026-06-10/photo_thumb.jpg", token: "tok-2" },
-  });
-  // 署名はパス規約どおりの2本に対してのみ要求される(migration 0002 のポリシーと一致)
-  assertEquals(world.signedUploadPaths, [
-    "pairs/pair-1/2026-06-10/photo.jpg",
-    "pairs/pair-1/2026-06-10/photo_thumb.jpg",
-  ]);
-  // 発行されたパスは checkin の photoPath 検査('pairs/<pair_id>/' 始まり)を通る形式
-  if (!result.body.photoUpload) throw new Error("unreachable");
   assertEquals(
-    result.body.photoUpload.photo.path.startsWith("pairs/pair-1/"),
-    true,
+    result.body.alreadyCheckedIn,
+    false,
+    "チェックイン自体も実行される",
   );
+  assertEquals(result.body.photoUpload, {
+    photo: {
+      path: "pairs/pair-1/2026-06-10/user-a/photo.jpg",
+      token: "tok-1",
+    },
+    thumb: {
+      path: "pairs/pair-1/2026-06-10/user-a/photo_thumb.jpg",
+      token: "tok-2",
+    },
+  });
+  // 署名はパス規約どおりの2本に対してのみ要求される(migration 0004 のポリシーと一致)
+  assertEquals(world.signedUploadPaths, [
+    "pairs/pair-1/2026-06-10/user-a/photo.jpg",
+    "pairs/pair-1/2026-06-10/user-a/photo_thumb.jpg",
+  ]);
+  // 発行された原寸パスをそのまま photoPath として再送すると受理される(T14 のフロー)
+  if (!result.body.photoUpload) throw new Error("unreachable");
+  const attach = await handleCheckin(deps(world, pusher), {
+    userId: "user-a",
+    dateLocal: TODAY,
+    photoPath: result.body.photoUpload.photo.path,
+  });
+  assertEquals(attach.status, 200, "発行されたパスは photoPath 検査を通る");
+  assertEquals(
+    world.checkins.get(`user-a|${TODAY}`)?.photoPath,
+    "pairs/pair-1/2026-06-10/user-a/photo.jpg",
+  );
+});
+
+Deno.test("checkin: requestPhotoUpload — 同じ日に2人が要求しても本人ごとに別のパス(上書きし合わない)", async () => {
+  const world = makeWorld();
+  const { pusher } = makePusher();
+  const d = deps(world, pusher);
+
+  const a = await handleCheckin(d, {
+    userId: "user-a",
+    dateLocal: TODAY,
+    requestPhotoUpload: true,
+  });
+  const b = await handleCheckin(d, {
+    userId: "user-b",
+    dateLocal: TODAY,
+    requestPhotoUpload: true,
+  });
+  if (a.status !== 200 || b.status !== 200) throw new Error("unreachable");
+  if (!a.body.photoUpload || !b.body.photoUpload) {
+    throw new Error("unreachable");
+  }
+
+  assertEquals(
+    a.body.photoUpload.photo.path,
+    "pairs/pair-1/2026-06-10/user-a/photo.jpg",
+  );
+  assertEquals(
+    b.body.photoUpload.photo.path,
+    "pairs/pair-1/2026-06-10/user-b/photo.jpg",
+  );
+  const all = [
+    a.body.photoUpload.photo.path,
+    a.body.photoUpload.thumb.path,
+    b.body.photoUpload.photo.path,
+    b.body.photoUpload.thumb.path,
+  ];
+  assertEquals(new Set(all).size, 4, "4本とも別パス");
+
+  // 相手の区画のパスは、自分の photoPath としては受け付けない
+  const steal = await handleCheckin(d, {
+    userId: "user-a",
+    dateLocal: TODAY,
+    photoPath: b.body.photoUpload.photo.path,
+  });
+  assertEquals(steal.status, 400);
 });
 
 Deno.test("checkin: requestPhotoUpload — チェックイン済みの日の再要求も 200(冪等)で新しいURLを返す", async () => {

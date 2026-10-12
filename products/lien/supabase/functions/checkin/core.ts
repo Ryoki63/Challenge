@@ -11,7 +11,9 @@
 //
 // 写真(REQUIREMENTS §3.4「完了後に写真を添える」/ DESIGN §5.6 = issue #48 決定):
 //   - photoPath は任意。チェックイン済みの日に photoPath 付きで再送すると写真を添付/差し替え
-//   - パスは 'pairs/<pair_id>/...' 規約(DESIGN §5.2)。ペアの無いソロ状態では受け付けない
+//   - パスは 'pairs/<pair_id>/<date_local>/<user_id>/photo.jpg' 規約(DESIGN §5.2。本人単位 —
+//     同じ日に2人が写真を付けても上書きし合わない。issue #52)。photoPath は**本人の**原寸
+//     写真パスでなければ 400 invalid_photo_path。ペアの無いソロ状態では受け付けない
 //   - requestPhotoUpload: true で署名付きアップロードURL(原寸+サムネの2本)を応答に同梱する。
 //     クライアントは 縮小 → 2本アップロード → photoPath 付き checkin 再送 の順で添付する(T14)。
 //     ソロ状態は写真の置き場所(ペア)が無いため 400 no_pair
@@ -73,15 +75,38 @@ export interface PhotoUploadUrls {
 }
 
 /**
- * 写真オブジェクトのパス規約(DESIGN §5.6 / migration 0002 の storage ポリシーと一致):
- *   'pairs/<pair_id>/<date_local>/photo.jpg' / 'photo_thumb.jpg'
+ * 写真オブジェクトのパス規約(DESIGN §5.2 / migration 0004 の storage ポリシーと一致):
+ *   'pairs/<pair_id>/<date_local>/<user_id>/photo.jpg' / 'photo_thumb.jpg'
+ * user_id 区画で本人単位にする(旧: 'pairs/<pair_id>/<date_local>/photo.jpg' はペア×日付単位で、
+ * 同じ日に2人目が付けると上書きされた — issue #52)。user_id は呼び出し本人(認証済み)。
  */
 export function photoUploadPaths(
   pairId: string,
   dateLocal: string,
+  userId: string,
 ): { photo: string; thumb: string } {
-  const dir = `pairs/${pairId}/${dateLocal}`;
+  const dir = `pairs/${pairId}/${dateLocal}/${userId}`;
   return { photo: `${dir}/photo.jpg`, thumb: `${dir}/photo_thumb.jpg` };
+}
+
+/**
+ * checkin の photoPath が「本人の」原寸写真パスか。
+ * 'pairs/<pair_id>/<YYYY-MM-DD>/<user_id>/photo.jpg' に厳密一致するときだけ true
+ * (相手の区画・旧形式・サムネ・余計な階層はすべて false)。
+ * 日付区画は形式のみ検査する(storage ポリシーと同じ。±1日の許容は dateLocal 側のガードが担う)
+ */
+export function isOwnPhotoPath(
+  photoPath: string,
+  pairId: string,
+  userId: string,
+): boolean {
+  const parts = photoPath.split("/");
+  return parts.length === 5 &&
+    parts[0] === "pairs" &&
+    parts[1] === pairId &&
+    /^\d{4}-\d{2}-\d{2}$/.test(parts[2]) &&
+    parts[3] === userId &&
+    parts[4] === "photo.jpg";
 }
 
 /** push 送信口(実装は ApnsClient。テストはモック)。結果の ok は記録用で処理は止めない */
@@ -160,10 +185,10 @@ export async function handleCheckin(
     return { status: 409, body: { error: "no_promise" } };
   }
 
-  // 4. 写真パスの規約検査('pairs/<pair_id>/...'。DESIGN §5.2)
+  // 4. 写真パスの規約検査('pairs/<pair_id>/<date>/<user_id>/photo.jpg' — 本人の区画のみ。DESIGN §5.2)
   const pair = await deps.repo.getActivePair(req.userId);
   if (photoPath !== null) {
-    if (!pair || !photoPath.startsWith(`pairs/${pair.pairId}/`)) {
+    if (!pair || !isOwnPhotoPath(photoPath, pair.pairId, req.userId)) {
       return { status: 400, body: { error: "invalid_photo_path" } };
     }
   }
@@ -193,7 +218,7 @@ export async function handleCheckin(
   //     checkin 自体は記録済みなのでクライアントの再送(冪等 200)で新しいURLを取り直せる
   let photoUpload: PhotoUploadUrls | undefined;
   if (req.requestPhotoUpload && pair) {
-    const paths = photoUploadPaths(pair.pairId, req.dateLocal);
+    const paths = photoUploadPaths(pair.pairId, req.dateLocal, req.userId);
     const photo = await deps.repo.createSignedUploadUrl(paths.photo);
     const thumb = await deps.repo.createSignedUploadUrl(paths.thumb);
     photoUpload = {
