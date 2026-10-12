@@ -71,7 +71,7 @@ products/lien/
 
 - SwiftUI + Observation(`@Observable`)。ViewModel は画面単位
 - データ層はプロトコル境界(`AuthServicing` / `InviteClient` / `PromiseAPIClient` / `SnapshotClient` / `CheckinAPIClient` など)で隔離し、ViewModel へ注入する(テストはモック)。View から Supabase を直接呼ばない。Edge Functions のクライアントは URLSession ベース(`Core/Api/`・`Core/Repositories/`。共通の下回りは `EdgeFunctionTransport`)で、JWT は `AuthServicing.accessToken()`(supabase-swift のセッション。期限切れは自動更新)から渡す。**supabase-swift を import するのは `SupabaseService.swift` だけ**(匿名サインイン・users の更新・accessToken)
-- **状態の正はサーバー**。アプリが永続するのは「最後に取得した PairSnapshot」+「未送信キュー」のみ(ローカルDBは持たない。SwiftData不使用)。「オンボ済み」のような独自の永続フラグも持たない
+- **状態の正はサーバー**。アプリが永続するのは「最後に取得した PairSnapshot」+「未送信キュー」のみ(ローカルDBは持たない。SwiftData不使用)。画面系統を決める「オンボ済み」のような独自の永続フラグも持たない
 - ルートは `AppPhase` enum の **4状態**で画面系統を切り替える。値は純粋関数 `AppRouter.phase(hasSession:snapshot:)` が、「セッションの有無」と「App Group の最後の snapshot」だけから導く(2026-10-13・issue #61。W1 #55 の実装に合わせて改訂した。旧記述は `onboarding` / `solo` / `paired` の3状態で、約束設定の独立画面と下の構成図が無かった)
 
 | AppPhase | 条件 | 出す画面 |
@@ -132,7 +132,7 @@ ios/Lien/
 
   同期は同時に1本だけ走り、走行中に来た要求は、終わった直後に1回だけ取り直す
 - `SnapshotSynchronizer`: GET /snapshot の結果で `pair_snapshot.json` を上書きし、**見た目が変わるときだけ**ウィジェットを reload する(`updatedAt` だけの差では reload しない — §3.5・§10 の reload 予算)。**端末の方が新しい可能性があるときは上書きしない**: ① 未送信キューが残っている(オフラインで記録したチェックインがサーバーへ届く前に上書きすると、画面が一瞬戻る。キューが空になった次回の同期で反映する)② 取得中に端末の snapshot が変わった(ホームのチェックイン完了や NSE の書き込みの方が新しい。取得結果は捨てて1回だけ取り直す)。取得に失敗したときは端末の snapshot を残す(オフラインでも表示は壊れない)
-- `PushTokenSync`(actor): `users.push_token` / `push_env` の自動保存(§4.1)。**トークンの取得とセッションの確立の両方がそろうまで保留**する(どちらが先でもよい)。最後に送信成功した (userID, token, env) を覚えて**変化時だけ**送り、ユーザーが変わった(再インストールで匿名ユーザーが作り直された)ときは同じトークンでも再送する。失敗は保留にして、次のトリガー(前面復帰・トークンの更新・セッションの確立)で再送する
+- `PushTokenSync`(actor): `users.push_token` / `push_env` の自動保存(§4.1)。**トークンの取得とセッションの確立の両方がそろうまで保留**する(どちらが先でもよい)。最後に送信成功した (userID, token, env) を覚えて**変化時だけ**送り、ユーザーが変わった(再インストールで匿名ユーザーが作り直された)ときは同じトークンでも再送する。失敗は保留にして、次のトリガー(前面復帰・トークンの更新・セッションの確立)で再送する。この「最後に送信成功した登録」は、画面の状態ではなく送信の重複防止の記録なので、上の「のみ」の例外として端末ローカルの UserDefaults に置く(App Group には置かない — NSE・ウィジェットは読まない。再インストールで消えるのは正しい挙動で、新しい匿名ユーザー・新しいトークンとして再送される)
 - 読み取りは RLS の範囲で PostgREST を直接使ってよい(現状: react の対象にする相手の当日の `checkins` 行 — `PartnerCheckinResolving`。PV #59 が `photo_path` と署名付き URL に広げる)。書き込みは、本人の users 行(プロフィール・push 登録 — §4.1)を除いて Edge Functions 経由(§5.2)
 
 ### 3.4 App Group 共有契約(ウィジェットとの境界。変更時は要レビュー)
@@ -182,7 +182,7 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
 
 ### 3.6 ディープリンク
 
-- カスタムスキーム `lien://invite/<token>`(v1.0。token は8文字英数 — §5.1)。Info.plist の `CFBundleURLTypes`(project.yml)で登録する。静的招待ページの URL(`https://<GH_PAGES>/lien/i/?t=<token>`)がそのまま貼り付けられた場合も、同じ関数(`DeepLinkHandler.inviteToken(from:)`)で token を拾う(この URL は OS からは飛んでこない — ユニバーサルリンクではないため)
+- カスタムスキーム `lien://invite/<token>`(v1.0。token は8文字英数 — §5.1)。Info.plist の `CFBundleURLTypes`(project.yml)で登録する。パースは `DeepLinkHandler.inviteToken(from:)`(純粋関数)で、静的招待ページの URL(`https://<GH_PAGES>/lien/i/?t=<token>`)の形式も解釈できる(ユニバーサルリンク化に備えた救済。v1.0 ではこの URL は OS からアプリへ飛んでこず、貼り付けを拾う呼び出し元も無い。ページの「アプリで開く」ボタンが `lien://invite/<token>` を開く — §6)
 - **自動受諾はしない**(2026-10-13 決定・issue #61。W1 #55 の実装に合わせた。旧記述は「`onOpenURL` → invite-accept 呼び出し → 失敗時はコード手入力画面へ誘導」)。流れ: `onOpenURL` → `AppModel.handleDeepLink` が token を保持 → **ソロのホームで招待シート(`PairingView`)を開き、コード入力欄にプリフィルする** → 利用者が「ペアになる」を**明示的にタップ**して初めて invite-accept を呼ぶ
   - 理由1: T23(ペア解消)が入るまで、成立したペアを取り消せない。リンクを開いただけ・誤って開いただけでペアが成立すると戻せない
   - 理由2: 受諾は同意の表明にあたる。招待してくれた人の名前は invite-accept の応答で初めて分かる(リンクの中には無い)ので、受諾の前に確認の一歩を置く
