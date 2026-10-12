@@ -50,6 +50,7 @@ bash products/lien/scripts/ops/check-cron.sh      # 自動確認と同じ検査�
 | `exposure` | PostgREST の公開スキーマに `net` / `cron` / `vault` が入っている、または `pg_graphql` 拡張が有効(§9) |
 
 - 黄(WARN)は「起動から 5.5 時間を過ぎて pg_net の応答が消えていて、中身を確認できない」。朝の自動確認(起動の 30 分後)では出ない。昼に手で実行したときに出る
+- **このリポジトリは公開なので、Actions のログとジョブサマリは誰でも読める**。Actions 上では件数(ペア数・達成数など)・ペア ID・応答の本文を出さない(`redact`。判定は同じ)。件数や `errors` の中身を見たいときは、手元の `check-cron.sh`(redact なし)か、Function のログ(`supabase functions logs close-day`)で見る
 - **失敗時に赤になることの確認**: Actions の「Run workflow」で `max_age_hours` に `0` を入れる(ローカルは `MAX_AGE_HOURS=0 bash .../check-cron.sh`)。最後の起動が「0 時間より古い」ので必ず赤になる。本番の状態は変えない
 - 自動確認は GitHub の `schedule` に頼るので、数分〜数十分遅れることがある。リポジトリの活動が 60 日止まると GitHub が無効化するので、/status で「直近 2 日に schedule の実行があるか」も見る
 

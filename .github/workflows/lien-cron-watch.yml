@@ -7,6 +7,8 @@
 #   - cron.job_run_details が succeeded で、1日以上止まっていない / 月初は grant-tickets を呼び、それ以外の日は呼んでいない
 #   - Vault の cron 専用シークレットと Function secrets が同じ値・Vault に万能鍵が無い・pg_net のキューが空
 #   - プロジェクトが ACTIVE_HEALTHY(無料枠の自動停止 = D5)・公開 API から net / cron / vault に届かない
+# このリポジトリは公開で Actions のログ・ジョブサマリは誰でも読めるので、ここでは件数(ペア数など)・ペア ID・応答の本文を出さない
+# (cron_check.ts の redact。GITHUB_ACTIONS=true のとき有効。判定は同じ)。件数が要るときは手元の check-cron.sh で見る
 # 必要な GitHub secrets: SUPABASE_ACCESS_TOKEN(lien-deploy.yml と同じ。https://supabase.com/dashboard/account/tokens)
 #
 # 失敗時に赤になることの確認(テスト用の入力): Actions の「Run workflow」で max_age_hours に 0 を入れる

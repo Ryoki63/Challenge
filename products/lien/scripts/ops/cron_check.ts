@@ -64,6 +64,12 @@ export interface CronSnapshot {
 export interface CheckOptions {
   /** 最後の起動の許容経過時間(時間)。0 にすると必ず赤になる(失敗時の動作確認) */
   maxAgeHours: number;
+  /**
+   * true なら、件数・ペア ID・応答の本文を結果に出さない。公開リポジトリの Actions のログ・ジョブサマリは
+   * 誰でも読めるので、ペア数などの運用の数字(ユーザー数に近い情報)を載せない。詳細は Function のログ
+   * (Supabase)か、手元の check-cron.sh(redact なし)で見る。GitHub Actions 上では自動で true
+   */
+  redact?: boolean;
 }
 
 export const DEFAULT_MAX_AGE_HOURS = 26;
@@ -173,9 +179,10 @@ function parseResponse(r: CronSnapshot["responses"][number]): ParsedResponse {
   };
 }
 
-/** 応答の本文を短く(ログ用。秘密は入っていない: 件数と日付だけ) */
-function brief(content: string | null): string {
+/** 応答の本文を短く(ログ用。秘密は入っていない: 件数と日付だけ)。redact なら本文は出さない */
+function brief(content: string | null, redact: boolean): string {
   if (!content) return "(本文なし)";
+  if (redact) return "(本文は公開ログのため省略)";
   return content.length > 200 ? content.slice(0, 200) + "…" : content;
 }
 
@@ -207,6 +214,7 @@ function checkResponseBody(
   id: string,
   label: string,
   res: ParsedResponse,
+  redact: boolean,
 ): Finding | null {
   if (res.timedOut || res.errorMsg) {
     return error(
@@ -217,24 +225,32 @@ function checkResponseBody(
     );
   }
   if (res.statusCode !== 200) {
-    return error(id, `${label}: HTTP ${res.statusCode}(${brief(res.content)})`);
+    return error(
+      id,
+      `${label}: HTTP ${res.statusCode}(${brief(res.content, redact)})`,
+    );
   }
   if (!res.json) {
-    return error(id, `${label}: 本文が JSON ではない(${brief(res.content)})`);
+    return error(
+      id,
+      `${label}: 本文が JSON ではない(${brief(res.content, redact)})`,
+    );
   }
   const errors = res.json.errors;
   if (!Array.isArray(errors)) {
     return error(
       id,
-      `${label}: 本文に errors 配列がない(${brief(res.content)})`,
+      `${label}: 本文に errors 配列がない(${brief(res.content, redact)})`,
     );
   }
   if (errors.length > 0) {
     return error(
       id,
-      `${label}: 一部のペアの処理が失敗した errors=${
-        JSON.stringify(errors).slice(0, 300)
-      }(Function のログで確認する)`,
+      redact
+        ? `${label}: 一部のペアの処理が失敗した(errors が ${errors.length} 件。詳細は公開ログのため省略。Function のログで確認する)`
+        : `${label}: 一部のペアの処理が失敗した errors=${
+          JSON.stringify(errors).slice(0, 300)
+        }(Function のログで確認する)`,
     );
   }
   return null;
@@ -244,6 +260,7 @@ function checkResponseBody(
 
 export function evaluate(s: CronSnapshot, o: CheckOptions): Finding[] {
   const findings: Finding[] = [];
+  const redact = o.redact === true;
   const nowMs = toMs(s.now);
   const responses = s.responses.map(parseResponse);
 
@@ -347,7 +364,12 @@ export function evaluate(s: CronSnapshot, o: CheckOptions): Finding[] {
         );
       }
     } else {
-      const bad = checkResponseBody("close-day:response", "close-day", res);
+      const bad = checkResponseBody(
+        "close-day:response",
+        "close-day",
+        res,
+        redact,
+      );
       if (bad) {
         findings.push(bad);
       } else {
@@ -366,7 +388,9 @@ export function evaluate(s: CronSnapshot, o: CheckOptions): Finding[] {
           findings.push(
             ok(
               "close-day:response",
-              `HTTP 200・errors 空。${actual} を確定(ペア ${j.pairs}・両者 ${j.recordedBoth}・チケット ${j.recordedTicket}・リセット ${j.reset}・スキップ ${j.skipped})`,
+              redact
+                ? `HTTP 200・errors 空。${actual} を確定(件数は公開ログのため省略)`
+                : `HTTP 200・errors 空。${actual} を確定(ペア ${j.pairs}・両者 ${j.recordedBoth}・チケット ${j.recordedTicket}・リセット ${j.reset}・スキップ ${j.skipped})`,
             ),
           );
         }
@@ -465,16 +489,19 @@ export function evaluate(s: CronSnapshot, o: CheckOptions): Finding[] {
           "grant-tickets:response",
           "grant-tickets",
           res,
+          redact,
         );
         findings.push(
           bad ??
             ok(
               "grant-tickets:response",
-              `月初の付与は HTTP 200・errors 空(付与 ${
-                res.json!.granted
-              }・処理済み ${res.json!.alreadyGranted}・上限 ${
-                res.json!.unchanged
-              })`,
+              redact
+                ? "月初の付与は HTTP 200・errors 空(件数は公開ログのため省略)"
+                : `月初の付与は HTTP 200・errors 空(付与 ${
+                  res.json!.granted
+                }・処理済み ${res.json!.alreadyGranted}・上限 ${
+                  res.json!.unchanged
+                })`,
             ),
         );
       }
@@ -763,7 +790,11 @@ async function main(): Promise<number> {
   let findings: Finding[];
   try {
     const snapshot = await collect(token, ref);
-    findings = evaluate(snapshot, { maxAgeHours });
+    // 公開リポジトリの Actions のログは誰でも読めるので、Actions 上では件数などを出さない
+    findings = evaluate(snapshot, {
+      maxAgeHours,
+      redact: Deno.env.get("GITHUB_ACTIONS") === "true",
+    });
   } catch (e) {
     // 取得できないこと自体が異常(自動停止・API 障害・トークン失効)。赤にする
     findings = [

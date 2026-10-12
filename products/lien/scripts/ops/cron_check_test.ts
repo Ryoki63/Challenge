@@ -174,6 +174,49 @@ Deno.test("evaluate: 本番の正常な状態(前夜の close-day が 200・erro
   );
 });
 
+Deno.test("evaluate: redact(Actions の公開ログ向け)— 件数・ペア ID・応答の本文を結果に出さない。判定は同じ", () => {
+  const redacted = { ...OPTS, redact: true };
+
+  // 正常: 件数(ペア 6 など)を出さない。確定した日と OK は出る
+  const okText = render(evaluate(healthy(), redacted));
+  assert(okText.includes("2026-10-12 を確定"), "確定した日は出る");
+  assert(
+    !/ペア \d|両者 \d|チケット \d|リセット \d|スキップ \d/.test(okText),
+    "件数を出さない",
+  );
+  assertEquals(errorIds(evaluate(healthy(), redacted)), []);
+
+  // 月初の付与も件数を出さない
+  const first = render(evaluate(firstOfMonth(), redacted));
+  assert(!/付与 \d|処理済み \d|上限 \d/.test(first), "付与の件数を出さない");
+
+  // 失敗: errors の中身(ペア ID・メッセージ)を出さず、件数だけ
+  const withErrors = healthy();
+  withErrors.responses[0].content =
+    '{"dateLocal":"2026-10-12","pairs":6,"recordedBoth":1,"recordedTicket":4,"reset":0,"skipped":0,"errors":[{"pairId":"p1-secret-id","message":"db down"}]}';
+  const bad = render(evaluate(withErrors, redacted));
+  assert(bad.includes("errors が 1 件"), "件数だけ出る");
+  assert(
+    !bad.includes("p1-secret-id") && !bad.includes("db down"),
+    "ペア ID・メッセージを出さない",
+  );
+  // redact なしなら中身が出る(手元の切り分け用)
+  assert(render(evaluate(withErrors, OPTS)).includes("p1-secret-id"));
+
+  // 失敗: 本文が想定外の形なら本文を出さない(redact なしなら出る)
+  const weird = healthy();
+  weird.responses[0].content =
+    '{"dateLocal":"2026-10-12","recordedBoth":0,"pairs":123}';
+  assert(!render(evaluate(weird, redacted)).includes("123"), "本文を出さない");
+  assert(render(evaluate(weird, OPTS)).includes("123"));
+
+  // 判定は redact に影響されない
+  assertEquals(
+    errorIds(evaluate(withErrors, redacted)),
+    errorIds(evaluate(withErrors, OPTS)),
+  );
+});
+
 Deno.test("evaluate: 月初(JST 11/1)は付与の呼び出し(1 row)とその応答も確かめて、正常なら赤も黄もない", () => {
   const findings = evaluate(firstOfMonth(), OPTS);
   assertEquals(errorIds(findings), []);

@@ -420,6 +420,6 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 - APNs は sandbox / production でエンドポイントが別。環境は**トークン単位**(`users.push_env`。呼び出し側が受信者の users 行から読んで `environment` に渡す — §4.1・§5.3)で、`APNS_ENV` は `push_env` が未設定のトークンのフォールバックにすぎない。TestFlight は production 側(Xcode 直インストールは sandbox)。環境が違うトークンは `400 BadDeviceToken` になり、そのトークンは `push_token` を null にされる
 - close-day の再実行はデータについては冪等だが、**リセットの日は行が残らないので通知を再送する** → 手動の再実行は `notify:false`(§5.3)。確定できるのは終わった日だけ。月をまたいで止まったときは「前月末日の前日まで close-day → grant-tickets → 残り」の順(`scripts/OPS.md` §4)
 - pg_net(`net` スキーマ)の関数・表は `supabase_admin` 所有で `PUBLIC` に EXECUTE / SELECT が付いており、**postgres(migration を流すロール)からは `revoke` しても何も変わらない**(2026-10-13 実測)。守りは「公開 API から net に届かないこと」(PostgREST の公開スキーマは `public, graphql_public` だけ・pg_graphql は無効=有効にすると net の表が GraphQL に出る恐れ。監視が毎朝確認)と「万能鍵をキューに載せないこと」(`scripts/OPS.md` §9)
-- pg_net の HTTP 応答(`net._http_response`)は 6 時間で消える。cron の結果の確認は、起動の 30 分後(00:40 JST)の自動監視が担う。Supabase 無料枠の自動停止(D5)も監視が検知する
+- pg_net の HTTP 応答(`net._http_response`)は 6 時間で消える。cron の結果の確認は、起動の 30 分後(00:40 JST)の自動監視が担う(リポジトリは公開なので、Actions のログには件数・ペア ID・応答の本文を出さない)。Supabase 無料枠の自動停止(D5)も監視が検知する
 - 匿名認証→Apple連携は Supabase の anonymous sign-in + linkIdentity を使う(再インストール時、未連携ユーザーは救済不可 — オンボで明示)
 - App Store の表示名「Lien」単独は重複の可能性 → 「Lien − ふたりの約束」等で回避(G4 で確定)
