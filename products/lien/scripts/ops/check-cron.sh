@@ -14,7 +14,7 @@
 # 環境変数:
 #   SUPABASE_ACCESS_TOKEN  (必須)sbp_...
 #   PROJECT_REF            (任意)既定 lniheehfbtpfhglinfjm
-#   MAX_AGE_HOURS          (任意)最後の起動の許容経過時間。既定 26
+#   MAX_AGE_HOURS          (任意)最後の起動の許容経過時間の上限。既定 26(通常は予定の回の検査が先に働く。0 で必ず赤)
 #
 # 注意: 本番 DB を SELECT するだけ。秘密の値は取得も表示もしない(SHA-256 の照合)
 

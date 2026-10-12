@@ -9,6 +9,8 @@
 //   deno test --allow-read products/lien/scripts/ops/
 //   → .github/workflows/lien-cron-watch.yml の ops-tests ジョブが、関係するファイルの変更ごとに回す
 
+import { JOB_SPECS, jobDrift } from "./cron_check.ts";
+
 const SUPABASE = new URL("../../supabase/", import.meta.url);
 
 // ---- 自作 assert ヘルパ(外部モジュールを使わない) ----
@@ -389,6 +391,62 @@ Deno.test("cron: 認証は Vault の lien_cron_secret だけ — 万能鍵(lien_
   }
 });
 
+Deno.test("cron: 本文は {}(close-day は昨日・通知あり、grant-tickets は今月)— notify や日付を固定していない", async () => {
+  const jobs = effectiveJobs(await readMigrations());
+  for (const [name, job] of jobs) {
+    assert(
+      normalizeSql(job.command).includes("body := '{}'::jsonb"),
+      `${name}: 本文が {} ではない(notify:false や日付を固定すると、通知が黙って止まる・毎晩同じ日を確定するのに起動は succeeded のまま)`,
+    );
+  }
+});
+
+Deno.test("cron: 監視(cron_check.ts の JOB_SPECS / jobDrift)が期待する定義が、migration の現行の定義と一致する", async () => {
+  const config = await Deno.readTextFile(new URL("config.toml", SUPABASE));
+  const projectId = /^project_id\s*=\s*"([a-z0-9]+)"/m.exec(config)?.[1];
+  assert(!!projectId, "config.toml に project_id がない");
+  const jobs = effectiveJobs(await readMigrations());
+
+  // 監視が知っているジョブ = migration の現行のジョブ(増減したら、監視の想定外のジョブの検知が誤報になる)
+  assertEquals(
+    [...jobs.keys()].sort(),
+    Object.values(JOB_SPECS).map((j) => j.name).sort(),
+    "監視(JOB_SPECS)と migration のジョブの組が違う",
+  );
+  for (const spec of Object.values(JOB_SPECS)) {
+    const job = jobs.get(spec.name)!;
+    assertEquals(
+      jobDrift(job, spec, projectId!),
+      [],
+      `${spec.name}: migration の定義が監視(cron_check.ts の JOB_SPECS)の期待とずれている。どちらかを直す`,
+    );
+  }
+
+  // 実際の migration の文面を壊したとき、監視がずれとして検知できること(監視の判定が空振りしていない)
+  const grant = jobs.get(JOB_SPECS.grantTickets.name)!;
+  const withoutGuard = {
+    ...grant,
+    command: grant.command.replace(/where extract\([\s\S]*?\)\s*=\s*1/i, ""),
+  };
+  assert(
+    withoutGuard.command !== grant.command,
+    "テストの前提: 条件を取り除けていない",
+  );
+  assert(
+    jobDrift(withoutGuard, JOB_SPECS.grantTickets, projectId!).length > 0,
+    "「JST の1日だけ」の条件を外した定義を、監視が検知できない",
+  );
+  const close = jobs.get(JOB_SPECS.closeDay.name)!;
+  const withNotifyOff = {
+    ...close,
+    command: close.command.replace("'{}'::jsonb", `'{"notify":false}'::jsonb`),
+  };
+  assert(
+    jobDrift(withNotifyOff, JOB_SPECS.closeDay, projectId!).length > 0,
+    '本文を {"notify":false} に固定した定義を、監視が検知できない',
+  );
+});
+
 Deno.test("cron: 呼び先の URL は config.toml の project_id と Function 名に一致し、Function は verify_jwt=false で存在する", async () => {
   const config = await Deno.readTextFile(new URL("config.toml", SUPABASE));
   const projectId = /^project_id\s*=\s*"([a-z0-9]+)"/m.exec(config)?.[1];
@@ -478,5 +536,38 @@ Deno.test("grant-tickets: index.ts が呼ぶ RPC の名前・引数名が migrat
     /grant execute on function public\.apply_monthly_ticket_grant\(uuid, date, date, int\)\s+to service_role/
       .test(sql),
     "0006 が service_role にだけ EXECUTE を渡していない",
+  );
+});
+
+Deno.test("grant-tickets: 旧来の印(同月の ledger monthly 行)の判定を消さない — invite-accept の初期付与が今もこの印を残す", async () => {
+  // 旧来の印は 0006 より前の付与のためだけのものではない。invite-accept は初期付与を
+  // reason='monthly'・date_local = started_on で ledger に書き、実行記録(ticket_grant_runs)は作らない。
+  // grant-tickets の事前チェックがこの印を見なくなると、ペアを作った月の付与が上乗せされる
+  // (月初の直前にできた premium ペアに +5 など)
+  const accept = await Deno.readTextFile(
+    new URL("functions/invite-accept/core.ts", SUPABASE),
+  );
+  assert(
+    /reason:\s*"monthly",\s*dateLocal:\s*startedOn/.test(accept),
+    "invite-accept の初期付与が ledger monthly(date_local = started_on)を書かなくなった。grant-tickets の旧来の印の扱いを見直す",
+  );
+
+  const index = await Deno.readTextFile(
+    new URL("functions/grant-tickets/index.ts", SUPABASE),
+  );
+  const from = index.indexOf("async hasMonthlyGrantInMonth(");
+  const to = index.indexOf("async applyMonthlyGrant(", from);
+  assert(from >= 0 && to > from, "hasMonthlyGrantInMonth が見つからない");
+  const check = index.slice(from, to);
+  assert(
+    check.includes('.from("ticket_grant_runs")'),
+    "実行記録(ticket_grant_runs)を見ていない",
+  );
+  assert(
+    check.includes('.from("ticket_ledger")') &&
+      check.includes('.eq("reason", "monthly")') &&
+      check.includes('.gte("date_local", monthStart)') &&
+      check.includes('.lt("date_local", nextMonthStart)'),
+    "同月の ledger monthly 行(旧来の印 = invite-accept の初期付与など)を処理済みの判定に使っていない。「旧来だから」と消してはいけない",
   );
 });
