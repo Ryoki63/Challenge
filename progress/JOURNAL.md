@@ -284,3 +284,4 @@
 - **#56 植物 v2-a(描画)**: v4 SVG レイヤー34点を本番アセットに取込(生成は Chrome 不要の決定論スクリプト・plant-assets CI は再生成 diff 検査)、PlantLayers / PlantCharacterView で描画を置換(左右で別の花色・ダークは背面プレート)、ウィジェット試作も差替。lien-ios 365テスト緑。**オーケストレータが CI の実描画一覧を目視**: Chrome の下書きと差なし → 受け入れ基準10を満たした。artifact は 11/11 に消えるため products/lien/assets/plant/ci_render/ に保存
 - 片付け: v4_drafts/composed の重複ファイル(正式ファイルとバイト一致の未追跡コピー)を削除。BACKLOG の順序を TASKPLAN §9 に揃えた(PA → PV → T23 → PB)
 - 次(第3波): ios-serial(#59 PV 相手の写真 → #23 審査対応一式 → #57 PB 成長の体験+VoiceOver ほか)∥ docs(DESIGN/GROWTH/TASKPLAN/E2E/README の持ち越し)∥ CI 保守(ops テストの統合・xcodegen 固定・リリース前の CI 緑確認ほか)∥ backend(本番に対する2ユーザーの API E2E スクリプト)
+- 第3波 起動(Workflow wf_13c84c7c-f34): ios-serial(#59 PV 相手の写真 → #23 審査対応一式 → #57 PB 成長の体験)∥ docs #65 ∥ ci #66 ∥ backend #67 本番 API 通しテスト。新規起票 #65・#66・#67、#57 に追加範囲をコメント
