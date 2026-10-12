@@ -160,4 +160,4 @@ bash products/lien/scripts/g1/measure.sh
 | checkin が 409 `no_promise` | promises 未作成 → `SUPABASE_SERVICE_ROLE_KEY` 付きで seed-pair.sh を再実行(promises への直接書き込みは service_role のみ。クライアント書き込みは RLS/GRANT で deny — migration 0001)。promise-set Function デプロイ済みならユーザーJWTで `POST /functions/v1/promise-set`(T12)でも作成できる |
 | push がデバイスBに届かない | ① `supabase secrets list` で APNs 5変数を確認 ② `APNS_ENV` の sandbox/production がビルド配布経路と一致しているか(Xcode直=sandbox) ③ `users.push_token` がデバイスBの最新トークンか ④ `supabase functions logs checkin` で送信結果を確認 |
 | db push が失敗 | `SUPABASE_DB_PASSWORD` の誤り → Dashboard でリセットして GitHub secret も更新 |
-| close-day を手動で叩きたい | `Authorization: Bearer <service_role key>` の**完全一致**が必要(Edge Runtime が注入する `SUPABASE_SERVICE_ROLE_KEY` と同じ値 = Dashboard の legacy `service_role` キー)。一致しない場合は 401 |
+| close-day を手動で叩きたい | [../OPS.md](../OPS.md) の「取りこぼしの再実行」(`ops/run-cron-fn.sh`)を使う。Bearer は Edge Runtime が注入する `SUPABASE_SERVICE_ROLE_KEY` との**完全一致**が必要で、**このプロジェクトではその値は default の secret key(`sb_secret_...`)**。Dashboard の legacy `service_role`(`eyJ...`)では 401(2026-10-12 実測) |
