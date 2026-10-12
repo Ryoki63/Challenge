@@ -1,0 +1,31 @@
+{
+  "aps": {
+    "alert": {
+      "title": "あきら",
+      "body": "筋トレやった!💪"
+    },
+    "sound": "default",
+    "mutable-content": 1
+  },
+  "lien": {
+    "type": "partner_checkin",
+    "snapshot": {
+      "schemaVersion": 1,
+      "pairId": "1f0c5a4e-9d3b-4c1a-8f2e-7b6d5a4c3b2a",
+      "updatedAt": "2026-06-11T08:30:00.000Z",
+      "streakCurrent": 7,
+      "streakBest": 7,
+      "todayMeDone": true,
+      "todayPartnerDone": true,
+      "myPromiseTitle": "ランニング",
+      "myPromiseEmoji": "🏃",
+      "partnerName": "あきら",
+      "partnerPromiseTitle": "筋トレ",
+      "partnerPromiseEmoji": "💪",
+      "plantStage": 3,
+      "plantMood": "happy",
+      "plantName": "みどり",
+      "hasPartnerPhotoToday": false
+    }
+  }
+}

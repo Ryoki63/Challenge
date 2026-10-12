@@ -1,0 +1,85 @@
+{
+  "snapshot": {
+    "internal_error": [500],
+    "method_not_allowed": [405],
+    "unauthorized": [401],
+    "user_not_found": [404]
+  },
+  "invite-create": {
+    "already_paired": [409],
+    "internal_error": [500],
+    "method_not_allowed": [405],
+    "token_generation_failed": [500],
+    "unauthorized": [401],
+    "user_not_found": [404]
+  },
+  "invite-accept": {
+    "already_paired": [409],
+    "cannot_accept_own_invite": [400],
+    "internal_error": [500],
+    "invalid_json": [400],
+    "invalid_token": [400],
+    "invite_already_used": [410],
+    "invite_expired": [410],
+    "invite_not_found": [404],
+    "method_not_allowed": [405],
+    "partner_already_paired": [409],
+    "unauthorized": [401],
+    "user_not_found": [404]
+  },
+  "promise-set": {
+    "internal_error": [500],
+    "invalid_emoji": [400],
+    "invalid_json": [400],
+    "invalid_remind_at": [400],
+    "invalid_title": [400],
+    "method_not_allowed": [405],
+    "unauthorized": [401],
+    "user_not_found": [404]
+  },
+  "checkin": {
+    "date_local_out_of_range": [400],
+    "internal_error": [500],
+    "invalid_date_local": [400],
+    "invalid_json": [400],
+    "invalid_photo_path": [400],
+    "invalid_request_photo_upload": [400],
+    "method_not_allowed": [405],
+    "no_pair": [400],
+    "no_promise": [409],
+    "unauthorized": [401],
+    "user_not_found": [404]
+  },
+  "checkin-cancel": {
+    "date_local_not_today": [400],
+    "internal_error": [500],
+    "invalid_date_local": [400],
+    "invalid_json": [400],
+    "method_not_allowed": [405],
+    "unauthorized": [401],
+    "user_not_found": [404]
+  },
+  "nudge": {
+    "internal_error": [500],
+    "invalid_json": [400],
+    "invalid_stamp": [400],
+    "method_not_allowed": [405],
+    "no_pair": [409],
+    "nudge_limit_exceeded": [429],
+    "partner_already_done": [409],
+    "unauthorized": [401],
+    "user_not_found": [404]
+  },
+  "react": {
+    "checkin_not_found": [404],
+    "internal_error": [500],
+    "invalid_json": [400],
+    "invalid_request": [400],
+    "invalid_stamp": [400],
+    "method_not_allowed": [405],
+    "no_pair": [409],
+    "not_partner": [403],
+    "unauthorized": [401],
+    "user_not_found": [404]
+  }
+}

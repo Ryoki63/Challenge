@@ -1,0 +1,21 @@
+{
+  "alreadyCheckedIn": false,
+  "snapshot": {
+    "schemaVersion": 1,
+    "pairId": null,
+    "updatedAt": "2026-06-11T08:30:00.000Z",
+    "streakCurrent": 0,
+    "streakBest": 0,
+    "todayMeDone": true,
+    "todayPartnerDone": false,
+    "myPromiseTitle": "筋トレ",
+    "myPromiseEmoji": "💪",
+    "partnerName": null,
+    "partnerPromiseTitle": null,
+    "partnerPromiseEmoji": null,
+    "plantStage": 0,
+    "plantMood": "normal",
+    "plantName": null,
+    "hasPartnerPhotoToday": false
+  }
+}

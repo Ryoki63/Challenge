@@ -1,0 +1,26 @@
+{
+  "aps": {
+    "content-available": 1
+  },
+  "lien": {
+    "type": "pair_update",
+    "snapshot": {
+      "schemaVersion": 1,
+      "pairId": "1f0c5a4e-9d3b-4c1a-8f2e-7b6d5a4c3b2a",
+      "updatedAt": "2026-06-11T08:30:00.000Z",
+      "streakCurrent": 6,
+      "streakBest": 6,
+      "todayMeDone": true,
+      "todayPartnerDone": false,
+      "myPromiseTitle": "ランニング",
+      "myPromiseEmoji": "🏃",
+      "partnerName": "あきら",
+      "partnerPromiseTitle": "筋トレ",
+      "partnerPromiseEmoji": "💪",
+      "plantStage": 2,
+      "plantMood": "fidget",
+      "plantName": "みどり",
+      "hasPartnerPhotoToday": false
+    }
+  }
+}

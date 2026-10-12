@@ -1,0 +1,21 @@
+{
+  "pairId": "1f0c5a4e-9d3b-4c1a-8f2e-7b6d5a4c3b2a",
+  "snapshot": {
+    "schemaVersion": 1,
+    "pairId": "1f0c5a4e-9d3b-4c1a-8f2e-7b6d5a4c3b2a",
+    "updatedAt": "2026-06-11T08:30:00.000Z",
+    "streakCurrent": 0,
+    "streakBest": 0,
+    "todayMeDone": false,
+    "todayPartnerDone": false,
+    "myPromiseTitle": "筋トレ",
+    "myPromiseEmoji": "💪",
+    "partnerName": "ゆうき",
+    "partnerPromiseTitle": "ランニング",
+    "partnerPromiseEmoji": "🏃",
+    "plantStage": 0,
+    "plantMood": "normal",
+    "plantName": null,
+    "hasPartnerPhotoToday": false
+  }
+}
