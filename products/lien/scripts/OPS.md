@@ -47,7 +47,7 @@ bash products/lien/scripts/ops/check-cron.sh      # 自動確認と同じ検査�
 | `grant-tickets:stray` | 保存期間内の応答に、JST の1日でない日の grant-tickets の応答がある(月の途中に呼ばれた) |
 | `net:queue` | `net.http_request_queue` に処理待ちが残っている(pg_net のワーカー停止) |
 | `vault:*` / `secrets:sync` | Vault に `lien_cron_secret` が無い・万能鍵 `lien_service_role_key` が残っている・Vault と Function secrets の値が違う |
-| `exposure` | PostgREST の公開スキーマに `net` / `cron` / `vault` が入っている(§9) |
+| `exposure` | PostgREST の公開スキーマに `net` / `cron` / `vault` が入っている、または `pg_graphql` 拡張が有効(§9) |
 
 - 黄(WARN)は「起動から 5.5 時間を過ぎて pg_net の応答が消えていて、中身を確認できない」。朝の自動確認(起動の 30 分後)では出ない。昼に手で実行したときに出る
 - **失敗時に赤になることの確認**: Actions の「Run workflow」で `max_age_hours` に `0` を入れる(ローカルは `MAX_AGE_HOURS=0 bash .../check-cron.sh`)。最後の起動が「0 時間より古い」ので必ず赤になる。本番の状態は変えない
@@ -312,6 +312,6 @@ issue #60 では「anon / authenticated から `net.http_post` の EXECUTE と `
 - pg_net の関数・表は `supabase_admin` 所有で、`PUBLIC`(全ロール)に EXECUTE / SELECT などが付いている(schema `net` の USAGE も PUBLIC)。anon / authenticated への個別の GRANT ではなく PUBLIC 経由なので、`revoke ... from anon, authenticated` を書いても何も変わらない
 - `revoke execute on function net.http_post(...) from public` を postgres で実行しても、エラーにならず何も変わらなかった(所有者でも supabase_admin のメンバーでもないため。DO ブロックの中で実行して結果を確認し、全体を巻き戻したので本番は変わっていない)。migration に効かない revoke を書くと、塞いだように見えてしまうので書かない
 - 代わりに次で守る:
-  1. **公開 API から net に届かない**。PostgREST の公開スキーマは `public, graphql_public` だけ(`Accept-Profile: net` を付けた anon のリクエストは 406 `Invalid schema: net`)、pg_graphql は無効(GraphQL は "pg_graphql extension is not enabled")。anon / authenticated が SQL を直接流す経路はない。監視の `exposure` が、公開スキーマに `net` / `cron` / `vault` が入っていないことを毎朝確認する
+  1. **公開 API から net に届かない**。PostgREST の公開スキーマは `public, graphql_public` だけ(`Accept-Profile: net` を付けた anon のリクエストは 406 `Invalid schema: net`)、pg_graphql は無効(GraphQL は "pg_graphql extension is not enabled")。anon / authenticated が SQL を直接流す経路はない。監視の `exposure` が、公開スキーマに `net` / `cron` / `vault` が入っていないこと、`pg_graphql` が無効なことを毎朝確認する(`pg_graphql` を有効にすると、PUBLIC に SELECT が付いた net の表が GraphQL の API に出る恐れがあるので、有効にするなら net が出ないことを確かめてから)
   2. **万能鍵を net のキューに載せない**(§1・§6)。キュー(`net.http_request_queue`。処理されるまでの短い間だけヘッダが入る)に載るのは cron 専用シークレットだけ。漏れても DB の読み書きには使えない
 - 将来、Supabase が net の所有や権限を変えて postgres から絞れるようになったら、migration に `revoke execute on function net.http_post(...) from public` と `revoke select on net.http_request_queue, net._http_response from public` を足し、cron が使うロール(`postgres`)と `service_role` に EXECUTE / INSERT / シーケンスの USAGE を明示的に GRANT する。**外すと cron が全部止まる**ので、適用前に一時ジョブで確かめること

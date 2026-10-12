@@ -33,6 +33,8 @@ export interface CronSnapshot {
   projectStatus: string;
   /** PostgREST の公開スキーマ(db_schema をカンマで分けたもの) */
   postgrestSchemas: string[];
+  /** pg_graphql 拡張が入っているか(入っていると GraphQL の API が net の表を反映しうる) */
+  graphqlEnabled: boolean;
   jobs: Array<{ jobname: string; schedule: string; active: boolean }>;
   /** cron.job_run_details(新しい順)。jobname は結合した cron.job の名前(削除済みのジョブは null) */
   runs: Array<{
@@ -566,7 +568,9 @@ export function evaluate(s: CronSnapshot, o: CheckOptions): Finding[] {
     }
   }
 
-  // 8. 公開 API から net / cron / vault に届かない(net の権限を postgres からは絞れないことの代わりの守り)
+  // 8. 公開 API から net / cron / vault に届かない(net の権限を postgres からは絞れないことの代わりの守り)。
+  //    REST(PostgREST)の公開スキーマと、GraphQL(pg_graphql。入れると、PUBLIC に SELECT が付いた
+  //    net の表を反映しうる)の両方を見る
   const exposed = s.postgrestSchemas.filter((x) =>
     FORBIDDEN_EXPOSED_SCHEMAS.includes(x)
   );
@@ -579,13 +583,20 @@ export function evaluate(s: CronSnapshot, o: CheckOptions): Finding[] {
         } が含まれている(anon / authenticated から net の表・関数に届く。公開スキーマから外す)`,
       ),
     );
+  } else if (s.graphqlEnabled) {
+    findings.push(
+      error(
+        "exposure",
+        "pg_graphql が有効(PUBLIC に SELECT が付いた net の表が GraphQL の API に出る恐れがある。無効にするか、net が出ないことを確かめてから許可する。OPS.md §9)",
+      ),
+    );
   } else {
     findings.push(
       ok(
         "exposure",
         `PostgREST の公開スキーマは ${
           s.postgrestSchemas.join(", ")
-        }(net / cron / vault は含まれない)`,
+        }(net / cron / vault は含まれない)・pg_graphql は無効`,
       ),
     );
   }
@@ -652,6 +663,7 @@ select jsonb_build_object(
   ),
   'queueDepth', (select count(*) from net.http_request_queue),
   'vaultSecretNames', (select coalesce(jsonb_agg(name order by name), '[]'::jsonb) from vault.secrets),
+  'graphqlEnabled', exists (select 1 from pg_extension where extname = 'pg_graphql'),
   'vaultCronSecretSha256', (
     select encode(extensions.digest(decrypted_secret, 'sha256'), 'hex')
     from vault.decrypted_secrets where name = '${CRON_SECRET_VAULT_NAME}'

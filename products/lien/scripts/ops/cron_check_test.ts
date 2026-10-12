@@ -42,6 +42,7 @@ function healthy(): CronSnapshot {
     now: "2026-10-12T15:40:00.123456+00:00",
     projectStatus: "ACTIVE_HEALTHY",
     postgrestSchemas: ["public", "graphql_public"],
+    graphqlEnabled: false,
     jobs: [
       { jobname: "lien-close-day", schedule: "10 15 * * *", active: true },
       { jobname: "lien-grant-tickets", schedule: "5 15 * * *", active: true },
@@ -486,6 +487,14 @@ Deno.test("evaluate: PostgREST の公開スキーマに net / cron / vault が�
   }
 });
 
+Deno.test("evaluate: pg_graphql が有効なら赤(PUBLIC に SELECT が付いた net の表が GraphQL に出る恐れ)", () => {
+  const s = healthy();
+  s.graphqlEnabled = true;
+  const findings = evaluate(s, OPTS);
+  assertEquals(errorIds(findings), ["exposure"]);
+  assert(byId(findings, "exposure").message.includes("pg_graphql"));
+});
+
 Deno.test("evaluate: pg_net のキューに処理待ちが残っていれば赤", () => {
   const s = healthy();
   s.queueDepth = 3;
@@ -530,5 +539,6 @@ Deno.test("SNAPSHOT_SQL: 読み取りだけ(SELECT)で、秘密の値そのも�
   }
   // 秘密は SHA-256 にして返す(decrypted_secret を素のまま select しない)
   assert(sql.includes("digest(decrypted_secret, 'sha256')"));
+  assert(sql.includes("'graphqlenabled'"), "pg_graphql の有無を返す");
   assert(!/select\s+decrypted_secret/.test(sql));
 });
