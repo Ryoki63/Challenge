@@ -125,6 +125,10 @@ final class StoragePhotoURLSigner: PhotoURLSigning {
             throw PartnerPhotoError.unauthorized
         case 404:
             throw PartnerPhotoError.notFound
+        case 400 where Self.isNotFoundBody(data):
+            // 「無い・読めない」(ペア外・存在しないオブジェクト・未ログイン)は、HTTP 400 で本文が
+            // {"statusCode":"404","error":"not_found",…} になる(本番で確認 — #67。contracts/storage-sign.not-found.json)
+            throw PartnerPhotoError.notFound
         default:
             throw PartnerPhotoError.server(status: http.statusCode)
         }
@@ -135,6 +139,15 @@ final class StoragePhotoURLSigner: PhotoURLSigning {
         else { throw PartnerPhotoError.invalidResponse }
 
         return SignedPhotoURL(url: signed, expiresAt: now().addingTimeInterval(TimeInterval(Self.expiresInSeconds)))
+    }
+
+    /// Storage の失敗本文が「オブジェクトが無い(RLS で読めないときも同じ)」を表すか。
+    /// `statusCode` は文字列("404")で返るが、数値の版にも備える
+    static func isNotFoundBody(_ data: Data) -> Bool {
+        guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return false }
+        let code = (object["statusCode"] as? String) ?? (object["statusCode"] as? Int).map(String.init)
+        let error = (object["error"] as? String)?.lowercased()
+        return code == "404" || error == "not_found" || error == "not found"
     }
 
     // MARK: URL の組み立て

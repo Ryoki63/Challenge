@@ -126,16 +126,49 @@ final class StoragePhotoURLSignerTests: XCTestCase {
     func testStatusCodesMapToTheErrors() async throws {
         let cases: [(status: Int, expected: PartnerPhotoError)] = [
             (401, .unauthorized), (403, .unauthorized), (404, .notFound),
-            (400, .server(status: 400)), (500, .server(status: 500)), (503, .server(status: 503)),
+            (500, .server(status: 500)), (503, .server(status: 503)),
         ]
         for entry in cases {
             let signer = makeSigner()
-            reply(entry.status, #"{"statusCode":"404","error":"not_found","message":"Object not found"}"#)
+            reply(entry.status, #"{"statusCode":"500","error":"internal","message":"x"}"#)
             do {
                 _ = try await signer.signedURL(forPath: thumbnailPath)
                 XCTFail("\(entry.status) で成功してしまった")
             } catch {
                 XCTAssertEqual(error as? PartnerPhotoError, entry.expected, "\(entry.status)")
+            }
+        }
+    }
+
+    func testNotFoundIsReportedAsHTTP400WithAStatusCodeInTheBody() async throws {
+        // 本番(#67): ペア外・存在しないオブジェクト・未ログインの署名は HTTP 404 でなく 400 で、本文が not_found
+        let bodies = [
+            #"{"statusCode":"404","error":"not_found","message":"Object not found"}"#,
+            #"{"statusCode":404,"error":"Not Found","message":"x"}"#, // 数値の版
+            #"{"error":"not_found"}"#,
+            #"{"statusCode":"404"}"#,
+        ]
+        for body in bodies {
+            let signer = makeSigner()
+            reply(400, body)
+            do {
+                _ = try await signer.signedURL(forPath: thumbnailPath)
+                XCTFail("成功してしまった: \(body)")
+            } catch {
+                XCTAssertEqual(error as? PartnerPhotoError, .notFound, body)
+            }
+        }
+    }
+
+    func testOtherBadRequestsStayServerErrors() async throws {
+        for body in [#"{"statusCode":"400","error":"invalid_request","message":"bad"}"#, "{}", "not json", ""] {
+            let signer = makeSigner()
+            reply(400, body)
+            do {
+                _ = try await signer.signedURL(forPath: thumbnailPath)
+                XCTFail("成功してしまった: \(body)")
+            } catch {
+                XCTAssertEqual(error as? PartnerPhotoError, .server(status: 400), body)
             }
         }
     }
@@ -633,6 +666,23 @@ final class PartnerPhotoContractTests: XCTestCase {
             url.absoluteString,
             "https://example.supabase.co/storage/v1/object/sign/photos/\(PartnerPhotoFixtures.thumbnailPath())?token=signed-download-token-1"
         )
+    }
+
+    func testStorageSignFailureFixtureIsReadAsNotFound() async throws {
+        // 本番(#67)で観測した失敗: HTTP 400 + 本文 {"statusCode":"404","error":"not_found",…}
+        let body = try ContractFixtures.data("storage-sign.not-found")
+        XCTAssertTrue(StoragePhotoURLSigner.isNotFoundBody(body))
+
+        let signer = StoragePhotoURLSigner(
+            baseURL: baseURL, apiKey: "test-anon-key", tokenProvider: tokenProvider, session: makeSession()
+        )
+        StubURLProtocol.handler = { _ in (400, body) }
+        do {
+            _ = try await signer.signedURL(forPath: PartnerPhotoFixtures.thumbnailPath())
+            XCTFail("成功してしまった")
+        } catch {
+            XCTAssertEqual(error as? PartnerPhotoError, .notFound)
+        }
     }
 
     /// 本番の部品(PostgREST の読み・署名・ダウンロード・サービス)を、フィクスチャの応答でつないで通す

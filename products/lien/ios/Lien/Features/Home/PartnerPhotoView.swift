@@ -183,5 +183,7 @@ struct PartnerPhotoViewer: View {
             }
             .accessibilityLabel(Strings.PartnerPhoto.viewerCloseButton)
         }
+        // VoiceOver の「2本指で Z を描く」(エスケープ)でも閉じられる
+        .accessibilityAction(.escape) { model.closeViewer() }
     }
 }

@@ -29,7 +29,7 @@ iOS は同じ JSON を `LienTests` のリソースとして読み、アプリが
 
 ## 手書きのフィクスチャ(PostgREST / Storage の応答)
 
-上の表のフィクスチャは Edge Function の実ハンドラから作る。次の4つは、Edge Function ではなく **PostgREST と Storage の応答**
+上の表のフィクスチャは Edge Function の実ハンドラから作る。次の5つは、Edge Function ではなく **PostgREST と Storage の応答**
 (相手の今日の写真をホームに出す経路 — PV #59)なので、`generate.ts` では作れず、**手書き**している。
 中身は応答の本文そのもの(補足のキーは足さない。iOS は本番と同じデコーダで読む)。
 
@@ -37,15 +37,20 @@ iOS は同じ JSON を `LienTests` のリソースとして読み、アプリが
 |---|---|---|---|
 | `partner-checkin.photo.json` | `GET {base}/rest/v1/checkins?select=id,photo_path&date_local=eq.<今日>&user_id=neq.<自分の user_id>&limit=1`(`apikey: <anon キー>` + `Authorization: Bearer <利用者の JWT>`) | 200 / 相手が今日、写真を添えた行(`photo_path` = 原寸のパス `pairs/<pair_id>/<date>/<user_id>/photo.jpg`) | `PartnerCheckinRow`(→ `PartnerCheckin`。`PostgRESTPartnerCheckinResolver`) |
 | `partner-checkin.no-photo.json` | 同上 | 200 / 相手の行はあるが `photo_path` が `null`(写真なし) | 同上 |
-| `partner-checkin.none.json` | 同上 | 200 / `[]`(相手がまだチェックインしていない・RLS で読めない = ペア解消後など) | 同上 |
+| `partner-checkin.none.json` | 同上 | 200 / `[]`(相手がまだチェックインしていない・取消した・RLS で読めない = ペア解消後など) | 同上 |
 | `storage-sign.ok.json` | `POST {base}/storage/v1/object/sign/photos/<photo_path または photo_thumb.jpg のパス>`(本文 `{"expiresIn": 3600}`。`apikey` + `Authorization: Bearer <利用者の JWT>`) | 200 / `{ "signedURL": "/object/sign/photos/<path>?token=<署名>" }`(ルート相対。`{base}/storage/v1` を前に付けて取りに行く)。token は目印の文字列(実物の署名ではない) | `StorageSignResponse`(→ `StoragePhotoURLSigner`) |
+| `storage-sign.not-found.json` | 同上(ペア外のユーザー・存在しないオブジェクト・未ログイン) | **HTTP 400**(404 ではない)/ 本文 `{ "statusCode": "404", "error": "not_found", "message": "Object not found" }` | `StoragePhotoURLSigner.isNotFoundBody`(→ `PartnerPhotoError.notFound`) |
 
-- 署名付き URL の取得は `GET {base}/storage/v1/object/sign/photos/<path>?token=<署名>`(認証ヘッダなし)。200 は JPEG の本文。署名の失効・無効は 400 系
-  (アプリは 400 / 401 / 403 を「失効」として署名からやり直し、404 は「無い・読めない」として扱う)
-- **これらは手書きで、本番の実応答との突き合わせは未完了**。backend レーンの API E2E(#67)が、本番で2ユーザーの
-  シナリオを流して実応答を取り、キー・型・ステータスをここと照合する(ペアの相手は署名付き URL を取れる / ペア外のユーザーは取れない、の RLS の実挙動も)。
+- 署名付き URL の取得は `GET {base}/storage/v1/object/sign/photos/<path>?token=<署名>`(認証ヘッダなし)。200 は `image/jpeg` の本文。
+  署名の寿命切れ・改ざんは **HTTP 400** `{"statusCode":"400","error":"InvalidJWT","message":"\"exp\" claim timestamp check failed"}`
+  (アプリは 400 / 401 / 403 を「失効」として署名からやり直し、404 は「無い」として扱う)
+- **本番の実応答との突き合わせは済み**(2026-10-13、backend レーンの API E2E #67。`scripts/OPS.md` §12): 上の4つの形(キー・型)は本番と一致した。
+  ペアの相手は `photo_path` を読んで署名付き URL を作れ、ペア外・未ログインは作れない(RLS の実挙動)。
+  署名の**発行**の失敗は HTTP 404 でなく **400**と分かったので、アプリは「400 で本文が not_found」を `notFound` に写す(`StoragePhotoURLSigner`)。
+  どちらでも結果は同じ(写真を出さない・サムネが無いときは原寸で代わりを作る)。`storage-sign.not-found.json` は #67 の観測記録から
+  `statusCode` / `error` / `message` を写したもので、本文にほかのキーがあっても、アプリは `statusCode` と `error` だけを読む。
   ずれが見つかったら、この表とフィクスチャ、`PartnerPhotoContractTests` を実応答に合わせる
-- `contracts_test.ts` の `HAND_WRITTEN` が、この4つを「生成物ではない JSON」として認める一覧。足したら表と両方を直す
+- `contracts_test.ts` の `HAND_WRITTEN` が、この5つを「生成物ではない JSON」として認める一覧。足したら表と両方を直す
 - 署名付き URL の寿命は `StoragePhotoURLSigner.expiresInSeconds`(3600 秒)。Storage の応答に寿命は含まれないので、アプリは要求した値から期限を数える
 
 ## 再生成と検査

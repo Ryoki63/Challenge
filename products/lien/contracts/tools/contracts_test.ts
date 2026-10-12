@@ -20,6 +20,7 @@ const HAND_WRITTEN = [
   "partner-checkin.no-photo.json",
   "partner-checkin.none.json",
   "storage-sign.ok.json",
+  "storage-sign.not-found.json",
 ];
 
 Deno.test("契約フィクスチャ: コミット済みの JSON がサーバー実装の出力と一致する", async () => {

@@ -176,7 +176,8 @@ struct PartnerCheckinRow: Decodable, Equatable, Sendable {
 }
 
 protocol PartnerCheckinResolving: AnyObject {
-    /// 相手の `dateLocal` のチェックイン行(まだ無ければ nil)。photo_path つき
+    /// 相手の `dateLocal` のチェックイン行(まだ無ければ nil)。photo_path つき。
+    /// 実装が持つのはこれだけ(下の `partnerCheckinID` は、これから作る拡張メソッドで、実装側では上書きしない)
     func partnerCheckin(dateLocal: String) async throws -> PartnerCheckin?
 }
 
