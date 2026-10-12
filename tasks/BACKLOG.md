@@ -24,17 +24,17 @@ v1.1 課金(#33〜#36)・T21 アルバム・T24 SIWA は `on-hold` ラベルで�
 - [x] [DOC][#58] 仕様改定(成長ルール v2・D3 スコープ削減・D6 計測) 完了条件: lien-ci 緑(store-metadata)
 
 ### 第2波(2026-10-13 起動)
-- [>] [B3] backend 堅牢化: OPS 再実行手順の修正(リセット通知を再送しない notify:false)・監視の自動化(毎朝 00:40 JST の Actions)・cron 専用シークレット・net 権限の revoke・cron 式の静的テスト・push_env を getUser で読む・DESIGN §5.6/§7/§10
-- [>] [DOC2] DESIGN §3.3(AppPhase 4状態・AppServices 等)・§3.6(ディープリンクはプリフィル+明示タップに合わせる)/ review-notes §1.1・§1.2 を実装に合わせる(T30)/ TASKPLAN の ios-serial 順の更新(PA を PV・T23 の前へ)
+- [x] [B3][#60] backend 堅牢化: OPS 再実行手順の修正(リセット通知を再送しない notify:false)・監視の自動化(毎朝 00:40 JST の Actions)・cron 専用シークレット・net 権限の revoke・cron 式の静的テスト・push_env を getUser で読む・DESIGN §5.6/§7/§10
+- [x] [DOC2][#61] DESIGN §3.3(AppPhase 4状態・AppServices 等)・§3.6(ディープリンクはプリフィル+明示タップに合わせる)/ review-notes §1.1・§1.2 を実装に合わせる(T30)/ TASKPLAN の ios-serial 順の更新(PA を PV・T23 の前へ)
 
 ### ios-serial(Strings.swift / project.yml / LienApp.swift — 上から厳密に直列。2026-10-13 順序更新: 新イラストを最初の内部 TestFlight に載せるため PA を前倒し)
 - [x] [W1][#55] アプリ結線: Live 基盤+AppRouter+ソロモード+push_token/push_env 保存+契約フィクスチャ 完了条件: lien-ios 緑+AppRouterTests・契約テスト緑
-- [>] [W1fu+T27lint] W1 の手直し(push_token 再送・AppModel の復帰・Live 構成テスト・招待シートの間隔)+罰なし文言 lint+「パートナー」→「相手」
-- [>] [T28準備][#28] Xcode 26 固定・ExportOptions・PrivacyInfo・1.0.0・v4 アイコン・Release で Config 欠落を致命に・supabase-swift 固定・push_env を署名から判定 完了条件: dry_run の無署名 archive 緑
-- [>] [PA][#56] 植物 v2-a(描画): v4 SVG レイヤー取込+PlantCharacterView+plant-assets CI の SVG 化 完了条件: CI 緑+実描画一覧の artifact
-- [ ] [PB][#57] 植物 v2-b(体験): ゲージ・段階アップ演出・名前付け 完了条件: lien-ios 緑+各テスト緑
-- [ ] [PV][#59] 相手の写真を当日のホームで見せる(PostgREST+署名付き URL)
-- [ ] [T23][#23] 審査対応一式(通報・ブロック=解消・規約同意・完全削除) 完了条件: deno+lien-ios 緑+レビューノート §1.4/§1.5 を再現
+- [x] [W1fu+T27lint][#62] W1 の手直し(push_token 再送・AppModel の復帰・Live 構成テスト・招待シートの間隔)+罰なし文言 lint+「パートナー」→「相手」
+- [x] [T28準備][#28] Xcode 26 固定・ExportOptions・PrivacyInfo・1.0.0・v4 アイコン・Release で Config 欠落を致命に・supabase-swift 固定・push_env を署名から判定 完了条件: dry_run の無署名 archive 緑
+- [x] [PA][#56] 植物 v2-a(描画): v4 SVG レイヤー取込+PlantCharacterView+plant-assets CI の SVG 化 完了条件: CI 緑+実描画一覧の artifact
+- [>] [PV][#59] 相手の写真を当日のホームで見せる(PostgREST+署名付き URL)
+- [>] [T23][#23] 審査対応一式(通報・ブロック=解消・規約同意・完全削除) 完了条件: deno+lien-ios 緑+レビューノート §1.4/§1.5 を再現
+- [>] [PB][#57] 植物 v2-b(体験): ゲージ・段階アップ演出・名前付け +VoiceOver 文・葉の下の約束の絵文字・PA レビューの手直し 完了条件: lien-ios 緑+各テスト緑
 - [ ] [T16][#16] 通知(縮小版: ローカル通知+streakRisk/milestone+ON/OFF) / [T17a][#17] S+ロック画面 / [T18][#18] 履歴 / [T19a][#19] チケット残数バッジ / [T22][#22] シェア画像 / [T27][#27] 文言総点検 — 11/8 機能凍結まで
 
 ### 人間(D5 ほか)

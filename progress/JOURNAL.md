@@ -274,3 +274,13 @@
 - 持ち越し(第2波へ): OPS の再実行手順の誤り(リセット通知の再送・grant-tickets の判定)/ 監視の自動化(毎朝 00:40 JST の Actions)/ cron 専用シークレット・net の権限 revoke / Release ビルドで Config 欠落時に Stub へ黙って落ちる / supabase-swift の版固定 / push_token のコールドスタート再送 / review-notes §1.1・§1.2 と実装のずれ5点 / DESIGN §3.3・§3.6・§5.6・§7・§10 の更新
 - 次(第2波): backend 堅牢化 B3 ∥ docs 整合 DOC2 ∥ ios-serial(W1 手直し+罰なし lint → T28準備 → PA 新イラスト取込)。順序変更: 新イラストを最初の内部 TestFlight(10/23 目標)に載せるため PA を PV・T23 の前へ(PA は PV・T23 に依存しない)
 - 第2波 起動(Workflow wf_cc8900bd-a55): backend #60 堅牢化 ∥ docs #61 ∥ ios-serial(#62 W1 手直し+罰なし lint → #28 T28準備 → #56 新イラスト取込)。新規起票 #60・#61・#62。各ステップ後に Opus max レビュー
+
+## 2026-10-13 04:00 (対話/Opus) — 第2波 完了の集約(Workflow wf_cc8900bd-a55・11エージェント・約3.6時間)
+- **#60 backend 堅牢化(本番)**: close-day に notify(手動再実行は通知しない)+今日以降を確定しないガード / grant-tickets を月単位の実行記録で冪等化(migration 0006)/ cron 認証を専用シークレット LIEN_CRON_SECRET に切替(migration 0007。Vault から万能鍵を削除)/ 毎朝 00:40 JST の監視 workflow lien-cron-watch / cron 式の静的テスト / push_env を getUser で読む / DESIGN 更新。11関数再デプロイ・スモーク29項目 PASS。**Opus レビュー must_fix 1件**=「前夜の cron が起動しなかった」を監視が赤にできない → 直近の予定起動の記録を必須にして修正。未達1件: net の権限 revoke は Supabase の所有者権限のため postgres から不可 → 公開スキーマ監視で代替(OPS §9)。意図しない本番データ変更1件(スモークでテストペア P3/P4 に both が1行ずつ。通知なし・OPS §7 に記録)
+- **注意: このリポジトリは公開**。監視 workflow の Actions ログは件数・ID を出さないよう修正済み(修正前の run 2件にテストペアの件数が残る)
+- **#61 docs**: DESIGN §3.3(AppPhase 4状態ほか)・§3.6(ディープリンクは明示タップ)・review-notes §1.1/§1.2 を実装に合わせた。レビュー ok
+- **#62 W1 手直し+罰なし文言 lint**: push_token の再送・オンボ復帰・Live 構成テスト・招待シートの間隔・「相手を招待する」・StringsReviewTests(Strings.swift 全リテラル146件を検査)。lien-ios 309テスト緑。レビュー ok
+- **#28 T28準備**: Xcode 26.6(macos-26)に固定・lien-release.yml(dry_run で無署名 archive 緑)・ExportOptions・PrivacyInfo(必須理由 API の棚卸し)・MARKETING_VERSION 1.0.0・**v4 アイコン(空色)**・Release で Config 欠落を致命に・supabase-swift 固定・push_env を署名の aps-environment から判定。lien-ios 345テスト緑。#28 は開いたまま(G0 後の人間作業 約1時間: ASC API キー+GitHub Secrets 6件 → lien-release を本番実行)
+- **#56 植物 v2-a(描画)**: v4 SVG レイヤー34点を本番アセットに取込(生成は Chrome 不要の決定論スクリプト・plant-assets CI は再生成 diff 検査)、PlantLayers / PlantCharacterView で描画を置換(左右で別の花色・ダークは背面プレート)、ウィジェット試作も差替。lien-ios 365テスト緑。**オーケストレータが CI の実描画一覧を目視**: Chrome の下書きと差なし → 受け入れ基準10を満たした。artifact は 11/11 に消えるため products/lien/assets/plant/ci_render/ に保存
+- 片付け: v4_drafts/composed の重複ファイル(正式ファイルとバイト一致の未追跡コピー)を削除。BACKLOG の順序を TASKPLAN §9 に揃えた(PA → PV → T23 → PB)
+- 次(第3波): ios-serial(#59 PV 相手の写真 → #23 審査対応一式 → #57 PB 成長の体験+VoiceOver ほか)∥ docs(DESIGN/GROWTH/TASKPLAN/E2E/README の持ち越し)∥ CI 保守(ops テストの統合・xcodegen 固定・リリース前の CI 緑確認ほか)∥ backend(本番に対する2ユーザーの API E2E スクリプト)
