@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lien アプリアイコン v4 — 「タネの子」が鉢のふちからのぞく構図(gen_v4.py の部品を再利用)。
+"""Lien アプリアイコン v4 — 「タネの子」が鉢のふちからのぞく構図(gen_v4.py / gen_layers.py の部品を再利用)。
 
 1024×1024。iOS が角丸マスクを掛けるので四隅は塗りつぶしのまま出力する。
 背景候補を3色出し、contact で比較できるようにする。
@@ -11,6 +11,7 @@ import os
 import subprocess
 
 import gen_v4 as g
+import gen_layers as gl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(HERE, "icon")
@@ -28,7 +29,8 @@ def icon_svg(bg):
     k = 4.75
     tx = S / 2 - g.CX * k
     ty = 196 - (g.BODY_TOP_Y - 38) * k   # 双葉の先端がおよそ y=196 に来る位置
-    inner = g.plant(2, "normal") + g.soil_in_pot() + g.body() + g.face("normal") + g.pot() + g.hands_on_rim()
+    inner = (g.soil_in_pot() + gl.leaf_open() + gl.MIRROR_OPEN + gl.leaf_open() + "</g>"
+             + g.body() + g.face("normal") + g.pot() + g.hands_on_rim())
     sparkles = "".join(sp.replace('stroke-width="2.6"', 'stroke-width="9"') for sp in (g.sparkle(150, 214, 44), g.sparkle(872, 318, 34), g.sparkle(880, 168, 20, g.SPARK_LIGHT)))
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {S} {S}" width="{S}" height="{S}">'
             f'{g.defs()}'

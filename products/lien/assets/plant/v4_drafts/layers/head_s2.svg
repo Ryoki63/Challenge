@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 320" width="240" height="320"><defs>
+  <linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#FFFBF2"/>
+    <stop offset="0.55" stop-color="#FFF1DC"/>
+    <stop offset="1" stop-color="#F6D9B6"/>
+  </linearGradient>
+  <linearGradient id="gPot" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#F4AE86"/>
+    <stop offset="0.45" stop-color="#E6895C"/>
+    <stop offset="1" stop-color="#CC6E45"/>
+  </linearGradient>
+  <linearGradient id="gRim" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#F7BE9A"/>
+    <stop offset="0.5" stop-color="#F4AE86"/>
+    <stop offset="1" stop-color="#E6895C"/>
+  </linearGradient>
+  <radialGradient id="gSoil" cx="0.5" cy="0.3" r="0.8">
+    <stop offset="0" stop-color="#7E5539"/>
+    <stop offset="1" stop-color="#644129"/>
+  </radialGradient>
+</defs><path d="M120 112 C116 104 106 98 108 86" fill="none" stroke="#4A3428" stroke-width="11.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M120 112 C116 104 106 98 108 86" fill="none" stroke="#74BD52" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M120 112 C124 104 134 98 132 86" fill="none" stroke="#4A3428" stroke-width="11.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M120 112 C124 104 134 98 132 86" fill="none" stroke="#74BD52" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(108 87) scale(1 1) rotate(-58)"><path d="M0 0 C4 -12.7 14 -11.3 18 0 C13.3 10 4.3 10.7 0 0 Z" fill="#82C95C"/><path d="M0 0 C4 -12.7 14 -11.3 18 0 C12.6 0 5.4 -0.7 0 0 Z" fill="#B5E58C"/><path d="M2.5 -0.3 Q9 -1.1 14.4 0" fill="none" stroke="#D6F5B8" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/><path d="M0 0 C4 -12.7 14 -11.3 18 0 C13.3 10 4.3 10.7 0 0 Z" fill="none" stroke="#4A3428" stroke-width="3.2" stroke-linejoin="round"/></g><g transform="translate(132 87) scale(-1 1) rotate(-58)"><path d="M0 0 C4 -12.7 14 -11.3 18 0 C13.3 10 4.3 10.7 0 0 Z" fill="#82C95C"/><path d="M0 0 C4 -12.7 14 -11.3 18 0 C12.6 0 5.4 -0.7 0 0 Z" fill="#B5E58C"/><path d="M2.5 -0.3 Q9 -1.1 14.4 0" fill="none" stroke="#D6F5B8" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/><path d="M0 0 C4 -12.7 14 -11.3 18 0 C13.3 10 4.3 10.7 0 0 Z" fill="none" stroke="#4A3428" stroke-width="3.2" stroke-linejoin="round"/></g></svg>

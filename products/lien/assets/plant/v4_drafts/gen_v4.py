@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Lien 植物キャラクター v4「タネの子」— SVG ベクタージェネレータ。
+"""Lien 植物キャラクター v4「タネの子」— SVG 部品ライブラリ(パレット・体・顔・鉢・葉・花の描画関数)。
+
+**単体では実行しない**。成果物の生成は gen_layers.py(レイヤー33点+合成プレビュー+契約13枚)と
+gen_icon_v4.py(アイコン)が行い、どちらもこのモジュールの関数を使う。
+以下は初版(2026-10-12 午前)の説明として残す。
+
 
 v0〜v3(ドット絵)を全面的に置き換える刷新案。キャラ設計:
   - 主役は鉢に住む「タネの子」。まるい大福のような体に顔があり、**頭から植物が育つ**
@@ -58,7 +63,6 @@ SOIL_DARK = "#644129"
 
 SPARK = "#FFCF4D"
 SPARK_LIGHT = "#FFF0B3"
-DROP = "#9CD3F5"
 
 FLOWER = {
     "pink":   {"petal": "#FFB3C7", "light": "#FFD9E3", "shade": "#F08AA6", "center": "#FFD45E", "center_dark": "#F2AE3C"},
@@ -111,7 +115,7 @@ POT_BOTTOM = 298.0
 
 def pot():
     rim = (f'<rect x="{f(RIM_X0)}" y="{f(RIM_Y0)}" width="{f(RIM_X1 - RIM_X0)}" '
-           f'height="{f(RIM_Y1 - RIM_Y0)}" rx="10" fill="url(#gRim)" stroke="{OUT}" stroke-width="{SW}"/>')
+           f'height="{f(RIM_Y1 - RIM_Y0)}" rx="10" ry="10" fill="url(#gRim)" stroke="{OUT}" stroke-width="{SW}"/>')
     body = (f'<path d="M55 {f(RIM_Y1)} L185 {f(RIM_Y1)} L175 {f(POT_BOTTOM - 9)} '
             f'Q173 {f(POT_BOTTOM)} 163 {f(POT_BOTTOM)} L77 {f(POT_BOTTOM)} Q67 {f(POT_BOTTOM)} 65 {f(POT_BOTTOM - 9)} Z" '
             f'fill="url(#gPot)" stroke="{OUT}" stroke-width="{SW}" stroke-linejoin="round"/>')
@@ -174,18 +178,6 @@ def hands_on_rim():
     return hand(CX - 50, RIM_Y0 + 1, -12) + hand(CX + 50, RIM_Y0 + 1, 12)
 
 
-def arms_up():
-    """バンザイ(喜び)— 体の背後から生えるように先に描く。"""
-    out = ""
-    for sx in (-1, 1):
-        x0, y0 = CX + sx * 62, 198
-        x1, y1 = CX + sx * 84, 164
-        d = f"M{f(x0)} {f(y0)} Q{f(CX + sx * 84)} {f(186)} {f(x1)} {f(y1)}"
-        out += (f'<path d="{d}" fill="none" stroke="{OUT}" stroke-width="{f(19 + SW * 2 - 1)}" stroke-linecap="round"/>'
-                f'<path d="{d}" fill="none" stroke="{BODY_MID}" stroke-width="19" stroke-linecap="round"/>')
-    return out
-
-
 # ---------------------------------------------------------------------------
 # 顔
 # ---------------------------------------------------------------------------
@@ -233,22 +225,6 @@ def eyes_sleep(dy=0.0):
     return out
 
 
-def eyes_sad(dy=0.0):
-    """しょんぼり: 開いた目+ハの字まゆ(泣かない・苦しまない)"""
-    out = ""
-    for sx in (-1, 1):
-        x = CX + sx * EYE_DX
-        y = EYE_Y + dy + 2
-        out += f'<ellipse cx="{f(x)}" cy="{f(y)}" rx="6" ry="7.2" fill="{EYE}"/>'
-        out += f'<circle cx="{f(x + 2)}" cy="{f(y - 2.8)}" r="2.3" fill="#FFFFFF"/>'
-        # まゆ: 外側が下がるハの字
-        bx0, by0 = x - sx * 2, y - 15
-        bx1, by1 = x + sx * 9, y - 11
-        out += (f'<path d="M{f(bx0)} {f(by0)} L{f(bx1)} {f(by1)}" stroke="{EYE}" stroke-width="3.2" '
-                f'stroke-linecap="round"/>')
-    return out
-
-
 def mouth_smile(dy=0.0):
     y = 196.0 + dy
     return (f'<path d="M{f(CX - 7)} {f(y)} Q{f(CX)} {f(y + 7)} {f(CX + 7)} {f(y)}" fill="none" '
@@ -269,17 +245,9 @@ def mouth_sleep(dy=0.0):
     return f'<ellipse cx="{f(CX)}" cy="{f(y)}" rx="3.2" ry="2.6" fill="{EYE}"/>'
 
 
-def mouth_sad(dy=0.0):
-    y = 201.0 + dy
-    return (f'<path d="M{f(CX - 6)} {f(y)} Q{f(CX)} {f(y - 5)} {f(CX + 6)} {f(y)}" fill="none" '
-            f'stroke="{EYE}" stroke-width="3.4" stroke-linecap="round"/>')
-
-
 def face(mood, dy=0.0):
     if mood == "happy":
         return blush(dy, 0.75) + eyes_happy(dy) + mouth_open(dy)
-    if mood == "sad":
-        return blush(dy, 0.35) + eyes_sad(dy) + mouth_sad(dy)
     if mood == "sleep":
         return blush(dy, 0.45) + eyes_sleep(dy) + mouth_sleep(dy)
     return blush(dy) + eyes_open(dy) + mouth_smile(dy)
@@ -315,111 +283,12 @@ def stem(d, width=5.5):
             f'<path d="{d}" fill="none" stroke="{STEM}" stroke-width="{f(width)}" stroke-linecap="round" stroke-linejoin="round"/>')
 
 
-def bud(x, y, angle, size=1.0, color="pink"):
-    """つぼみ(上向きのしずく形)。angle で内側に傾ける。"""
-    c = FLOWER[color]
-    s = size
-    tr = f"translate({f(x)} {f(y)}) rotate({f(angle)}) scale({f(s)})"
-    return (f'<g transform="{tr}">'
-            f'<path d="M0 -21 C9 -13 12 -3 9 3 C6 8 -6 8 -9 3 C-12 -3 -9 -13 0 -21 Z" fill="{c["petal"]}" stroke="{OUT}" stroke-width="{f(SW / s)}" stroke-linejoin="round"/>'
-            f'<path d="M0 -17 C4 -11 5 -5 3 -1" fill="none" stroke="{c["light"]}" stroke-width="{f(3 / s)}" stroke-linecap="round"/>'
-            # がく
-            f'<path d="M-10 2 Q-6 -5 0 1 Q6 -5 10 2 Q6 10 0 9 Q-6 10 -10 2 Z" fill="{LEAF}" stroke="{OUT}" stroke-width="{f(SW / s)}" stroke-linejoin="round"/>'
-            f'</g>')
-
-
-def flower(x, y, r, angle=0.0, color="pink", petals=5):
-    c = FLOWER[color]
-    out = f'<g transform="translate({f(x)} {f(y)}) rotate({f(angle)})">'
-    pr = r * 0.52   # 花びらの半径
-    dist = r * 0.5
-    for k in range(petals):
-        a = -90 + k * 360 / petals
-        px = dist * math.cos(math.radians(a))
-        py = dist * math.sin(math.radians(a))
-        out += (f'<ellipse cx="{f(px)}" cy="{f(py)}" rx="{f(pr * 0.92)}" ry="{f(pr * 1.08)}" '
-                f'transform="rotate({f(a + 90)} {f(px)} {f(py)})" fill="{c["petal"]}" stroke="{OUT}" stroke-width="{SW}"/>')
-    # 花びらの内側(付け根寄り)を明るく — 立体感と「ふんわり」感
-    for k in range(petals):
-        a = -90 + k * 360 / petals
-        hx = (dist - pr * 0.18) * math.cos(math.radians(a))
-        hy = (dist - pr * 0.18) * math.sin(math.radians(a))
-        out += (f'<ellipse cx="{f(hx)}" cy="{f(hy)}" rx="{f(pr * 0.5)}" ry="{f(pr * 0.62)}" '
-                f'transform="rotate({f(a + 90)} {f(hx)} {f(hy)})" fill="{c["light"]}" opacity="0.9"/>')
-    out += f'<circle cx="0" cy="0" r="{f(r * 0.36)}" fill="{c["center"]}" stroke="{OUT}" stroke-width="{SW}"/>'
-    out += f'<circle cx="{f(-r * 0.1)}" cy="{f(-r * 0.1)}" r="{f(r * 0.12)}" fill="#FFFFFF" opacity="0.7"/>'
-    out += '</g>'
-    return out
-
-
 def bez(p0, p1, p2, p3, t):
     """3次ベジェ上の点(茎に葉を正しく付けるため)。"""
     u = 1 - t
     x = u ** 3 * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t ** 3 * p3[0]
     y = u ** 3 * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t ** 3 * p3[1]
     return x, y
-
-
-# --- 段階ごとの頭の植物 -----------------------------------------------------
-def plant(stage, mood, color="pink"):
-    """stage: 1 芽 / 2 双葉 / 3 若葉 / 4 つぼみ / 5 開花(二輪咲き)。
-    mood=sad で葉が垂れる(枯れない・縮まない)。happy で少し上向き。"""
-    ax, ay = HEAD_ANCHOR
-    lift = 10 if mood == "happy" else (-24 if mood == "sad" else 0)
-    droop = 0.22 if mood == "sad" else 0.0
-    out = ""
-    if stage == 1:
-        top = ay - 20
-        out += stem(f"M{f(ax)} {f(ay + 4)} L{f(ax)} {f(top)}", 5)
-        out += leaf(ax, top + 1, 21, 38 + lift, -1, 0.52, droop)
-        out += leaf(ax, top + 1, 21, 38 + lift, +1, 0.52, droop)
-    elif stage == 2:
-        top = ay - 26
-        out += stem(f"M{f(ax)} {f(ay + 4)} L{f(ax)} {f(top)}", 5.5)
-        out += leaf(ax, top + 1, 44, 18 + lift, -1, 0.5, droop)
-        out += leaf(ax, top + 1, 44, 18 + lift, +1, 0.5, droop)
-    elif stage == 3:
-        fut = ay - 22
-        top = ay - 62
-        out += stem(f"M{f(ax)} {f(ay + 4)} C{f(ax)} {f(fut - 10)} {f(ax + 7)} {f(top + 22)} {f(ax)} {f(top)}", 5.5)
-        out += leaf(ax, fut, 40, 12 + lift * 0.8, -1, 0.5, droop)
-        out += leaf(ax, fut, 40, 12 + lift * 0.8, +1, 0.5, droop)
-        out += leaf(ax + 2, top + 18, 30, 40 + lift, +1, 0.48, droop)
-        out += leaf(ax + 1, top + 4, 26, 44 + lift, -1, 0.48, droop)
-        # 先端の小さな芽
-        out += leaf(ax, top + 1, 12, 78, +1, 0.55, 0)
-    elif stage in (4, 5):
-        fut = ay - 20
-        split = ay - 30
-        # ふたりの茎: 外へふくらんで内へ戻る = 2本の茎のすき間がハート形になる
-        sad = mood == "sad"
-        top_y = ay - (96 if stage == 5 else 92) + (8 if sad else 0)
-        gap = 27 if stage == 5 else 20
-        curves = []
-        for sx in (-1, 1):
-            p0 = (ax, split)
-            p1 = (ax + sx * 14, split - 4)
-            p2 = (ax + sx * 58, split - 30)
-            p3 = (ax + sx * gap, top_y)
-            curves.append((sx, p0, p1, p2, p3))
-        out += stem(f"M{f(ax)} {f(ay + 4)} L{f(ax)} {f(split)}", 6)
-        for sx, p0, p1, p2, p3 in curves:
-            out += stem(f"M{f(p0[0])} {f(p0[1])} C{f(p1[0])} {f(p1[1])} {f(p2[0])} {f(p2[1])} {f(p3[0])} {f(p3[1])}", 5.2)
-        out += leaf(ax, fut, 40, 12 + lift * 0.8, -1, 0.5, droop)
-        out += leaf(ax, fut, 40, 12 + lift * 0.8, +1, 0.5, droop)
-        # 茎の途中(外側のふくらみ)に付く小さな葉
-        for sx, p0, p1, p2, p3 in curves:
-            bx, by = bez(p0, p1, p2, p3, 0.52)
-            out += leaf(bx, by, 22, 22 + lift * 0.6, sx, 0.5, droop)
-        tilt = 18 + (14 if sad else 0)
-        if stage == 4:
-            for sx, p0, p1, p2, p3 in curves:
-                out += bud(p3[0], p3[1] + 2, -sx * tilt, 1.22, color)
-        else:
-            fr = 31
-            for sx, p0, p1, p2, p3 in curves:
-                out += flower(p3[0] + sx * 2, p3[1] - 6, fr, sx * (14 - (10 if sad else 0)), color)
-    return out
 
 
 # ---------------------------------------------------------------------------
@@ -432,96 +301,9 @@ def sparkle(x, y, s, color=SPARK):
     return f'<path d="{d}" fill="{color}" stroke="{OUT}" stroke-width="2.6" stroke-linejoin="round"/>'
 
 
-def happy_fx(stage):
-    top = 40 if stage >= 4 else (70 if stage == 3 else 92)
-    return (sparkle(30, top + 10, 11) + sparkle(212, top + 30, 13) + sparkle(222, 214, 7, SPARK_LIGHT)
-            + sparkle(20, 206, 8, SPARK_LIGHT)
-            + f'<circle cx="52" cy="{f(top + 46)}" r="3" fill="{SPARK}"/>'
-            + f'<circle cx="190" cy="{f(top)}" r="3" fill="{SPARK}"/>')
-
-
-def sad_fx():
-    # 汗ひとつぶ(右上)— 痛み・涙ではなく「しょんぼり」の記号
-    x, y = 180, 152
-    return (f'<path d="M{x} {y - 13} C{x + 6} {y - 4} {x + 8} {y} {x + 8} {y + 4} '
-            f'C{x + 8} {y + 9} {x + 4} {y + 12} {x} {y + 12} C{x - 4} {y + 12} {x - 8} {y + 9} {x - 8} {y + 4} '
-            f'C{x - 8} {y} {x - 6} {y - 4} {x} {y - 13} Z" fill="{DROP}" stroke="{OUT}" stroke-width="2.8"/>'
-            f'<circle cx="{x - 3}" cy="{y + 4}" r="2" fill="#FFFFFF" opacity="0.9"/>')
-
-
-def zzz():
-    def z(x, y, size, op):
-        d = f"M{f(x)} {f(y)} L{f(x + size)} {f(y)} L{f(x)} {f(y + size * 1.1)} L{f(x + size)} {f(y + size * 1.1)}"
-        return (f'<path d="{d}" fill="none" stroke="{OUT}" stroke-width="3.6" stroke-linecap="round" '
-                f'stroke-linejoin="round" opacity="{op}"/>')
-    return z(168, 150, 13, 0.75) + z(188, 126, 9, 0.55)
-
-
-# ---------------------------------------------------------------------------
-# フレーム合成
-# ---------------------------------------------------------------------------
-def soil_frame():
-    """ソロ / stage0: タネの子は土の中でおやすみ中(頭のてっぺんだけ見える)。
-    ペア成立→ふたりの初チェックインで目を覚ます=招待とチェックインの動機。"""
-    inner = ground_shadow()
-    inner += soil_in_pot()
-    # 土から少しだけ出た頭(体パスを下げて描き、鉢で隠す)
-    inner += (f'<clipPath id="cSoil"><rect x="0" y="0" width="{W}" height="{f(RIM_Y0 + 6)}"/></clipPath>'
-              f'<g clip-path="url(#cSoil)"><g transform="translate(0 21) translate(120 232) scale(0.84) translate(-120 -232)">{body()}{face("sleep")}</g></g>')
-    inner += pot()
-    inner += hands_on_rim()
-    inner += zzz()
-    return inner
-
-
-def stage_frame(stage, mood, color="pink"):
-    inner = ground_shadow()
-    inner += plant(stage, mood, color)
-    inner += soil_in_pot()
-    if mood == "happy":
-        inner += arms_up()
-    squash = 0.96 if mood == "sad" else 1.0
-    dy = 2.0 if mood == "sad" else 0.0
-    inner += body(dy=0, squash=squash)
-    inner += face(mood, dy=dy)
-    inner += pot()
-    if mood != "happy":
-        inner += hands_on_rim()
-    if mood == "happy":
-        inner += happy_fx(stage)
-    elif mood == "sad":
-        inner += sad_fx()
-    return inner
-
-
 def svg(inner):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">'
             f'{defs()}{inner}</svg>\n')
-
-
-# 契約(PlantSprite.swift / mapping.md)の13 imageset と同名で出力する
-FRAMES = [
-    ("soil", lambda: soil_frame()),
-    ("stage1_normal", lambda: stage_frame(1, "normal")),
-    ("stage1_happy", lambda: stage_frame(1, "happy")),
-    ("stage2_normal", lambda: stage_frame(2, "normal")),
-    ("stage2_happy", lambda: stage_frame(2, "happy")),
-    ("stage2_sad", lambda: stage_frame(2, "sad")),
-    ("stage3_normal", lambda: stage_frame(3, "normal")),
-    ("stage3_happy", lambda: stage_frame(3, "happy")),
-    ("stage4_normal", lambda: stage_frame(4, "normal")),
-    ("stage4_happy", lambda: stage_frame(4, "happy")),
-    ("stage5_normal", lambda: stage_frame(5, "normal")),
-    ("stage5_happy", lambda: stage_frame(5, "happy")),
-    ("stage5_sad", lambda: stage_frame(5, "sad")),
-]
-
-# 参考: 最終形の花色バリエーション(成長ルール案の「色違い」用。パレット差し替えのみ)
-EXTRAS = [
-    ("extra_stage5_yellow", lambda: stage_frame(5, "normal", "yellow")),
-    ("extra_stage5_blue", lambda: stage_frame(5, "normal", "blue")),
-    ("extra_stage5_white", lambda: stage_frame(5, "normal", "white")),
-]
 
 
 def render_png(svg_path, png_path, scale=2):
@@ -532,52 +314,8 @@ def render_png(svg_path, png_path, scale=2):
     ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def contact_sheet(names, path, cols=7, cell_w=240, cell_h=320, label=True):
-    rows = math.ceil(len(names) / cols)
-    pad = 8
-    lab = 26 if label else 0
-    sw, sh = cols * (cell_w + pad) + pad, rows * (cell_h + lab + pad) + pad
-    cells = ""
-    for i, n in enumerate(names):
-        cx = pad + (i % cols) * (cell_w + pad)
-        cy = pad + (i // cols) * (cell_h + lab + pad)
-        cells += (f'<div style="position:absolute;left:{cx}px;top:{cy}px;width:{cell_w}px;height:{cell_h + lab}px;'
-                  f'background:#FFF7EA;border-radius:18px">'
-                  f'<img src="svg/{n}.svg" style="width:{cell_w}px;height:{cell_h}px;display:block">'
-                  + (f'<div style="font:600 13px -apple-system,Helvetica;color:#8A6F5E;text-align:center">{n}</div>' if label else "")
-                  + '</div>')
-    html = (f'<!doctype html><html><body style="margin:0;background:#F3E9DA;width:{sw}px;height:{sh}px;position:relative">'
-            f'{cells}</body></html>')
-    hp = os.path.join(HERE, "_sheet.html")
-    with open(hp, "w") as fh:
-        fh.write(html)
-    subprocess.run([
-        CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--allow-file-access-from-files",
-        f"--window-size={sw},{sh}", "--force-device-scale-factor=1", f"--screenshot={path}", "file://" + hp,
-    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    os.remove(hp)
-
-
 def main():
-    svg_only = "--svg-only" in sys.argv
-    for d in (SVG_DIR, PNG_DIR):
-        if os.path.isdir(d):
-            shutil.rmtree(d)
-        os.makedirs(d)
-    names = []
-    for name, fn in FRAMES + EXTRAS:
-        p = os.path.join(SVG_DIR, f"{name}.svg")
-        with open(p, "w") as fh:
-            fh.write(svg(fn()))
-        names.append(name)
-    if svg_only:
-        return
-    for name in names:
-        render_png(os.path.join(SVG_DIR, f"{name}.svg"), os.path.join(PNG_DIR, f"{name}.png"))
-    contact_sheet([n for n, _ in FRAMES], os.path.join(HERE, "contact_sheet.png"))
-    contact_sheet(["soil", "stage1_normal", "stage2_normal", "stage3_normal", "stage4_normal", "stage5_normal", "stage5_happy"],
-                  os.path.join(HERE, "growth_strip.png"), cols=7, label=False)
-    contact_sheet([n for n, _ in EXTRAS] + ["stage5_normal"], os.path.join(HERE, "variants.png"), cols=4)
+    raise SystemExit("gen_v4.py は部品ライブラリです。python3 gen_layers.py と python3 gen_icon_v4.py を実行してください")
 
 
 if __name__ == "__main__":
