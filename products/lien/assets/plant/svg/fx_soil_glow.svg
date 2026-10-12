@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 320" width="240" height="320"><defs>
+  <linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#FFFBF2"/>
+    <stop offset="0.55" stop-color="#FFF1DC"/>
+    <stop offset="1" stop-color="#F6D9B6"/>
+  </linearGradient>
+  <linearGradient id="gPot" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#F4AE86"/>
+    <stop offset="0.45" stop-color="#E6895C"/>
+    <stop offset="1" stop-color="#CC6E45"/>
+  </linearGradient>
+  <linearGradient id="gRim" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#F7BE9A"/>
+    <stop offset="0.5" stop-color="#F4AE86"/>
+    <stop offset="1" stop-color="#E6895C"/>
+  </linearGradient>
+  <radialGradient id="gSoil" cx="0.5" cy="0.3" r="0.8">
+    <stop offset="0" stop-color="#7E5539"/>
+    <stop offset="1" stop-color="#644129"/>
+  </radialGradient>
+</defs><ellipse cx="120" cy="206" rx="104.4" ry="58" fill="#FFF3A8" opacity="0.170"/><ellipse cx="120" cy="206" rx="83.5" ry="46.4" fill="#FFF3A8" opacity="0.170"/><ellipse cx="120" cy="206" rx="62.6" ry="34.8" fill="#FFF3A8" opacity="0.170"/><ellipse cx="120" cy="206" rx="41.8" ry="23.2" fill="#FFF3A8" opacity="0.170"/><ellipse cx="120" cy="206" rx="20.9" ry="11.6" fill="#FFF3A8" opacity="0.170"/><path d="M40 169 Q41.5 174.5 47 176 Q41.5 177.5 40 183 Q38.5 177.5 33 176 Q38.5 174.5 40 169 Z" fill="#FFCF4D" stroke="#4A3428" stroke-width="2.6" stroke-linejoin="round"/><path d="M204 159 Q206 166 213 168 Q206 170 204 177 Q202 170 195 168 Q202 166 204 159 Z" fill="#FFCF4D" stroke="#4A3428" stroke-width="2.6" stroke-linejoin="round"/><path d="M178 141 Q179.1 144.9 183 146 Q179.1 147.1 178 151 Q176.9 147.1 173 146 Q176.9 144.9 178 141 Z" fill="#FFF0B3" stroke="#4A3428" stroke-width="2.6" stroke-linejoin="round"/></svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 320" width="240" height="320"><defs>
+  <linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#FFFBF2"/>
+    <stop offset="0.55" stop-color="#FFF1DC"/>
+    <stop offset="1" stop-color="#F6D9B6"/>
+  </linearGradient>
+  <linearGradient id="gPot" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#F4AE86"/>
+    <stop offset="0.45" stop-color="#E6895C"/>
+    <stop offset="1" stop-color="#CC6E45"/>
+  </linearGradient>
+  <linearGradient id="gRim" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#F7BE9A"/>
+    <stop offset="0.5" stop-color="#F4AE86"/>
+    <stop offset="1" stop-color="#E6895C"/>
+  </linearGradient>
+  <radialGradient id="gSoil" cx="0.5" cy="0.3" r="0.8">
+    <stop offset="0" stop-color="#7E5539"/>
+    <stop offset="1" stop-color="#644129"/>
+  </radialGradient>
+</defs><path d="M30 49 Q32.4 57.6 41 60 Q32.4 62.4 30 71 Q27.6 62.4 19 60 Q27.6 57.6 30 49 Z" fill="#FFCF4D" stroke="#4A3428" stroke-width="2.6" stroke-linejoin="round"/><path d="M212 71 Q214.9 81.1 225 84 Q214.9 86.9 212 97 Q209.1 86.9 199 84 Q209.1 81.1 212 71 Z" fill="#FFCF4D" stroke="#4A3428" stroke-width="2.6" stroke-linejoin="round"/><path d="M226 243 Q227.5 248.5 233 250 Q227.5 251.5 226 257 Q224.5 251.5 219 250 Q224.5 248.5 226 243 Z" fill="#FFF0B3" stroke="#4A3428" stroke-width="2.6" stroke-linejoin="round"/><path d="M14 236 Q15.8 242.2 22 244 Q15.8 245.8 14 252 Q12.2 245.8 6 244 Q12.2 242.2 14 236 Z" fill="#FFF0B3" stroke="#4A3428" stroke-width="2.6" stroke-linejoin="round"/><circle cx="52" cy="100" r="3" fill="#FFCF4D"/><circle cx="194" cy="50" r="3" fill="#FFCF4D"/></svg>

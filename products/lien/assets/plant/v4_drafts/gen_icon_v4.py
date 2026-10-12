@@ -4,16 +4,20 @@
 1024×1024。iOS が角丸マスクを掛けるので四隅は塗りつぶしのまま出力する。
 背景候補を3色出し、contact で比較できるようにする。
 
-使い方: python3 gen_icon_v4.py
+使い方: python3 gen_icon_v4.py   (gen_v4 / gen_layers は ../tools/ から読む)
 """
 
 import os
 import subprocess
-
-import gen_v4 as g
-import gen_layers as gl
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# gen_v4.py / gen_layers.py は 2026-10-13 に ../tools/ へ昇格した(issue #56)
+sys.path.insert(0, os.path.join(HERE, "..", "tools"))
+
+import gen_v4 as g  # noqa: E402
+import gen_layers as gl  # noqa: E402
+
 OUT_DIR = os.path.join(HERE, "icon")
 S = 1024
 

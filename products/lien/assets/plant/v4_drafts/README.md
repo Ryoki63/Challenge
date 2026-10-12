@@ -1,6 +1,12 @@
 # 植物キャラクター v4「タネの子」— SVG レイヤー下書き
 
-- 状態: **下書き(G2 #40 でユーザー承認待ち)**。本番の `../png/`・`../PlantAssets.xcassets/`・`../tools/`・`../mapping.md` は未変更(`mapping.md` は現行のドット絵 v0 の説明のまま。採用後の取込タスクで、この README の内容に置き換える)
+> **【2026-10-13 取込済み(issue #56)】** この下書きは D1 で採用され、`../svg/`・`../PlantAssets.xcassets/` に取り込まれた。
+> **レイヤー名・重ね順・状態対応・のぞきの位置・左右反転・ダークモードの正本は [`../mapping.md`](../mapping.md)**。
+> 生成スクリプトは `../tools/`(`gen_v4.py`・`gen_layers.py` を昇格。部品の絵は変えていない)に移した。
+> このフォルダは**承認時点の下書きの記録**(プレビュー画像・独立レビューの対応表)で、これ以降は更新しない。
+> 以下の本文は取込前の記述のまま(`../png/`・`../tools/gen_sprites.py` などは廃止した)。
+
+- 状態(取込前): 下書き(G2 #40 でユーザー承認待ち)。本番の `../png/`・`../PlantAssets.xcassets/`・`../tools/`・`../mapping.md` は未変更(`mapping.md` は現行のドット絵 v0 の説明のまま。採用後の取込タスクで、この README の内容に置き換える)
 - 制作: 2026-10-12、Opus(ユーザーの直接指示「イラストはダサすぎるので刷新」による。#49 の F 本制作とは別物)
 - 成長ルール: [docs/GROWTH.md](../../../../../docs/GROWTH.md) §4・§9 に対応(10段階・ふたりの葉・すやすや)
 - 独立レビュー(Opus max)を1回実施し、指摘を反映済み(末尾の対応表)
@@ -27,20 +33,21 @@
 | `contact_sheet.png` | 旧6段階ルールのまま進める場合のフォールバック(契約13枚+段階ごとの sad 3枚) |
 | `icon_compare.png` | アイコン案(空色を推奨。杏・ミントは比較用) |
 
-## 生成
+## 生成(取込前の記述。現在は `../tools/` を使う)
 
 ```bash
-python3 gen_layers.py     # layers/(34点)・composed/・svg/+png/(フォールバック)・preview_*.png・peek_offsets.json
-python3 gen_icon_v4.py    # icon/(1024px)+ icon_compare.png
+# 取込後:  cd .. && python3 tools/gen_layers.py [--previews]
+python3 gen_icon_v4.py    # icon/(1024px)+ icon_compare.png(../tools の gen_v4 / gen_layers を使う)
 ```
 
+- 取込前は `python3 gen_layers.py` が layers/(34点)・composed/・svg/+png/(フォールバック)・preview_*.png・peek_offsets.json を出していた。
+  取込後の `../tools/gen_layers.py` は、`../svg/`(34点)・`../peek_offsets.json`・`../layer_stacks.json` を出す(プレビューは `--previews` で `../_preview/` へ。git には入れない)
 - `gen_v4.py` は部品ライブラリ(単体では実行しない)
-- プレビューの PNG 化はヘッドレス Chrome(`/Applications/Google Chrome.app`)。SVG 自体は依存なし
-- 決定論: 同じ入力から同じ SVG が出る(2回生成して全 SVG のハッシュ一致を確認)
-- 生成時の自動チェック(失敗したら止まる)
+- 決定論: 同じ入力から同じ SVG が出る。取込後は、三角関数・べき乗の誤差を丸めて ubuntu(CI)と macOS で同じ出力になるようにし、CI が再生成の diff を検査する
+- 生成時の自動チェック(失敗したら止まる)。取込後は `../tools/verify_assets.py` が CI でも実行する
   - 使う SVG 要素は path・基本図形・linear/radialGradient・opacity・transform のみ。filter・mask・clipPath・text・style・use・image・stop-opacity は使わない
   - 全レイヤーが XML として妥当
-  - **左右の花の塗り(`petal_sN` とその左右反転)が1画素も重ならない**(塗りと線を別レイヤーにしても輪郭が透けない条件)
+  - **左右の花の塗り(`petal_sN` とその左右反転)が1画素も重ならない**(取込後は Chrome を使わず純 Python で走査する)
 - 光(芽・土・のぞき・ハートのタネ)は stop-opacity を使わず、不透明度の低い同心円を重ねて描く(iOS の SVG 描画との差をなくすため)
 
 ## レイヤー(34点)

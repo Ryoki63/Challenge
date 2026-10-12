@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 320" width="240" height="320"><defs>
+  <linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#FFFBF2"/>
+    <stop offset="0.55" stop-color="#FFF1DC"/>
+    <stop offset="1" stop-color="#F6D9B6"/>
+  </linearGradient>
+  <linearGradient id="gPot" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#F4AE86"/>
+    <stop offset="0.45" stop-color="#E6895C"/>
+    <stop offset="1" stop-color="#CC6E45"/>
+  </linearGradient>
+  <linearGradient id="gRim" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#F7BE9A"/>
+    <stop offset="0.5" stop-color="#F4AE86"/>
+    <stop offset="1" stop-color="#E6895C"/>
+  </linearGradient>
+  <radialGradient id="gSoil" cx="0.5" cy="0.3" r="0.8">
+    <stop offset="0" stop-color="#7E5539"/>
+    <stop offset="1" stop-color="#644129"/>
+  </radialGradient>
+</defs><ellipse cx="70" cy="223" rx="10" ry="8" transform="rotate(-12 70 223)" fill="#FFF1DC" stroke="#4A3428" stroke-width="4.2"/><ellipse cx="67" cy="220" rx="2.6" ry="1.6" fill="#FFFFFF" opacity="0.6"/><ellipse cx="170" cy="223" rx="10" ry="8" transform="rotate(12 170 223)" fill="#FFF1DC" stroke="#4A3428" stroke-width="4.2"/><ellipse cx="167" cy="220" rx="2.6" ry="1.6" fill="#FFFFFF" opacity="0.6"/></svg>
