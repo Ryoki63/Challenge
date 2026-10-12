@@ -8,6 +8,7 @@ import {
   type CloseDayPairRow,
   type CloseDayRepo,
   handleCloseDay,
+  parseCloseDayRequest,
 } from "./core.ts";
 import type {
   PairSnapshot,
@@ -633,4 +634,174 @@ Deno.test("close-day: plants の書き込みが前回失敗していても、次
   await handleCloseDay(deps(world, pusher), {});
 
   assertEquals(world.plants.get("pair-1"), { grownDays: 4 });
+});
+
+// ---- notify(手動の再実行で通知を再送しない — issue #60)----
+
+Deno.test("close-day: notify 省略は true(cron の素朴な POST は従来どおり通知する)・応答に notify を載せる", async () => {
+  const world = makeWorld();
+  world.checkins.add(`user-a|${D}`); // B が未達 → チケット消費
+  const { sent, pusher } = makePusher();
+
+  const result = await handleCloseDay(deps(world, pusher), {});
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.notify, true);
+  assertEquals(sent.length, 2);
+});
+
+Deno.test("close-day: notify: false — チケット消費は確定するが push は一切送らない", async () => {
+  const world = makeWorld();
+  world.checkins.add(`user-a|${D}`); // B が未達
+  const { sent, pusher } = makePusher();
+
+  const result = await handleCloseDay(deps(world, pusher), { notify: false });
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.notify, false);
+  assertEquals(result.body.recordedTicket, 1);
+  assertEquals(world.streakDays.get(`pair-1|${D}`), "ticket", "確定はする");
+  assertEquals(world.pairs[0].ticketBalance, 1);
+  assertEquals(world.ledger, [
+    { pairId: "pair-1", delta: -1, reason: "consume", dateLocal: D },
+  ]);
+  assertEquals(sent.length, 0, "通知は送らない");
+});
+
+Deno.test("close-day: notify: false — リセットは確定(記録)するが責めない文言の push も送らない", async () => {
+  const world = makeWorld();
+  world.pairs[0].ticketBalance = 0;
+  world.checkins.add(`user-a|${D}`);
+  const { sent, pusher } = makePusher();
+
+  const result = await handleCloseDay(deps(world, pusher), { notify: false });
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.reset, 1);
+  assertEquals(world.streakDays.has(`pair-1|${D}`), false);
+  assertEquals(world.resets, [{ pairId: "pair-1", dateLocal: D }]);
+  assertEquals(sent.length, 0);
+});
+
+Deno.test("close-day: リセットの日は行が残らないので、通常の再実行は push を再送する — だから手動の再実行は notify: false", async () => {
+  const world = makeWorld();
+  world.pairs[0].ticketBalance = 0;
+  world.checkins.add(`user-a|${D}`); // B が未達 → チケットなしでリセット
+  const { sent, pusher } = makePusher();
+  const d = deps(world, pusher);
+
+  // 00:10 の cron(通知あり)→ 両者へ「責めない文言」を1通ずつ
+  await handleCloseDay(d, {});
+  assertEquals(sent.length, 2);
+
+  // 通常の再実行(notify 省略)は、もう一度リセットの分岐に入って再送する(既知の挙動)
+  await handleCloseDay(d, {});
+  assertEquals(
+    sent.length,
+    4,
+    "notify を付けない再実行は同じ日のリセット通知を再送する",
+  );
+
+  // notify: false の再実行は、何度やっても送らない・データも増えない
+  const before = JSON.stringify([...world.streakDays.entries()]);
+  const rerun = await handleCloseDay(d, { notify: false });
+  assertEquals(rerun.status, 200);
+  if (rerun.status !== 200) throw new Error("unreachable");
+  assertEquals(rerun.body.reset, 1, "リセットの判定自体は同じ");
+  assertEquals(sent.length, 4, "notify: false は再送しない");
+  assertEquals(JSON.stringify([...world.streakDays.entries()]), before);
+  assertEquals(world.ledger.length, 0);
+});
+
+Deno.test("close-day: notify: false でも両者達成の確定(成長の数え直し)は同じ", async () => {
+  const world = makeWorld();
+  world.checkins.add(`user-a|${D}`).add(`user-b|${D}`);
+  const { sent, pusher } = makePusher();
+
+  const result = await handleCloseDay(deps(world, pusher), { notify: false });
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.recordedBoth, 1);
+  assertEquals(world.streakDays.get(`pair-1|${D}`), "both");
+  assertEquals(world.plants.get("pair-1"), { grownDays: 6 });
+  assertEquals(sent.length, 0);
+});
+
+// ---- 対象日のガード(終わっていない日は確定しない)----
+
+Deno.test("close-day: 今日(JST)・未来の日は 400 date_not_closable で、何も書かず何も送らない", async () => {
+  const world = makeWorld();
+  const { sent, pusher } = makePusher();
+
+  // NOW は JST 2026-06-11 00:10。今日 = 2026-06-11
+  for (const dateLocal of ["2026-06-11", "2026-06-12", "2027-01-01"]) {
+    const result = await handleCloseDay(deps(world, pusher), { dateLocal });
+    assertEquals(result.status, 400, dateLocal);
+    assertEquals(
+      result.status === 400 ? result.body : null,
+      { error: "date_not_closable" },
+      dateLocal,
+    );
+  }
+  assertEquals(world.streakDays.size, 5, "確定済みの5日のまま");
+  assertEquals(world.ledger.length, 0);
+  assertEquals(sent.length, 0);
+
+  // 昨日(JST)は確定できる
+  const yesterday = await handleCloseDay(deps(world, pusher), {
+    dateLocal: "2026-06-10",
+  });
+  assertEquals(yesterday.status, 200);
+});
+
+Deno.test("close-day: ガードは JST の日付で判定する(UTC の日付ではない)", async () => {
+  // 2026-06-10T20:00Z = JST 2026-06-11 05:00。UTC ではまだ 6/10 だが、JST の今日は 6/11
+  const at = new Date("2026-06-10T20:00:00Z");
+  const world = makeWorld();
+  const { pusher } = makePusher();
+  const d = { repo: makeRepo(world), pusher, now: () => at };
+
+  const today = await handleCloseDay(d, { dateLocal: "2026-06-11" });
+  assertEquals(today.status, 400);
+  const yesterday = await handleCloseDay(d, { dateLocal: "2026-06-10" });
+  assertEquals(yesterday.status, 200);
+});
+
+// ---- 要求の解釈 ----
+
+Deno.test("parseCloseDayRequest: dateLocal と notify だけ許す・型違いと知らないキーは 400", () => {
+  assertEquals(parseCloseDayRequest({}), { ok: true, value: {} });
+  assertEquals(
+    parseCloseDayRequest({ dateLocal: "2026-10-11", notify: false }),
+    { ok: true, value: { dateLocal: "2026-10-11", notify: false } },
+  );
+  assertEquals(parseCloseDayRequest({ notify: true }), {
+    ok: true,
+    value: { notify: true },
+  });
+  // notify は真偽値だけ("false" の文字列を既定の true で動かさない)
+  for (const notify of ["false", 0, 1, null, "no"]) {
+    assertEquals(
+      parseCloseDayRequest({ notify }),
+      { ok: false, error: "invalid_notify" },
+      String(notify),
+    );
+  }
+  assertEquals(parseCloseDayRequest({ dateLocal: 20261011 }), {
+    ok: false,
+    error: "invalid_date_local",
+  });
+  assertEquals(parseCloseDayRequest({ dateLocal: null }), {
+    ok: false,
+    error: "invalid_date_local",
+  });
+  // 打ち間違い(notifiy)を、既定の「通知あり」で動かさない
+  assertEquals(parseCloseDayRequest({ notifiy: false }), {
+    ok: false,
+    error: "unknown_field",
+  });
 });

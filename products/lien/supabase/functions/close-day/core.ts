@@ -17,8 +17,13 @@
 // 冪等性(DESIGN §5.4「close-day の再実行は安全」):
 //   - streak_days に d の行が既にあるペアは decideCloseDay が skip を返す
 //     → balance・ledger・植物・push のいずれも二重実行されない
-//   - reset(行なし)の再実行は再び reset 分岐に入るが、書き込みが無いので
-//     実害は push の再送のみ。index 側の cron は1日1回なので許容
+//   - reset(行なし)の再実行は再び reset 分岐に入る。書き込みが無いので実害は push の再送だけ
+//     (「責めない文言」でも、同じ日の通知が2回届くのは避けたい)。cron は1日1回なので通常は起きないが、
+//     手動の再実行(取りこぼしの埋め直し・動作確認)では起きる。そこで要求に `notify`(既定 true)を持たせ、
+//     `notify: false` なら push を一切送らない。手動の再実行スクリプト(scripts/ops/run-cron-fn.sh)は
+//     常に notify: false で呼ぶ(issue #60)
+//   - 確定できるのは「終わった日」だけ(対象日 < JST の今日)。今日・未来の日を確定すると、
+//     まだチェックインしていない人を未達として確定してしまい、streak_days の行が残って取り消せない
 //
 // 植物の成長(REQUIREMENTS §3.9 / GROWTH §7.2): 成長回数は「ふたり達成日の累計」なので
 // kind='both' の確定時だけ増える(ticket の日はストリーク継続だが達成日ではない)。
@@ -48,6 +53,7 @@ import {
   systemPushTitle,
   ticketUsedBody,
 } from "../_shared/messages.ts";
+import { type ParseResult, rejectUnknownKeys } from "../_shared/cron_http.ts";
 import type { Pusher } from "../checkin/core.ts";
 
 // DESIGN §5.4 はリセット時の push を要求するが、§4 の type 列挙には reset 用の値が
@@ -108,12 +114,47 @@ export interface CloseDayDeps {
   now?: () => Date;
 }
 
+/** close-day の要求。cron は本文 `{}`(= 昨日・通知あり)で呼ぶ */
+export interface CloseDayRequest {
+  /** 確定する日(JST の date_local)。省略 = JST の昨日。今日・未来は 400 */
+  dateLocal?: string;
+  /** false で push を送らない(手動の再実行用)。省略 = true */
+  notify?: boolean;
+}
+
+/**
+ * HTTP 本文(JSON オブジェクト)→ CloseDayRequest。許すキーは dateLocal と notify だけ。
+ * 型が違う値は 400 にする(`"notify": "false"` を既定の true で動かさない)
+ */
+export function parseCloseDayRequest(
+  body: Record<string, unknown>,
+): ParseResult<CloseDayRequest> {
+  const unknown = rejectUnknownKeys(body, ["dateLocal", "notify"]);
+  if (!unknown.ok) return unknown;
+  const req: CloseDayRequest = {};
+  if (body.dateLocal !== undefined) {
+    if (typeof body.dateLocal !== "string") {
+      return { ok: false, error: "invalid_date_local" };
+    }
+    req.dateLocal = body.dateLocal;
+  }
+  if (body.notify !== undefined) {
+    if (typeof body.notify !== "boolean") {
+      return { ok: false, error: "invalid_notify" };
+    }
+    req.notify = body.notify;
+  }
+  return { ok: true, value: req };
+}
+
 export type CloseDayRunResult =
   | {
     status: 200;
     body: {
       /** 確定処理した対象日 d */
       dateLocal: string;
+      /** push を送る設定で動いたか(手動の再実行は false) */
+      notify: boolean;
       pairs: number;
       recordedBoth: number;
       recordedTicket: number;
@@ -126,23 +167,30 @@ export type CloseDayRunResult =
 
 /**
  * close-day の本体(cron 00:10 JST 想定)。
- * dateLocal 未指定なら「Asia/Tokyo の今日の前日」を d とする。
+ * dateLocal 未指定なら「Asia/Tokyo の今日の前日」を d とする。今日・未来の日は確定できない(400)。
+ * notify: false なら push を送らない(手動の再実行用。リセットの通知を再送しない)。
  * ペア単位でエラーを隔離する(1ペアの失敗で全体を止めない)。
  */
 export async function handleCloseDay(
   deps: CloseDayDeps,
-  req: { dateLocal?: string } = {},
+  req: CloseDayRequest = {},
 ): Promise<CloseDayRunResult> {
   const now = deps.now ?? (() => new Date());
   const at = now();
+  const notify = req.notify ?? true;
 
+  const todayJst = dateLocalInTimeZone(at, DEFAULT_TIMEZONE);
   let dateLocal: string;
   try {
-    dateLocal = req.dateLocal ??
-      addDaysLocal(dateLocalInTimeZone(at, DEFAULT_TIMEZONE), -1);
+    dateLocal = req.dateLocal ?? addDaysLocal(todayJst, -1);
     assertDateLocal(dateLocal);
   } catch {
     return { status: 400, body: { error: "invalid_date_local" } };
+  }
+  // 終わっていない日(JST の今日・未来)は確定しない。確定すると、まだチェックインしていない人を
+  // 未達として確定して(チケット消費・リセット)、streak_days の行も残る。打ち間違いを通さない
+  if (dateLocal >= todayJst) {
+    return { status: 400, body: { error: "date_not_closable" } };
   }
 
   const pairs = await deps.repo.listPairsForClose(dateLocal);
@@ -154,7 +202,7 @@ export async function handleCloseDay(
 
   for (const pair of pairs) {
     try {
-      const outcome = await closeOnePair(deps, pair, dateLocal, at);
+      const outcome = await closeOnePair(deps, pair, dateLocal, at, notify);
       if (outcome === "both") recordedBoth++;
       else if (outcome === "ticket") recordedTicket++;
       else if (outcome === "reset") reset++;
@@ -171,6 +219,7 @@ export async function handleCloseDay(
     status: 200,
     body: {
       dateLocal,
+      notify,
       pairs: pairs.length,
       recordedBoth,
       recordedTicket,
@@ -186,6 +235,7 @@ async function closeOnePair(
   pair: CloseDayPairRow,
   dateLocal: string,
   at: Date,
+  notify: boolean,
 ): Promise<"both" | "ticket" | "reset" | "skip"> {
   const [memberA, memberB] = pair.memberIds;
   const [existingKind, aCheckin, bCheckin, restDeclared] = await Promise.all([
@@ -238,23 +288,28 @@ async function closeOnePair(
       });
     }
     // 消費は両者に通知(REQUIREMENTS §3.5「自動消費して継続(消費は両者に通知)」)
-    await pushToMembers(deps, pair.memberIds, at, {
-      type: "ticket_used",
-      body: ticketUsedBody(),
-    });
+    if (notify) {
+      await pushToMembers(deps, pair.memberIds, at, {
+        type: "ticket_used",
+        body: ticketUsedBody(),
+      });
+    }
     return "ticket";
   }
 
-  // 4. チケットなし → 行を作らない(=途切れ)。記録と「責めない文言」push のみ
+  // 4. チケットなし → 行を作らない(=途切れ)。記録と「責めない文言」push のみ。
+  //    notify: false でも記録(構造化ログ)は残す。書き込みが無いので、再実行しても行は増えない
   await deps.repo.recordStreakReset(pair.pairId, dateLocal);
   const { best } = deriveStreak(
     await deps.repo.listStreakDays(pair.pairId),
     dateLocal,
   );
-  await pushToMembers(deps, pair.memberIds, at, {
-    type: STREAK_RESET_PUSH_TYPE,
-    body: streakResetBody(best),
-  });
+  if (notify) {
+    await pushToMembers(deps, pair.memberIds, at, {
+      type: STREAK_RESET_PUSH_TYPE,
+      body: streakResetBody(best),
+    });
+  }
   return "reset";
 }
 
