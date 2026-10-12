@@ -2,8 +2,8 @@
 //
 // - オンボのプレ許可画面(ページ3)で説明してから OS ダイアログを1回だけ出す(issue #10)。
 //   「あとで」を選んでもオンボは完了できる(初回拒否されると設定アプリ誘導しかなくなるため)
-// - 許可されたら APNs 登録を開始する。デバイストークンの受け取りと users.push_token への
-//   保存はプッシュパイプライン側の後続タスクで実装する
+// - 許可されたら APNs 登録を開始する。デバイストークンの受け取りは AppDelegate(DeviceTokenStore)、
+//   users.push_token / push_env への保存は PushTokenSync(issue #55)が担う
 
 import Foundation
 import UIKit

@@ -80,7 +80,8 @@ final class PairingViewModel {
         InviteToken.isValidFormat(trimmedCode) && !isAccepting
     }
 
-    /// ディープリンク lien://invite/<token> からのプリフィル(本格ルーティングは後続タスク)
+    /// ディープリンク lien://invite/<token> からのプリフィル(AppModel がソロのホームで招待画面を開く。
+    /// 受諾は明示のタップ — 招待してくれた人の名前は受諾後にしか分からないので、確認の一歩を兼ねる)
     func prefill(token: String) {
         codeInput = token
         acceptErrorMessage = nil

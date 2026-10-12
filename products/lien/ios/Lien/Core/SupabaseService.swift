@@ -1,38 +1,15 @@
-// SupabaseService.swift — Supabase 認証+users プロフィール更新(DESIGN §3.3 / T10)
+// SupabaseService.swift — Supabase 認証+users プロフィール更新の本実装(DESIGN §3.3 / T10 / issue #55)
 //
-// - View から直接呼ばない。ViewModel へは AuthServicing プロトコルで注入する(テストはモック)
-// - Config 未設定(CI など Secrets.xcconfig が無い環境)では StubAuthService に差し替え、
-//   ネットワークを一切使わずにビルド・テストが通る。実 Supabase 疎通は T08 の E2E で検証
+// - 抽象(AuthServicing)・エラー・スタブ(StubAuthService)は AuthServicing.swift。
+//   View から直接呼ばない。ViewModel へは AuthServicing プロトコルで注入する(テストはモック)
+// - Config 未設定(CI など Secrets.xcconfig が無い環境)では AppServices が StubAuthService に
+//   差し替え、ネットワークを一切使わずにビルド・テストが通る。実 Supabase 疎通は T08 の E2E で検証
 // - supabase-swift をリンクするのは Lien ターゲットのみ(LienWidget / LienNSE には入れない)
 
 import Foundation
 import Supabase
 
-/// 認証+プロフィール更新の抽象(T10 時点)。Functions 呼び出し等は後続タスクで拡張する
-protocol AuthServicing: AnyObject {
-    /// 現在のセッションのユーザー ID(未サインインなら nil)
-    var currentUserID: UUID? { get }
-
-    /// 匿名サインイン(Supabase anonymous sign-in — DESIGN §10)。
-    /// auth.users への INSERT 時に public.users の骨組み行がトリガーで自動作成される
-    /// (0001_init.sql の handle_new_user。クライアントは users に INSERT しない)
-    @discardableResult
-    func signInAnonymously() async throws -> UUID
-
-    /// 自分の users 行のプロフィール列を更新する。
-    /// 更新できる列は列レベル GRANT(nickname / avatar_emoji / timezone / remind_at /
-    /// push_token — 0001_init.sql)に限られる
-    func updateProfile(nickname: String, avatarEmoji: String, timezone: String) async throws
-}
-
-enum AuthServiceError: Error, Equatable {
-    /// サインイン前にプロフィール更新を呼んだ
-    case notSignedIn
-}
-
-// MARK: - 本実装(supabase-swift)
-
-final class SupabaseService: AuthServicing {
+final class SupabaseService: AuthServicing, PushRegistrationUpdating {
     /// users 行の更新ペイロード(キー名は DB 列名と一致させる)
     private struct ProfileUpdate: Encodable {
         let nickname: String
@@ -43,6 +20,17 @@ final class SupabaseService: AuthServicing {
             case nickname
             case avatarEmoji = "avatar_emoji"
             case timezone
+        }
+    }
+
+    /// APNs 登録の更新ペイロード(push_token / push_env は本人が更新できる列 — 0001 + 0005)
+    private struct PushRegistrationUpdate: Encodable {
+        let pushToken: String
+        let pushEnv: String
+
+        enum CodingKeys: String, CodingKey {
+            case pushToken = "push_token"
+            case pushEnv = "push_env"
         }
     }
 
@@ -76,34 +64,20 @@ final class SupabaseService: AuthServicing {
             .execute()
     }
 
-    /// 標準構成: Secrets 設定済みなら本実装、未設定(CI 等)なら StubAuthService
-    static func makeDefault(bundle: Bundle = .main) -> AuthServicing {
-        if let config = Config.load(bundle: bundle) {
-            return SupabaseService(config: config)
-        }
-        return StubAuthService()
-    }
-}
-
-// MARK: - スタブ(Config 未設定環境用)
-
-/// メモリ内で成功応答だけ返すスタブ。永続しないため、未設定ビルドでは起動のたびに
-/// オンボーディングから始まる(実値設定後は SupabaseService がセッションを keychain 永続する)
-final class StubAuthService: AuthServicing {
-    private(set) var signedInUserID: UUID?
-
-    var currentUserID: UUID? { signedInUserID }
-
-    @discardableResult
-    func signInAnonymously() async throws -> UUID {
-        if let existing = signedInUserID { return existing }
-        let id = UUID()
-        signedInUserID = id
-        return id
+    func accessToken() async throws -> String {
+        guard currentUserID != nil else { throw AuthServiceError.notSignedIn }
+        // auth.session は期限切れなら refresh token で自動更新してから返す
+        return try await client.auth.session.accessToken
     }
 
-    func updateProfile(nickname: String, avatarEmoji: String, timezone: String) async throws {
-        guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
-        // メモリ内スタブ: 何も送信しない
+    /// users.push_token と users.push_env を更新する(PushTokenSync から呼ばれる)。
+    /// RLS(users_update_self)と列レベル GRANT により、更新できるのは自分の行のこの列だけ
+    func updatePushRegistration(token: String, environment: PushEnvironment) async throws {
+        guard let userID = currentUserID else { throw AuthServiceError.notSignedIn }
+        _ = try await client
+            .from("users")
+            .update(PushRegistrationUpdate(pushToken: token, pushEnv: environment.rawValue))
+            .eq("id", value: userID)
+            .execute()
     }
 }

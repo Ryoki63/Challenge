@@ -52,8 +52,9 @@ struct PairingView: View {
         .onChange(of: pendingInviteToken) { consumePendingToken() }
     }
 
-    /// ディープリンクのコードを入力欄へプリフィルする(自動送信はしない —
-    /// 実 invite-accept 結線後の自動受諾は後続タスク。DESIGN §3.6)
+    /// ディープリンクのコードを入力欄へプリフィルする(自動送信はしない — 受諾は明示のタップ。
+    /// DESIGN §3.6 は「onOpenURL → invite-accept 自動呼び出し」だが、ペア解消(T23)が入るまでは
+    /// 取り消せないため据え置き。実機 E2E の結果で変更する余地を followups に残してある)
     private func consumePendingToken() {
         guard let token = pendingInviteToken else { return }
         viewModel.prefill(token: token)

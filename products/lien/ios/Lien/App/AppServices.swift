@@ -1,0 +1,73 @@
+// AppServices.swift — アプリ全体の依存の束(Live / Stub)と Stub 構成(issue #55)
+//
+// LienApp.swift に散らばっていた生成処理をここへ集約する。
+//   - Config(Supabase URL / anon key)があれば Live(AppServices+Live.swift の make / live)
+//   - 無ければ Stub(本ファイルの stub)。CI(Secrets.xcconfig が無い環境)や、まだ Supabase に
+//     つなぎたくない開発ビルドでも、ネットワークを一切使わずに画面遷移まで動く
+//
+// View / ViewModel は個々のプロトコル(AuthServicing / InviteClient / ...)だけを知り、
+// どちらの構成かを意識しない。差し替えはこのファイルの組み立てだけで完結する。
+
+import Foundation
+
+struct AppServices {
+    /// true = 実 Supabase につながる構成
+    let isLive: Bool
+    let auth: AuthServicing
+    let pushAuthorizer: PushAuthorizing
+    let inviteClient: InviteClient
+    let promiseClient: PromiseAPIClient
+    let snapshotClient: SnapshotClient
+    /// チェックイン(+当日取消・写真添付・キュー再送の能力。HomeViewModel が as? で能力検出する)
+    let checkinService: CheckinPerforming
+    /// つつく / リアクション。nil のときは checkinService の能力検出に任せる
+    /// (Stub 構成の LocalEchoCheckinService がモック適合している)
+    let nudgeService: NudgeSending?
+    let reactionService: Reacting?
+    /// 未送信キュー(スナップショット同期が「端末の方が新しい」ことを判定するのに使う)。Stub 構成は nil
+    let pendingOps: PendingOpsQueue?
+    let store: AppGroupStore?
+    let pushTokenSync: PushTokenSync
+    let reloadWidgets: () -> Void
+}
+
+extension AppServices {
+    /// Config 未設定(CI・Secrets なし)用の構成。サーバーを一切呼ばない。
+    /// 同期(StubSnapshotClient)は端末の snapshot をそのまま返すので、端末内の状態を巻き戻さない
+    static func stub(
+        store: AppGroupStore?,
+        pushAuthorizer: PushAuthorizing,
+        reloadWidgets: @escaping () -> Void = {}
+    ) -> AppServices {
+        let auth = StubAuthService()
+        return AppServices(
+            isLive: false,
+            auth: auth,
+            pushAuthorizer: pushAuthorizer,
+            inviteClient: StubInviteClient(store: store),
+            promiseClient: StubPromiseAPIClient(),
+            snapshotClient: StubSnapshotClient(store: store),
+            checkinService: LocalEchoCheckinService(),
+            nudgeService: nil,
+            reactionService: nil,
+            pendingOps: nil,
+            store: store,
+            pushTokenSync: PushTokenSync(
+                registrar: auth,
+                currentUserID: { auth.currentUserID },
+                ledger: InMemoryPushRegistrationLedger()
+            ),
+            reloadWidgets: reloadWidgets
+        )
+    }
+}
+
+extension AppGroupStore {
+    /// App Group が解決できないとき(エンタイトルメント無しの署名なしビルドなど)の代替保存先。
+    /// ウィジェット・NSE とは共有されないが、アプリ本体は動き続ける
+    static func localFallback(fileManager: FileManager = .default) -> AppGroupStore {
+        let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        return AppGroupStore(containerURL: base.appendingPathComponent("LienLocal", isDirectory: true))
+    }
+}

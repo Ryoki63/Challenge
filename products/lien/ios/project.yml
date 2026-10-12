@@ -57,10 +57,15 @@ targets:
           - CFBundleURLName: "$(LIEN_BUNDLE_ID_BASE).invite"
             CFBundleURLSchemes:
               - lien
-        # Config.swift(後続タスク)が xcconfig → Info.plist 経由で読む(DESIGN §3.3)
+        # Config.swift が xcconfig → Info.plist 経由で読む(DESIGN §3.3)
         SUPABASE_URL: "$(SUPABASE_URL)"
         SUPABASE_ANON_KEY: "$(SUPABASE_ANON_KEY)"
         LIEN_APP_GROUP_ID: "$(LIEN_APP_GROUP_ID)"
+        # サイレント push(content-available: 1 — checkin-cancel / promise-set の pair_update)で
+        # アプリを起こし、snapshot を GET /snapshot で取り直すため(AppDelegate / AppModel — issue #55)。
+        # 可視 push は NSE が処理するので、これが無くても通知は届く(サイレントのフォールバック経路用)
+        UIBackgroundModes:
+          - remote-notification
     dependencies:
       - target: LienWidget
       - target: LienNSE
@@ -126,6 +131,12 @@ targets:
     platform: iOS
     sources:
       - path: LienTests
+      # iOS ⇔ サーバーの契約フィクスチャ(products/lien/contracts/*.json — サーバーの実ハンドラ出力。
+      # ContractFixtureTests が本番と同じデコーダで読む)。JSON だけをテストバンドルのリソースに含める
+      - path: ../contracts
+        includes:
+          - "*.json"
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE).tests"

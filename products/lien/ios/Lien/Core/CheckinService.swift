@@ -14,8 +14,9 @@
 //   - 写真はオンライン専用(バイナリをキューに持たない — シンプル優先)。失敗はそのまま
 //     throw してユーザーの再試行に委ねる
 //
-// アプリへの結線(LienApp.swift の LocalEchoCheckinService → CheckinService 差し替え)は
-// 本タスクでは行わない(T13 競合回避 — issue #14。close 時に残作業として明記)。
+// アプリへの結線(LocalEchoCheckinService → CheckinService 差し替え)は issue #55 で完了:
+// AppServices+Live.swift が EdgeFunctionCheckinClient + PendingOpsQueue と組み合わせて生成する
+// (Config 未設定のスタブ構成は引き続き LocalEchoCheckinService — AppServices.swift)。
 
 import Foundation
 

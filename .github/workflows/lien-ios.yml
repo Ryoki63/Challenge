@@ -7,6 +7,9 @@ on:
   push:
     paths:
       - "products/lien/ios/**"
+      # 契約フィクスチャ(サーバーの実ハンドラ出力)は LienTests のリソース(project.yml が ../contracts を参照 — issue #55)。
+      # サーバーの応答形が変わって再生成されたときも iOS のデコード検証を走らせる
+      - "products/lien/contracts/**"
       # 植物スプライトのカタログは Lien ターゲットのリソース(project.yml が ../assets/ を参照 — T13)。
       # アセット側だけの変更でも iOS ビルドが走るようにする
       - "products/lien/assets/plant/PlantAssets.xcassets/**"

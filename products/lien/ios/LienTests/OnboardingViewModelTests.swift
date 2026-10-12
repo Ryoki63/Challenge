@@ -42,6 +42,11 @@ private final class MockAuthService: AuthServicing {
         lastAvatarEmoji = avatarEmoji
         lastTimezone = timezone
     }
+
+    func accessToken() async throws -> String {
+        guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
+        return "test-access-token"
+    }
 }
 
 private final class MockPushAuthorizer: PushAuthorizing {
@@ -231,50 +236,6 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertEqual(finishedCount, 1)
     }
 
-    // MARK: 起動時の初期 phase 導出(LienApp.initialPhase — issue #10 手順7)
-
-    func testInitialPhaseDerivation() throws {
-        let auth = MockAuthService()
-        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("OnboardingVMTests-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        let store = AppGroupStore(containerURL: tempDir)
-
-        // セッション無し → onboarding(store の有無は関係ない)
-        XCTAssertEqual(LienApp.initialPhase(authService: auth, store: store), .onboarding)
-        XCTAssertEqual(LienApp.initialPhase(authService: auth, store: nil), .onboarding)
-
-        // セッション有り+snapshot 無し → solo
-        auth.presetSignedIn()
-        XCTAssertEqual(LienApp.initialPhase(authService: auth, store: store), .solo)
-
-        // snapshot はあるが pairId == null(ソロ状態)→ solo のまま
-        try store.saveSnapshot(makeSnapshot(pairId: nil))
-        XCTAssertEqual(LienApp.initialPhase(authService: auth, store: store), .solo)
-
-        // pairId 有り → paired
-        try store.saveSnapshot(makeSnapshot(pairId: "1f0c5a4e-9d3b-4c1a-8f2e-7b6d5a4c3b2a"))
-        XCTAssertEqual(LienApp.initialPhase(authService: auth, store: store), .paired)
-    }
-
-    private func makeSnapshot(pairId: String?) -> PairSnapshot {
-        PairSnapshot(
-            schemaVersion: PairSnapshot.currentSchemaVersion,
-            pairId: pairId,
-            updatedAt: Date(timeIntervalSince1970: 1_781_166_600), // 2026-06-11T08:30:00Z
-            streakCurrent: 0,
-            streakBest: 0,
-            todayMeDone: false,
-            todayPartnerDone: false,
-            myPromiseTitle: nil,
-            myPromiseEmoji: nil,
-            partnerName: nil,
-            partnerPromiseTitle: nil,
-            partnerPromiseEmoji: nil,
-            plantStage: 0,
-            plantMood: .normal,
-            plantName: nil,
-            hasPartnerPhotoToday: false
-        )
-    }
+    // 起動時の初期 phase 導出(旧 LienApp.initialPhase — issue #10 手順7)は
+    // 純粋関数 AppRouter.phase(hasSession:snapshot:) に移った(AppRouterTests — issue #55)
 }

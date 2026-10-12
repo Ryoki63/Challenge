@@ -2,10 +2,10 @@
 //
 // - View から直接呼ばない。ViewModel へは InviteClient プロトコルで注入する
 //   (テストは PairingViewModelTests の MockInviteClient — SupabaseService と同じイディオム)
-// - 実 HTTP 実装(Edge Functions 呼び出し)は Functions デプロイ(G0)後の後続タスクで追加し、
-//   SupabaseService.makeDefault と同様に Config の有無で本実装 / スタブを切り替える。
-//   本タスク(issue #11)はプロトコル+スタブまで(UI・エラーマッピングを CI で固定する)
-// - エラーコード文字列の正本: invite-create/core.ts / invite-accept/core.ts(下記に出典コメント)
+// - 実 HTTP 実装は EdgeFunctionInviteClient(同ディレクトリ。issue #55)。Config の有無による
+//   Live / スタブの切替は AppServices(App/AppServices.swift)が行う
+// - エラーコード文字列の正本: invite-create/core.ts / invite-accept/core.ts(下記に出典コメント。
+//   契約テスト ContractFixtureTests が products/lien/contracts/errors.json と照合する)
 
 import Foundation
 
@@ -58,11 +58,18 @@ enum InviteClientError: Error, Equatable {
     }
 }
 
-// MARK: - スタブ(実 HTTP 実装が入るまでのアプリ実行用。StubAuthService と同じ役割)
+// MARK: - スタブ(Config 未設定のアプリ実行用。StubAuthService と同じ役割)
 
 /// メモリ内で成功応答だけ返すスタブ。発行はローカル生成 token、受諾は形式検証のみ行い
-/// ダミーのペア snapshot を返す(実サーバー疎通は G0 デプロイ後の後続タスク+T20 実機 E2E)
+/// ダミーのペア snapshot を返す。store を渡すと、端末の snapshot(自分の約束など)を引き継いだ
+/// ペア snapshot を返す(スタブ構成でもペア成立後に約束設定へ戻らないようにする)
 final class StubInviteClient: InviteClient {
+    private let store: AppGroupStore?
+
+    init(store: AppGroupStore? = nil) {
+        self.store = store
+    }
+
     /// invite-create/core.ts の INVITE_TOKEN_ALPHABET と同一
     /// (8文字英数・紛らわしい 0/O/1/l を除外 — DESIGN §5.1)
     static let tokenAlphabet: [Character] =
@@ -91,24 +98,9 @@ final class StubInviteClient: InviteClient {
             throw InviteClientError.invalidToken
         }
         let pairId = UUID().uuidString.lowercased()
-        let snapshot = PairSnapshot(
-            schemaVersion: PairSnapshot.currentSchemaVersion,
-            pairId: pairId,
-            updatedAt: Date(),
-            streakCurrent: 0,
-            streakBest: 0,
-            todayMeDone: false,
-            todayPartnerDone: false,
-            myPromiseTitle: nil,
-            myPromiseEmoji: nil,
-            partnerName: nil,
-            partnerPromiseTitle: nil,
-            partnerPromiseEmoji: nil,
-            plantStage: 0,
-            plantMood: .normal,
-            plantName: nil,
-            hasPartnerPhotoToday: false
-        )
+        var snapshot = store?.loadSnapshot() ?? PairSnapshot.emptySolo(updatedAt: Date())
+        snapshot.pairId = pairId
+        snapshot.updatedAt = Date()
         return InviteAcceptResponse(pairId: pairId, snapshot: snapshot)
     }
 }

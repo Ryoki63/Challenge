@@ -5,9 +5,11 @@ import XCTest
 @testable import Lien
 
 final class SmokeTests: XCTestCase {
-    func testAppPhaseHasThreeStates() {
-        XCTAssertEqual(AppPhase.allCases.count, 3)
+    func testAppPhaseHasFourStates() {
+        // issue #55: 約束設定(promiseSetup)が本番導線に加わった(導出は AppRouterTests)
+        XCTAssertEqual(AppPhase.allCases.count, 4)
         XCTAssertEqual(AppPhase.onboarding.rawValue, "onboarding")
+        XCTAssertEqual(AppPhase.promiseSetup.rawValue, "promiseSetup")
         XCTAssertEqual(AppPhase.solo.rawValue, "solo")
         XCTAssertEqual(AppPhase.paired.rawValue, "paired")
     }

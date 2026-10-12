@@ -22,7 +22,7 @@ protocol CheckinPerforming: AnyObject {
 
 /// ローカルエコー実装: サーバーを呼ばず、楽観更新済みの snapshot をそのまま返す。
 /// 本実装は CheckinService(T14。実 API+オフラインキュー)。本クラスは Config 未設定
-/// (CI・Secrets なし)環境の場つなぎとして残す(LienApp.swift の結線が参照 — 差し替えは後続の数行)。
+/// (CI・Secrets なし)環境の場つなぎとして残す(AppServices の Stub 構成が使う — issue #55)。
 /// ストリーク数は触らない(確定はサーバーのアルゴリズムが正 — DESIGN §5.4)
 final class LocalEchoCheckinService: CheckinPerforming {
     private let now: () -> Date
@@ -89,14 +89,17 @@ final class HomeViewModel {
     private let cancelService: CheckinCanceling?
     private let photoService: PhotoAttaching?
     private let opsFlusher: PendingOpsFlushing?
-    /// 追加能力(T15)。checkinService が適合する場合のみ非 nil(能力検出。
-    /// 現状は LocalEchoCheckinService のモック適合のみ — NudgeReactService.swift)
+    /// 追加能力(T15 / issue #55)。明示注入があればそれを使い(Live 構成: LiveNudgeReactService)、
+    /// 無ければ checkinService が適合する場合のみ非 nil(能力検出。Stub 構成は
+    /// LocalEchoCheckinService のモック適合 — NudgeReactService.swift)
     private let nudgeService: NudgeSending?
     private let reactionService: Reacting?
 
     init(
         store: AppGroupStore?,
         checkinService: CheckinPerforming,
+        nudgeService: NudgeSending? = nil,
+        reactionService: Reacting? = nil,
         reloadWidgets: @escaping () -> Void = { WidgetCenter.shared.reloadAllTimelines() }
     ) {
         self.store = store
@@ -105,15 +108,15 @@ final class HomeViewModel {
         self.cancelService = checkinService as? CheckinCanceling
         self.photoService = checkinService as? PhotoAttaching
         self.opsFlusher = checkinService as? PendingOpsFlushing
-        self.nudgeService = checkinService as? NudgeSending
-        self.reactionService = checkinService as? Reacting
+        self.nudgeService = nudgeService ?? (checkinService as? NudgeSending)
+        self.reactionService = reactionService ?? (checkinService as? Reacting)
     }
 
     // MARK: 読み込み
 
-    /// App Group から snapshot を読み直す(onAppear / フォアグラウンド復帰時)。
+    /// App Group から snapshot を読み直す(onAppear / フォアグラウンド復帰時 / AppModel の同期完了時)。
     /// 未送信キューの再送は flushPendingOps(T14)。サーバーとの能動的な再同期
-    /// (GET /snapshot)はスナップショット同期の後続タスクの責務
+    /// (GET /snapshot)は AppModel / SnapshotSynchronizer が行い、結果は App Group 経由で届く
     func load() {
         snapshot = store?.loadSnapshot()
     }

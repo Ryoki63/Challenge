@@ -1,0 +1,104 @@
+// SnapshotSynchronizer.swift — GET /snapshot の結果を App Group へ反映する(DESIGN §4 自己修復 / issue #55)
+//
+// 状態の正はサーバー。起動時・前面復帰時・push 受信時に最新の snapshot を取得して
+// pair_snapshot.json を上書きし、ウィジェットを reload する。
+//   - 招待した側がペア成立を知る(solo → paired)
+//   - ペア解消の反映(paired → solo)
+//   - push の取りこぼし・日付跨ぎ・他端末での変更の回復
+//
+// ただし**端末側の方が新しい可能性があるときは上書きしない**(楽観更新を巻き戻さない):
+//   1. 未送信キュー(pending_ops.json)が残っている — オフラインで記録したチェックインが
+//      まだサーバーに届いていない。サーバーの snapshot は「未完」のままなので、上書きすると
+//      画面が一瞬戻って見える。キューが空になった次回の同期で反映される
+//   2. 取得中に端末の snapshot が変わった — ホームのチェックイン完了や NSE の書き込みが
+//      この取得より後の状態を保存した。取得結果の方が古いので捨てる
+// 取得に失敗したときは端末の snapshot をそのまま残す(オフラインでも表示は壊れない)。
+
+import Foundation
+
+@MainActor
+final class SnapshotSynchronizer {
+    enum Failure: Equatable {
+        case unauthorized
+        case userNotFound
+        case network
+        case server
+        /// App Group への書き込みに失敗した
+        case storage
+    }
+
+    enum Outcome: Equatable {
+        /// サーバーの snapshot を端末へ反映した
+        case applied(PairSnapshot)
+        /// 未送信のチェックイン操作が残っているため反映しなかった
+        case skippedPendingOps
+        /// 取得中に端末の snapshot が更新されたため、取得結果を捨てた
+        case skippedLocalChanged
+        case failed(Failure)
+    }
+
+    private let client: SnapshotClient
+    private let store: AppGroupStore?
+    private let hasPendingOps: () -> Bool
+    private let reloadWidgets: () -> Void
+
+    init(
+        client: SnapshotClient,
+        store: AppGroupStore?,
+        hasPendingOps: @escaping () -> Bool = { false },
+        reloadWidgets: @escaping () -> Void = {}
+    ) {
+        self.client = client
+        self.store = store
+        self.hasPendingOps = hasPendingOps
+        self.reloadWidgets = reloadWidgets
+    }
+
+    func sync() async -> Outcome {
+        let before = store?.loadSnapshot()
+
+        let fetched: PairSnapshot
+        do {
+            fetched = try await client.fetchSnapshot()
+        } catch let error as SnapshotClientError {
+            return .failed(Self.failure(for: error))
+        } catch {
+            // トークン取得の失敗(未サインイン・更新失敗)など。再送可能な一時エラーとして扱う
+            return .failed(.network)
+        }
+
+        if hasPendingOps() { return .skippedPendingOps }
+        if store?.loadSnapshot() != before { return .skippedLocalChanged }
+
+        if let store {
+            do {
+                try store.saveSnapshot(fetched)
+            } catch {
+                return .failed(.storage)
+            }
+            // 表示が変わるときだけウィジェットを reload する(updatedAt だけの差では reload しない —
+            // WidgetKit の reload 予算を前面復帰のたびに消費しない — DESIGN §3.5)
+            if Self.hasVisibleChange(from: before, to: fetched) {
+                reloadWidgets()
+            }
+        }
+        return .applied(fetched)
+    }
+
+    private static func failure(for error: SnapshotClientError) -> Failure {
+        switch error {
+        case .unauthorized: return .unauthorized
+        case .userNotFound: return .userNotFound
+        case .network: return .network
+        case .server: return .server
+        }
+    }
+
+    /// updatedAt(サーバーが組み立てた時刻)以外に差があるか
+    static func hasVisibleChange(from old: PairSnapshot?, to new: PairSnapshot) -> Bool {
+        guard let old else { return true }
+        var normalized = new
+        normalized.updatedAt = old.updatedAt
+        return normalized != old
+    }
+}

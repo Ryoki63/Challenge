@@ -5,8 +5,10 @@
 // 文言は Strings.Home / Strings.Checkin、色・余白は DesignSystem の定数に集約(DESIGN §3.8)。
 // 表示原則(§3.10)はウィジェット(LienWidgetEntryView)と揃える:
 //   自分未完 = 自分側グレー / 相手が先に完了 =「(名前)が待ってるよ」。
-// ソロ状態(pairId = null)は土+誘導文言の最小表示(招待 UI は T11 PairingView の責務)。
+// ソロ状態(pairId = null)は土+誘導文言+「パートナーを招待する」導線(招待 UI 本体は T11 PairingView —
+// RootView がシートで開く。issue #55)。チェックインはソロでもできる(写真・つつく・リアクションはペア後)。
 // 未送信キュー(pending_ops.json)の再送は表示時+フォアグラウンド復帰時(DESIGN §3.7)。
+// サーバーとの同期(GET /snapshot)は AppModel が行い、結果は App Group 経由で reloadToken の変化として届く。
 
 import SwiftUI
 
@@ -15,18 +17,27 @@ struct HomeView: View {
     @State private var viewModel: HomeViewModel
     @Environment(\.scenePhase) private var scenePhase
 
+    /// AppModel が snapshot を同期・保存するたびに増える値。変化したら App Group から読み直す
+    private let reloadToken: Int
+    /// ソロ状態の「パートナーを招待する」。nil なら導線を出さない(ペア成立後・プレビュー)
+    private let onInvite: (() -> Void)?
+
+    init(viewModel: HomeViewModel, reloadToken: Int = 0, onInvite: (() -> Void)? = nil) {
+        _viewModel = State(initialValue: viewModel)
+        self.reloadToken = reloadToken
+        self.onInvite = onInvite
+    }
+
+    /// プレビュー・簡易構成用(本番の依存は RootView が HomeViewModel として渡す)
     init(store: AppGroupStore?, checkinService: CheckinPerforming) {
-        _viewModel = State(initialValue: HomeViewModel(
-            store: store,
-            checkinService: checkinService
-        ))
+        self.init(viewModel: HomeViewModel(store: store, checkinService: checkinService))
     }
 
     var body: some View {
         ScrollView {
             Group {
                 if let snapshot = viewModel.snapshot {
-                    SnapshotContent(viewModel: viewModel, snapshot: snapshot)
+                    SnapshotContent(viewModel: viewModel, snapshot: snapshot, onInvite: onInvite)
                 } else {
                     EmptyHomeContent()
                 }
@@ -41,6 +52,7 @@ struct HomeView: View {
         }
         .onAppear { viewModel.load() }
         .task { await viewModel.flushPendingOps() }
+        .onChange(of: reloadToken) { viewModel.load() }
         .onChange(of: scenePhase) {
             // フォアグラウンド復帰時の再送(DESIGN §3.7。snapshot 表示も読み直す)
             if scenePhase == .active {
@@ -56,6 +68,7 @@ struct HomeView: View {
 private struct SnapshotContent: View {
     let viewModel: HomeViewModel
     let snapshot: PairSnapshot
+    let onInvite: (() -> Void)?
 
     var body: some View {
         VStack(spacing: LienSpacing.m) {
@@ -66,7 +79,7 @@ private struct SnapshotContent: View {
             )
 
             if viewModel.isSolo {
-                // ソロ状態: 土+誘導文言の最小表示(§3.9。招待導線は PairingView — T11)
+                // ソロ状態: 土+誘導文言+招待導線(§3.2, §3.9。招待画面本体は PairingView — T11)
                 VStack(spacing: LienSpacing.xs) {
                     Text(Strings.Home.soloCaption)
                         .font(.subheadline)
@@ -74,6 +87,14 @@ private struct SnapshotContent: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                    if let onInvite {
+                        Button(action: onInvite) {
+                            Text(Strings.Home.inviteButton)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.top, LienSpacing.xs)
+                    }
                 }
             }
 
@@ -87,8 +108,8 @@ private struct SnapshotContent: View {
             CheckinFlowView(viewModel: viewModel)
 
             // 相手未完のときだけ出す「つつく」ボタン(1日3回まで — §3.7 / T15)。
-            // モック注入(LocalEchoCheckinService)時のみ能力検出で表示される
-            // (実 Supabase 結線は後続の統合タスク — Features/Nudge/NudgeSheet.swift 冒頭コメント参照)
+            // Live 構成は LiveNudgeReactService(実 Edge Functions)、Stub 構成は LocalEchoCheckinService の
+            // モック適合で能力検出される(AppServices — issue #55。ソロでは viewModel.canNudge が false)
             NudgeArea(viewModel: viewModel)
         }
     }
@@ -336,7 +357,7 @@ private struct ReactionArea: View {
     }
 }
 
-// MARK: - 空状態(snapshot 未取得。GET /snapshot による自己修復は後続 — DESIGN §4)
+// MARK: - 空状態(snapshot 未取得。AppModel の GET /snapshot 同期で自己修復される — DESIGN §4)
 
 private struct EmptyHomeContent: View {
     var body: some View {

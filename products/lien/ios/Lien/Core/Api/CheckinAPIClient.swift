@@ -58,7 +58,8 @@ enum CheckinClientError: Error, Equatable {
     case noPromise
     /// "no_pair" — 400(requestPhotoUpload をソロ状態で要求 — DESIGN §5.6)
     case noPair
-    /// "invalid_photo_path" — 400(パス規約 'pairs/<pair_id>/...' 違反)
+    /// "invalid_photo_path" — 400(パス規約 'pairs/<pair_id>/<date_local>/<user_id>/photo.jpg' 違反 —
+    /// 本人の原寸写真パスのみ受理する。#52)
     case invalidPhotoPath
     /// "user_not_found" — 404
     case userNotFound
@@ -249,10 +250,12 @@ final class StubCheckinAPIClient: CheckinAPIClient {
     /// サーバー側状態の代わり(受信者視点の snapshot)。テスト・プレビューが初期値を与える
     private(set) var snapshot: PairSnapshot
     private(set) var uploadedTargets: [PhotoUploadTarget] = []
+    private let userID: String
     private let now: () -> Date
 
-    init(snapshot: PairSnapshot, now: @escaping () -> Date = Date.init) {
+    init(snapshot: PairSnapshot, userID: String = "stub-user", now: @escaping () -> Date = Date.init) {
         self.snapshot = snapshot
+        self.userID = userID
         self.now = now
     }
 
@@ -271,8 +274,9 @@ final class StubCheckinAPIClient: CheckinAPIClient {
         var photoUpload: PhotoUploadURLs?
         if requestPhotoUpload {
             guard let pairId = snapshot.pairId else { throw CheckinClientError.noPair }
-            // パス規約はサーバー(checkin/core.ts photoUploadPaths)と一致させる
-            let dir = "pairs/\(pairId)/\(dateLocal)"
+            // パス規約はサーバー(checkin/core.ts photoUploadPaths — 本人単位)と一致させる
+            // (契約テスト ContractFixtureTests がパスの形のずれを検知する)
+            let dir = "pairs/\(pairId)/\(dateLocal)/\(userID)"
             photoUpload = PhotoUploadURLs(
                 photo: PhotoUploadTarget(path: "\(dir)/photo.jpg", token: "stub-token-photo"),
                 thumb: PhotoUploadTarget(path: "\(dir)/photo_thumb.jpg", token: "stub-token-thumb")

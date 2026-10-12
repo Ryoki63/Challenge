@@ -91,6 +91,9 @@ enum Strings {
             "\(formattedDate) まで有効・1回かぎりの招待です"
         }
 
+        /// ホームからシートで開いた招待画面を閉じる(招待は任意 — あとからいつでも開ける)
+        static let closeButton = "あとで"
+
         // コードを入力(受諾)
         static let acceptSectionTitle = "コードを入力"
         static let acceptExplainer = "相手から受け取った8文字のコードを入れてね。"
@@ -160,6 +163,8 @@ enum Strings {
         static let soloCaption = Widget.soloCaption
         /// ソロ状態の誘導(招待の動機付け — §3.9)
         static let soloInviteHint = "招待した相手とペアになると、ふたりの約束がはじまります"
+        /// ソロ状態のホームから招待画面を開くボタン(§3.2: 招待待ちでも使える。招待は任意)
+        static let inviteButton = "パートナーを招待する"
 
         // ストリーク(§3.5: 最高記録は永続表示。リセット時も「ふたりの財産」として残す)
         static let streakCaption = "ふたりの記録"

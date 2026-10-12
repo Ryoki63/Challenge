@@ -21,4 +21,42 @@ final class DeviceTokenStoreTests: XCTestCase {
         store.update(deviceToken: Data([0xde, 0xad, 0xbe, 0xef]))
         XCTAssertEqual(store.deviceTokenHex, "deadbeef")
     }
+
+    // MARK: onUpdate フック(PushTokenSync への橋渡し — issue #55)
+
+    @MainActor
+    func testOnUpdateIsCalledForEachNewToken() {
+        let store = DeviceTokenStore()
+        var received: [String] = []
+        store.onUpdate = { received.append($0) }
+        store.update(deviceToken: Data([0x01]))
+        store.update(deviceToken: Data([0x02]))
+        XCTAssertEqual(received, ["01", "02"])
+    }
+
+    @MainActor
+    func testSettingOnUpdateReplaysAlreadyReceivedToken() {
+        // フック設定前(LienApp.init より前)にトークンが届いていても取りこぼさない
+        let store = DeviceTokenStore()
+        store.update(deviceToken: Data([0xab]))
+        var received: [String] = []
+        store.onUpdate = { received.append($0) }
+        XCTAssertEqual(received, ["ab"])
+    }
+
+    @MainActor
+    func testRemoteNotificationRelayCallsHandler() async {
+        let relay = RemoteNotificationRelay()
+        var count = 0
+        relay.handler = { count += 1 }
+        await relay.notify()
+        await relay.notify()
+        XCTAssertEqual(count, 2)
+    }
+
+    @MainActor
+    func testRemoteNotificationRelayWithoutHandlerIsNoOp() async {
+        let relay = RemoteNotificationRelay()
+        await relay.notify() // handler 未設定でも落ちない
+    }
 }

@@ -3,14 +3,14 @@
 // CheckinService.swift の「追加能力プロトコル」パターンを踏襲する(HomeViewModel は
 // checkinService を as? でキャストして能力検出する — 新しい init 引数は増やさない)。
 //
-// スコープ(2026-06-11 決定・issue #15):
-//   - 本タスクはホーム画面の導線(つつくボタン/リアクション導線)をモック注入で結線する。
-//     実 Supabase Functions nudge/react(本体はもう実装済み・デプロイ無し)への実 HTTP 呼び出しは
-//     行わない。LienApp.swift は現在も checkinService: LocalEchoCheckinService() を注入しており
-//     (T14 の CheckinService 本結線はまだ別タスク — issue #14)、本タスクはその既存のモックに
-//     NudgeSending / Reacting を適合させることで導線を見せる
-//   - 実 API クライアント(NudgeAPIClient 等)+ CheckinService 側への適合追加は、CheckinService
-//     自体の本結線(LienApp.swift 差し替え)と合わせて行う後続の統合タスクの責務とする
+// スコープ:
+//   - T15(2026-06-11 決定・issue #15)はホーム画面の導線(つつくボタン/リアクション導線)を
+//     モック注入(LocalEchoCheckinService のモック適合 — 本ファイル末尾)で結線した
+//   - 実 Supabase Functions nudge/react への結線は issue #55: 実 API クライアント
+//     (EdgeFunctionNudgeReactClient — Api/NudgeReactAPIClient.swift)と、それを NudgeSending / Reacting
+//     として公開する LiveNudgeReactService(Core/LiveNudgeReactService.swift)。AppServices が
+//     Config の有無で Live / モックを切り替え、Live は HomeViewModel へ明示注入される
+//     (CheckinService 自体は nudge/react を知らない — 能力の合成は注入側の責務)
 //
 // 自由テキスト入力は無し(§3.7「チャット化を避ける」)。スタンプは閉じた語彙(NudgeStamp /
 // ReactionStamp)のみ。サーバー側正本は supabase/functions/_shared/messages.ts の
