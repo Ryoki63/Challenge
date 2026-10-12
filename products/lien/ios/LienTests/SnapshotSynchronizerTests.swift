@@ -16,18 +16,25 @@ final class MockSnapshotClient: SnapshotClient {
     private(set) var callCount = 0
     /// 取得中に実行される(ホームの保存や NSE の書き込みが割り込む状況を模す)
     var onFetch: (() -> Void)?
-    /// 応答を遅らせる秒数(同時実行の検証用)
-    var delay: TimeInterval = 0
+    /// true の間、最初の取得は release() が呼ばれるまで応答しない(同時実行を決定的に検証するための関門)
+    var holdsFirstFetch = false
+    private var gate: CheckedContinuation<Void, Never>?
 
     init(result: Result<PairSnapshot, Error>) {
         self.result = result
     }
 
+    /// 関門を開ける(最初の取得を先へ進める)
+    func release() {
+        gate?.resume()
+        gate = nil
+    }
+
     func fetchSnapshot() async throws -> PairSnapshot {
         callCount += 1
         onFetch?()
-        if delay > 0 {
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        if holdsFirstFetch, callCount == 1 {
+            await withCheckedContinuation { gate = $0 }
         }
         return try result.get()
     }

@@ -110,7 +110,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         Task { @MainActor in await RemoteNotificationRelay.shared.notify() }
-        completionHandler([.banner, .sound])
+        completionHandler([.banner, .list, .sound])
     }
 
     /// 通知のタップ(アプリが前面へ来る。前面復帰の同期とは別に、確実に取り直す)

@@ -12,19 +12,12 @@ extension AppServices {
     static func make(bundle: Bundle = .main) -> AppServices {
         let pushAuthorizer = PushManager()
         let reloadWidgets: () -> Void = { WidgetCenter.shared.reloadAllTimelines() }
+        // App Group が解決できない署名なしビルドでも、アプリ本体は動き続ける(ウィジェット・NSE とは共有されない)
+        let store = AppGroupStore.standard(bundle: bundle) ?? AppGroupStore.localFallback()
         guard let config = Config.load(bundle: bundle) else {
-            return stub(
-                store: AppGroupStore.standard(bundle: bundle),
-                pushAuthorizer: pushAuthorizer,
-                reloadWidgets: reloadWidgets
-            )
+            return stub(store: store, pushAuthorizer: pushAuthorizer, reloadWidgets: reloadWidgets)
         }
-        return live(
-            config: config,
-            store: AppGroupStore.standard(bundle: bundle) ?? AppGroupStore.localFallback(),
-            pushAuthorizer: pushAuthorizer,
-            reloadWidgets: reloadWidgets
-        )
+        return live(config: config, store: store, pushAuthorizer: pushAuthorizer, reloadWidgets: reloadWidgets)
     }
 
     static func live(

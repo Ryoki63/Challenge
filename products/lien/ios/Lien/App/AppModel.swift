@@ -39,7 +39,8 @@ final class AppModel {
     private let now: () -> Date
 
     private var isRefreshing = false
-    private var rerunRequested = false
+    /// 同期の走行中に別の要求が来た(終了直後に1回だけ取り直す)。テストが観測する
+    private(set) var rerunRequested = false
     private var lastRefreshFinishedAt: Date?
 
     /// 前面復帰の同期を省く最短間隔(起動直後の start() との二重取得を避ける。push 起点は省かない)

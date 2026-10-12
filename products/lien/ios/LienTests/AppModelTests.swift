@@ -219,18 +219,26 @@ final class AppModelTests: XCTestCase {
     func testConcurrentRefreshesCoalesceIntoOneExtraRun() async throws {
         let h = try await makeHarness(local: SnapshotFactory.solo())
         defer { h.temp.cleanup() }
-        h.client.delay = 0.1
+        h.client.holdsFirstFetch = true // 最初の取得を関門で止め、「走行中」を決定的に作る
 
         let model = h.model
         let first = Task { await model.refresh() }
-        try await Task.sleep(nanoseconds: 30_000_000) // first が走行中になるまで待つ
+        await waitUntil { h.client.callCount == 1 } // first が取得の途中(走行中)になった
+        XCTAssertFalse(model.rerunRequested)
+
+        // 走行中に来た要求は、待たずに「あとで1回」と記録して即座に戻る
         let second = Task { await model.refresh() }
         let third = Task { await model.refresh() }
-        await first.value
         await second.value
         await third.value
+        XCTAssertTrue(model.rerunRequested)
+        XCTAssertEqual(h.client.callCount, 1, "走行中は新しい取得を始めない")
+
+        h.client.release()
+        await first.value
 
         XCTAssertEqual(h.client.callCount, 2, "走行中の要求は終了直後の1回に畳む(3本同時でも 1 + 1)")
+        XCTAssertFalse(model.rerunRequested)
     }
 
     func testSceneActivationRightAfterStartIsSkipped() async throws {
