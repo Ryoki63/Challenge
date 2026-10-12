@@ -2,6 +2,7 @@
 
 対象: `products/lien/supabase/migrations/0003_cron.sql` で登録し、`0007_cron_secret.sql` で認証を cron 専用シークレットに替えた cron ジョブ(issue #51・#60 / docs/GROWTH.md §7.1)。
 G0〜G1 の人間作業は [g1/RUNBOOK.md](g1/RUNBOOK.md)。本書は「公開後も続く運用」の手順。
+cron とは別に、本番の API を 2 ユーザーで通して確かめる手順(通しテスト。issue #67)は §12。
 
 ## 1. 何がどう動いているか
 
@@ -267,6 +268,7 @@ PY
 | 2026-10-13 01:46〜01:50 | **#60 のスモーク(本番)**: 関数 29 項目 PASS(405 / 認証なし・別の秘密・**万能鍵が 401** / 壊れた JSON・知らないキー・型違い・今日と明日の確定・未来の月が 400 / `{"dateLocal":"2026-03-31","notify":false}` が 200 で `notify:false`・対象 0 ペア / RPC を service role で呼ぶと FK 違反 23503 = 結線 OK、anon では 401 / 表は anon から読めない)。cron の経路は一時ジョブ(毎分。本番ジョブの command をそのまま使用。確認後に削除)で確認: close-day は `succeeded` / `1 row` → pg_net の応答 200(`notify:false`・errors 空)、**grant-tickets の command は 1日でない日なので `succeeded` / `0 rows` で、pg_net の応答は増えない**(= 呼ばれない)。`ops/run-cron-fn.sh close-day 2026-03-30 2026-03-31` が Vault の秘密で 200・`notify:false`(引数の検査も確認: 今日・確認なしの grant-tickets・未来の月・1日でない日付は断る)。Function が流す問い合わせの形(`USER_COLUMNS` / `PARTNER_SELECT` の select・`ticket_grant_runs`・`db.rpc`)を supabase-js で本番に対して確認(読み取りと、必ず失敗する RPC だけ)。**意図しない変更が1つ**: スモークの「空の本文」(cron の素朴な POST)の確認で、既定の「昨日 = 2026-10-12」が実際に確定された。00:10 の cron が閉じなかったテストペア P3(`c33b5d9c-…`)・P4(`7ef8edd2-…`)の 10/12 に `both` が1行ずつ入り、`plants.grown_days` が数え直された(通知は出ていない: push_token を持つユーザーがいない・APNs 未設定)。テストペアなので影響はないが、台帳(§8)の値は 10/12 の分だけ進んでいる |
 | 2026-10-13 01:48〜01:49 | 監視の確認: `ops/check-cron.sh`(手元)と、GitHub Actions の `lien-cron-watch` の手動実行(workflow_dispatch。run 38279962642)が全項目 OK(`secrets:sync` で Vault と Function secrets が一致、`vault:master-key` で万能鍵なし、`exposure` で公開スキーマに net なし)。失敗時の動作確認: `max_age_hours=0` で手動実行(run 38280031567)すると `watch` ジョブが `failure`(FAIL: close-day:run / grant-tickets:run)になり、赤になることを確認。本番の状態は変えていない。続けて §6 の鍵の更新スクリプトを実行して**更新の経路**も確認: Vault の値が変わり、直後の最初の呼び出しから新しい値で 200(Function の再デプロイ不要)、`secrets:sync` も OK。なお上の2つの run(38279962642・38280031567)は、公開ログへの件数の出力をやめる前なので、ログにテストペアの件数が出ている。以降の run(redact 版。例 38280878109 = 緑)は件数・ペア ID・応答の本文を出さない |
 | 2026-10-13 02:33〜02:36 | **#60 の Opus レビュー修正を反映**。① 監視(`ops/cron_check.ts`)を直した: 直近の予定の回(close-day は JST 00:10・grant-tickets は 00:05。猶予 5 分)の起動を必須にし、前夜の回が抜けたら赤・月初の付与の回が抜けたら赤にした(以前は最後の起動が 26 時間以内なら OK で、どちらも見逃していた)。ジョブ定義(スケジュール・呼び先・鍵・本文)のずれと想定外のジョブも赤。手動実行 38285007571 が緑(redact 版)、`max_age_hours=0` の 38285073541 が赤になることを確認。本番の状態は変えていない ② grant-tickets を再デプロイ(v5 → v6。旧来の印のコメントの修正だけで動作は同じ。デプロイ物 = main の HEAD を保つため。他の 10 関数は変更なし)。デプロイ後に副作用のないスモーク 6 項目が PASS(GET 405 / 認証なし・別の秘密 401 / cron 秘密 + 未来の月・知らないキー・壊れた JSON が 400)。`ticket_grant_runs` は 0 行のまま・データは変わっていない ③ lien-cron-watch・lien-deploy の action を commit SHA で固定(lien-deploy の dry_run 手動実行 38285254685 が緑)。lien-cron-watch の ops-tests を functions/ 配下の変更でも回すようにした ④ 上の 01:43〜01:50 の行の関数の版数を実測に訂正 |
+| 2026-10-13 05:07〜05:21 | **issue #67: 本番に対する 2 ユーザーの API 通しテストを初めて実行**(`scripts/e2e/run.sh`。§12)。開発中の 3 回(05:07・05:11・05:14)と最終の 1 回(05:20)で、各回 匿名ユーザー 3 人・ペア 1 組・写真 2 枚を作り、すべて削除した(後片付けのあと、users・pairs・Storage のオブジェクトが実行前と同じ件数に戻ったことを SELECT で確認。作った ID は §8 の末尾)。最終回は **244 項目 PASS・FAIL 0**・契約フィクスチャ(`contracts/`)とのずれ 1(署名付き URL の発行の失敗は HTTP 404 でなく 400。手書きフィクスチャの説明が 404 を想定)・NOTE 3(取消後も写真の実体が Storage に残る = issue #68 / 署名の失敗が 400 / APNs の secrets が未設定 = G0 待ち)。#59 PV の経路(相手が `checkins.photo_path` を読み、署名付き URL で画像を取れる。ペア外・未ログインは取れない)と、PushTokenSync の経路(自分の `users.push_token` / `push_env` の書き込みと読み戻し)も本番で通った。close-day / grant-tickets は呼んでいない(§10)。本番のスキーマ・関数・設定は変えていない |
 
 ## 8. 本番のテストデータ(台帳)
 
@@ -283,6 +285,17 @@ PY
 | P3 `c33b5d9c-9788-4529-b608-a607036fdf30` | 10-13 00:36 | `be4c372d-0f32-4c8f-9183-2ee7b6abe342` / `e8adc43d-61c3-4ae1-b238-ab505158d483`(テスト54E/F) | #54 のレビュー修正スモーク(昨日の仮判定の窓)。`started_on` を 10-12 にずらし、10-12 付けの checkin を SQL で入れた |
 | P4 `7ef8edd2-7890-4726-ba39-b781ddcfce6e` | 10-13 00:37 | `46797561-77a7-4bfe-b588-e9b5a3bae11b` / `4d2131ea-644f-4850-b1ac-a510b8fcaa0f`(テスト54G/H) | 同上(react の最初の1回だけ push・遅れた checkin) |
 | (ペアなし) | 10-13 00:06 | `662e804a-6988-4d2b-9295-e55d53a44f6d`(テスト54E・約束あり)/ `079bfe55-70fd-4f16-b790-359cdb6aa037`(テスト54F) | 同じスモークの1回目が通信のタイムアウトで途中終了した残り |
+
+### 通しテスト(§12)が作って、その場で削除したもの(2026-10-13・issue #67)
+
+`scripts/e2e/run.sh run` は実行のたびに、匿名ユーザー 3 人(ニックネーム `E2E-A` / `E2E-B` / `E2E-C`)・ペア 1 組・Storage の写真 2 枚を作る。`--cleanup`(または `cleanup` コマンド)で削除するので、**通常は本番に残らない**。残したままにしたとき(`--cleanup` なしの実行、途中の失敗)だけ、上の表と下の SQL のリストに足す(残っているかは `run.sh list` で分かる)。次の 4 回は削除済みなので、表にも SQL のリストにも入れていない(監査のための記録):
+
+| 実行(JST) | users(A / B / C) | pair | 後片付け |
+|---|---|---|---|
+| 10-13 05:07 | `2c8944f3-57f2-4baf-a27f-781dd80e8ae7` / `fde5f2f2-bbbe-4c1f-bc48-40b10c36be48` / `9b12c9ba-e587-402a-8c5a-7cb140e67496` | `3b65a71c-5e9c-4615-9be0-25d35ee7cf94` | 05:09 `cleanup` で削除(Storage 2 件を含む)。この回は契約の比べ方に不備があり(名前なし・ソロの null を FAIL にした)、直してから再実行した |
+| 10-13 05:11 | `ed2149ff-20a2-4aec-b240-e1aed1e339aa` / `7f29f59e-675d-4546-bc04-f960dfcf8d42` / `5c2a49e2-e450-4fa4-a6a4-133c8ddb4545` | `223e25d3-7b38-444e-aecd-690c5755d649` | 05:12 `--cleanup` で削除 |
+| 10-13 05:14 | `6890099d-7d31-40fc-b726-d5b4d68908c5` / `240a6207-c66e-4d28-b352-58ccc32def5b` / `b8c42f60-8752-4587-b9ee-12cd20f3d15b` | `9c0140de-eb0c-497e-bcac-75f9dd39a3a1` | 05:15 `--cleanup` で削除。コードの分割後の確認(235 項目 PASS) |
+| 10-13 05:20(最終) | `aba422f1-5223-4dba-819a-f843da70e9b6` / `ceefbf04-d193-4b9b-b411-a66d814fac1b` / `c95cd4cf-cb03-49de-9530-f031249053ce` | `16d10099-841f-43aa-b52c-6779ed67d344` | 05:21 `--cleanup` で削除。244 項目 PASS(PV の手書きフィクスチャとの突き合わせを足した版) |
 
 ### KPI の SQL から除く
 
@@ -342,3 +355,88 @@ Opus レビュー(2026-10-13)の指摘。いまはペアが数組で起きない
 
 - **close-day の残数の更新は「絶対値で書く」**: 最初に読んだ残数から計算した値(`balance - 1` など)をそのまま書くので、読んでから書くまでの間に別の処理が残数を変えると、その変更を上書きする(lost update)。たとえば grant-tickets の付与が 00:10 までに終わらない規模になると、付与を上書きしてしまう。いまは 00:05 の付与が数秒で終わり、00:10 の確定の前に必ず済む。直し方: 残数の増減を DB 側の原子的な更新(RPC。`apply_monthly_ticket_grant` のように1トランザクション)にする
 - **grant-tickets はペアごとに約 5 往復の問い合わせを順に行う**(実行記録の確認・ledger の確認・メンバー2人の `premium_until`・RPC)。pg_net の timeout は 60 秒(`0007_cron_secret.sql` の `timeout_milliseconds`)で、見積もりではペアが数百組になると超える。超えると応答は `timed_out` になり(監視の `grant-tickets:response` が赤になる)、Function 自体は最後まで動くが、結果は pg_net 経由では見えない。直し方: ペア・`premium_until`・実行記録を `in (...)` でまとめて読み、書き込みだけを RPC にする
+
+## 12. 本番に対する 2 ユーザーの API 通しテスト(e2e。issue #67)
+
+実機の E2E(T20)の前に、エージェントが本番のバックエンドに 2 ユーザーのシナリオを流し、「CI は緑なのに本番で通らない」を先に潰す(docs/REVIEW-2026-10-12.md §4.2 T20)。`products/lien/scripts/e2e/`(deno)。**手動実行専用**: 本番にテスト用の匿名ユーザーを作る。CI では動かさない(`CI=true` のときは `E2E_ALLOW_CI=1` が無いと止まる。lien-ci・lien-cron-watch のどのジョブからも呼ばれない)。
+
+### 使い方
+
+```bash
+set -a; source .env; set +a      # SUPABASE_ACCESS_TOKEN を環境変数に読む(値は表示されない)
+bash products/lien/scripts/e2e/run.sh check             # 環境の確認だけ(キー・プロジェクトの状態・フィクスチャ。データは作らない)
+bash products/lien/scripts/e2e/run.sh run --cleanup     # 通しテスト → 最後に作ったデータを削除(ふだんはこれ)
+bash products/lien/scripts/e2e/run.sh run               # データを残して中身を調べたいとき(あとで cleanup)
+bash products/lien/scripts/e2e/run.sh cleanup --dry-run # 直近の run が作ったデータの削除予定だけ見る(SELECT のみ)
+bash products/lien/scripts/e2e/run.sh cleanup           # 直近の run が作ったデータを削除
+bash products/lien/scripts/e2e/run.sh cleanup --user <uuid> [--user <uuid> ...]   # ID を指定して削除
+bash products/lien/scripts/e2e/run.sh list              # 残っている通しテストのユーザーを一覧(SELECT のみ)
+```
+
+- 終了コード: 0 = すべて PASS / 1 = FAIL あり(または後片付けの失敗)/ 2 = 使い方・環境の誤り
+- 環境変数: `SUPABASE_ACCESS_TOKEN`(アプリが使う公開キーの取得・DB の確認・後片付けに使う)/ `SUPABASE_ANON_KEY`(任意。指定すれば Management API なしで `run` できる)/ `PROJECT_REF` / `E2E_STATE_DIR`(作ったデータの ID を書く状態ファイルの置き場所。既定 `${TMPDIR:-/tmp}/lien-e2e`。リポジトリの外)
+- オプション(`run`): `--no-outsider`(ペア外の C を作らない)/ `--no-db-checks`(最後の DB の SELECT を省く)/ `--force-time`(下の実行制限を無視。勧めない)
+- 所要時間は約 1 分(リクエスト約 160 回)。匿名サインインは **1 時間に 30 回まで**(Supabase の既定。IP ごと)で、1 回の実行で 3 回使う。続けて何度も流すと 429 になり、S01 で止まる
+- **実行制限**: JST 23:50〜00:15 は動かない(00:05 の grant-tickets・00:10 の close-day と、日付の変わり目に重ならないように)。新しいペアの `started_on` は今日なので、昨日の確定の対象にも入らない
+
+### 何を通すか(S 番号は出力と対応)
+
+アプリが実際に送るヘッダ・本文の形で呼ぶ(Edge Functions は `Authorization: Bearer` だけ・PostgREST は `apikey` + `Authorization`・署名付きアップロードはどちらも付けない)。登場人物は新しい匿名ユーザー 3 人: A(招待する側)・B(受ける側)・C(ペア外。ソロのチェックインと、見えてはいけないものの確認に使う)。
+
+| 手順 | 確かめること |
+|---|---|
+| S01 | 匿名サインアップ(JWT の role・sub・is_anonymous)・`users` の骨組み行(トリガー)・`refresh_token` での更新(同じユーザー ID のまま) |
+| S02 | 認証なし・不正な JWT は 401 `unauthorized`・メソッド違い 405・壊れた JSON 400 |
+| S03 | `users` の PATCH(アプリの `updateProfile` と同じ本文) |
+| S04〜S06 | `GET /snapshot` の新規(`snapshot.empty.json`)とソロ(`snapshot.solo.json`)・`promise-set`(新規 / 編集 = 同じ id で `created:false` / 不正入力の 400) |
+| S07 | ソロ: 写真の要求は 400 `no_pair`・日付の検査・C のソロのチェックイン(`checkin.solo.json`)と冪等 |
+| S08 | `invite-create` → `invite-accept`(`invite-accept.ok.json`)・失敗系(形式・存在しない・自分の招待・使用済み・既ペア) |
+| S09, S11, S15, S16 | 各段階の snapshot: 成立直後(段階 0・回数 0・次は 1 回)・A だけ完了(fidget・相手の写真あり)・ふたり達成(ストリーク 1・成長 1 回・段階 1・次は 3 回・happy)・A と B で共通の項目が同じ |
+| S10 | 写真つきチェックイン: `requestPhotoUpload` → 署名付きアップロード(原寸 + サムネ)→ `photoPath` 付きで再送 → 差し替え(x-upsert)・本人の区画以外のパスは 400 `invalid_photo_path` |
+| S12 | **#59 PV の経路**: 相手(B)が PostgREST で `checkins.photo_path` を読む → `POST /storage/v1/object/sign/photos/<path>` で署名付き URL を作る → ヘッダなしで GET して同じバイト列(SHA-256)が取れる。ペア外(C)・未ログイン・改ざんしたトークンは取れない |
+| S13, S14 | `nudge`(3 回まで・4 回目は 429・語彙外 400・完了済みの相手は 409)・`react`(新規 / 同じスタンプは `changed:false` / 6 種すべてに付け替え・自分のチェックインは 403・ペアなしは 409) |
+| S17 | `plant-name`: `first` は先着(2 人目は 409 `already_named` と今の名前)・`rename` は上書き・不正な名前(空・9 字・ゼロ幅・改行)は 400 |
+| S18 | `checkin-cancel`(冪等・当日以外は 400)→ 成長回数が戻る → やり直しで「ふたり達成」に戻る・ソロの取消 |
+| S19 | **PushTokenSync の経路**: 自分の `users.push_token` / `push_env` を読める(登録前は null)→ 書ける → 読み戻せる → `push_env` の不正値は CHECK で 400。相手の行は読めない・書き換えられない。push を送る操作をしても本処理は成功する。最後に偽のトークンを消す |
+| S20 | クライアントから書けないもの: `premium_until`・`checkins` の直接 INSERT / DELETE・`plants`・Storage の写真の削除 |
+| S21 | Management API で SELECT: 初期のお休みチケット 2 枚・close-day が走っていない(`streak_days` 0 行・`plants.grown_days` 0)・`nudges` 3 行・取消で `reactions` が CASCADE で消える・Storage のオブジェクト数 |
+
+応答は `products/lien/contracts/` のフィクスチャと **形(キー・型)** で突き合わせる(`e2e/shape.ts`)。フィクスチャは 1 つの状態の標本なので、同じ系統のフィクスチャを合成した形で見る(例: `snapshot` の `plantName` は名前の前は null・ソロはペア関連が null)。整数の標本には小数を許さない(Swift の `Int` でデコードできない)。新規ユーザー・ソロ・ペア成立直後のように値が決まっている状態は、**値まで**フィクスチャと比べる。エラーは `errors.json` のコードと HTTP ステータスに一致するかを見る。ずれは FAIL にして、最後に「契約フィクスチャとのずれ」にまとめる。
+
+### 読み方
+
+- `PASS` 期待どおり / `FAIL` 期待と違う(終了コード 1)/ `NOTE` 失敗ではないが知っておくべき観測 / `SKIP` 前提が満たされず確認できなかった
+- FAIL の行の下に、期待と実際(応答の抜粋。鍵・JWT は伏せる)が出る。FAIL のまま終わっても作ったデータの ID は状態ファイルに残る(`cleanup` で消せる)
+- 「作ったデータ」のブロックに ID が出る(この端末の画面だけ。issue・ログ・コミットには貼らない。台帳 §8 には ID を書く)
+
+### 作るデータと後片付け
+
+- 作るもの: 匿名ユーザー 3 人(`E2E-A` / `E2E-B` / `E2E-C`、絵文字 🧪)・ペア 1 組(+ 植物・お休みチケットの初期付与・招待)・チェックイン・nudge・Storage の写真 2 枚(`pairs/<ペア>/<今日>/<A>/photo.jpg` と `photo_thumb.jpg`)
+- 消す順序(`cleanup`): ① Storage の実体(Storage API。**secret key をこの削除にだけ**使い、Management API から取って表示しない)② `pairs`(`pair_members` / `plants` / `streak_days` / `ticket_ledger` / `nudges` / `ticket_grant_runs` が CASCADE)③ `auth.users`(`public.users` → `promises` / `checkins` / `reactions` / `invites` が CASCADE)。ペアは users から CASCADE されないので先に消す。最後に SELECT で残りが 0 件であることを確かめる。この順序は T23(アカウント削除)の予行にもなる
+- 安全装置: 消すのは「この実行が状態ファイルに記録した ID」か `--user` で明示した ID だけ(ニックネームでの一括削除はしない)。**匿名ユーザーで、ニックネームが `E2E-A/B/C`(記録した ID に限り空も可)でないものが混じっていたら、何も消さずに止まる**。対象のペアに対象外のメンバーがいても止まる。ID は UUID の形式を検査してから SQL に入れる。`--dry-run` は SELECT だけ
+- 状態ファイルは ID だけ(JWT・鍵は書かない)。`cleanup` は直近のものを使う。`--state` で指定できるのは `E2E_STATE_DIR` の中のものだけ
+- 実行前後で、`auth.users` / `pairs` / Storage のオブジェクトの件数は変わらない(2026-10-13 に確認)
+
+### 本番で確かめた契約(#59 PV の実装向けに)
+
+- 相手の当日の行: `GET /rest/v1/checkins?select=id,user_id,date_local,photo_path&date_local=eq.<今日>&user_id=neq.<自分>&limit=1`(`apikey` + `Authorization: Bearer <JWT>`)→ 200 `[{id, user_id, date_local, photo_path}]`。`photo_path` は原寸のパス。サムネのパスは同じ区画の `photo_thumb.jpg`(行には持たない)
+- 署名付き URL: `POST {base}/storage/v1/object/sign/photos/<photo_path>`(`apikey` + `Authorization`、本文 `{"expiresIn": 120}`)→ 200 `{"signedURL": "/object/sign/photos/<path>?token=..."}`。画像の URL は **`{base}/storage/v1` + signedURL**。これをヘッダなしで GET すると 200・`image/jpeg`
+- 署名の**発行**に失敗するとき(ペア外・存在しないオブジェクト・未ログイン)は **HTTP 400** で本文が `{"statusCode":"404","error":"not_found","message":"Object not found",...}` になる(HTTP ステータスは 404 ではない)。クライアントは「200 以外 = 静かに植物だけに戻す」でよい。取消されて行が消えた日は、そもそも行が 0 件になる
+- 署名付き URL の**取得**(GET)が失敗するとき: 寿命切れは **HTTP 400** `{"statusCode":"400","error":"InvalidJWT","message":"\"exp\" claim timestamp check failed"}`、トークンの改ざんも 400。アプリの `.expired`(400 / 401 / 403 → 署名からやり直す)と合う。「署名は有効だがオブジェクトが消えた」ときの GET のステータスは未確認(取消時に写真を消す案 #68 が入ったら確かめる)
+- 署名付きアップロード(`PUT {base}/storage/v1/object/upload/sign/photos/<path>?token=...`)は、アプリの `uploadPhoto` の現状の形(`Content-Type: image/jpeg` と `x-upsert: true` だけ。`apikey` も `Authorization` も付けない)で通る。同じパスへの差し替えも通る
+
+### 2026-10-13 の結果(初回)
+
+最終回: **244 項目 PASS・FAIL 0**・NOTE 3・SKIP 0。契約フィクスチャとの突き合わせは形(キー・型)34 回・値 4 回で、ずれ 1 件(下の NOTE 1)。Edge Function の応答のフィクスチャ 14 ファイル(`snapshot` 3 状態・`checkin` 3 種・`checkin-cancel`・`promise-set`・`invite-create` / `invite-accept`・`nudge`・`react`・`plant-name` 2 種)は、本番の実応答と形が一致した。エラーは `errors.json` のコード 28 種類(のべ 53 回。HTTP ステータスとの組)を引き出して一致を確認した。未確認なのは、本番では安全に起こせないもの(500 系・`user_not_found`・`invite_expired`・`partner_already_paired`・`plant_not_found`・`token_generation_failed`)と、APNs のペイロード(`push.*.json`。実機・APNs が要る)。スタンプは react の 6 種すべてと nudge の 3 種(1 日 3 回の上限のため)を通した。PV の手書きフィクスチャ(`partner-checkin.*.json` / `storage-sign.ok.json`)の形も一致した。
+
+- NOTE 1: 署名付き URL の**発行**(`POST …/object/sign/photos/<path>`)の失敗は、ペア外・存在しないオブジェクト・未ログインのいずれも **HTTP 404 でなく 400**(本文が `{"statusCode":"404","error":"not_found",...}`)。`contracts/README.md` の手書きフィクスチャの説明(404 = 無い・読めない)と、`StoragePhotoURLSigner`(404 だけ `notFound`)は実態とずれる。実際は `.server(400)` になるが、結果(写真を出さない・サムネが無いときは原寸で代わりを作る)は同じ。説明か写像をそろえるのは #59 側
+- NOTE 2: 取消後も写真の実体が Storage に残り、相手は決まったパスから署名付き URL を作って取れる(通常のアプリの画面からは見えない)。DESIGN §5.7-3 の前提が #59 の方式で崩れている → **issue #68**
+- NOTE 3: APNs の secrets(`APNS_AUTH_KEY` / `APNS_KEY_ID` / `APPLE_TEAM_ID` / `APNS_ENV` / `APNS_TOPIC`)が 5 つとも未設定で、push は送られない(G0 待ち)。偽のトークンは残る。G0 のあとに流すと、偽のトークンが 400 BadDeviceToken で掃除される側の観測に変わる(DESIGN §4.1)
+- 最も遅い呼び出しは 1〜3 秒(Edge Function の初回呼び出し・Management API の SQL)
+
+### 変更するとき
+
+- 応答の形が変わったら、`contracts/tools/generate.ts` でフィクスチャを再生成する(`contracts/README.md`)。通しテストはフィクスチャを読むだけなので自動で追従する(キーや型が変わった / 増えたら、本番に出す前後でずれとして FAIL になる)
+- 新しい API やエラーコードを足したら、`steps_*.ts` に手順を足す(`rep.run("S22", ...)`)。共有の道具は `scenario_lib.ts`。`errors.json` にあるコードの確認は `expectError`
+- 単体テスト(ネットワーク不要。形の突き合わせ・フィクスチャの読み込み・後片付けの安全装置): `deno test --allow-read products/lien/scripts/e2e/`
+- close-day / grant-tickets は呼ばない(§10)。両方を通したいときは、§4 の手動の再実行と §2 の監視の手順に従う
