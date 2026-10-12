@@ -121,7 +121,8 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
 
 - TimelineProvider のエントリは2点: `now`(現在状態)と `翌日0:00`(日付跨ぎで両者「未完」表示に戻す)。`policy: .atEnd`
 - reload のトリガーは NSE とアプリ本体のみ(WidgetKit の reload 予算を浪費しない)
-- ドット絵は `Image(...).resizable().interpolation(.none)` で整数倍拡大(にじみ禁止)
+- 植物は SVG のレイヤーを同じキャンバス(viewBox 240×320)で重ねて描く(`PlantCharacterView`)。拡大縮小は自由(ドット絵のときの整数倍・`interpolation(.none)` の制約はない)。レイヤーの規則と重ね順は `products/lien/assets/plant/mapping.md`(取込後)/ 現時点の正本は `products/lien/assets/plant/v4_drafts/README.md`
+- ウィジェットも `PlantCharacterView` を共有する(SwiftUI と Foundation だけに依存させる)。全レイヤーを重ねてメモリに収まるかは実機(G1 / T20)で確かめ、収まらなければ「段階 × 葉の状態」を合成済みの1枚にしたウィジェット専用画像で代える(GROWTH.md §9.5)
 - 表示原則(REQUIREMENTS §3.10): 自分未完=自分側グレー / 相手が先に完了=「(名前)が待ってるよ」
 
 ### 3.6 ディープリンク
