@@ -171,6 +171,7 @@ final class EdgeFunctionSnapshotClientTests: XCTestCase {
         XCTAssertEqual(request.method, "GET")
         XCTAssertEqual(request.header("Authorization"), "Bearer test-token")
         XCTAssertNil(request.body)
+        XCTAssertEqual(request.request.timeoutInterval, EdgeFunctionSnapshotClient.requestTimeout, "自己修復の取得は短く切り上げる")
         XCTAssertNil(snapshot.pairId)
         XCTAssertEqual(snapshot.myPromiseTitle, "筋トレ")
     }

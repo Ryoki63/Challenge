@@ -44,6 +44,10 @@ protocol SnapshotClient: AnyObject {
 // MARK: - live 実装(URLSession。supabase-swift 非依存)
 
 final class EdgeFunctionSnapshotClient: SnapshotClient {
+    /// 自己修復の取得は短く切り上げる(通信が不安定でも起動直後の読み込み表示を長く引き延ばさない。
+    /// 失敗しても端末の snapshot で表示を続け、次の前面復帰・push で取り直す)
+    static let requestTimeout: TimeInterval = 15
+
     private let transport: EdgeFunctionTransport
 
     init(
@@ -59,7 +63,8 @@ final class EdgeFunctionSnapshotClient: SnapshotClient {
     }
 
     func fetchSnapshot() async throws -> PairSnapshot {
-        let request = try await transport.functionRequest("snapshot", method: "GET")
+        var request = try await transport.functionRequest("snapshot", method: "GET")
+        request.timeoutInterval = Self.requestTimeout
         let result: (data: Data, status: Int)
         do {
             result = try await transport.send(request)

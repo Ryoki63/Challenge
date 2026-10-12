@@ -38,6 +38,8 @@ Deno.test("契約フィクスチャ: 作る JSON と置いてある JSON が1対
   }
   const orphans = present.filter((n) => !expected.has(n));
   if (orphans.length > 0) {
-    throw new Error(`generate.ts が作らない JSON があります: ${orphans.join(", ")}`);
+    throw new Error(
+      `generate.ts が作らない JSON があります: ${orphans.join(", ")}`,
+    );
   }
 });

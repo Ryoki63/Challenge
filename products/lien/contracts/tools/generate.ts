@@ -117,7 +117,14 @@ class World {
         startedOn: "2026-06-01",
         memberIds: [USER_ME, USER_PARTNER],
       };
-      this.streakDays = ["2026-06-05", "2026-06-06", "2026-06-07", "2026-06-08", "2026-06-09", "2026-06-10"]
+      this.streakDays = [
+        "2026-06-05",
+        "2026-06-06",
+        "2026-06-07",
+        "2026-06-08",
+        "2026-06-09",
+        "2026-06-10",
+      ]
         .map((dateLocal) => ({ dateLocal, kind: "both" as const }));
       this.plant = { grownDays: 13, name: "みどり" };
     }
@@ -197,7 +204,9 @@ class World {
   createSignedUploadUrl(_path: string) {
     this.signedUploads++;
     // 実物は Storage が発行する署名トークン(JWT)。形だけ固定の擬似値にする
-    return Promise.resolve({ token: `signed-upload-token-${this.signedUploads}` });
+    return Promise.resolve({
+      token: `signed-upload-token-${this.signedUploads}`,
+    });
   }
 
   // -- CheckinCancelRepo --
@@ -211,7 +220,12 @@ class World {
 
   // -- PromiseSetRepo --
   upsertActivePromise(
-    p: { userId: string; title: string; emoji: string; remindAt: string | null },
+    p: {
+      userId: string;
+      title: string;
+      emoji: string;
+      remindAt: string | null;
+    },
   ) {
     const existing = this.promises.get(p.userId);
     const id = existing?.id ?? "c3333333-3333-4333-8333-333333333333";
@@ -329,7 +343,11 @@ function must200<T extends { status: number; body: unknown }>(
   result: T,
 ): T["body"] {
   if (result.status !== 200) {
-    throw new Error(`${name}: 200 を期待したが ${result.status}: ${JSON.stringify(result.body)}`);
+    throw new Error(
+      `${name}: 200 を期待したが ${result.status}: ${
+        JSON.stringify(result.body)
+      }`,
+    );
   }
   return result.body;
 }
@@ -347,7 +365,9 @@ export async function buildFixtures(): Promise<Map<string, unknown>> {
       "snapshot.paired",
       must200(
         "snapshot.paired",
-        await handleSnapshot({ repo: w as AnyRepo, now: clock }, { userId: USER_ME }),
+        await handleSnapshot({ repo: w as AnyRepo, now: clock }, {
+          userId: USER_ME,
+        }),
       ),
     );
   }
@@ -357,7 +377,9 @@ export async function buildFixtures(): Promise<Map<string, unknown>> {
       "snapshot.solo",
       must200(
         "snapshot.solo",
-        await handleSnapshot({ repo: w as AnyRepo, now: clock }, { userId: USER_ME }),
+        await handleSnapshot({ repo: w as AnyRepo, now: clock }, {
+          userId: USER_ME,
+        }),
       ),
     );
   }
@@ -368,7 +390,9 @@ export async function buildFixtures(): Promise<Map<string, unknown>> {
       "snapshot.empty",
       must200(
         "snapshot.empty",
-        await handleSnapshot({ repo: w as AnyRepo, now: clock }, { userId: USER_ME }),
+        await handleSnapshot({ repo: w as AnyRepo, now: clock }, {
+          userId: USER_ME,
+        }),
       ),
     );
   }
@@ -388,8 +412,12 @@ export async function buildFixtures(): Promise<Map<string, unknown>> {
         ),
       ),
     );
-    const toPartner = sent.find((s) => s.deviceToken === "device-token-partner");
-    if (!toPartner) throw new Error("checkin.paired: 相手への push が送られていない");
+    const toPartner = sent.find((s) =>
+      s.deviceToken === "device-token-partner"
+    );
+    if (!toPartner) {
+      throw new Error("checkin.paired: 相手への push が送られていない");
+    }
     out.set("push.visible", toPartner.payload);
   }
   {
@@ -437,8 +465,12 @@ export async function buildFixtures(): Promise<Map<string, unknown>> {
         ),
       ),
     );
-    const toPartner = sent.find((s) => s.deviceToken === "device-token-partner");
-    if (!toPartner) throw new Error("checkin-cancel.ok: 相手へのサイレント push が無い");
+    const toPartner = sent.find((s) =>
+      s.deviceToken === "device-token-partner"
+    );
+    if (!toPartner) {
+      throw new Error("checkin-cancel.ok: 相手へのサイレント push が無い");
+    }
     out.set("push.silent", toPartner.payload);
   }
 
@@ -527,7 +559,11 @@ export async function buildFixtures(): Promise<Map<string, unknown>> {
         "react.ok",
         await handleReact(
           { repo: w as AnyRepo, pusher, now: clock },
-          { userId: USER_ME, checkinId: PARTNER_CHECKIN_ID, stamp: REACTION_STAMPS[0] },
+          {
+            userId: USER_ME,
+            checkinId: PARTNER_CHECKIN_ID,
+            stamp: REACTION_STAMPS[0],
+          },
         ),
       ),
     );
@@ -564,14 +600,21 @@ const FUNCTIONS = [
  * iOS 側のエラーマップ(InviteClientError 等)がサーバーの実在する文字列だけを使っていること、
  * サーバーに増えたコードをクライアントが取りこぼしていないことをテストするための台帳
  */
-async function collectErrorCodes(): Promise<Record<string, Record<string, number[]>>> {
+async function collectErrorCodes(): Promise<
+  Record<string, Record<string, number[]>>
+> {
   const coreRe = /status:\s*(\d{3}),\s*body:\s*\{\s*error:\s*"([a-z_]+)"/g;
   const indexRe = /json\(\s*(\d{3}),\s*\{\s*error:\s*"([a-z_]+)"/g;
   const result: Record<string, Record<string, number[]>> = {};
   for (const fn of FUNCTIONS) {
     const codes: Record<string, Set<number>> = {};
-    for (const [file, re] of [["core.ts", coreRe], ["index.ts", indexRe]] as const) {
-      const path = new URL(`../../supabase/functions/${fn}/${file}`, import.meta.url);
+    for (
+      const [file, re] of [["core.ts", coreRe], ["index.ts", indexRe]] as const
+    ) {
+      const path = new URL(
+        `../../supabase/functions/${fn}/${file}`,
+        import.meta.url,
+      );
       const source = await Deno.readTextFile(path);
       for (const m of source.matchAll(re)) {
         (codes[m[2]] ??= new Set()).add(Number(m[1]));
@@ -631,7 +674,9 @@ async function main() {
       );
       Deno.exit(1);
     }
-    console.log(`OK: ${fixtures.size} 件のフィクスチャはサーバー実装の出力と一致`);
+    console.log(
+      `OK: ${fixtures.size} 件のフィクスチャはサーバー実装の出力と一致`,
+    );
   }
 }
 
