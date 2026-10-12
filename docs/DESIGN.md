@@ -273,7 +273,7 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 |---|---|---|---|
 | checkin | POST | dateLocal, photoPath? | upsert → 両者状態判定 → 相手へ可視push(snapshot同梱) → 自分用snapshot返却 |
 | checkin-cancel | POST | dateLocal | 当日のみ削除 → 相手へサイレント更新 |
-| invite-create | POST | — | token発行(8桁, 72h, 1回限り) |
+| invite-create | POST | — | token発行(8文字の英数字・大文字小文字を区別, 72h, 1回限り) |
 | invite-accept | POST | token | ペア作成(双方が未ペアであること検査) → 両者へpush |
 | promise-set | POST | title, emoji, remindAt? | 自分の現役の約束を upsert(編集は同一 promise_id への UPDATE = checkins の FK 継続でストリーク非影響 — REQUIREMENTS §3.3)→ ペアなら相手へサイレント更新(2026-06-11 実装同期・T12。§5.2「書き込みは Function 経由」のギャップを充足) |
 | nudge | POST | stamp | 1日3回制限 → 相手へpush(文言は messages.ts からサーバーが選ぶ) |
@@ -372,7 +372,7 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 
 1. A が invite-create → アプリは2形式を得る: `lien://invite/<token>` と `https://<GH_PAGES>/lien/i/?t=<token>`
 2. 共有シートで LINE 等へ送る。受け手は静的ページ経由: アプリあり→「アプリで開く」ボタン(カスタムスキーム起動) / なし→TestFlight・App Store 誘導+コード表示
-3. アプリ内「コードを入力」(8桁手入力)でも成立する
+3. 招待シートの「コードを入力」欄に、8文字の英数字コード(大文字小文字を区別。例 `AbCd2345`)を手入力しても成立する。シートの入口はソロのホームの招待ボタン(§3.6)
 - web/invite は JS 数十行の静的ページ。GitHub Pages でホスト(リポジトリ公開設定は G0 で人間が判断)
 
 ## 7. シークレットと環境変数(誰が・何を・どこに)
