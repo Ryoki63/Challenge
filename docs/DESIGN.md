@@ -107,6 +107,9 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
   "partnerName": "ゆうき",
   "partnerPromiseTitle": "ランニング", "partnerPromiseEmoji": "🏃",
   "plantStage": 3,
+  "plantGrownDays": 9,
+  "plantStageFloor": 7,
+  "plantNextStageAt": 14,
   "plantMood": "normal | happy | fidget | sad",
   "plantName": "みどり",
   "hasPartnerPhotoToday": false
@@ -115,6 +118,13 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
 
 - 書き込むのは**アプリ本体と NSE の2者だけ**。ウィジェットは読み取り専用
 - snapshot は**受信者視点**でサーバーが組み立てる(me/partner の向きをクライアントで反転しない)
+- **植物のキー(成長ルール v2。2026-10-12・issue #54 / docs/GROWTH.md)**
+  - `plantStage`: 成長段階 0〜9(0=たね 1=ふたば 2=めばえ 3=わかば 4=よりそい 5=つぼみ 6=いろづき 7=ほころび 8=ふたりざき 9=みのり)。サーバーの閾値配列 `PLANT_STAGE_THRESHOLDS = [0,1,3,7,14,21,30,45,66,100]` の添字で、段階名はアプリ側(Strings)が持つ。アプリが知らない大きい段階が来たら、知っている最大の段階として描く
+  - `plantGrownDays`: 成長回数(ふたり達成日の累計)。数え方は §5.4「成長回数」。ソロは 0
+  - `plantStageFloor`: 今の段階に入る回数(= 閾値配列の `plantStage` 番目)。ソロは 0
+  - `plantNextStageAt`: 次の段階に必要な回数。最後の段階(みのり)とソロは `null`(キーは省略せず `null` で出す)。アプリは閾値表を持たずに「あと `plantNextStageAt - plantGrownDays` 回」と区間の進み具合 `(plantGrownDays - plantStageFloor) / (plantNextStageAt - plantStageFloor)` を作れる(あとからサーバー側で閾値を下げても、古いアプリが追従する)
+  - `plantMood` の `sad` はアプリでは「すやすや」眠る絵で描く(値は互換性のため `sad` のまま)
+- **互換性**: キーの**追加のみ**(`schemaVersion` は 1 のまま)。古いアプリは未知のキーを無視し、新しいアプリは無いキーを nil として扱いゲージを出さない(表示がちらつかない)。古いアプリは段階 6 以上を 5 として描く(外部配布の前にサーバーと新しいアプリをそろえる — GROWTH §8.6)。この snapshot を組み立てる全関数(§5.3)は**まとめてデプロイする**(一部だけ出すと、通知ごとに古い形と新しい形が混ざる)
 - 相手の今日の写真サムネは `photo_thumb.jpg` として同コンテナに保存(NSE がダウンロード、200KB上限)。失敗時は植物表示にフォールバック
 
 ### 3.5 ウィジェット実装方針
@@ -209,13 +219,23 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 | promise-set | POST | title, emoji, remindAt? | 自分の現役の約束を upsert(編集は同一 promise_id への UPDATE = checkins の FK 継続でストリーク非影響 — REQUIREMENTS §3.3)→ ペアなら相手へサイレント更新(2026-06-11 実装同期・T12。§5.2「書き込みは Function 経由」のギャップを充足) |
 | nudge | POST | stamp | 1日3回制限 → 相手へpush(文言は messages.ts からサーバーが選ぶ) |
 | react | POST | checkinId, stamp | リアクション保存 → 相手へpush |
-| snapshot | GET | — | 自分視点の PairSnapshot(起動時の自己修復用) |
-| close-day | cron 00:10 JST | — | 前日確定(§5.4)。チケット消費・リセットの通知送信 |
+| plant-name | POST | name, mode(`first` \| `rename`) | 植物の名前を付ける・変える(2026-10-12 追加・issue #54。下の補足)→ 自分用 snapshot 返却 + 変わったときだけ相手へサイレント更新(`pair_update`・snapshot 同梱) |
+| snapshot | GET | — | 自分視点の PairSnapshot(起動時の自己修復用)。成長回数は streak_days から数え、昨日の仮判定を含む(§5.4) |
+| close-day | cron 00:10 JST | — | 前日確定(§5.4)。チケット消費・リセットの通知送信。both の確定では plants.grown_days を both の行数で数え直す(stage は書かない) |
 | grant-tickets | cron 毎月1日 00:05 JST | — | free: balance=min(2, balance+2) / premium: balance=min(10, balance+5) |
 | _shared/ | — | — | streak.ts / tickets.ts(純粋ロジック)、apns.ts(JWT発行・送信)、snapshot.ts、messages.ts |
 
 - **純粋ロジックは I/O から分離**して `_shared/` に置き、`deno test` 可能にする。これが Windows レーンで回せる唯一の自動テストなので、ストリーク・チケットの全エッジケースをここで担保する
 - apns.ts は送信クライアントを注入可能にし、テストではモック
+- **plant-name の仕様(2026-10-12・issue #54 / docs/GROWTH.md §5.3・§8.1)**
+  - 入力: `POST { name, mode }`。`mode` は `first`(最初に付ける)か `rename`(あとから変える)。それ以外は 400 `invalid_mode`
+  - `name`: 前後の空白を除き、NFC に正規化したうえで **1〜8字**(Unicode コードポイントで数える。ニックネームと同じ字数、promise-set と同じ数え方)。改行・タブなどの制御文字、行/段落区切り、対になっていないサロゲート、見える文字が1つも無い名前(空白・ゼロ幅文字だけ)は 400 `invalid_name`。入力検査は DB を引く前に行う
+  - `first`: plants.name が null のときだけ書く(**先に付けた人の名前に決まる**)。すでに名前があれば **409 `already_named`** と今の名前 `{ "error": "already_named", "name": "<今の名前>" }` を返し、何も書かない・相手へ送らない。誰が付けたかは返さない(再インストールで「自分が付けたか」の記録が消えても誤表示にならない)。同時に2人が送っても、書けるのは先に着いた1人だけ(`UPDATE ... WHERE name IS NULL` の更新行数で一意に決着し、負けた側は決まった名前で 409)
+  - `rename`: 上書き。名前がまだ無くても書ける。**今の名前と同じなら何も書かず、相手へも送らない**(200)
+  - 前提: 有効な(active の)ペアが必須(無ければ 409 `no_pair`)。書き込むのは呼び出し本人のペアの鉢だけ(pairId は入力に取らず、JWT の userId から引く)。鉢の行が無い(データ不整合)ときは 404 `plant_not_found`。そのほか 404 `user_not_found`・400 `invalid_json`・401 `unauthorized`・405 `method_not_allowed`
+  - 応答 200: `{ "name": "<保存された名前>", "snapshot": <呼び出し本人視点の PairSnapshot(plantName が入る)> }`
+  - 相手への知らせ: 変わったときだけ、相手視点の snapshot を同梱した**サイレント push**(`type: pair_update`・`content-available`)。相手のアプリは、次に開いたとき `snapshot.plantName` の変化から「名前が『みどり』にかわったよ」を出す。相手名義の可視通知(「ゆうき: 『みどり』と名づけたよ」)は P1 で、messages.ts の文言を T16 と調整してから(GROWTH §5.3)。サイレントは配送保証がない(§4)。送信失敗でも 200
+  - 契約フィクスチャ: `products/lien/contracts/plant-name.ok.json` / `plant-name.already-named.json`
 - **ワンタップ返事の扱い(2026-06-11 決定・issue #15)**: つつかれた側の定型4種返事(REQUIREMENTS §3.7)は、T15 では記録APIを実装しない。`nudges.replied` 列は migration 0001 で先行確保済みだが未使用のまま残し、実際の記録(通知アクションカテゴリでの受信 → `replied` 更新)は T16(issue #16。通知UI全体の担当)で行う
 
 ### 5.4 ストリーク確定アルゴリズム(これが正本)
@@ -226,7 +246,7 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 
 確定処理(close-day が毎日 00:10 JST に前日 d を処理):
 1. `pairs.status = active` かつ `started_on <= d` のペアを列挙
-2. 両者 checkin あり → `streak_days(d, 'both')` を upsert
+2. 両者 checkin あり → `streak_days(d, 'both')` を upsert し、`plants.grown_days` を **both の行数で数え直して**書く(「+1」ではない。stage は書かない — 下の「成長回数」)
 3. 欠けあり(1人でも) → `ticket_balance > 0` なら balance−1、`streak_days(d, 'ticket')` upsert、ledger に `consume` 記録、両者へ `ticket_used` push
 4. チケットなし → 行を作らない(=途切れ)。`streak_reset` イベント記録。push は「責めない文言」(messages.ts の reset 系)
    - **既知の未決事項(2026-06-11 注記)**: `streak_reset` イベントの記録は現状 close-day 実装では構造化 console ログのみで、永続化先は未定(events テーブル新設 or ticket_ledger 拡張)。issue #47 でユーザー判断待ち
@@ -245,6 +265,20 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 - 相手完了通知の後に相手が取消 → 確定は close-day 時点の状態で行う(リアルタイム表示が一時的にズレるのは許容)
 - close-day の再実行は安全(upsert・PK 衝突で冪等)
 - 「2人とも未達」の日もチケット1枚で守る(枚数は1日1枚。罰なし原則を優先し、人数では数えない)
+
+成長回数(植物。2026-10-12 追加・issue #54 / docs/GROWTH.md §3.2・§7.2):
+- **成長回数 = streak_days の `kind='both'` の行数(昨日まで)+ 昨日の仮判定(下記)+ 今日の先取り(今日両者完了なら +1)**。純粋関数 `countBothDays` / `derivePlantProgress`(`_shared/snapshot.ts`)。`kind='ticket'` の日(お休みチケットで守った日)は数えない: ストリークは守られるが、植物は育たない。回数は減らない(ストリークが途切れても縮まない。例外: 当日のチェックイン取消で、先取りしていた1回分は戻る)
+- 今日(以降)の行は数えない(今日の分は「先取り」で別に足すので二重にならない)。同じ日付の行は1日と数える
+- **`plants.grown_days` / `plants.stage` は snapshot では読まない**。表示用の段階は、10段階の閾値配列 `PLANT_STAGE_THRESHOLDS = [0,1,3,7,14,21,30,45,66,100]`(添字 = 段階)から snapshot が計算する。close-day が plants に書くのは `grown_days`(both の行数で数え直した控え。分析用と v1.1 用)だけで、**`stage` は書かない**: 旧実装は段階 6 以上を書くと `plants.stage` の CHECK(0〜5)に違反し、行(streak_days)は書けたのに成長だけ失敗して、再実行も `already_finalized` で飛ばされるため成長が永久に欠けた。これで **v1.0 に migration は要らない**(CHECK を外すのは v1.1 の plants 改修と一緒に行う)
+- 閾値の調整ルール(GROWTH §3.6): 閾値は**下げる方向にだけ**動かす(上げると到達済みのペアの植物が戻って見える)・段階は**末尾にだけ**足す・変更は2週間に1回まで。`snapshot_test.ts` のラチェットテスト(凍結基準 `[0,1,3,7,14,21,30,45,66,100]`)が機械的に守る。みのり(100回)はあとから延ばせない(延ばしたいときは段階を後ろに足す)
+- 既知の上限: `listStreakDays` は PostgREST の既定の上限 1000 行(≒ 2.7 年分)で切られる。v1.0 では問題ないが、v1.x のうちに件数を数える問い合わせ(count)に置き換える(ストリークの最高記録の計算にも同じ上限がある)
+
+昨日の仮判定(0時台の誤表示対策。2026-10-12 追加・GROWTH §7.3 の最小版):
+- 0:00 から close-day(00:10 JST)が昨日の行を書くまでの間は、昨日の `streak_days` 行がまだ無い。そのまま数えると、ストリークが 0 に見え、昨日の分で上がった段階が1つ戻り、昨日を「未達成」と数えて `sad`(すやすや)が誤って出る
+- 次の3つがそろえば、昨日を **both とみなす**: ① 昨日の行がない ② 昨日がペア成立日(`started_on`)以降 ③ 2人とも昨日チェックインしている。この扱いは**ストリーク・すやすやの判定・成長回数のすべて**に使う(`loadSnapshotForUser` が昨日の行を足してから `buildPairSnapshot` に渡す)
+- 確定結果と必ず一致する: 両者がチェックインしていれば close-day は必ず both を記録し、チェックインの取消は当日しかできないので、昨日のチェックインはもう動かない。昨日の行があれば(確定済み)二重に足さず、昨日の checkin も問い合わせない。問い合わせるのは昨日の行が無いときだけで、自分と相手の2回
+- checkin・checkin-cancel・invite-accept・nudge・promise-set・react・snapshot の各 `index.ts` は変更なし(変更は `_shared/snapshot.ts` だけ。ただし全関数のデプロイのやり直しは要る — §3.4 の互換性)
+- 残る誤表示: 「片方だけチェックインして、お休みチケットで守られる日」は 0:00〜0:10 の間だけストリークが 0 に見える(close-day が送る `ticket_used` 通知の snapshot で直る)。完全版(T19 に相乗り。P1)は、`decideCloseDay` を close-day と同じ入力で呼んで昨日を仮判定する(ふたり達成以外の仮判定は 0:00〜1:00 JST に限る)
 
 ### 5.5 冪等性・整合性
 
