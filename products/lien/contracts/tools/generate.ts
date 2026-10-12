@@ -22,6 +22,8 @@ import { handleInviteAccept } from "../../supabase/functions/invite-accept/core.
 import { handleNudge } from "../../supabase/functions/nudge/core.ts";
 import { handleReact } from "../../supabase/functions/react/core.ts";
 import { handlePlantName } from "../../supabase/functions/plant-name/core.ts";
+import { handlePairDissolve } from "../../supabase/functions/pair-dissolve/core.ts";
+import { handleDeleteAccount } from "../../supabase/functions/delete-account/core.ts";
 import {
   NUDGE_STAMPS,
   REACTION_STAMPS,
@@ -321,6 +323,44 @@ class World {
   getPremiumUntil() {
     return Promise.resolve(null);
   }
+
+  // -- PairDissolveRepo(pair-dissolve / delete-account)--
+  dissolvePair(_pairId: string, _dissolvedAtIso: string) {
+    // 現役のペアが無くなる(行は残る = アーカイブ)。植物・ストリークの行はそのまま
+    const had = this.pair !== null;
+    this.pair = null;
+    return Promise.resolve(had);
+  }
+
+  // -- DeleteAccountRepo --
+  removedPhotoPaths: string[] = [];
+  listMemberships(_userId: string) {
+    // 解消後の呼び出しなので、ペアは解消済みの形で返る(delete-account/core.ts の順序と同じ)
+    return Promise.resolve([
+      {
+        pairId: PAIR_ID,
+        startedOn: "2026-06-01",
+        status: "dissolved" as const,
+        dissolvedAt: NOW.toISOString(),
+      },
+    ]);
+  }
+  listPhotoPaths(_userId: string) {
+    return Promise.resolve([] as string[]);
+  }
+  removePhotos(paths: string[]) {
+    this.removedPhotoPaths.push(...paths);
+    return Promise.resolve();
+  }
+  deleteMemberships(_userId: string) {
+    return Promise.resolve();
+  }
+  deleteOrphanPairs(_pairIds: string[]) {
+    return Promise.resolve();
+  }
+  deleteAuthUser(_userId: string) {
+    return Promise.resolve();
+  }
 }
 
 // deno-lint-ignore no-explicit-any
@@ -619,6 +659,76 @@ export async function buildFixtures(): Promise<Map<string, unknown>> {
     out.set("plant-name.already-named", result.body);
   }
 
+  // POST /pair-dissolve ----------------------------------------------------------
+  {
+    // 相手(ゆうき)とのペアを解消する(自分はチェックイン済み)。応答は { dissolved, snapshot }(解消後 = ソロの形)。
+    // 相手へは、解消後のソロの snapshot を同梱したサイレント push(pair_update)
+    const w = world({ meDone: true });
+    const { sent, pusher } = capturingPusher();
+    out.set(
+      "pair-dissolve.ok",
+      must200(
+        "pair-dissolve.ok",
+        await handlePairDissolve(
+          { repo: w as AnyRepo, pusher, now: clock },
+          { userId: USER_ME },
+        ),
+      ),
+    );
+    const toPartner = sent.find((s) =>
+      s.deviceToken === "device-token-partner"
+    );
+    if (!toPartner) {
+      throw new Error("pair-dissolve.ok: 相手へのサイレント push が無い");
+    }
+    out.set("push.pair-dissolved", toPartner.payload);
+  }
+  {
+    // 冪等: すでにペアが無い(解消済み・ずっとソロ)なら dissolved: false と今のソロの snapshot
+    const w = world({ paired: false });
+    const { sent, pusher } = capturingPusher();
+    out.set(
+      "pair-dissolve.already",
+      must200(
+        "pair-dissolve.already",
+        await handlePairDissolve(
+          { repo: w as AnyRepo, pusher, now: clock },
+          { userId: USER_ME },
+        ),
+      ),
+    );
+    if (sent.length !== 0) {
+      throw new Error(
+        "pair-dissolve.already: 解消していないのに push を送った",
+      );
+    }
+  }
+
+  // POST /delete-account ---------------------------------------------------------
+  {
+    const w = world({ partnerDone: true, partnerPhoto: true });
+    const { pusher } = capturingPusher();
+    out.set(
+      "delete-account.ok",
+      must200(
+        "delete-account.ok",
+        await handleDeleteAccount(
+          { repo: w as AnyRepo, pusher, now: clock },
+          { userId: USER_ME },
+        ),
+      ),
+    );
+    // 写真は本人の区画だけを消す(相手の区画 USER_PARTNER は含まない)
+    if (
+      w.removedPhotoPaths.length === 0 ||
+      w.removedPhotoPaths.some((p) => !p.includes(`/${USER_ME}/`))
+    ) {
+      throw new Error(
+        "delete-account.ok: 消す写真のパスが本人の区画だけになっていない",
+      );
+    }
+  }
+
   // 語彙(スタンプ)------------------------------------------------------------
   out.set("stamps", {
     nudge: [...NUDGE_STAMPS],
@@ -643,6 +753,8 @@ const FUNCTIONS = [
   "nudge",
   "react",
   "plant-name",
+  "pair-dissolve",
+  "delete-account",
 ] as const;
 
 /**

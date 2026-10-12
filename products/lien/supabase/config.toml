@@ -45,3 +45,9 @@ verify_jwt = false
 
 [functions.plant-name]
 verify_jwt = false
+
+[functions.pair-dissolve]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false

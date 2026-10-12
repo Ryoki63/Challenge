@@ -1,0 +1,29 @@
+{
+  "aps": {
+    "content-available": 1
+  },
+  "lien": {
+    "type": "pair_update",
+    "snapshot": {
+      "schemaVersion": 1,
+      "pairId": null,
+      "updatedAt": "2026-06-11T08:30:00.000Z",
+      "streakCurrent": 0,
+      "streakBest": 0,
+      "todayMeDone": false,
+      "todayPartnerDone": false,
+      "myPromiseTitle": "ランニング",
+      "myPromiseEmoji": "🏃",
+      "partnerName": null,
+      "partnerPromiseTitle": null,
+      "partnerPromiseEmoji": null,
+      "plantStage": 0,
+      "plantGrownDays": 0,
+      "plantStageFloor": 0,
+      "plantNextStageAt": null,
+      "plantMood": "normal",
+      "plantName": null,
+      "hasPartnerPhotoToday": false
+    }
+  }
+}

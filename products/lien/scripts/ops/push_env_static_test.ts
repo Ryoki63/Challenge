@@ -44,13 +44,15 @@ async function pushingFunctions(): Promise<string[]> {
   return names.sort();
 }
 
-Deno.test("push を送る Function は 8 つ(増えたら、その index.ts も下の検査に入る)", async () => {
+Deno.test("push を送る Function は 10 個(増えたら、その index.ts も下の検査に入る)", async () => {
   assertEquals(await pushingFunctions(), [
     "checkin",
     "checkin-cancel",
     "close-day",
+    "delete-account", // 2026-10-13 追加(issue #23): 現役のペアを解消して相手へサイレント push
     "invite-accept",
     "nudge",
+    "pair-dissolve", // 2026-10-13 追加(issue #23): 相手へサイレント push(解消後のソロの snapshot)
     "plant-name",
     "promise-set",
     "react",

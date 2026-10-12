@@ -93,5 +93,16 @@
     "plant_not_found": [404],
     "unauthorized": [401],
     "user_not_found": [404]
+  },
+  "pair-dissolve": {
+    "internal_error": [500],
+    "method_not_allowed": [405],
+    "unauthorized": [401],
+    "user_not_found": [404]
+  },
+  "delete-account": {
+    "internal_error": [500],
+    "method_not_allowed": [405],
+    "unauthorized": [401]
   }
 }

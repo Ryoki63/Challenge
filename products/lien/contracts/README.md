@@ -19,7 +19,9 @@ iOS は同じ JSON を `LienTests` のリソースとして読み、アプリが
 | `invite-create.ok.json` / `invite-accept.ok.json` | `POST /invite-create` / `/invite-accept` | `InviteCreateResponse` / `InviteAcceptResponse` |
 | `nudge.ok.json` / `react.ok.json` | `POST /nudge` / `/react` | `NudgeResponse` / `ReactResponse` |
 | `plant-name.ok.json` / `plant-name.already-named.json` | `POST /plant-name`(`plant-name/core.ts`)。最初に名前を付ける `{ name, snapshot }` / すでに名前がある鉢への first の 409 `{ error: "already_named", name }` | (iOS 側は未実装 — 植物 v2-b の PlantNaming の Live 結線で追加。#57) |
-| `push.visible.json` / `push.silent.json` | 相手へ送る APNs ペイロード(可視 / サイレント)。`lien.snapshot` を NSE・アプリが読む | `AppGroupStore.saveSnapshotData` |
+| `pair-dissolve.ok.json` / `pair-dissolve.already.json` | `POST /pair-dissolve`(`pair-dissolve/core.ts`)。ペアを解消した `{ dissolved: true, snapshot }`(snapshot は解消後のソロの形)/ すでにペアが無かった冪等の応答 `{ dissolved: false, snapshot }` | `PairDissolveResponse` |
+| `delete-account.ok.json` | `POST /delete-account`(`delete-account/core.ts`)。`{ deleted: true }` | `AccountDeleteResponse` |
+| `push.visible.json` / `push.silent.json` / `push.pair-dissolved.json` | 相手へ送る APNs ペイロード(可視 / サイレント / ペアを解消されたときのサイレント。解消後のソロの snapshot 同梱)。`lien.snapshot` を NSE・アプリが読む | `AppGroupStore.saveSnapshotData` |
 | `stamps.json` | `_shared/messages.ts` のスタンプ語彙(順序つき) | `NudgeStamp` / `ReactionStamp` |
 | `errors.json` | 各 function の `core.ts` / `index.ts` が返しうる `{ "error": "<code>" }` と HTTP ステータス | `InviteClientError` ほか各エラーマップ |
 
