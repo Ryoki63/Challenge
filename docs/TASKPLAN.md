@@ -147,6 +147,7 @@ T33 RevenueCat 組込+ペイウォール(3文脈) [W→G6] / T34 曜日指定 [W
 - §7 の更新: 「Live 結線は T08・T20 でまとめて行い、CI 緑だが未結線は許容する」は撤回する。**W1(#55)を T15 の直後に入れ**、以降のタスクは完了条件に「Live 実装+契約テスト(本番の実応答を JSON フィクスチャにしたもの)」を含める。バックエンドは 6月から本番で動いているので、G0 を待つ必要があるのは APNs だけ
 - §8 の更新: 「G2 = スタイル F で確定」は D1 で撤回し、v4「タネの子」に置き換える。「成長カーブ10段階案は回答待ち」は D2 で確定した。律速は人間の待ち(G0・決定事項)で、**10/16 までに G0 と決定がそろえば、公開目標 12/11 に間に合う**(余裕は 1.5〜2週間)
 - 2026-10-13 の更新(#61): ios-serial の順序を W1 → W1 手直し+T27 の lint → T28準備 → **PA → PV → T23 → PB** → … に直した(PA の前倒し。理由は §9.3 の箇条書き)。第2波の新タスク #60〜#62 を §9.3 の表に加えた
+- 2026-10-13 の更新(#65): 第2波の完了を反映した。**W1 手直し+T27 の lint(#62)・T28準備(#28)・PA(#56)・B3(#60)・DOC2(#61)が完了**し、ios-serial は次の PV(#59)へ進む。§9.3 の表に「状態」の列を足し、第3波の新タスク #65〜#67(と持ち越しの #63・#64)を加えた。T27 の lint と T28準備の完了は §9.4 の該当の行にも書いた。進捗の要約は [REVIEW-2026-10-12.md](REVIEW-2026-10-12.md) §7
 
 ### 9.1 決定 D1〜D6
 
@@ -186,33 +187,39 @@ D3 で外す機能と行き先:
 | 12月〜1月 | G6 の準備(有料App契約・RevenueCat) | T33 → **v1.1 課金を 1/20〜1/31 に公開**(1月コホートが30日目の課金文脈に達する前) |
 
 - 週ごとの割り当ては目安。**レーン内の順序は BACKLOG(上から厳密に直列)が正**
+- 進捗(2026-10-13 時点): 10/13〜10/20 の行(W1・W1 手直し+T27 の lint・T28準備、backend の cron 登録・写真パス・push_env・関数の本番デプロイ)と、10/19〜10/25 の行の PA・GS(成長ルールのサーバー側)はすべて完了した(日程より前倒し)。ios-serial の現在地は PV(第3波)で、次は T23 → PB。人間の作業は、G0(#38)が開いたまま(期限 10/16)。詳細は REVIEW-2026-10-12.md §7
 - 年末は審査が遅れる(2024 年の告知では 12/20〜26)。2026 年の告知を 11月に確認して日程を見直す
 - G3 の D7 は審査提出を止めるゲートではない(§5 では、未達のとき優先順位を変えるための KPI)
 
-### 9.3 新タスク #51〜#62 とレーン
+### 9.3 新タスク #51〜#67 とレーン
 
-第1波(2026-10-12 起動)は、backend(#51→#52→#53→#54)∥ docs(#58)∥ ios-serial(#55)を並列に進める。第2波(2026-10-13 起動。第1波の Opus レビューの持ち越し)は、backend(#60)∥ docs(#61)∥ ios-serial(#62 → #28 T28準備 → #56 PA)を並列に進める。
+第1波(2026-10-12 起動)は、backend(#51→#52→#53→#54)∥ docs(#58)∥ ios-serial(#55)を並列に進める。第2波(2026-10-13 起動。第1波の Opus レビューの持ち越し)は、backend(#60)∥ docs(#61)∥ ios-serial(#62 → #28 T28準備 → #56 PA)を並列に進めた(**いずれも完了**)。第3波(2026-10-13 起動。第2波の Opus レビューの持ち越しと T20 の前段)は、ios-serial(#59 PV → #23 T23 → #57 PB)∥ docs(#65)∥ ci(#66)∥ backend(#67)を並列に進める。
 
-| issue | ID | 内容 | タグ | レーン | 決定 |
-|---|---|---|---|---|---|
-| #51 | X1 | 本番 cron 登録(close-day 00:10 JST / grant-tickets 毎月1日。migration 0003) | W | backend | D4 |
-| #52 | X2 | 写真の保存パスを本人単位に(同日2人目の上書き防止。migration 0004・checkin) | W | backend | D4 |
-| #53 | X3 | push_env 保存と APNs 環境のトークン単位選択(サーバー。migration 0005・apns.ts) | W | backend | D4 |
-| #54 | GS | 成長ルール v2(サーバー): 10段階・streak_days から数える・昨日の仮判定・plant-name・一括デプロイ | W | backend | D2・D4 |
-| #55 | W1 | アプリ結線: Live 基盤・AppRouter・ソロモード・push_token / push_env の保存・契約フィクスチャ | W | ios-serial | — |
-| #56 | PA | 植物 v2-a(描画): v4 SVG の取込・PlantCharacterView・plant-assets CI の SVG 化 | W | ios-serial | D1 |
-| #57 | PB | 植物 v2-b(体験): ゲージ・段階アップ演出・名前付け | W | ios-serial | D2 |
-| #58 | DOC | 仕様改定: 成長ルール v2・v1.0 のスコープ削減・計測方針(本改定) | W | docs | D1〜D3・D6 |
-| #59 | PV | 相手の今日の写真をホームに表示する(閲覧)。署名付き URL をクライアントで作る(RLS で足りるので migration・新関数なし)。#58 のレビューで判明した担当漏れ | W | ios-serial | D3 |
-| #60 | B3 | backend 堅牢化(第1波のレビューの持ち越し): close-day の手動再実行でリセット通知を再送しない・grant-tickets の冪等性(月単位の実行記録。追加系 migration)・毎朝の監視 workflow・cron 専用シークレット・net の権限を絞る・push_env を getUser と一緒に読む・DESIGN §5.3・§5.6・§7・§10 の更新 | W | backend | D4 |
-| #61 | DOC2 | DESIGN §3.3・§3.6 と review-notes §1.1・§1.2 を W1 の実装に合わせる+本節の ios-serial の順序の更新(PA の前倒し) | W | docs | — |
-| #62 | W1FU | W1 の手直し(push_token の再送・AppModel の復帰・Live 構成のテスト・招待シートの同期間隔・文言「パートナー」→「相手」)+罰なし文言 lint の前倒し(T27 の一部。§9.4) | W | ios-serial | — |
+| issue | ID | 内容 | タグ | レーン | 決定 | 状態(2026-10-13) |
+|---|---|---|---|---|---|---|
+| #51 | X1 | 本番 cron 登録(close-day 00:10 JST / grant-tickets 毎月1日。migration 0003) | W | backend | D4 | 済(本番に登録。2026-10-13 00:10 JST の初回の定期実行を確認) |
+| #52 | X2 | 写真の保存パスを本人単位に(同日2人目の上書き防止。migration 0004・checkin) | W | backend | D4 | 済(migration 0004。本番でスモーク) |
+| #53 | X3 | push_env 保存と APNs 環境のトークン単位選択(サーバー。migration 0005・apns.ts) | W | backend | D4 | 済(migration 0005) |
+| #54 | GS | 成長ルール v2(サーバー): 10段階・streak_days から数える・昨日の仮判定・plant-name・一括デプロイ | W | backend | D2・D4 | 済(11関数を一括デプロイ。スモーク PASS) |
+| #55 | W1 | アプリ結線: Live 基盤・AppRouter・ソロモード・push_token / push_env の保存・契約フィクスチャ | W | ios-serial | — | 済(lien-ios 緑) |
+| #56 | PA | 植物 v2-a(描画): v4 SVG の取込・PlantCharacterView・plant-assets CI の SVG 化 | W | ios-serial | D1 | 済(2026-10-13。実描画の一覧画像を保存: `assets/plant/ci_render/`。承認は人が #40 で行う) |
+| #57 | PB | 植物 v2-b(体験): ゲージ・段階アップ演出・名前付け | W | ios-serial | D2 | 第3波(ios-serial の最後。VoiceOver・のぞきの判定・オンボの注意書きなどの持ち越しも含む) |
+| #58 | DOC | 仕様改定: 成長ルール v2・v1.0 のスコープ削減・計測方針(本改定) | W | docs | D1〜D3・D6 | 済 |
+| #59 | PV | 相手の今日の写真をホームに表示する(閲覧)。署名付き URL をクライアントで作る(RLS で足りるので migration・新関数なし)。#58 のレビューで判明した担当漏れ | W | ios-serial | D3 | 第3波(ios-serial の先頭) |
+| #60 | B3 | backend 堅牢化(第1波のレビューの持ち越し): close-day の手動再実行でリセット通知を再送しない・grant-tickets の冪等性(月単位の実行記録。追加系 migration)・毎朝の監視 workflow・cron 専用シークレット・net の権限を絞る・push_env を getUser と一緒に読む・DESIGN §5.3・§5.6・§7・§10 の更新 | W | backend | D4 | 済(本番へ。net の権限だけ #63 へ) |
+| #61 | DOC2 | DESIGN §3.3・§3.6 と review-notes §1.1・§1.2 を W1 の実装に合わせる+本節の ios-serial の順序の更新(PA の前倒し) | W | docs | — | 済 |
+| #62 | W1FU | W1 の手直し(push_token の再送・AppModel の復帰・Live 構成のテスト・招待シートの同期間隔・文言「パートナー」→「相手」)+罰なし文言 lint の前倒し(T27 の一部。§9.4) | W | ios-serial | — | 済(T27 の lint を含む) |
+| #63 | B3-FU | net スキーマの権限(pg_net)を絞れなかった件 — 代わりの守りで受け入れるか決める(#60 の持ち越し) | H | (人間の判断) | — | 開(human-gate) |
+| #64 | B4 | 公開後の規模対応: close-day の原子的な残数更新・grant-tickets のまとめ読み(#60 レビューの持ち越し) | W | backend | — | on-hold(公開後) |
+| #65 | DOC3 | 文書の持ち越し: DESIGN §3.3/§3.5/§3.8/§4.1/§7・招待コードの8文字・E2E-M1 の①〜④の順序・review-notes・README・本書と REVIEW の進捗 | W | docs | — | 第3波 |
+| #66 | CI3 | CI・リリース経路の保守(ops テストの lien-ci への統合・xcodegen の固定・リリース前の CI 緑確認ほか) | W | ci | — | 第3波 |
+| #67 | E2E-API | 本番に対する2ユーザーの API 通しテスト(T20 の前段。`products/lien/scripts/e2e/`) | W | backend(scripts/ と OPS.md のみ) | — | 第3波 |
 
 | レーン | 範囲 | 順序・並列性 |
 |---|---|---|
 | backend | `products/lien/supabase/`。DESIGN §3.4・§4・§5.2〜§5.4 のオーナー(第2波の #60 は §5.3・§5.6・§7・§10 も) | 直列: X1 → X2 → X3 → GS → B3(#60)。snapshot の形を変える作業は GS → T19 → T33 → T35 の順に1つずつ。migration 連番は 0003=cron(#51)/ 0004=写真パス(#52)/ 0005=push_env(#53)。T16 の notif_prefs は v1.1 に移ったので v1.0 では連番を使わない。以降は着手時に採番 |
-| ios-serial | `products/lien/ios/`。`Strings.swift`・`project.yml`・`LienApp.swift` の単独オーナー | 1タスク=1サブエージェントで厳密に直列(BACKLOG の順。2026-10-13 に PA を前倒し — #61): W1 → W1 手直し+T27 の lint(#62。§9.4)→ T28準備 → **PA** → PV → T23 → **PB** → T16 / T17a / T18 / T19a / T22(11/8 の機能凍結まで)→ T27 本体(11/9〜11/12)。順序の理由は下の箇条書き |
-| docs | `docs/`・`products/lien/marketing/`(store_metadata/ と review-notes.md)。DESIGN は第1波が §3.5 だけ、第2波(#61)が §3.3 と §3.6 だけ | 並列可。第1波(#58)で REQUIREMENTS・TASKPLAN・CONCEPT・E2E-M1・GROWTH の状態行・DESIGN §3.5・ストアの説明文を更新。第2波(#61)で DESIGN §3.3・§3.6、review-notes §1.1・§1.2、本書の ios-serial の順序を W1 の実装に合わせた |
+| ios-serial | `products/lien/ios/`。`Strings.swift`・`project.yml`・`LienApp.swift` の単独オーナー | 1タスク=1サブエージェントで厳密に直列(BACKLOG の順。2026-10-13 に PA を前倒し — #61): W1(済)→ W1 手直し+T27 の lint(#62。§9.4。済)→ T28準備(済)→ **PA**(済)→ PV → T23 → **PB** → T16 / T17a / T18 / T19a / T22(11/8 の機能凍結まで)→ T27 本体(11/9〜11/12)。**2026-10-13 時点の現在地は PV(第3波)**。順序の理由は下の箇条書き |
+| docs | `docs/`・`products/lien/marketing/`(store_metadata/ と review-notes.md)・`products/lien/README.md`・`products/lien/ios/README.md`。DESIGN は第1波が §3.5 だけ、第2波(#61)が §3.3 と §3.6 だけ、第3波(#65)が §3.3・§3.5・§3.8・§4.1・§6・§7 と §5.3 の invite-create の行だけ(§5.3 は T23 が新関数の行を同時に足す) | 並列可。第1波(#58)で REQUIREMENTS・TASKPLAN・CONCEPT・E2E-M1・GROWTH の状態行・DESIGN §3.5・ストアの説明文を更新。第2波(#61)で DESIGN §3.3・§3.6、review-notes §1.1・§1.2、本書の ios-serial の順序を W1 の実装に合わせた。第3波(#65)で、第2波の実装(PushTokenSync のずれの確認・Release の Config 欠落は致命・StringsReviewTests・花の着色はコード側・secrets の一覧)と、招待コードの8文字、E2E-M1 の①〜④の順序、本書と REVIEW の進捗を反映した |
 | assets | `products/lien/assets/plant/` | 旧13枚・`gen_sprites.py`・`png/` は廃止。v4 の取込は #56(ios-serial の中)で行い、`lien-ci.yml` の plant-assets ジョブもそこで SVG 用に直す |
 
 - ios-serial の順序の理由(2026-10-13 に更新: PA を PV・T23 の前へ前倒し — #61。#58 のレビュー指摘で REVIEW §3 に合わせて直した順序からの変更。BACKLOG の並びも同じにする)
@@ -229,7 +236,7 @@ D3 で外す機能と行き先:
 |---|---|
 | G0 #38 | 締切 10/16。App ID・App Group・Push は Xcode の自動署名に任せ、失敗したときだけ Portal で手動登録する。提供地域は日本のみ。完了条件は「内部 TestFlight に1本上げられる状態」 |
 | T08 残 #8 / G1 #39 | 内部 TestFlight(production APNs)で計測する。受信側を「背景」5回・「強制終了」5回に分け、p50 / p90 と生データを #8・#39 に記録する |
-| T09v2 #49 / G2 #40 | #49 の取込は #56 が引き継ぐ。G2 は決定済み(D1・D2・アイコンは空色) |
+| T09v2 #49 / G2 #40 | #49 の取込は #56 が引き継ぐ(**→ #56 は 2026-10-13 に済み**。承認は人が #40 で一覧画像を見て行う)。G2 は決定済み(D1・D2・アイコンは空色) |
 | T15 #15 | 完了(5552670)。残り: nudge・react の Live クライアント(W1)・deploy.sh への追加(GS)・本番デプロイ(D4)。**react の仕様修正も GS に含める**(REVIEW §4.1 の QR の指摘。nudge・react は本番に未デプロイなので、初めて出す前に直す): ① リアクションの push は最初の1回だけにする(今の `react/core.ts` は、スタンプを変えると push を送り直す)② 相手の当日判定は相手のタイムゾーンで行う(要テスト。今の実装が正しいかをテストで確かめる)。**→ 2026-10-12 に #54 の再オープン分で完了**: ① は `handleReact` が既存のリアクションが無い(最初の1回)ときだけ push する(付け替えは上書きのみ。`changed` は保存内容が変わったか)。② は今の実装で正しく(同梱する相手視点の snapshot は相手の timezone の「今日」で決まる)、送り手 Asia/Tokyo・相手 Pacific/Honolulu(と逆)のテストで固定した。react を含む 9 関数を本番へ再デプロイしてスモーク済み。なお nudge の「相手が未完か」の判定は送り手の timezone の今日で行う(ペアは同一 TZ 前提 — REQUIREMENTS §3.4。時差ペアの厳密対応は v2+) |
 | PV #59(新規) | **v1.0 必須。相手の今日の写真をホームに表示する(閲覧)**。ios-serial で W1 の後・T23 の前(2026-10-13 から PA の後 — §9.3)。W1 の PostgREST 読み(相手の当日の `checkins` 行。リアクション用)を `photo_path` まで広げ、`photos` バケットの署名付き URL をクライアントで作る。既存の RLS(`checkins_select_pair` = 現役ペアの相手の行を読める / `photos_select_pair_member` = パスの第2セグメントが自分の現役 pair_id なら、パスの深さを問わず読める。0004 の `<user_id>/` 区画でも読める)で足りるので、migration も新関数も要らない。snapshot にパスや URL を足す案は採らない(署名付き URL は短寿命で、snapshot は push と App Group に載るため。足すなら backend の snapshot 変更の順 GS → T19 → T33 → T35 に入れる)。完了条件は #59 のとおり(CI 緑・テスト・契約フィクスチャ・RLS の本番確認)。実機の確認(E2E-M1 ⑧)は T20 |
 | T16 #16 | 縮小版: ローカル通知(リマインド・21時のストリーク危機)+ messages.ts の streakRisk / milestone + ローカル通知の ON/OFF。サーバー側の通知設定・migration・ワンタップ返事は後ろへ(D3) |
@@ -240,8 +247,8 @@ D3 で外す機能と行き先:
 | T21 #21 / T24 #24 | v1.0 の範囲外(on-hold)。T21 は v1.1、T24 は 1.0.1 |
 | T22 #22 | v1.0。植物の描画切替と T17a の後。遅れたら最初に削る候補 |
 | T23 #23 | 前倒しして「審査対応一式」に広げる(通報とブロック=解消・初回の規約同意・完全削除・端末側のサインアウト。REQUIREMENTS §8)。PV(#59)の後に着手する — 写真の長押しからの通報は、PV が表示する写真に付けるため |
-| T27 #27 | 罰なし文言の lint だけを W1 の直後に前倒しし(W1 の手直しと一緒に #62 にまとめた。§9.3 の ios-serial の順序に入れた)、以降の CI で常に検査する。本体(全文言のレビュー表)は 11/9〜11/12 |
-| T28 #28 | 分割。**T28準備**(W1 手直し+T27 の lint(#62)の直後。ios-serial。`project.yml`・`lien-ios.yml` を触るので W1 とは並列にしない): Xcode 26 固定・ExportOptions・archive スクリプト・PrivacyInfo.xcprivacy・MARKETING_VERSION 1.0.0・アイコン差し替え(完了条件は dry_run の無署名 archive 緑)/ **T28a**(G0 直後〜10/23): 機能が未完成でも内部 TestFlight に1本上げる / **T28b**(〜11/13): 外部テスト申請(申請ボタンは人間が押す) |
+| T27 #27 | 罰なし文言の lint だけを W1 の直後に前倒しし(W1 の手直しと一緒に #62 にまとめた。§9.3 の ios-serial の順序に入れた)、以降の CI で常に検査する。**→ lint は 2026-10-13 に #62 で済み**(`StringsReviewTests`: Strings.swift の全リテラル・`StringsCatalog`・サーバー側の禁止ワードとの整合検査。DESIGN §3.8。Strings.swift に文言を足したら `StringsCatalog.all` にも足す)。本体(全文言のレビュー表)は 11/9〜11/12 のまま |
+| T28 #28 | 分割。**T28準備**(W1 手直し+T27 の lint(#62)の直後。ios-serial。`project.yml`・`lien-ios.yml` を触るので W1 とは並列にしない): Xcode 26 固定・ExportOptions・archive スクリプト・PrivacyInfo.xcprivacy・MARKETING_VERSION 1.0.0・アイコン差し替え(完了条件は dry_run の無署名 archive 緑)/ **T28a**(G0 直後〜10/23): 機能が未完成でも内部 TestFlight に1本上げる / **T28b**(〜11/13): 外部テスト申請(申請ボタンは人間が押す)。**→ T28準備は 2026-10-13 に済み**(Xcode 26.6 に固定・lien-release の dry_run 緑・ExportOptions・PrivacyInfo・1.0.0・v4 アイコン・Release で Config が無ければ起動時に止める・supabase-swift の固定・push_env を署名から判定)。#28 は開いたまま — G0 のあとの人間の作業(App Store Connect の API キー+GitHub Secrets 6件 → lien-release を `dry_run=false` で実行。ios/README.md §8、DESIGN §7.2)が残る |
 | T30 #30 | W1 の実装を実ビルドで確かめてから review-notes §1.1 を確定する(§1.1・§1.2 の書き直しは 2026-10-13 に #61 で済み。T30 に残るのは実ビルドでの確認と確定)。審査用デモ運用(開発者が操作する相手役ユーザー+期限を延ばした招待+相手側の操作スクリプト)を作る。年齢レーティングの UGC 設問・プライバシーマニフェストを review-notes §2 に追加する。**#58 のレビューで見つかった文書の食い違いも直す**(表の下の「T30 への引き継ぎ」) |
 | T32 #32 | Pairy 語は全廃。説明文は新ルール(ふたりそろった日の数だけ育つ・すやすや眠って待つ)に直した(#58)。スクショは UI とアートの凍結後に CI のシミュレータで撮る別タスク |
 | スクショ(T26 #26 の設計書 `marketing/screenshots/plan.md` と SVG 下絵) | 旧画風・旧範囲が前提なので、UI とアートの凍結後に作り直す(11/9〜11/13)。Frame 2(M ウィジェット+相手の写真)と Frame 3 のサブコピー(「写真をそえると、相手のウィジェットに届く」)は、D3 で v1.0 の事実と合わなくなる。作り直しで直す(審査 2.3 の正確さ) |
