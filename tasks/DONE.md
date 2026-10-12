@@ -15,3 +15,4 @@
 - [x] T07: PairSnapshot+AppGroupStore+静的ウィジェットS+NSE+LienTests(CI緑)。 — 2026-06-11 (issue #7)
 - [x] T09: 植物スプライトv0 13枚+AssetCatalog取込+プレビュー。G2(#40)へ提出済み。 — 2026-06-11 (issue #9)
 - [x] T25: privacy-policy+terms+Web公開HTML+CHECKLIST-G4。 — 2026-06-11 (issue #25)
+- [x] T30準備: App Reviewレビューノート草案(marketing/review-notes.md新規)+REQUIREMENTS §8台帳化(全5項目に状態+参照)。issue #30はクローズせず継続(T23/T08実データ投入/T28完了後に本編完了)。 — 2026-10-12 (issue #30)

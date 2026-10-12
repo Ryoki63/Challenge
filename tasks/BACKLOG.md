@@ -34,7 +34,6 @@
 
 ### レーンC: docs/marketing(レーンA/Bと並列可)
 - [ ] [T20準備][#20] 実機 E2E チェックリスト12項目+ランブック(docs/E2E-M1.md)+e2e_reset.sql 完了条件: 12項目が REQUIREMENTS §3.2〜3.9 を網羅(サブエージェント検証)+issue #20 に「実機待ち」コメント
-- [ ] [T30準備][#30] App Review 向けレビューノート草案(marketing/review-notes.md)+REQUIREMENTS §8 台帳化(各項目に状態+参照) 完了条件: §8 全5項目に対応節と状態注記が存在
 - [ ] [T32準備][#32] ストアメタデータ確定値化(store_metadata/ja/+alternatives.md)+verify_metadata.py+lien-ci.yml に store-metadata ジョブ 完了条件: store-metadata ジョブ緑+#42 に G4 決定依頼コメント投稿
 
 ### Wave 5以降(参考 — ゲート解放で着手。詳細は #50)
