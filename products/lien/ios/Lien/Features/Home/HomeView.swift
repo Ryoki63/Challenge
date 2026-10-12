@@ -86,7 +86,10 @@ private struct SnapshotContent: View {
             // チェックイン+写真添付+当日取消(T14 — Features/Checkin/CheckinFlowView.swift)
             CheckinFlowView(viewModel: viewModel)
 
-            // TODO(T15): 相手未完のときだけ出す「つつく」ボタン(1日3回まで — §3.7)
+            // 相手未完のときだけ出す「つつく」ボタン(1日3回まで — §3.7 / T15)。
+            // モック注入(LocalEchoCheckinService)時のみ能力検出で表示される
+            // (実 Supabase 結線は後続の統合タスク — Features/Nudge/NudgeSheet.swift 冒頭コメント参照)
+            NudgeArea(viewModel: viewModel)
         }
     }
 }
@@ -195,6 +198,9 @@ private struct TodayArea: View {
                     .font(.headline)
                     .foregroundStyle(LienColors.done)
             }
+
+            // 相手の今日のチェックインにスタンプ1つ(§3.8 / T15)
+            ReactionArea(viewModel: viewModel)
         }
     }
 }
@@ -231,6 +237,102 @@ private struct TodayChip: View {
         )
         .opacity(done ? 1.0 : 0.55)
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - つつく(相手未完のときだけ押せる。1日3回まで — REQUIREMENTS §3.7 / T15)
+
+@MainActor
+private struct NudgeArea: View {
+    let viewModel: HomeViewModel
+    @State private var showsSheet = false
+
+    var body: some View {
+        if viewModel.canNudge || viewModel.isSendingNudge {
+            VStack(spacing: LienSpacing.xs) {
+                nudgeMessageArea
+                Button {
+                    showsSheet = true
+                } label: {
+                    Group {
+                        if viewModel.isSendingNudge {
+                            ProgressView()
+                        } else {
+                            Text(Strings.Nudge.button)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!viewModel.canNudge)
+            }
+            .sheet(isPresented: $showsSheet) {
+                NudgeSheet(viewModel: viewModel, isPresented: $showsSheet)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var nudgeMessageArea: some View {
+        if let message = viewModel.nudgeErrorMessage {
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(LienColors.gentleAlert)
+                .multilineTextAlignment(.center)
+        } else if let note = viewModel.nudgeSentNote {
+            Text(note)
+                .font(.footnote)
+                .foregroundStyle(LienColors.done)
+                .multilineTextAlignment(.center)
+        }
+    }
+}
+
+// MARK: - リアクション(相手の今日のチェックインにスタンプ1つ — REQUIREMENTS §3.8 / T15)
+
+@MainActor
+private struct ReactionArea: View {
+    let viewModel: HomeViewModel
+    @State private var showsSheet = false
+
+    var body: some View {
+        if viewModel.canReact || viewModel.isSendingReaction {
+            VStack(spacing: LienSpacing.xs) {
+                reactionMessageArea
+                Button {
+                    showsSheet = true
+                } label: {
+                    Group {
+                        if viewModel.isSendingReaction {
+                            ProgressView()
+                        } else {
+                            Text(Strings.Reaction.button)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!viewModel.canReact)
+            }
+            .sheet(isPresented: $showsSheet) {
+                ReactionSheet(viewModel: viewModel, isPresented: $showsSheet)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var reactionMessageArea: some View {
+        if let message = viewModel.reactionErrorMessage {
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(LienColors.gentleAlert)
+                .multilineTextAlignment(.center)
+        } else if let note = viewModel.reactionSentNote {
+            Text(note)
+                .font(.footnote)
+                .foregroundStyle(LienColors.done)
+                .multilineTextAlignment(.center)
+        }
     }
 }
 

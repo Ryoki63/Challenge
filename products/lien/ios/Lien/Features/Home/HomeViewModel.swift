@@ -66,6 +66,18 @@ final class HomeViewModel {
     private(set) var photoErrorMessage: String?
     /// 写真添付が完了した直後の一言(同一セッション内の表示用)
     private(set) var photoAttachedNote: String?
+    /// つつき送信中(T15)
+    private(set) var isSendingNudge = false
+    /// つつき失敗時のメッセージ(責めない文言 — §3.5)
+    private(set) var nudgeErrorMessage: String?
+    /// つつき送信が完了した直後の一言(同一セッション内の表示用)
+    private(set) var nudgeSentNote: String?
+    /// リアクション送信中(T15)
+    private(set) var isSendingReaction = false
+    /// リアクション失敗時のメッセージ(責めない文言 — §3.5)
+    private(set) var reactionErrorMessage: String?
+    /// リアクション送信が完了した直後の一言(同一セッション内の表示用)
+    private(set) var reactionSentNote: String?
 
     // MARK: 依存(モック注入可能)
 
@@ -77,6 +89,10 @@ final class HomeViewModel {
     private let cancelService: CheckinCanceling?
     private let photoService: PhotoAttaching?
     private let opsFlusher: PendingOpsFlushing?
+    /// 追加能力(T15)。checkinService が適合する場合のみ非 nil(能力検出。
+    /// 現状は LocalEchoCheckinService のモック適合のみ — NudgeReactService.swift)
+    private let nudgeService: NudgeSending?
+    private let reactionService: Reacting?
 
     init(
         store: AppGroupStore?,
@@ -89,6 +105,8 @@ final class HomeViewModel {
         self.cancelService = checkinService as? CheckinCanceling
         self.photoService = checkinService as? PhotoAttaching
         self.opsFlusher = checkinService as? PendingOpsFlushing
+        self.nudgeService = checkinService as? NudgeSending
+        self.reactionService = checkinService as? Reacting
     }
 
     // MARK: 読み込み
@@ -161,8 +179,22 @@ final class HomeViewModel {
         return snapshot.todayMeDone && snapshot.pairId != nil && !isBusy
     }
 
+    /// つつくボタンを出すか(ペア成立+相手が未完のときだけ押せる — REQUIREMENTS §3.7)。
+    /// 1日3回の上限はクライアントでは数えない(サーバー正本 — functions/nudge/core.ts。
+    /// 超過時はサーバー応答 429 を nudgeErrorMessage で表示する)
+    var canNudge: Bool {
+        guard let snapshot, nudgeService != nil, snapshot.pairId != nil else { return false }
+        return !snapshot.todayPartnerDone && !isBusy
+    }
+
+    /// リアクション導線を出すか(ペア成立+相手が今日チェックイン済み — REQUIREMENTS §3.8)
+    var canReact: Bool {
+        guard let snapshot, reactionService != nil, snapshot.pairId != nil else { return false }
+        return snapshot.todayPartnerDone && !isBusy
+    }
+
     private var isBusy: Bool {
-        isCheckingIn || isCanceling || isAttachingPhoto
+        isCheckingIn || isCanceling || isAttachingPhoto || isSendingNudge || isSendingReaction
     }
 
     // MARK: チェックイン(楽観反映。実 API+オフラインキューは CheckinService — T14)
@@ -211,6 +243,38 @@ final class HomeViewModel {
         }
     }
 
+    // MARK: つつく(REQUIREMENTS §3.7 / T15)
+
+    func sendNudge(stamp: NudgeStamp) async {
+        guard canNudge, let nudgeService else { return }
+        isSendingNudge = true
+        clearMessages()
+        defer { isSendingNudge = false }
+        do {
+            try await nudgeService.sendNudge(stamp: stamp)
+            nudgeSentNote = Strings.Nudge.sentNote
+        } catch NudgeSendError.limitReached {
+            nudgeErrorMessage = Strings.Nudge.limitReachedMessage
+        } catch {
+            nudgeErrorMessage = Strings.Nudge.errorMessage
+        }
+    }
+
+    // MARK: リアクション(REQUIREMENTS §3.8 / T15)
+
+    func sendReaction(stamp: ReactionStamp) async {
+        guard canReact, let reactionService else { return }
+        isSendingReaction = true
+        clearMessages()
+        defer { isSendingReaction = false }
+        do {
+            try await reactionService.sendReaction(stamp: stamp)
+            reactionSentNote = Strings.Reaction.sentNote
+        } catch {
+            reactionErrorMessage = Strings.Reaction.errorMessage
+        }
+    }
+
     // MARK: 未送信キューの再送(起動時+フォアグラウンド復帰時 — DESIGN §3.7 / T14)
 
     func flushPendingOps() async {
@@ -236,5 +300,9 @@ final class HomeViewModel {
         cancelErrorMessage = nil
         photoErrorMessage = nil
         photoAttachedNote = nil
+        nudgeErrorMessage = nil
+        nudgeSentNote = nil
+        reactionErrorMessage = nil
+        reactionSentNote = nil
     }
 }

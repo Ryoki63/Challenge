@@ -210,4 +210,28 @@ enum Strings {
         static let cancelKeep = "そのままにする"
         static let cancelErrorMessage = "通信がうまくいきませんでした。もう一度お試しください"
     }
+
+    /// つつく(ナッジ。REQUIREMENTS §3.7 / T15)。
+    /// 自由テキストは入れない — スタンプ6種から選ぶのみ(チャット化を避ける)
+    enum Nudge {
+        /// ホームのつつくボタン(相手が未完のときだけ表示 — §3.7)
+        static let button = "つつく"
+        static let sheetTitle = "スタンプでつつく"
+        static let sheetSubtitle = "ひとことの代わりに、スタンプを送ってみよう"
+        /// 送信済みの一言(セッション内のみ表示。送った/送れたの確認)
+        static let sentNote = "つつきました"
+        /// 1日3回まで(§3.7)。上限超過はサーバー正本の判定(429) — 責めない文言
+        static let limitReachedMessage = "今日はもうたくさんつついたよ。また明日ね"
+        static let errorMessage = "通信がうまくいきませんでした。もう一度お試しください"
+    }
+
+    /// リアクション(REQUIREMENTS §3.8 / T15)。
+    /// 相手の今日のチェックインにスタンプ1つ(❤️🔥👏😂🥹💪)
+    enum Reaction {
+        /// 相手のチェックインチップに添えるリアクション導線のラベル
+        static let button = "リアクション"
+        static let sheetTitle = "スタンプでリアクション"
+        static let sentNote = "リアクションしました"
+        static let errorMessage = "通信がうまくいきませんでした。もう一度お試しください"
+    }
 }
