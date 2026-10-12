@@ -44,16 +44,22 @@ final class OnboardingViewModel {
 
     private let authService: AuthServicing
     private let pushAuthorizer: PushAuthorizing
+    private let onProfileSubmitStarted: (() -> Void)?
     private let onFinished: () -> Void
     private var hasFinished = false
 
+    /// - onProfileSubmitStarted: プロフィール送信(匿名サインインを含む)を始めるたびに呼ぶ。
+    ///   ルート(AppModel)が、ここで作るセッションを「起動時に読めなかったセッションの復元」と取り違えて
+    ///   オンボーディングの途中で画面を飛ばさないようにするための合図(issue #62)
     init(
         authService: AuthServicing,
         pushAuthorizer: PushAuthorizing,
+        onProfileSubmitStarted: (() -> Void)? = nil,
         onFinished: @escaping () -> Void
     ) {
         self.authService = authService
         self.pushAuthorizer = pushAuthorizer
+        self.onProfileSubmitStarted = onProfileSubmitStarted
         self.onFinished = onFinished
     }
 
@@ -91,6 +97,7 @@ final class OnboardingViewModel {
         isSubmitting = true
         submitErrorMessage = nil
         defer { isSubmitting = false }
+        onProfileSubmitStarted?()
         do {
             // 既にセッションがあれば再サインインしない(匿名ユーザーの二重作成防止)
             if authService.currentUserID == nil {

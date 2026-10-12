@@ -202,6 +202,42 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertEqual(vm.step, .notification)
     }
 
+    // MARK: プロフィール送信の開始通知(issue #62: ルートが新しいセッションを復元と取り違えないための合図)
+
+    func testSubmitProfileNotifiesRootBeforeSigningIn() async {
+        let auth = MockAuthService()
+        auth.updateProfileError = TestError.network
+        var signInCountAtNotification: [Int] = []
+        let vm = OnboardingViewModel(
+            authService: auth,
+            pushAuthorizer: MockPushAuthorizer(),
+            onProfileSubmitStarted: { signInCountAtNotification.append(auth.signInCallCount) },
+            onFinished: {}
+        )
+        vm.advanceFromConcept()
+        vm.nickname = "ゆき"
+
+        await vm.submitProfile() // サインインのあとでプロフィール更新が失敗
+        auth.updateProfileError = nil
+        await vm.submitProfile() // リトライ
+
+        XCTAssertEqual(signInCountAtNotification, [0, 1], "送信のたびに、サインインより前に通知する(リトライでも)")
+    }
+
+    func testInvalidNicknameDoesNotNotifyRoot() async {
+        var notified = 0
+        let vm = OnboardingViewModel(
+            authService: MockAuthService(),
+            pushAuthorizer: MockPushAuthorizer(),
+            onProfileSubmitStarted: { notified += 1 },
+            onFinished: {}
+        )
+        vm.advanceFromConcept()
+        vm.nickname = "   "
+        await vm.submitProfile()
+        XCTAssertEqual(notified, 0, "送信に進まなかったときは通知しない")
+    }
+
     // MARK: 通知プレ許可
 
     func testRequestNotificationsCallsAuthorizerAndFinishes() async {

@@ -41,6 +41,8 @@ enum AuthServiceError: Error, Equatable {
 /// オンボーディングから始まる(実値設定後は SupabaseService がセッションを keychain 永続する)
 final class StubAuthService: AuthServicing, PushRegistrationUpdating {
     private(set) var signedInUserID: UUID?
+    /// サーバーの users 行の代わり(updatePushRegistration で書き、fetchPushRegistration で読む)
+    private var storedPushRegistration = ServerPushRegistration(token: nil, environment: nil)
 
     var currentUserID: UUID? { signedInUserID }
 
@@ -64,6 +66,12 @@ final class StubAuthService: AuthServicing, PushRegistrationUpdating {
 
     func updatePushRegistration(token: String, environment: PushEnvironment) async throws {
         guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
-        // メモリ内スタブ: 何も送信しない
+        // メモリ内スタブ: 何も送信しない(読み戻し用に覚えるだけ)
+        storedPushRegistration = ServerPushRegistration(token: token, environment: environment)
+    }
+
+    func fetchPushRegistration() async throws -> ServerPushRegistration {
+        guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
+        return storedPushRegistration
     }
 }

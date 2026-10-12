@@ -5,7 +5,7 @@
 // 文言は Strings.Home / Strings.Checkin、色・余白は DesignSystem の定数に集約(DESIGN §3.8)。
 // 表示原則(§3.10)はウィジェット(LienWidgetEntryView)と揃える:
 //   自分未完 = 自分側グレー / 相手が先に完了 =「(名前)が待ってるよ」。
-// ソロ状態(pairId = null)は土+誘導文言+「パートナーを招待する」導線(招待 UI 本体は T11 PairingView —
+// ソロ状態(pairId = null)は土+誘導文言+「相手を招待する」導線(招待 UI 本体は T11 PairingView —
 // RootView がシートで開く。issue #55)。チェックインはソロでもできる(写真・つつく・リアクションはペア後)。
 // 未送信キュー(pending_ops.json)の再送は表示時+フォアグラウンド復帰時(DESIGN §3.7)。
 // サーバーとの同期(GET /snapshot)は AppModel が行い、結果は App Group 経由で reloadToken の変化として届く。
@@ -19,7 +19,7 @@ struct HomeView: View {
 
     /// AppModel が snapshot を同期・保存するたびに増える値。変化したら App Group から読み直す
     private let reloadToken: Int
-    /// ソロ状態の「パートナーを招待する」。nil なら導線を出さない(ペア成立後・プレビュー)
+    /// ソロ状態の「相手を招待する」。nil なら導線を出さない(ペア成立後・プレビュー)
     private let onInvite: (() -> Void)?
 
     init(viewModel: HomeViewModel, reloadToken: Int = 0, onInvite: (() -> Void)? = nil) {

@@ -8,6 +8,8 @@
 //   3. 画面側の変更(オンボ完了・約束保存・ペア成立)を受けて phase を再導出する
 //   4. push_token / push_env の自動保存(PushTokenSync)を、セッション確立・前面復帰のたびに促す
 //   5. 招待ディープリンク(lien://invite/<token>)を保持し、ソロのホームで招待画面を開く
+//   6. オンボーディングのまま起動したあとでセッションが読めるようになったら、phase を導き直す
+//      (再起動後の最初のアンロック前にバックグラウンド起動されると Keychain を読めない — issue #62)
 //
 // 同期は同時に1本だけ走らせる。走行中に要求が来たら、終わった直後に1回だけ取り直す。
 
@@ -42,6 +44,10 @@ final class AppModel {
     /// 同期の走行中に別の要求が来た(終了直後に1回だけ取り直す)。テストが観測する
     private(set) var rerunRequested = false
     private var lastRefreshFinishedAt: Date?
+    /// このプロセスの中で、オンボーディングのプロフィール送信(匿名サインインを含む)を始めたか。
+    /// 始めたあとにできたセッションは「いま作っているセッション」であって、起動時に読めなかったものの
+    /// 復元ではない。復元と取り違えて phase を進めると、通知の許可画面などを飛ばしてしまう
+    private var isOnboardingUnderway = false
 
     /// 前面復帰の同期を省く最短間隔(起動直後の start() との二重取得を避ける。push 起点は省かない)
     static let minForegroundRefreshInterval: TimeInterval = 2
@@ -69,16 +75,19 @@ final class AppModel {
     func start() async {
         Task { await services.pushTokenSync.sessionDidChange() }
         guard phase != .onboarding else { return }
-        if phase == .promiseSetup, services.store?.loadSnapshot() == nil {
-            isResolving = true
-        }
-        await refresh()
+        await syncFirstTimeIfNeeded()
     }
 
     /// フォアグラウンド復帰時(DESIGN §4: アプリ本体は復帰時に必ず GET /snapshot で自己修復する)
     func sceneDidBecomeActive() async {
         Task { await services.pushTokenSync.flush() }
-        guard phase != .onboarding else { return }
+        if phase == .onboarding {
+            // 起動時にセッションが読めずオンボのまま立ち上がった端末が、アンロック後に前面へ来た場合の回復
+            // (復帰直後の同期は、直近の同期との間隔で間引かない)
+            guard restoreSessionIfAvailable() else { return }
+            await syncFirstTimeIfNeeded()
+            return
+        }
         if let last = lastRefreshFinishedAt,
            now().timeIntervalSince(last) < Self.minForegroundRefreshInterval {
             return
@@ -90,20 +99,29 @@ final class AppModel {
     /// 可視 push は NSE が snapshot を書くが、アプリ本体の表示・phase 更新はここで追従する。
     /// サイレント push(取消・約束変更・ペア更新)はこの同期が主経路になる
     func remoteNotificationReceived() async {
-        guard phase != .onboarding else { return }
+        if phase == .onboarding {
+            // バックグラウンド起動のプロセスが、アンロック後に受けた push でセッションの復元に気づく場合
+            guard restoreSessionIfAvailable() else { return }
+            await syncFirstTimeIfNeeded()
+            return
+        }
         await refresh()
     }
 
     // MARK: - 画面からの通知
 
+    /// オンボーディングのプロフィール送信(匿名サインインを含む)が始まった。
+    /// 以降、完了するまでの間にできたセッションは、起動時に読めなかったセッションの復元として扱わない
+    func onboardingProfileSubmitStarted() {
+        isOnboardingUnderway = true
+    }
+
     /// オンボーディング完了(匿名サインインとプロフィール更新は済んでいる)
     func onboardingFinished() async {
+        isOnboardingUnderway = false
         reloadFromStore()
         Task { await services.pushTokenSync.sessionDidChange() }
-        if phase == .promiseSetup, services.store?.loadSnapshot() == nil {
-            isResolving = true
-        }
-        await refresh()
+        await syncFirstTimeIfNeeded()
     }
 
     /// 約束の保存が成功した(snapshot の myPromise* は PromiseSetupViewModel が書き込み済み)
@@ -128,7 +146,7 @@ final class AppModel {
         applyPendingInvite()
     }
 
-    /// ソロのホームの「パートナーを招待する」
+    /// ソロのホームの「相手を招待する」
     func presentPairing() {
         guard phase == .solo else { return }
         showsPairing = true
@@ -161,6 +179,33 @@ final class AppModel {
     }
 
     // MARK: - private
+
+    /// セッションがある状態から始める同期。端末に snapshot が無ければ(再インストール直後など)、
+    /// 既存の約束・ペアがサーバーにあるかもしれないので、結果が出るまで約束設定を出さず読み込み表示にする
+    private func syncFirstTimeIfNeeded() async {
+        if phase == .promiseSetup, services.store?.loadSnapshot() == nil {
+            isResolving = true
+        }
+        await refresh()
+    }
+
+    /// phase がオンボーディングのまま起動したあとで、セッションが読めるようになっていたら(= 既存ユーザー)、
+    /// phase を導き直す。戻り値は、オンボーディングを抜けた(同期を始めてよい)か。
+    ///
+    /// 再起動後に端末が最初にアンロックされるまで、Keychain(AfterFirstUnlock)は読めない。その前に
+    /// サイレント push などでバックグラウンド起動されたプロセスは、セッション無し = オンボーディングで
+    /// 立ち上がり、あとで前面に来ても何も読み直さなければ、既存ユーザーがずっとオンボのままになる。
+    /// オンボーディングの操作中(プロフィール送信を始めたあと)は、いま作ったセッションを復元と取り違えない
+    private func restoreSessionIfAvailable() -> Bool {
+        guard
+            phase == .onboarding,
+            !isOnboardingUnderway,
+            services.auth.currentUserID != nil
+        else { return false }
+        reloadFromStore()
+        Task { await services.pushTokenSync.sessionDidChange() } // セッションが戻ったので、保留中の APNs 登録も促す
+        return phase != .onboarding
+    }
 
     /// App Group の snapshot とセッションから phase を再導出し、ホームに読み直しを促す
     private func reloadFromStore() {

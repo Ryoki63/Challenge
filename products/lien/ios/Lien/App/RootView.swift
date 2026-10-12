@@ -2,7 +2,7 @@
 //
 //   onboarding   : オンボーディング3画面(T10)。完了で AppModel.onboardingFinished
 //   promiseSetup : 約束設定(T12)を本番導線に。保存で AppModel.promiseSaved → ホームへ
-//   solo / paired: ホーム(T13)。ソロは土の鉢+チェックイン+「パートナーを招待する」導線で、
+//   solo / paired: ホーム(T13)。ソロは土の鉢+チェックイン+「相手を招待する」導線で、
 //                  招待画面(T11)はホームからシートで開く(招待コードのディープリンクでも自動で開く)
 //
 // 前面復帰・起動・ディープリンクは AppModel に委ねる(サーバー同期と phase 更新はそちらの責務)。
@@ -20,6 +20,7 @@ struct RootView: View {
                 OnboardingView(
                     authService: model.services.auth,
                     pushAuthorizer: model.services.pushAuthorizer,
+                    onProfileSubmitStarted: { model.onboardingProfileSubmitStarted() },
                     onFinished: { Task { await model.onboardingFinished() } }
                 )
             case .promiseSetup:
@@ -103,12 +104,15 @@ private struct PairingSheet: View {
         }
         .task {
             // 招待した側が、相手の受諾(ペア成立)を push なしでも画面上で知れるようにする。
-            // シートが開いている間だけ、短い間隔で snapshot を取り直す
+            // シートが開いている間だけ snapshot を取り直す。相手がなかなか受諾しない間に無駄な通信を
+            // 続けないよう、間隔は 4秒 → 8秒 → … → 30秒と段階的に伸ばす(InviteSyncSchedule)
             // (成立すると phase が paired になり、AppModel がシートを閉じる)
+            var attempt = 0
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(4))
+                try? await Task.sleep(for: .seconds(InviteSyncSchedule.interval(forAttempt: attempt)))
                 if Task.isCancelled { break }
                 await model.refresh()
+                attempt += 1
             }
         }
     }

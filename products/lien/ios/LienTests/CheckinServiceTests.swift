@@ -53,7 +53,8 @@ private final class MockCheckinAPIClient: CheckinAPIClient {
             var photoUpload: PhotoUploadURLs?
             if requestPhotoUpload {
                 guard let pairId = serverSnapshot.pairId else { throw CheckinClientError.noPair }
-                let dir = "pairs/\(pairId)/\(dateLocal)"
+                // 本人単位のパス(checkin/core.ts: 'pairs/<pair_id>/<date_local>/<user_id>/photo.jpg' — issue #52)
+                let dir = "pairs/\(pairId)/\(dateLocal)/user-a"
                 photoUpload = PhotoUploadURLs(
                     photo: PhotoUploadTarget(path: "\(dir)/photo.jpg", token: "t1"),
                     thumb: PhotoUploadTarget(path: "\(dir)/photo_thumb.jpg", token: "t2")
@@ -332,13 +333,13 @@ final class CheckinServiceTests: XCTestCase {
         XCTAssertTrue(api.checkinCalls[0].requestPhotoUpload)
         XCTAssertNil(api.checkinCalls[0].photoPath)
         XCTAssertFalse(api.checkinCalls[1].requestPhotoUpload)
-        XCTAssertEqual(api.checkinCalls[1].photoPath, "pairs/pair-1/\(today)/photo.jpg")
+        XCTAssertEqual(api.checkinCalls[1].photoPath, "pairs/pair-1/\(today)/user-a/photo.jpg")
 
         // 原寸+サムネの2本(processPhoto スタブ: 原寸 100B / サムネ 10B)
         XCTAssertEqual(api.uploads.count, 2)
-        XCTAssertEqual(api.uploads[0].target.path, "pairs/pair-1/\(today)/photo.jpg")
+        XCTAssertEqual(api.uploads[0].target.path, "pairs/pair-1/\(today)/user-a/photo.jpg")
         XCTAssertEqual(api.uploads[0].byteCount, 100)
-        XCTAssertEqual(api.uploads[1].target.path, "pairs/pair-1/\(today)/photo_thumb.jpg")
+        XCTAssertEqual(api.uploads[1].target.path, "pairs/pair-1/\(today)/user-a/photo_thumb.jpg")
         XCTAssertEqual(api.uploads[1].byteCount, 10)
 
         XCTAssertEqual(result.streakCurrent, 24, "最終応答のサーバー snapshot を返す")

@@ -60,8 +60,8 @@ final class CheckinAPIClientTests: XCTestCase {
               "alreadyCheckedIn": true,
               "snapshot": \(snapshotJSON),
               "photoUpload": {
-                "photo": { "path": "pairs/pair-1/2026-06-10/photo.jpg", "token": "tok-1" },
-                "thumb": { "path": "pairs/pair-1/2026-06-10/photo_thumb.jpg", "token": "tok-2" }
+                "photo": { "path": "pairs/pair-1/2026-06-10/user-a/photo.jpg", "token": "tok-1" },
+                "thumb": { "path": "pairs/pair-1/2026-06-10/user-a/photo_thumb.jpg", "token": "tok-2" }
               }
             }
             """
@@ -72,8 +72,8 @@ final class CheckinAPIClientTests: XCTestCase {
         XCTAssertEqual(
             response.photoUpload,
             PhotoUploadURLs(
-                photo: PhotoUploadTarget(path: "pairs/pair-1/2026-06-10/photo.jpg", token: "tok-1"),
-                thumb: PhotoUploadTarget(path: "pairs/pair-1/2026-06-10/photo_thumb.jpg", token: "tok-2")
+                photo: PhotoUploadTarget(path: "pairs/pair-1/2026-06-10/user-a/photo.jpg", token: "tok-1"),
+                thumb: PhotoUploadTarget(path: "pairs/pair-1/2026-06-10/user-a/photo_thumb.jpg", token: "tok-2")
             )
         )
     }
@@ -120,11 +120,11 @@ final class CheckinAPIClientTests: XCTestCase {
     func testSignedUploadURLBuilding() throws {
         let url = EdgeFunctionCheckinClient.signedUploadURL(
             baseURL: try XCTUnwrap(URL(string: "https://example.supabase.co")),
-            target: PhotoUploadTarget(path: "pairs/pair-1/2026-06-10/photo.jpg", token: "tok-1")
+            target: PhotoUploadTarget(path: "pairs/pair-1/2026-06-10/user-a/photo.jpg", token: "tok-1")
         )
         XCTAssertEqual(
             url?.absoluteString,
-            "https://example.supabase.co/storage/v1/object/upload/sign/photos/pairs/pair-1/2026-06-10/photo.jpg?token=tok-1"
+            "https://example.supabase.co/storage/v1/object/upload/sign/photos/pairs/pair-1/2026-06-10/user-a/photo.jpg?token=tok-1"
         )
     }
 }

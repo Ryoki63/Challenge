@@ -12,11 +12,13 @@ struct OnboardingView: View {
     init(
         authService: AuthServicing,
         pushAuthorizer: PushAuthorizing,
+        onProfileSubmitStarted: (() -> Void)? = nil,
         onFinished: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: OnboardingViewModel(
             authService: authService,
             pushAuthorizer: pushAuthorizer,
+            onProfileSubmitStarted: onProfileSubmitStarted,
             onFinished: onFinished
         ))
     }

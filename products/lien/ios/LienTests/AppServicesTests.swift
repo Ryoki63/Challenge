@@ -5,6 +5,8 @@
 //   - Stub 構成はネットワークを使わず、オンボ → 約束設定 → ソロのホーム(チェックイン)→ ペア成立 まで
 //     実際の ViewModel と AppModel の組み合わせで通る
 //   - 端末の App Group が使えないときの代替保存先
+//   - Live 構成の組み立て(issue #62): 各スロットが Live の実装になっていて、未サインインのうちは通信せず、
+//     チェックインのキューと未送信キュー(同期の巻き戻し判定)が同じものを指している
 
 import XCTest
 @testable import Lien
@@ -12,6 +14,17 @@ import XCTest
 private final class GrantingPushAuthorizer: PushAuthorizing {
     @discardableResult
     func requestAuthorization() async -> Bool { true }
+}
+
+/// Supabase の接続情報だけを返す Bundle(AppServices.make を Live で組み立てさせる)
+private final class ConfiguredBundle: Bundle, @unchecked Sendable {
+    override func object(forInfoDictionaryKey key: String) -> Any? {
+        switch key {
+        case Config.supabaseURLInfoPlistKey: return "https://example.supabase.co"
+        case Config.supabaseAnonKeyInfoPlistKey: return "anon-key"
+        default: return nil
+        }
+    }
 }
 
 @MainActor
@@ -60,6 +73,126 @@ final class AppServicesTests: XCTestCase {
         let store = AppGroupStore.localFallback()
         XCTAssertEqual(store.containerURL.lastPathComponent, "LienLocal")
         XCTAssertTrue(store.containerURL.path.contains("Application Support"))
+    }
+
+    // MARK: Live 構成の組み立て(ネットワークなし — issue #62)
+
+    /// Live 構成を組み立てる。URLSession は記録用のスタブ(組み立てただけで通信が起きないことを確かめる)
+    private func makeLiveServices(store: AppGroupStore) -> AppServices {
+        StubURLProtocol.reset()
+        return AppServices.live(
+            config: Config(supabaseURL: URL(string: "https://example.supabase.co")!, supabaseAnonKey: "anon-key"),
+            store: store,
+            pushAuthorizer: GrantingPushAuthorizer(),
+            session: StubURLProtocol.makeSession(),
+            reloadWidgets: {}
+        )
+    }
+
+    func testLiveServicesUseLiveImplementationsInEverySlot() {
+        let temp = TempStore()
+        defer { temp.cleanup() }
+        let services = makeLiveServices(store: temp.store)
+        defer { StubURLProtocol.reset() }
+
+        XCTAssertTrue(services.isLive)
+        XCTAssertTrue(services.auth is SupabaseService)
+        XCTAssertTrue(services.inviteClient is EdgeFunctionInviteClient)
+        XCTAssertTrue(services.promiseClient is EdgeFunctionPromiseClient)
+        XCTAssertTrue(services.snapshotClient is EdgeFunctionSnapshotClient)
+        XCTAssertTrue(services.checkinService is CheckinService)
+        XCTAssertTrue(services.nudgeService is LiveNudgeReactService)
+        XCTAssertTrue(services.reactionService is LiveNudgeReactService)
+        XCTAssertNotNil(services.pendingOps)
+        XCTAssertEqual(services.store?.containerURL, temp.store.containerURL)
+        XCTAssertTrue(
+            (services.nudgeService as AnyObject) === (services.reactionService as AnyObject),
+            "つつくとリアクションは同じ Live サービスが担う"
+        )
+        XCTAssertEqual(StubURLProtocol.captured.count, 0, "組み立てただけでは通信しない")
+    }
+
+    func testLiveServicesDoNotTouchTheNetworkBeforeSignIn() async {
+        let temp = TempStore()
+        defer { temp.cleanup() }
+        let services = makeLiveServices(store: temp.store)
+        defer { StubURLProtocol.reset() }
+
+        // 未サインインではユーザー JWT が取れない。どのクライアントも、リクエストを送らずに失敗する
+        await assertFails("招待の発行") { _ = try await services.inviteClient.createInvite() }
+        await assertFails("約束の保存") {
+            _ = try await services.promiseClient.setPromise(title: "筋トレ", emoji: "💪", remindAt: nil)
+        }
+        await assertFails("snapshot の取得") { _ = try await services.snapshotClient.fetchSnapshot() }
+        await assertFails("つつく") { try await services.nudgeService?.sendNudge(stamp: .wave) }
+        XCTAssertEqual(StubURLProtocol.captured.count, 0, "トークンが無い間は Edge Function を呼ばない")
+    }
+
+    func testLiveCheckinQueueIsTheOneTheSynchronizerGuards() async throws {
+        // チェックインを積むキューと、snapshot 同期が「端末の方が新しい」を判定するキューは同じもの。
+        // 別物になると、未送信のチェックインがあるのに同期が楽観状態を巻き戻してしまう
+        let temp = TempStore()
+        defer { temp.cleanup() }
+        let services = makeLiveServices(store: temp.store)
+        defer { StubURLProtocol.reset() }
+        let queue = try XCTUnwrap(services.pendingOps)
+        XCTAssertTrue(queue.isEmpty)
+
+        // 未サインイン(送信できない)でのチェックイン = オフラインと同じ: 楽観値を返し、キューに残す
+        let result = try await services.checkinService.performCheckin(current: SnapshotFactory.solo())
+
+        XCTAssertTrue(result.todayMeDone)
+        XCTAssertEqual(queue.load().count, 1)
+        XCTAssertEqual(
+            PendingOpsQueue(store: temp.store).load(),
+            queue.load(),
+            "キューは AppServices.live に渡したストアの上にある"
+        )
+        XCTAssertEqual(StubURLProtocol.captured.count, 0)
+    }
+
+    func testAppModelOnLiveServicesStartsInOnboardingWithoutSession() async {
+        let temp = TempStore()
+        defer { temp.cleanup() }
+        let services = makeLiveServices(store: temp.store)
+        defer { StubURLProtocol.reset() }
+
+        let model = AppModel(services: services)
+        XCTAssertEqual(model.phase, .onboarding)
+        await model.start()
+        await model.sceneDidBecomeActive()
+
+        XCTAssertEqual(model.phase, .onboarding, "セッションが無ければ、同期もせずオンボのまま")
+        XCTAssertEqual(StubURLProtocol.captured.count, 0)
+    }
+
+    func testMakeBuildsLiveServicesWhenConfigIsPresent() {
+        let services = AppServices.make(bundle: ConfiguredBundle())
+        XCTAssertTrue(services.isLive)
+        XCTAssertTrue(services.auth is SupabaseService)
+    }
+
+    func testMakeFallsBackToStubServicesWhenConfigIsMissing() {
+        final class EmptyKeysBundle: Bundle, @unchecked Sendable {
+            override func object(forInfoDictionaryKey key: String) -> Any? { "" }
+        }
+        let services = AppServices.make(bundle: EmptyKeysBundle())
+        XCTAssertFalse(services.isLive)
+        XCTAssertTrue(services.auth is StubAuthService)
+    }
+
+    private func assertFails(
+        _ label: String,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        _ operation: () async throws -> Void
+    ) async {
+        do {
+            try await operation()
+            XCTFail("\(label): 未サインインなのに成功した", file: file, line: line)
+        } catch {
+            // 失敗すればよい(エラーの型は各クライアントのエラーマップに依る)
+        }
     }
 
     // MARK: Stub 構成の通し(実 ViewModel + AppModel)

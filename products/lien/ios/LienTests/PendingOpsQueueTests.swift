@@ -67,21 +67,21 @@ final class PendingOpsQueueTests: XCTestCase {
         XCTAssertEqual(queue.load(), [.checkin(dateLocal: "2026-06-11", photoPath: nil)])
 
         // 写真付きで再 enqueue → photoPath 昇格
-        queue.enqueue(.checkin(dateLocal: "2026-06-11", photoPath: "pairs/p1/2026-06-11/photo.jpg"))
+        queue.enqueue(.checkin(dateLocal: "2026-06-11", photoPath: "pairs/p1/2026-06-11/user-a/photo.jpg"))
         XCTAssertEqual(queue.load(), [
-            .checkin(dateLocal: "2026-06-11", photoPath: "pairs/p1/2026-06-11/photo.jpg"),
+            .checkin(dateLocal: "2026-06-11", photoPath: "pairs/p1/2026-06-11/user-a/photo.jpg"),
         ])
 
         // photoPath nil の再 enqueue では昇格済みの写真を失わない
         queue.enqueue(.checkin(dateLocal: "2026-06-11", photoPath: nil))
         XCTAssertEqual(queue.load(), [
-            .checkin(dateLocal: "2026-06-11", photoPath: "pairs/p1/2026-06-11/photo.jpg"),
+            .checkin(dateLocal: "2026-06-11", photoPath: "pairs/p1/2026-06-11/user-a/photo.jpg"),
         ])
 
-        // 新しい photoPath は差し替え(その日1枚 — REQUIREMENTS §3.4)
-        queue.enqueue(.checkin(dateLocal: "2026-06-11", photoPath: "pairs/p1/2026-06-11/photo2.jpg"))
+        // 新しい photoPath は差し替え(その日1枚 — REQUIREMENTS §3.4。実際は同じパスへの上書きだが、ここでは別の文字列で差し替えを確かめる)
+        queue.enqueue(.checkin(dateLocal: "2026-06-11", photoPath: "pairs/p1/2026-06-11/user-a/photo2.jpg"))
         XCTAssertEqual(queue.load(), [
-            .checkin(dateLocal: "2026-06-11", photoPath: "pairs/p1/2026-06-11/photo2.jpg"),
+            .checkin(dateLocal: "2026-06-11", photoPath: "pairs/p1/2026-06-11/user-a/photo2.jpg"),
         ])
     }
 

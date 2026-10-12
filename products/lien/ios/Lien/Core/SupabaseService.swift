@@ -34,6 +34,17 @@ final class SupabaseService: AuthServicing, PushRegistrationUpdating {
         }
     }
 
+    /// 自分の users 行から読む APNs 登録(users_select_self により、読めるのは自分の行だけ)
+    private struct PushRegistrationRow: Decodable, Sendable {
+        let pushToken: String?
+        let pushEnv: String?
+
+        enum CodingKeys: String, CodingKey {
+            case pushToken = "push_token"
+            case pushEnv = "push_env"
+        }
+    }
+
     private let client: SupabaseClient
 
     init(config: Config) {
@@ -79,5 +90,23 @@ final class SupabaseService: AuthServicing, PushRegistrationUpdating {
             .update(PushRegistrationUpdate(pushToken: token, pushEnv: environment.rawValue))
             .eq("id", value: userID)
             .execute()
+    }
+
+    /// users.push_token と users.push_env を読む(PushTokenSync が、サーバー側で APNs 登録が
+    /// 無効にされていない(410 / BadDeviceToken で push_token が null にされていない)かを確かめるのに使う)。
+    /// 行が無い・列が null なら、その項目は nil(= 登録なし)
+    func fetchPushRegistration() async throws -> ServerPushRegistration {
+        guard let userID = currentUserID else { throw AuthServiceError.notSignedIn }
+        let rows: [PushRegistrationRow] = try await client
+            .from("users")
+            .select("push_token, push_env")
+            .eq("id", value: userID)
+            .execute()
+            .value
+        let row = rows.first
+        return ServerPushRegistration(
+            token: row?.pushToken,
+            environment: row?.pushEnv.flatMap(PushEnvironment.init(rawValue:))
+        )
     }
 }

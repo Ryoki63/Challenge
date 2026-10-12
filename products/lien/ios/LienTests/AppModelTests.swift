@@ -7,6 +7,8 @@
 //   - 端末の方が新しいとき(未送信キューあり)は巻き戻さない
 //   - オンボ完了・約束保存・ペア成立・ディープリンクの扱い
 //   - オンボ完了時の push_token 保存の促し
+//   - オンボのまま起動したあとでセッションが読めるようになったとき(Keychain が最初のアンロック前だった)の
+//     phase の導き直し。オンボ操作中にできたセッションは復元と取り違えない(issue #62)
 
 import XCTest
 @testable import Lien
@@ -15,9 +17,16 @@ import XCTest
 
 private final class RecordingRegistrar: PushRegistrationUpdating {
     private(set) var calls: [(token: String, environment: PushEnvironment)] = []
+    /// サーバーの users 行の代わり(送った内容がそのまま読み戻せる)
+    private var server = ServerPushRegistration(token: nil, environment: nil)
 
     func updatePushRegistration(token: String, environment: PushEnvironment) async throws {
         calls.append((token, environment))
+        server = ServerPushRegistration(token: token, environment: environment)
+    }
+
+    func fetchPushRegistration() async throws -> ServerPushRegistration {
+        server
     }
 }
 
@@ -150,6 +159,106 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertEqual(h.model.phase, .paired, "オフラインでも端末の snapshot で表示を続ける")
         XCTAssertEqual(h.store.loadSnapshot(), SnapshotFactory.paired())
+    }
+
+    // MARK: オンボのまま起動したあとのセッション復元(issue #62)
+
+    func testSceneActivationRestoresSessionThatBecameReadableAfterLaunch() async throws {
+        // 再起動後の最初のアンロック前にバックグラウンド起動された: Keychain を読めず、セッション無し =
+        // オンボで立ち上がった。App Group の snapshot(既存ユーザー)は残っている
+        let h = try await makeHarness(
+            signedIn: false,
+            local: SnapshotFactory.solo(),
+            server: .success(SnapshotFactory.paired())
+        )
+        defer { h.temp.cleanup() }
+        await h.model.start()
+        XCTAssertEqual(h.model.phase, .onboarding)
+        XCTAssertEqual(h.client.callCount, 0)
+
+        try await h.auth.signInAnonymously() // アンロック後、セッションが読めるようになった
+        await h.model.sceneDidBecomeActive()
+
+        XCTAssertEqual(h.model.phase, .paired, "オンボのままにせず、既存ユーザーとして復帰して同期する")
+        XCTAssertEqual(h.client.callCount, 1)
+    }
+
+    func testSceneActivationRestoreWithoutLocalSnapshotWaitsForFirstSyncBeforePromiseSetup() async throws {
+        let h = try await makeHarness(signedIn: false, local: nil, server: .success(SnapshotFactory.paired()))
+        defer { h.temp.cleanup() }
+        try await h.auth.signInAnonymously()
+        h.client.holdsFirstFetch = true
+
+        let model = h.model
+        let activation = Task { await model.sceneDidBecomeActive() }
+        await waitUntil { h.client.callCount == 1 }
+        XCTAssertEqual(model.phase, .promiseSetup)
+        XCTAssertTrue(model.isResolving, "初回同期の結果が出るまで、約束設定を見せずに読み込み表示にする")
+
+        h.client.release()
+        await activation.value
+
+        XCTAssertFalse(model.isResolving)
+        XCTAssertEqual(model.phase, .paired, "サーバーに既存の約束・ペアがあれば、約束設定を見せずにそこへ復帰する")
+    }
+
+    func testSceneActivationWithoutSessionStaysInOnboarding() async throws {
+        let h = try await makeHarness(signedIn: false, local: SnapshotFactory.solo())
+        defer { h.temp.cleanup() }
+
+        await h.model.sceneDidBecomeActive()
+
+        XCTAssertEqual(h.model.phase, .onboarding, "セッションがまだ読めないなら、オンボのまま")
+        XCTAssertEqual(h.client.callCount, 0)
+    }
+
+    func testSceneActivationDuringOnboardingDoesNotMistakeNewSessionForRestoredOne() async throws {
+        // ニックネーム送信で匿名サインインしたあと(通知の許可画面)に、別アプリから戻る / OS の許可ダイアログが閉じる:
+        // その前面復帰で phase を進めてしまうと、通知の許可画面を飛ばしてしまう
+        let h = try await makeHarness(signedIn: false, server: .success(SnapshotFactory.noPromise()))
+        defer { h.temp.cleanup() }
+        h.model.onboardingProfileSubmitStarted() // OnboardingViewModel.submitProfile の冒頭
+        try await h.auth.signInAnonymously()
+
+        await h.model.sceneDidBecomeActive()
+        XCTAssertEqual(h.model.phase, .onboarding, "オンボ操作中は進めない")
+        XCTAssertEqual(h.client.callCount, 0)
+
+        await h.model.remoteNotificationReceived()
+        XCTAssertEqual(h.model.phase, .onboarding)
+        XCTAssertEqual(h.client.callCount, 0)
+
+        await h.model.onboardingFinished() // オンボ完了で初めて先へ進む
+        XCTAssertEqual(h.model.phase, .promiseSetup)
+        XCTAssertEqual(h.client.callCount, 1)
+    }
+
+    func testRemoteNotificationRestoresSessionThatBecameReadableAfterLaunch() async throws {
+        let h = try await makeHarness(
+            signedIn: false,
+            local: SnapshotFactory.solo(),
+            server: .success(SnapshotFactory.paired())
+        )
+        defer { h.temp.cleanup() }
+        try await h.auth.signInAnonymously()
+
+        await h.model.remoteNotificationReceived()
+
+        XCTAssertEqual(h.model.phase, .paired)
+        XCTAssertEqual(h.client.callCount, 1)
+    }
+
+    func testRestoredSessionFlushesHeldPushRegistration() async throws {
+        let h = try await makeHarness(signedIn: false, local: SnapshotFactory.solo())
+        defer { h.temp.cleanup() }
+        await h.model.services.pushTokenSync.receive(token: "aabbcc") // トークンは来たが、セッションが無くて保留
+        XCTAssertEqual(h.registrar.calls.count, 0)
+
+        try await h.auth.signInAnonymously()
+        await h.model.sceneDidBecomeActive()
+        await waitUntil { h.registrar.calls.count >= 1 }
+
+        XCTAssertEqual(h.registrar.calls.count, 1, "セッションが戻ったら保留中の push_token / push_env を保存する")
     }
 
     // MARK: 同期による phase 更新
