@@ -7,6 +7,8 @@
 #   変更時は Base.xcconfig の2行 + 各 *.entitlements を更新する)
 # - 外部依存は supabase-swift のみ(DESIGN §3.1 で唯一の許可依存。T10 で追加)。
 #   リンクするのは Lien ターゲットだけ(LienWidget / LienNSE には混ぜない — DESIGN §3.4)
+# - 各ターゲットのフォルダにある PrivacyInfo.xcprivacy は sources に含まれ、リソースとして同梱される
+#   (必須理由 API と収集データの宣言。issue #28。整合は LienTests/PrivacyManifestTests)
 
 name: Lien
 
@@ -15,11 +17,14 @@ options:
     iOS: "17.0"
   createIntermediateGroups: true
 
-# SPM 依存(メジャー固定: 2.x — issue #10)
+# SPM 依存(exactVersion で固定 — issue #28。リリースビルドが、ある日突然別の版になって壊れるのを防ぐ)。
+# 推移依存(swift-crypto など)も含めた解決結果は ios/Package.resolved にコミットしてあり、
+# CI(lien-ios / lien-release)は xcodegen の後でそれを .xcodeproj へ戻して使う(scripts/pin-packages.sh)。
+# 版を上げるとき: ここを変える → CI が「Package.resolved が古い」と出力する新しい内容を ios/Package.resolved に貼る
 packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
-    from: "2.0.0"
+    exactVersion: "2.55.3"
 
 # Debug / Release とも共通設定は Config/Base.xcconfig に置く。
 # Base.xcconfig の末尾で Secrets.xcconfig を optional include しているため、
@@ -44,6 +49,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE)"
         CODE_SIGN_ENTITLEMENTS: Lien/Lien.entitlements
+        # App Store Connect は AppIcon(1024 単一サイズ・アルファなし)が無いアップロードを弾く(ITMS-90022 / 90713)。
+        # 画像は Lien/Assets.xcassets/AppIcon.appiconset(正本: ../assets/icon/icon_1024.png — v4 空色)
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: Lien/Info.plist
       properties:
@@ -91,6 +99,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE).widget"
         CODE_SIGN_ENTITLEMENTS: LienWidget/LienWidget.entitlements
+        # アプリ本体に埋め込まれる拡張。単独では archive に出さない(アプリの archive に Lien.app/PlugIns として入る)
+        SKIP_INSTALL: "YES"
     info:
       path: LienWidget/Info.plist
       properties:
@@ -114,6 +124,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE).nse"
         CODE_SIGN_ENTITLEMENTS: LienNSE/LienNSE.entitlements
+        SKIP_INSTALL: "YES"
     info:
       path: LienNSE/Info.plist
       properties:

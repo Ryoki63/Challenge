@@ -1,6 +1,10 @@
 # Lien iOS CI — xcodegen generate → xcodebuild(DESIGN §8)
 # CI 予算: macOS ランナーは10倍消費のため products/lien/ios/** 変更時のみ起動し、
-# 8分以内を目標にする(timeout-minutes: 15 は安全弁)
+# 8分以内を目標にする(timeout-minutes: 20 は安全弁)
+#
+# Xcode は products/lien/ios/.xcode-version の版に固定(lien-release と共通 — issue #28)。
+# 2026-04-28 以降、App Store Connect へのアップロードは Xcode 26 / iOS 26 SDK 以上が必須なので、
+# テストも同じ SDK で回して「TestFlight に上げるビルドと同じコンパイラで通る」ことを毎回確かめる。
 name: lien-ios
 
 on:
@@ -13,6 +17,8 @@ on:
       # 植物スプライトのカタログは Lien ターゲットのリソース(project.yml が ../assets/ を参照 — T13)。
       # アセット側だけの変更でも iOS ビルドが走るようにする
       - "products/lien/assets/plant/PlantAssets.xcassets/**"
+      # アプリアイコンの正本。ios の AppIcon.appiconset と同一であることを ReleaseReadinessTests が検査する(issue #28)
+      - "products/lien/assets/icon/**"
       - ".github/workflows/lien-ios.yml"
   workflow_dispatch:
 
@@ -21,17 +27,29 @@ concurrency:
   group: lien-ios-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: iOS build + test (simulator / no codesign)
-    runs-on: macos-15
-    timeout-minutes: 15
+    runs-on: macos-26
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: products/lien/ios
     steps:
+      # actions は commit SHA で固定する(タグは付け替えられる。lien-deploy と同じ方針)
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # ios/.xcode-version の Xcode に切り替え、iOS 26 SDK 以上であることを確かめる(lien-release と共通)
+      - name: Select Xcode (pinned) + iOS 26 SDK check
+        run: scripts/select-xcode.sh
+
+      # リリース用スクリプト(Supabase 接続情報の検証・archive の検査・Package.resolved の比較)の単体テスト。数秒
+      - name: Release script unit tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
 
       - name: Install XcodeGen
         env:
@@ -42,15 +60,21 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      # コミット済みの ios/Package.resolved を .xcodeproj へ戻して解決し、ずれていたら止める。
+      # 以降の xcodebuild は -onlyUsePackageVersionsFromResolvedFile で、この固定を必ず使う(issue #28)
+      - name: Pin Swift packages (Package.resolved)
+        run: scripts/pin-packages.sh
+
       # xcodebuild test はビルドも行うため、ビルドとテストを1ステップに統合して
       # macOS 分を節約する(T07)。LienTests は Lien スキームの testTargets(project.yml)。
-      # destination の "iPhone 16" は macos-15(Xcode 16.x)の標準シミュレータ。
-      # OS バージョンは指定せずランナー既載の最新ランタイムに委ねる
+      # destination の "iPhone 17" は macos-26(Xcode 26.x)の標準シミュレータ
+      # (iPhone 16 は macos-26 のイメージに無い)。OS バージョンは指定せずランナー既載の最新ランタイムに委ねる
       - name: Build & test (Lien scheme, iOS Simulator)
         run: |
           set -o pipefail
           xcodebuild test \
             -project Lien.xcodeproj \
             -scheme Lien \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -onlyUsePackageVersionsFromResolvedFile \
             CODE_SIGNING_ALLOWED=NO
