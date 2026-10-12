@@ -234,7 +234,7 @@ D3 で外す機能と行き先:
 
 | タスク | 変更 |
 |---|---|
-| G0 #38 | 締切 10/16。App ID・App Group・Push は Xcode の自動署名に任せ、失敗したときだけ Portal で手動登録する。提供地域は日本のみ。完了条件は「内部 TestFlight に1本上げられる状態」 |
+| G0 #38 | 締切 10/16。App ID・App Group・Push は Xcode の自動署名に任せ、失敗したときだけ Portal で手動登録する(**例外: アプリ本体の Bundle ID `com.ryoki63.lien` だけは、App Store Connect のレコードを作る前に Developer Portal の Identifiers で登録する** — ASC の「新規アプリ」で選べるのは登録済みの Bundle ID だけ。実機に Xcode から直接入れるなら Devices にその UDID も。手順は `products/lien/ios/README.md` §8.1)。提供地域は日本のみ。完了条件は「内部 TestFlight に1本上げられる状態」 |
 | T08 残 #8 / G1 #39 | 内部 TestFlight(production APNs)で計測する。受信側を「背景」5回・「強制終了」5回に分け、p50 / p90 と生データを #8・#39 に記録する |
 | T09v2 #49 / G2 #40 | #49 の取込は #56 が引き継ぐ(**→ #56 は 2026-10-13 に済み**。承認は人が #40 で一覧画像を見て行う)。G2 は決定済み(D1・D2・アイコンは空色) |
 | T15 #15 | 完了(5552670)。残り: nudge・react の Live クライアント(W1)・deploy.sh への追加(GS)・本番デプロイ(D4)。**react の仕様修正も GS に含める**(REVIEW §4.1 の QR の指摘。nudge・react は本番に未デプロイなので、初めて出す前に直す): ① リアクションの push は最初の1回だけにする(今の `react/core.ts` は、スタンプを変えると push を送り直す)② 相手の当日判定は相手のタイムゾーンで行う(要テスト。今の実装が正しいかをテストで確かめる)。**→ 2026-10-12 に #54 の再オープン分で完了**: ① は `handleReact` が既存のリアクションが無い(最初の1回)ときだけ push する(付け替えは上書きのみ。`changed` は保存内容が変わったか)。② は今の実装で正しく(同梱する相手視点の snapshot は相手の timezone の「今日」で決まる)、送り手 Asia/Tokyo・相手 Pacific/Honolulu(と逆)のテストで固定した。react を含む 9 関数を本番へ再デプロイしてスモーク済み。なお nudge の「相手が未完か」の判定は送り手の timezone の今日で行う(ペアは同一 TZ 前提 — REQUIREMENTS §3.4。時差ペアの厳密対応は v2+) |
