@@ -253,3 +253,10 @@
 - commit/push: 41b3668(REVIEW-2026-10-12.md・GROWTH.md・v4_drafts 一式)。lien-ci success。approval-ping 発火を確認
 - 承認依頼: #40(D1 画風 v4 / D2 成長ルール / アイコン — 画像7枚付き)・#50(決定パッケージ D1〜D6+人間の作業: G0 を 10/16 まで・Xcode 26 導入・テスター募集)に needs-approval+human-gate。#49 に「F 本制作は行わず v4 で置換提案中」を記録
 - 結果: ユーザー依頼4点(Haiku 洗い出し・方針レビュー・イラスト刷新・成長ルール再考)は完了し、承認待ちで停止。**承認後の次アクション**: (1) 決定に従い #50/BACKLOG/DONE を整理し新タスク(W1 アプリ結線・cron 登録・写真パス修正・Pages 公開・T28準備)を起票 (2) v4 採用なら取込タスク(SVG→xcassets・PlantCharacterView・plant-assets CI の SVG 化)(3) 成長ルール採用なら GROWTH.md §8 の順で REQUIREMENTS/DESIGN 改定 → サーバー → iOS
+
+## 2026-10-12 16:10 (対話/Opus) — 決定「全部推奨で」→ 起票・計画更新・第1波着手
+- 着手: ユーザー回答「全部推奨で」= D1 v4 採用 / D2 成長ルール10段階 / D3 v1.0 から7機能を外す / D4 本番変更の包括承認 / D5 Supabase Pro 化(支払いのため人間)/ D6 計測は SQL のみ
+- 事実確認(読み取りのみ): 本番は ACTIVE_HEALTHY。拡張は supabase_vault のみで **pg_cron / pg_net 未導入・cron ジョブ0件**(レビュー指摘 M1 を確定)。checkins は pair_id を持たないため写真なしのソロのチェックインはサーバー側で受付可
+- 起票: #51 cron / #52 写真パス / #53 push_env / #54 成長ルール(サーバー)/ #55 W1 アプリ結線 / #56 植物描画 / #57 植物体験 / #58 仕様改定。ラベル on-hold・v1.0.1 を新設し #21・#24・#33〜#36 に付与(ループから外す)。#19 は分割、#35 は計画の作り直しを記録。#40・#50 に決定を記録し needs-approval を外した(human-gate の close は人間)
+- 整理: BACKLOG を第1波の計画で作り直し(T10〜T14 の残骸を削除)。DONE に T08準備①②・T10〜T14 の追記漏れを補完(JOURNAL の事実のみ)
+- 次: 第1波を並列実行 — backend(#51→#52→#53→#54、Sonnet)∥ docs(#58、Sonnet)∥ ios-serial(#55、Sonnet)。各ステップ後に Opus でレビュー→必要なら修正。サブエージェントは JOURNAL に直接書かず、オーケストレータが集約して記録する

@@ -9,29 +9,27 @@
 
 ---
 
-## Wave 4(2026-06-11 改定計画 #50 — いま実行可能。人間ゲート待ちは積まない)
+## 第1波(2026-10-12 決定 — docs/REVIEW-2026-10-12.md §3。正は GitHub Issues)
 
-### レーンA: ios-serial(Strings.swift / project.yml / LienApp.swift 共有 — 上から厳密に直列)
-- [ ] [T10][#10] オンボ3画面(AuthServicing/PushAuthorizing プロトコル+モック注入。supabase-swift は Lien ターゲットのみに追加。初期 phase 導出ロジックを新設) 完了条件: lien-ios.yml 緑+OnboardingViewModelTests 緑。実 Supabase 疎通は T08 持ち越しを issue に明記
-- [ ] [T08準備②][#8] push トークン取得ハーネス(AppDelegate 新設+DEBUG トークン表示 UI+aps-environment を entitlements に追加) 完了条件: lien-ios.yml 緑(issue #8 は close しない)
-- [ ] [T11][#11] 招待 UI+ディープリンク+web/invite 静的ページ(InviteClient モック注入。web 部分は依存ゼロで先行可) 完了条件: web 3状態の手元ブラウザ確認+lien-ios.yml/lien-ci.yml 緑
-- [ ] [T12][#12] 約束設定(functions promise-set 新設+PromiseSetupView。LienApp.swift には触れない) 完了条件: deno test 緑+lien-ios.yml 緑+DESIGN §5.3 に promise-set 追記
-- [ ] [T13][#13] ホーム画面(PlantSprite.swift と PlantAssets.xcassets 取込の単独オーナー。CheckinPerforming はローカルエコー注入) 完了条件: lien-ios.yml 緑+PlantSpriteTests/HomeViewModelTests 緑
-- [ ] [T14][#14] チェックインフロー+オフラインキュー+写真(migration 0002_photo_storage_policies — 着手時に最新連番を再確認) 完了条件: deno test 緑+lien-ios.yml 緑+PendingOpsQueueTests 緑
-- [ ] [T16][#16] 通知一式(messages.ts は streakRisk/milestone 等の残りに限定=nudge 系は T15 委譲。prefs+migration 0003_notif_prefs+ReminderScheduler) 完了条件: deno test 緑+lien-ios.yml 緑+ReminderSchedulerTests 緑
-- [ ] [T17][#17] ウィジェット3種(M/円形/インライン)+NSE サムネ(T13 作成の PlantSprite.swift を LienWidget sources へ共有追加。photoThumbUrl 契約を DESIGN §4 に追記) 完了条件: lien-ios.yml 緑+ペイロード/サムネ/日付跨ぎテスト緑
-- [ ] [T18][#18] カレンダー履歴(HistoryCalendarBuilder 純粋ロジック+モック repo。streak.ts と同一意味論をテストで突合) 完了条件: lien-ios.yml 緑+月境界・both/ticket 判定テスト緑
-- [ ] [T19][#19] お休みチケット(functions rest-declare 新設+snapshot に ticketBalance 追加+Tickets UI) 完了条件: deno test 緑+lien-ios.yml 緑+snapshot 後方互換テスト緑
-- [ ] [T21][#21] アルバム画面(AlbumRepository モック+30日制限ポリシー純粋関数) 完了条件: lien-ios.yml 緑+AlbumAccessPolicyTests(29/30/31日境界)緑
-- [ ] [T22][#22] シェア画像生成(ImageRenderer 2フォーマット。xcassets は T13 取込済みを確認し未追加時のみ追加) 完了条件: lien-ios.yml 緑+寸法/非ブランク/決定性テスト緑+XCTAttachment 目視
-- [ ] [T23][#23] 設定画面+functions pair-dissolve/delete-account(通報 mailto・削除2段階確認。messages.ts は T16 の後に追記) 完了条件: deno test 緑+lien-ios.yml 緑+SettingsViewModelTests 緑
-- [ ] [T24][#24] Apple ID 連携(functions apple-link+nonce ロジック+モック注入。entitlements は T08準備②の後) 完了条件: deno test 緑+lien-ios.yml 緑+AppleSignInTests 緑
-- [ ] [T28準備][#28] リリース CI 準備(lien-release.yml dry_run+ExportOptions.plist+AppIcon 仮取込=products/lien/assets/icon/icon_drafts/draft_a_bloom_1024.png、G4 で差し替え) 完了条件: dry_run=true で無署名アーカイブ緑(issue #28 は close しない)
+v1.0 の目標: 内部 TestFlight 10/23 → 機能凍結 11/8 → 外部テスト 11/13 → 審査提出 11/23〜27 → 公開 12/11。
+v1.1 課金(#33〜#36)・T21 アルバム・T24 SIWA は `on-hold` ラベルでループから外している。
 
-### レーンB: infra/scripts(レーンAと並列可)
-- [ ] [T08準備①][#8] デプロイ自動化+G1 計測ハーネス(supabase/config.toml verify_jwt=false+scripts/deploy.sh+lien-deploy.yml+scripts/g1/{seed-pair.sh,measure.sh,RUNBOOK.md}) 完了条件: bash -n 構文チェック+lien-ci.yml 緑のまま(issue #8 は close しない)
+### backend(直列: supabase/ と DESIGN §3.4・§4・§5.2〜§5.4 のオーナー)
+- [>] [X1][#51] 本番 cron 登録(pg_cron+pg_net+Vault。close-day 00:10 JST / grant-tickets 毎月1日) 完了条件: 本番 cron.job に2ジョブ+手動実行 200
+- [ ] [X2][#52] 写真パスを本人単位に(migration 0004+checkin) 完了条件: deno test 緑+本番で他人パスへの書込 403
+- [ ] [X3][#53] push_env 保存+APNs 環境のトークン単位選択(migration 0005+apns.ts) 完了条件: deno test 緑+本番適用
+- [ ] [GS][#54] 成長ルール v2(サーバー): 10段階・streak_days から数える・昨日の仮判定・plant-name・一括デプロイ 完了条件: deno test 緑+本番スモーク
 
-### Wave 5以降(参考 — ゲート解放で着手。詳細は #50)
-- Wave 5: [T09v2][#49] G2(#40)回答後、選定スタイルで全コマ制作(assetsレーン・Wave 4と並走可)
-- Wave 6: [T08][#8] G0(#38)後、デプロイ+実機G1計測
-- Wave 7〜: T20 実機E2E → T27 → T28 本提出(G3)→ M3/M4
+### docs(並列可: REQUIREMENTS / TASKPLAN / CONCEPT / E2E-M1 / store_metadata / DESIGN §3.5)
+- [>] [DOC][#58] 仕様改定(成長ルール v2・D3 スコープ削減・D6 計測) 完了条件: lien-ci 緑(store-metadata)
+
+### ios-serial(Strings.swift / project.yml / LienApp.swift — 上から厳密に直列)
+- [>] [W1][#55] アプリ結線: Live 基盤+AppRouter+ソロモード+push_token/push_env 保存+契約フィクスチャ 完了条件: lien-ios 緑+AppRouterTests・契約テスト緑
+- [ ] [PA][#56] 植物 v2-a(描画): v4 SVG レイヤー取込+PlantCharacterView+plant-assets CI の SVG 化 完了条件: CI 緑+実描画一覧の artifact
+- [ ] [PB][#57] 植物 v2-b(体験): ゲージ・段階アップ演出・名前付け 完了条件: lien-ios 緑+各テスト緑
+- [ ] [T28準備][#28] Xcode 26 固定・ExportOptions・PrivacyInfo・MARKETING_VERSION 1.0.0・v4 アイコン 完了条件: dry_run の無署名 archive 緑
+- [ ] [T23][#23] 審査対応一式(通報・ブロック=解消・規約同意・完全削除) 完了条件: deno+lien-ios 緑+レビューノート §1.4/§1.5 を再現
+- [ ] [T16][#16] 通知(縮小版: ローカル通知+streakRisk/milestone+ON/OFF) / [T17a][#17] S+ロック画面 / [T18][#18] 履歴 / [T19a][#19] チケット残数バッジ / [T22][#22] シェア画像 / [T27][#27] 文言総点検 — 11/8 機能凍結まで
+
+### 人間(D5 ほか)
+- G0(#38)を 10/16 までに / Xcode 26 導入(ディスク 40GB)/ テスター募集(11/6 まで)/ Supabase Pro 化(12/1 まで)/ G4a(11/6 まで)
