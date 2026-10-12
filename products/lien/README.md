@@ -18,7 +18,7 @@
 ```
 products/lien/
 ├── ios/
-│   ├── project.yml          # XcodeGen 定義(.xcodeproj はコミットしない)※T06 で追加
+│   ├── project.yml          # XcodeGen 定義(.xcodeproj はコミットしない)
 │   ├── Lien/                # アプリ本体ターゲット
 │   ├── LienWidget/          # ウィジェット拡張
 │   ├── LienNSE/             # Notification Service Extension
@@ -29,16 +29,17 @@ products/lien/
 │   └── functions/           # Edge Functions(deno)
 │       └── _shared/         # streak.ts / tickets.ts / apns.ts / snapshot.ts / messages.ts
 ├── assets/
-│   ├── plant/               # ドット絵スプライト(原寸PNG)
+│   ├── plant/               # 植物「タネの子」の SVG レイヤー34点+PlantAssets.xcassets+生成スクリプト(tools/)。規則は mapping.md
 │   └── icon/
 ├── web/invite/              # 招待用静的ページ(GitHub Pages)
 └── marketing/               # ASO文言・スクショ・privacy-policy.md・terms.md
 ```
 
-## シークレット(DESIGN §7)
+## シークレット(一覧は DESIGN §7)
 
-- `ios/Config/Secrets.xcconfig` は **gitignore 対象**(コミット禁止)。雛形は `ios/Config/Secrets.example.xcconfig` をコピーして人間(G0)が実値を設定する
-- `SERVICE_ROLE_KEY` / APNs キー等は Supabase 側の環境変数・secrets で管理し、リポジトリには置かない
+- `ios/Config/Secrets.xcconfig` は **gitignore 対象**(コミット禁止)。雛形は `ios/Config/Secrets.example.xcconfig` をコピーして人間(G0)が実値を設定する。入れてよいのは **anon(publishable)キーだけ**(service_role / `sb_secret_…` は IPA に同梱されて漏れる)
+- Edge Function の **`SUPABASE_SERVICE_ROLE_KEY` は Supabase が自動で注入する**(自分では設定しない・リポジトリにも置かない)。このプロジェクトでは default の secret key(`sb_secret_…`)で、legacy の `service_role`(`eyJ…`)ではない。cron(close-day / grant-tickets)の認証には使わず、専用の `LIEN_CRON_SECRET` を使う(`scripts/OPS.md` §6)
+- 手動で入れる Function secrets は、APNs の5変数(`APNS_AUTH_KEY` / `APNS_KEY_ID` / `APPLE_TEAM_ID` / `APNS_ENV` / `APNS_TOPIC`)と `LIEN_CRON_SECRET`(任意で `INVITE_WEB_BASE_URL`)。TestFlight 用の署名と接続情報(`ASC_KEY_P8` ほか6件)は GitHub Actions secrets(`ios/README.md` §8.1)
 - コードへのキーのハードコードは禁止(AGENTS.md)
 
 ## 検証コマンド(DESIGN §8)
@@ -51,7 +52,12 @@ products/lien/
 | iOS 単体テスト | LienTests(日付処理・スナップショット解釈・キュー) | CI / Mac |
 | 実機 E2E | TASKPLAN のチェックリスト | 人間+Mac(G1, M1末, G3) |
 
-## CI
+## CI(`.github/workflows/`)
 
-- `.github/workflows/lien-ci.yml` — deno test ジョブ(ubuntu-latest、全 push で起動)
-- iOS ビルドジョブは T06 で別ワークフローとして追加予定(`products/lien/ios/**` 変更時のみ起動・8分以内)
+| ワークフロー | 起動 | 内容 |
+|---|---|---|
+| `lien-ci.yml` | 全 push | deno test(Edge Functions)・契約フィクスチャの一致検査・植物アセット(SVG の再生成 diff 検査+verify)・ストアメタデータの検査 |
+| `lien-ios.yml` | `products/lien/ios/**` ほか(契約フィクスチャ・植物アセット・アイコン)の変更時 | iOS のビルドとテスト(macOS。Xcode は `ios/.xcode-version` に固定 — `ios/README.md` §1) |
+| `lien-release.yml` | 手動 | TestFlight 用の archive・署名・アップロード(`dry_run` は既定で true — `ios/README.md` §8) |
+| `lien-deploy.yml` | 手動 | Supabase への migration とデプロイ(`scripts/deploy.sh`) |
+| `lien-cron-watch.yml` | 毎朝 00:40 JST ほか | 本番の定期実行(cron)の監視(`scripts/OPS.md`) |

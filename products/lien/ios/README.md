@@ -98,12 +98,18 @@ xcodebuild test -project Lien.xcodeproj -scheme Lien \
 
 `lien-release`(`.github/workflows/lien-release.yml`)が archive・署名・アップロードまで行う。**手動起動のみ**。
 
-### 8.1 準備(1 回だけ)
+### 8.1 準備(1 回だけ。順序に注意)
 
-1. Apple Developer Program への加入、App Store Connect でアプリのレコード作成(Bundle ID = `com.ryoki63.lien`。名前は仮でよい — G0)
-2. App Store Connect → ユーザとアクセス → 統合 → **App Store Connect API** でキーを発行し、`.p8` をダウンロードする
+1. Apple Developer Program へ加入する(G0)
+2. Developer Portal(Certificates, Identifiers & Profiles)→ **Identifiers** で、アプリ本体の App ID(Explicit)`com.ryoki63.lien` を登録する。
+   **この登録を先に済ませる**: 次の App Store Connect の「新規アプリ」で選べる Bundle ID は、ここに登録済みのものだけ。
+   Capabilities は選ばなくてよい(下の注記のとおり、足りないものはクラウド署名が付ける)
+3. App Store Connect → アプリ →「新規アプリ」でレコードを作る(プラットフォーム iOS・名前は仮でよい・Bundle ID は 2. で登録した `com.ryoki63.lien` — G0)
+   - **実機に Xcode から直接入れるとき(E2E の経路A — [docs/E2E-M1.md](../../../docs/E2E-M1.md) §1.2)だけ**: Developer Portal → **Devices** に、その実機の UDID を登録する
+     (Xcode の自動署名で実機をつなぐと、自動で登録されることもある)。TestFlight へ上げるだけなら UDID の登録は要らない
+4. App Store Connect → ユーザとアクセス → 統合 → **App Store Connect API** でキーを発行し、`.p8` をダウンロードする
    (一度しかダウンロードできない)。ロールは **Admin を推奨**(クラウド署名が配布用の証明書を作るため。App Manager で足りるかは初回に確認)
-3. GitHub のリポジトリ → Settings → Secrets and variables → Actions に登録する:
+5. GitHub のリポジトリ → Settings → Secrets and variables → Actions に登録する(一覧は [DESIGN §7.2](../../../docs/DESIGN.md)):
 
    | secret | 値 |
    |---|---|
@@ -114,8 +120,8 @@ xcodebuild test -project Lien.xcodeproj -scheme Lien \
    | `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
    | `SUPABASE_ANON_KEY` | anon(publishable)キー。**service_role / secret キーは入れない** |
 
-   App ID(`com.ryoki63.lien` / `.widget` / `.nse`)・App Group(`group.com.ryoki63.lien.shared`)・Push Notifications は、
-   クラウド署名(`-allowProvisioningUpdates`)が自動で登録する。App Group の自動付与に失敗したときだけ、
+   アプリ本体以外の App ID(`com.ryoki63.lien.widget` / `.nse`)・App Group(`group.com.ryoki63.lien.shared`)・Push Notifications は、
+   クラウド署名(`-allowProvisioningUpdates`)が自動で登録・付与する。App Group の自動付与に失敗したときだけ、
    Developer Portal で App ID に手動で付与して再実行する
 
 ### 8.2 実行
