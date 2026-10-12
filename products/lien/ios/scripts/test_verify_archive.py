@@ -5,9 +5,11 @@ import io
 import os
 import plistlib
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -125,6 +127,94 @@ class VerifyArchiveTests(unittest.TestCase):
     def test_not_an_app_archive(self):
         os.makedirs(os.path.join(self.tmp, "Empty.xcarchive"))
         self.assertGreater(verify(os.path.join(self.tmp, "Empty.xcarchive")).errors, 0)
+
+
+class SignedArchiveTests(unittest.TestCase):
+    """署名済みの archive の検査(--signed)。dry-run では通らない経路なので、codesign の呼び方と出力の読み方をここで固定する
+    (旧来の `--entitlements :-` は非推奨の構文。現行は `--entitlements - --xml` — issue #66)"""
+
+    GOOD = {
+        "com.apple.security.application-groups": ["group.com.example.lien"],
+        "aps-environment": "development",
+    }
+
+    @staticmethod
+    def plist_text(data):
+        return plistlib.dumps(data).decode("utf-8")
+
+    def fake_codesign(self, entitlements_output="", verify_code=0):
+        """subprocess.run の差し替え。--verify と -d で返すものを分ける。呼ばれた引数は self.calls に残す"""
+        self.calls = []
+
+        def run(args, **kwargs):
+            self.calls.append(list(args))
+            if "--verify" in args:
+                return subprocess.CompletedProcess(
+                    args, verify_code, stdout="", stderr="" if verify_code == 0 else "invalid signature")
+            return subprocess.CompletedProcess(
+                args, 0, stdout=entitlements_output, stderr="Executable=/x/Lien.app/Lien\n")
+
+        return run
+
+    def check(self, entitlements_output, verify_code=0):
+        report = va.Report()
+        with contextlib.redirect_stdout(io.StringIO()):
+            with mock.patch.object(va.subprocess, "run", side_effect=self.fake_codesign(entitlements_output, verify_code)):
+                va.check_signed(report, "/x/Lien.app")
+        return report
+
+    def test_entitlements_are_requested_with_the_current_syntax(self):
+        with mock.patch.object(va.subprocess, "run", side_effect=self.fake_codesign(self.plist_text(self.GOOD))):
+            entitlements = va.read_entitlements("/x/Lien.app")
+        self.assertEqual(self.calls, [["codesign", "-d", "--entitlements", "-", "--xml", "/x/Lien.app"]])
+        self.assertEqual(entitlements, self.GOOD)
+        self.assertFalse([arg for call in self.calls for arg in call if arg.startswith(":")], "非推奨の ':-' は使わない")
+
+    def test_good_entitlements_have_no_errors_or_warnings(self):
+        report = self.check(self.plist_text(self.GOOD))
+        self.assertEqual((report.errors, report.warnings), (0, 0), report.markdown())
+        self.assertIn("aps-environment", report.markdown())
+
+    def test_missing_aps_environment_is_an_error(self):
+        report = self.check(self.plist_text({"com.apple.security.application-groups": ["group.com.example.lien"]}))
+        self.assertEqual(report.errors, 1, report.markdown())
+        self.assertIn("aps-environment", report.markdown())
+
+    def test_missing_app_group_is_an_error(self):
+        report = self.check(self.plist_text({"aps-environment": "development"}))
+        self.assertEqual(report.errors, 1, report.markdown())
+        self.assertIn("App Group", report.markdown())
+
+    def test_output_that_is_not_a_plist_is_only_a_warning(self):
+        # `--xml` を付けないときの、人向けの整形。plist ではないので読めない扱い(エラーにはしない)
+        pretty = "[Dict]\n\t[Key] aps-environment\n\t[Value]\n\t\t[String] development\n"
+        report = self.check(pretty)
+        self.assertEqual((report.errors, report.warnings), (0, 1), report.markdown())
+        with mock.patch.object(va.subprocess, "run", side_effect=self.fake_codesign(pretty)):
+            self.assertEqual(va.read_entitlements("/x/Lien.app"), {})
+
+    def test_no_output_is_only_a_warning(self):
+        report = self.check("")
+        self.assertEqual((report.errors, report.warnings), (0, 1), report.markdown())
+
+    def test_failed_verify_is_only_a_warning(self):
+        report = self.check(self.plist_text(self.GOOD), verify_code=1)
+        self.assertEqual((report.errors, report.warnings), (0, 1), report.markdown())
+
+    @unittest.skipUnless(sys.platform == "darwin" and shutil.which("codesign"), "macOS の codesign が必要")
+    def test_real_codesign_returns_the_entitlements_as_a_plist(self):
+        # 本物の codesign で確かめる(macOS のランナーで走る)。ad-hoc 署名した実行ファイルから、署名したエンタイトルメントが戻ること
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        target = os.path.join(tmp, "Lien")
+        shutil.copy("/usr/bin/true", target)
+        write_plist(os.path.join(tmp, "entitlements.plist"), self.GOOD)
+        signed = subprocess.run(
+            ["codesign", "--force", "-s", "-", "--entitlements", os.path.join(tmp, "entitlements.plist"), target],
+            capture_output=True, text=True)
+        if signed.returncode != 0:
+            self.skipTest(f"この環境では ad-hoc 署名ができない: {signed.stderr.strip()[:200]}")
+        self.assertEqual(va.read_entitlements(target), self.GOOD)
 
 
 class XcconfigReaderTests(unittest.TestCase):

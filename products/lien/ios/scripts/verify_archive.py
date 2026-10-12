@@ -147,6 +147,25 @@ def check_release_configuration(report, binary):
     )
 
 
+# codesign でエンタイトルメントを plist(XML)として標準出力へ出す引数(issue #66)。
+# 旧来の `--entitlements :-` は「パスに ':' を付ける指定は非推奨で、将来のリリースで使えなくなる」と警告される。
+# 現行の構文は `--entitlements -` に `--xml` を足したもの。`--xml` を付けないと、plist ではない人向けの整形
+# (`[Dict] [Key] …`)で出てくるので、読めなくなる(`Executable=…` の行は標準エラー出力へ出る)
+CODESIGN_ENTITLEMENTS_ARGS = ["--entitlements", "-", "--xml"]
+
+
+def read_entitlements(path):
+    """署名済みのコード(.app や実行ファイル)のエンタイトルメントを辞書で返す。読めなければ {}"""
+    result = subprocess.run(["codesign", "-d", *CODESIGN_ENTITLEMENTS_ARGS, path], capture_output=True, text=True)
+    if not result.stdout.strip():
+        return {}
+    try:
+        data = plistlib.loads(result.stdout.encode("utf-8"))
+    except Exception:  # noqa: BLE001 - plist でない出力(構文が合わない・署名がない)は「読めない」として扱う
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def check_signed(report, app):
     """署名済み archive の確認(想定外の挙動で止めないよう、問題は warning にとどめる)"""
     verify = subprocess.run(["codesign", "--verify", "--deep", "--strict", app], capture_output=True, text=True)
@@ -154,11 +173,7 @@ def check_signed(report, app):
         report.ok("codesign --verify", "署名は有効")
     else:
         report.warn("codesign --verify", (verify.stderr or verify.stdout).strip()[:300])
-    ent = subprocess.run(["codesign", "-d", "--entitlements", ":-", app], capture_output=True, text=True)
-    try:
-        entitlements = plistlib.loads(ent.stdout.encode("utf-8")) if ent.stdout.strip() else {}
-    except Exception:  # noqa: BLE001
-        entitlements = {}
+    entitlements = read_entitlements(app)
     if not entitlements:
         report.warn("署名のエンタイトルメント", "読み取れませんでした")
         return
