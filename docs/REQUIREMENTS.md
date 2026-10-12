@@ -235,11 +235,18 @@ invites        (token PK, from_user FK, created_at, expires_at, used_at?)
 
 ## 8. App Store 審査対策チェックリスト
 
+(2026-10-12 台帳化注記 / issue #30: 各項目に状態+参照を付記。チェックボックス自体は全消化までは `[ ]` のまま維持し、消化はissue #30 コミット②で行う)
+
 - [ ] レビューノートにテストペア2組のアカウント情報を記載
+      — 状態: **TBD(実データ投入は次段階で実行)**。匿名認証のため「アカウント情報」=招待コード+再現手順として記載する方針。ハーネス(`scripts/g1/seed-pair.sh`)・Supabaseバックエンドともに実装済み・稼働確認済み(2026-06-11完了)。審査専用ペアの作成実行自体は本タスクの文書化スコープ外のため未実施 / 参照: [marketing/review-notes.md §1.3](../products/lien/marketing/review-notes.md#13-test-pair-accounts-2-pairs-as-requested-by-app-review-guidance), issue #8
 - [ ] ペアなしでも基本動作する(ソロ状態)ことを審査ノートで説明
+      — 状態: **準備済み(文章済み)**。REQUIREMENTS §3.2「招待待ちでも使える」を根拠に説明文を作成済み。実機/TestFlightでの最終確認はT28(G3後)/ 参照: [marketing/review-notes.md §1.1](../products/lien/marketing/review-notes.md#11-solo-mode-works-without-a-pair-no-must-have-2-users-blocker), issue #28
 - [ ] 写真UGCの通報導線とブロック(ペア解消)を実装・規約記載
+      — 状態: **規約記載は済み/実装はT23待ち(未着手)**。terms.md第6条(通報)・第7条(ブロック=ペア解消)に記載済み。アプリ側のSettings実装・pair-dissolve Functionは未着手 / 参照: [marketing/terms.md:46-56](../products/lien/marketing/terms.md), [marketing/review-notes.md §1.4](../products/lien/marketing/review-notes.md#14-report-flow-and-blocking-ugc--guideline-12), issue #23
 - [ ] アカウント削除導線(設定内)
+      — 状態: **規約記載は済み/実装はT23待ち(未着手)**。terms.md第8条に記載済み。delete-account Function・設定画面UIは未着手 / 参照: [marketing/terms.md:58-61](../products/lien/marketing/terms.md), [marketing/review-notes.md §1.5](../products/lien/marketing/review-notes.md#15-account-deletion), issue #23
 - [ ] サブスク(v1.1): 価格・期間・解約方法の表記、復元ボタン
+      — 状態: **v1.0提出ではN/A**(v1.0は全機能無料提供・サブスク未導入。terms.md第3条3項に告知済み)。T33(#33)実装+G6(#44)課金セットアップ後に再チェックする / 参照: terms.md第3条, issue #33, issue #44
 
 ## 9. マイルストーン
 

@@ -169,3 +169,39 @@
 - 着手: issue #15 の「進め方(実行計画 2026-06-11)」10手順に従い実装開始。ユーザー指示によりスコープ拡張: T13/T14完了済みのため、計画が先送りしていた「ホームへの結線」も本タスク内でモック注入経由で実施する(つつくボタンの表示条件+リアクションUIの導線)。本番Supabaseへのデプロイ・実機push検証は対象外(モック注入のみ)
 - 事前調査で判明: migrations/0001_init.sqlに`nudges`/`reactions`テーブルとRLSが既に存在(新規マイグレーション不要)。`_shared/apns.ts`の`LienPushType`に`nudge`/`reaction`は既に含まれる。`checkin-cancel`のcore.ts/index.tsパターン(repo/pusher注入+薄いI/O層)を踏襲して`functions/nudge`・`functions/react`を新設する。config.tomlは関数ごとに`verify_jwt=false`を明記する既存慣習を確認(デプロイはしない)
 - 進め方: バックエンド(messages.ts拡張+nudge/react函数+deno test全緑)→commit1 → iOS(NudgeReactService+NudgeSheet+ReactionPicker+ホーム結線+Strings.swift追加+NudgeReactTests)→commit2→push→lien-ci/lien-ios CI緑確認→BACKLOG/DONE更新→issue完了コメント+close
+
+## 2026-10-12 13:32 (サブエージェント/レーンD docs) — T20準備: 実機E2Eチェックリスト+ランブック着手 (issue #20)
+- 着手: issue #20 の「進め方」コメント(2026-06-11記載)の手順1〜3(前倒し可・依存ゼロ分)に従い実装開始。本タスクは準備スライスのみ(実機2台でのE2E実施そのものはG0→T08→T11〜T19 close後の別セッション)。issue #20はクローズしない
+- 事前調査で判明: migrations 0001でテーブル名確定(users/pairs/pair_members/promises/checkins/streak_days/ticket_ledger/nudges/reactions/plants/invites)。チケット規則(free: grant2/cap2)・invite token形式(8桁英数、紛らわしい文字除外)・plant stage閾値(0/3/7/14/30/60日)・DEBUG用DeviceTokenDebugView(G1と同じpushトークン取得経路)を確認。e2e_reset.sqlの配置先はissueコメント指定の`products/lien/supabase/scripts/e2e_reset.sql`に従う(作成のみ・本番実行は一切しない)
+- 進め方: 12項目チェックリスト+ランブック+REQUIREMENTS §3.2〜3.9セルフ検証表付録をdocs/E2E-M1.mdに作成→e2e_reset.sql作成(トランザクション化・テストユーザー限定・警告コメント)→path-scoped commit→push.sh→lien-ci緑確認→BACKLOG該当行削除+DONE追記→issue #20へ「準備完了・実機待ち」コメント
+
+## 2026-10-12 13:37 (対話/メインエージェント) — T30準備: レビューノート草案+REQUIREMENTS §8台帳化 着手 (issue #30)
+- 着手: issue #30 の「進め方」コメント(2026-06-11記載)に従い開始。追加スコープ(オーケストレータ指示): review-notes.md に提出前チェック(App Privacy草案/年齢レーティング/Export Compliance/Support・Privacy URL/テストペア準備手順/UGC Guideline 1.2)もまとめる
+- 事前調査: REQUIREMENTS §8は現状5項目(行236-242、全未チェック)。terms.md第6-8条(通報/ブロック=ペア解消/アカウント削除)・privacy-policy.md §1(取得情報表)・CHECKLIST-G4.md(G4人間ゲート項目・GitHub Pages URL未確定)・project.yml(ITSAppUsesNonExemptEncryption: false 既設定)・seed-pair.sh/RUNBOOK.md(テストペア作成ハーネス)を確認済み
+- Apple公式ドキュメント(developer.apple.com)の年齢レーティング・Export Compliance該当ページの取得が404/断片のみ→ 詳細は「要確認」として記載し、断定しない方針で進める
+- 競合確認: 並行してT15(つつく+リアクション)/T20準備/T32準備が別エージェントで稼働中。本タスクは docs/REQUIREMENTS.md §8 のみ + marketing/review-notes.md(新規)に限定し、他タスクのファイルには触れない
+
+## 2026-10-12 13:40 (対話/Opus) — 残タスク洗い出し(Haiku)+方針レビュー(Opus)/ イラスト全面刷新 / 成長ルール再設計
+- 着手: ユーザー指示「今やるべきことをHaikuで洗い出し→方針案をレビュー」「イラストはダサすぎるので刷新」「成長曲線をユーザーがハマる仕組みに再考」
+- 体制: Workflow(Haiku max×2で洗い出し → Opus max×2で方針レビュー[クリティカルパス視点/品質・リスク視点]、並行して Opus max で成長ルール設計→敵対レビュー→改訂)。イラストはオーケストレータ(Opus)が直接制作
+- 競合回避: 別セッションが T15(ios/・functions)と T32準備(store_metadata・lien-ci.yml)を実行中 → 本作業は assets/plant/ 配下の新規フォルダと新規docのみ触る。REQUIREMENTS/snapshot.ts の改定は承認後
+- 技術判断: イラストは手描きピクセル/プロシージャルドット絵を廃し **SVGベクター**へ(xcassets は SVG をベクターのまま取込可。プレビューはヘッドレスChromeで透過PNG化できることを確認済み)
+
+## 2026-10-12 13:40 — migration 0002 本番適用+checkin 再デプロイ(ユーザー承認済み)
+- 着手: ユーザー @Ryoki63 が 2026-10-12 13:24 の対話で、COMMON.md の「Supabase 本番には触らない」ルールを**本タスク限定**(migration 0002 本番適用 + checkin 関数の再デプロイのみ)で明示解除。対象外(nudge/react 等の新規関数デプロイ・他 SQL・データ変更)は一切行わない。T08(#8)実行時の知見(Management API `/database/query` 経由・User-Agent 必須・ローカル CLI の Go バイナリ欠落)を踏襲して進める
+- 事前確認で判明: プロジェクト(ref lniheehfbtpfhglinfjm)が **status=INACTIVE(一時停止中)** だった(4か月アクセスなしによる自動停止と推測。database/query が `Connection terminated due to connection timeout` で失敗)。0002適用・checkin再デプロイを行うには稼働中である必要があるため、`POST /v1/projects/{ref}/restore` で復元をリクエスト(HTTP 200)。データ変更・SQL実行は未実施。復元完了をポーリング中
+- 復元完了: 約4分で `status=ACTIVE_HEALTHY` に到達(COMING_UP→RESTORING→ACTIVE_HEALTHY)。合わせて functions 一覧(Management API)で既存8関数(checkin/checkin-cancel/snapshot/invite-create/invite-accept/close-day/grant-tickets/promise-set)が全て ACTIVE・T08/T12時点のバージョンのままであることを確認(T15等の新規関数はまだ本番に存在しない=指示の前提と一致)
+- 事前確認結果(すべて読み取りのみ・Management API `/database/query`): `supabase_migrations.schema_migrations` は 0001(name=init, statements=null)のみ→**0002未適用**。`storage.objects` の既存ポリシーは `photos_select_pair_member`(SELECT, authenticated)のみ→insert/updateポリシーはまだ無い。`photos` バケットは存在(public=false)。`public.is_active_pair_member(uuid)` は存在。`public.is_valid_pair_photo_upload` は存在しない(0002未適用の確証)。→ 0002 の適用に進む
+
+## 2026-10-12 13:39 (サブエージェント/assets) — #49 フェーズ2第1段: 植物スプライトF本制作(48×64・13枚) 着手
+- 着手: issue #49(G2決定済み: スタイルF「モダンレトロ」)に従い、現行13枚構成(土+5段階×normal/happy+sad2)をFスタイル・48×64で本制作しv0プレースホルダを差し替える
+- 事前調査: v3_drafts/style_f/gen.py(6キーフレーム: soil/sprout/mid/late/final_normal/final_happy、幾何計算プロシージャル描画・輪郭自動抽出・3トーンセルシェード)を精読。既存13枚の対応=sprout→stage1(芽)/mid→stage2(双葉)/late→stage4(つぼみ、蕾あり)/final→stage5(開花、花あり)。stage3(若葉)はFの6キーフレームに無いためmid↔late間の中間形として新規設計が必要
+- 設計方針: gen_sprites.pyを全面書き換え(F方式=楕円/ブロブ+ミラー対称+輪郭自動抽出)。段階定義は`GROWTH_STAGES`データ配列(stem/leaf/body/bud/flower/faceパラメータの辞書)で保持し将来10段階拡張に対応。happy=表情+キラキラ、sad=表情(への字)+葉がわずかに下向き+汗ひとつぶ1点(罰なし原則: 色・サイズは変えない)
+- リスク確認: 新解像度48×64はアスペクト比3:4(旧16×24は2:3)。iOS PixelImage.swift/PlantSprite.swiftはpixelWidth=16/pixelHeight=24をハードコードしフレームサイズを決定(.resizable()のみでaspectRatio指定なし)→ 差し替えると表示が歪む(非均等拡大)懸念があるため**Swiftコードは触らず最終報告で指摘**する方針
+- **migration 0002 本番適用 完了**: `begin; <0002のSQL全文>; insert into supabase_migrations.schema_migrations(version, name) values ('0002','photo_storage_policies'); commit;`(0001の記録行 `{version:'0001', name:'init', statements:null}` と同じ列構成に合わせ version/name のみ指定)を Management API `/database/query` で実行(HTTP 201・エラー無し)。事後確認: `schema_migrations` に0002行が追加/ `storage.objects` ポリシーに `photos_insert_pair_member`(INSERT)・`photos_update_pair_member`(UPDATE)が追加(既存の `photos_select_pair_member` も健在)/ `public.is_valid_pair_photo_upload(text)` が security definer 関数として存在。データ変更は無し(DDL+ポリシー+migration履行のみ)
+- 節目(イラスト): v4「タネの子」初版を制作(products/lien/assets/plant/v4_drafts/)。鉢に住む大福型のキャラの頭から植物が育つ構成(体・顔は全段階共通=愛着の連続性)/ 双葉2枚=ふたり / 最終形は2本の茎がハートを描く「二輪咲き」/ ソロ時は鉢のふちから寝顔がのぞく(ペア成立→初チェックインで目覚める=招待動機)。13枚の契約名(PlantSprite.swift)を維持したドロップイン構成。目視QC 4回で修正(体の形・鉢の比率・茎への葉の付き方・寝顔・花びら)。ウィジェット実寸 96px/48px で判読性を確認
+- 節目(アイコン): 同キャラで新アイコン案を制作(空色背景を選定。杏・ミントも比較用に保存)
+- checkin 再デプロイ方法の選定: ローカル supabase CLI(`~/.local/bin/supabase`)は shim で、同梱の `supabase-go` 実バイナリが欠落していたため T08 と同じ事象を再現(`Could not find the supabase-go binary`)。CLI自体のエラーメッセージが案内する手順どおり、公式リリースタグ v2.105.0 の `supabase_2.105.0_darwin_arm64.tar.gz` を GitHub Releases から取得・展開(`~/.local/share/supabase/`)して `supabase-go` を補完→ `PATH` に追加した CLI で `supabase projects list` が成功(認証確認)。これで lien-deploy.yml(全8関数)を使わずに `checkin` 単体だけをデプロイできる見込み
+- **checkin 再デプロイ 完了**: `~/.local/share/supabase/supabase functions deploy checkin --project-ref lniheehfbtpfhglinfjm`(cwd=products/lien, env に SUPABASE_ACCESS_TOKEN)で実行。アップロードされたアセットは checkin/index.ts・core.ts と _shared/{apns,snapshot,streak,messages}.ts のみ(他関数には触れていない)。Management API の functions一覧で確認: `checkin` だけ v1→**v2**、他7関数(checkin-cancel/snapshot/invite-create/invite-accept/close-day/grant-tickets/promise-set)は v1 のまま不変。lien-deploy.yml(全8本デプロイ)は使わずに済んだ
+- 自己検証(サブエージェント委任は深度制限で不可→自ら実施): §8全5項目↔review-notes.md §1.1-1.5の対応、terms.md第6-8条/privacy-policy.md§1,9/CHECKLIST-G4.md/project.yml:54/migrations 0001のフィールド名/issue #8,23,28,33,44実在性を全てgrep/読み取りで照合し一致を確認。途中、テストペア作成の前提条件記述に不正確な点(G0/T08完了状況の誤認)を発見→ JOURNAL内T08実行ログ(2026-06-11)を再確認し「Supabaseバックエンド自体は完了済み・残るG0項目はApple Developer Program加入のみ」という正確な状態に両ファイルを修正。docs/REQUIREMENTS.md差分は§8のみ1 hunk・追記7行(削除0)でスコープ違反なしを確認。ios/・supabase/functions/等の禁止ファイルは一切変更していないことを確認
+- 結果: review-notes.md新規作成(§1.1-1.5=§8の5項目に1:1対応、§2.1-2.6=追加スコープ6項目)+ docs/REQUIREMENTS.md §8台帳化(状態+参照を5項目全てに付記)完了。TBD5件(テストペア実データのみ・意図的)・要確認19件(Apple仕様の断定回避)。commit→push前の最終状態
