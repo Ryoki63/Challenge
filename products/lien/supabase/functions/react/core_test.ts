@@ -1,5 +1,7 @@
 // core_test.ts — react/core.ts の deno test(リポジトリ/プッシャーはモック。ネットワーク不要)
-// 正本: docs/REQUIREMENTS.md §3.8(リアクション)/ docs/DESIGN.md §5.3
+// 正本: docs/REQUIREMENTS.md §3.8(リアクション)/ docs/DESIGN.md §5.3 / docs/TASKPLAN.md §9.4(T15 の行)
+//   - push は最初のリアクションの1回だけ(付け替え・同一スタンプの再送では送らない)
+//   - 同梱する snapshot の「今日」は相手(受信者)のタイムゾーンで決まる
 
 import {
   handleReact,
@@ -8,6 +10,7 @@ import {
   type ReactRepo,
 } from "./core.ts";
 import type {
+  PairSnapshot,
   SnapshotCheckinRow,
   SnapshotPairRow,
   SnapshotPlantRow,
@@ -220,7 +223,7 @@ Deno.test("react: 同一スタンプの再送は冪等(200 changed:false)で再p
   assertEquals(sent2.length, 0, "同一スタンプの再送はpushしない");
 });
 
-Deno.test("react: 別スタンプへの変更は200 changed:true・再push(新しいスタンプの文言)", async () => {
+Deno.test("react: 別スタンプへの付け替えは 200 changed:true・上書きするが push は送らない(最初の1回だけ)", async () => {
   const world = makeWorld();
   const { pusher } = makePusher("ok");
   await handleReact(deps(world, pusher), {
@@ -239,16 +242,130 @@ Deno.test("react: 別スタンプへの変更は200 changed:true・再push(新�
     stamp: "🔥",
   });
   assertEquals(result.status, 200);
+  // changed は「保存内容が変わったか」。付け替えは true(push の有無とは別)
   if (result.status === 200) assertEquals(result.body.changed, true);
-  assertEquals(sent2.length, 1, "スタンプ変更時は再pushする");
-  const payload = sent2[0].payload as { aps: { alert: { body: string } } };
-  assert(payload.aps.alert.body.includes("🔥"));
+  assertEquals(sent2.length, 0, "付け替えでは push を送り直さない");
   assertEquals(
     world.reactions.length,
     1,
     "行は更新であり追加ではない(UNIQUE制約と一致)",
   );
-  assertEquals(world.reactions[0].stamp, "🔥");
+  assertEquals(world.reactions[0].stamp, "🔥", "スタンプは上書きされる");
+});
+
+Deno.test("react: 付け替え・再送を何度繰り返しても、push は最初の1回だけ", async () => {
+  const world = makeWorld();
+  const { sent, pusher } = makePusher("ok"); // 全リクエストで同じ pusher を使い、総数を数える
+  const results = [];
+  for (const stamp of ["❤️", "🔥", "🔥", "❤️", "👏", "👏", "🔥"]) {
+    results.push(
+      await handleReact(deps(world, pusher), {
+        userId: "user-a",
+        checkinId: "checkin-b-1",
+        stamp,
+      }),
+    );
+  }
+  assertEquals(sent.length, 1, "push は最初のリアクションの1回だけ");
+  const payload = sent[0].payload as { aps: { alert: { body: string } } };
+  assert(
+    payload.aps.alert.body.includes("❤️"),
+    "その1回は最初のスタンプの文言",
+  );
+  // changed: 新規 true → 付け替え true → 同じスタンプの再送 false → 付け替え true ...
+  assertEquals(
+    JSON.stringify(
+      results.map((r) => (r.status === 200 ? r.body.changed : null)),
+    ),
+    JSON.stringify([true, true, false, true, true, false, true]),
+  );
+  assertEquals(world.reactions.length, 1);
+  assertEquals(world.reactions[0].stamp, "🔥", "最後のスタンプが残る");
+});
+
+Deno.test("react: 最初のリアクションの push が失敗しても、付け替えで送り直さない(自己修復経路前提)", async () => {
+  const world = makeWorld();
+  const { sent: sentFail, pusher: failing } = makePusher("fail");
+  await handleReact(deps(world, failing), {
+    userId: "user-a",
+    checkinId: "checkin-b-1",
+    stamp: "❤️",
+  });
+  assertEquals(sentFail.length, 1, "最初の1回は送る(結果は ok:false)");
+  const { sent: sentLater, pusher: working } = makePusher("ok");
+  await handleReact(deps(world, working), {
+    userId: "user-a",
+    checkinId: "checkin-b-1",
+    stamp: "🔥",
+  });
+  assertEquals(
+    sentLater.length,
+    0,
+    "最初の1回を過ぎたら、失敗していても送らない",
+  );
+});
+
+Deno.test("react: 相手に届く snapshot の「今日」は相手のタイムゾーンで決まる(送り手とずれる TZ のペア)", async () => {
+  // NOW = 2026-06-10T03:00:00Z。東京は 6/10 12:00、ホノルル(UTC-10)は 6/9 17:00 で、日付が1日ずれる。
+  // 送り手 A がリアクションし、push に載る snapshot は受信者 B 視点。B の todayMeDone / todayPartnerDone は
+  // 「B の日付」で決まる。送り手の日付(A の今日)を使うと、この組み合わせは反転してしまう
+  const cases = [
+    {
+      name: "相手が日付の遅れる側(送り手 東京・相手 ホノルル)",
+      senderTz: "Asia/Tokyo",
+      partnerTz: "Pacific/Honolulu",
+      senderToday: "2026-06-10",
+      partnerToday: "2026-06-09",
+    },
+    {
+      name: "相手が日付の進む側(送り手 ホノルル・相手 東京)",
+      senderTz: "Pacific/Honolulu",
+      partnerTz: "Asia/Tokyo",
+      senderToday: "2026-06-09",
+      partnerToday: "2026-06-10",
+    },
+  ];
+  for (const c of cases) {
+    const sender = { ...userA, timezone: c.senderTz };
+    const partner = { ...userB, timezone: c.partnerTz };
+    const world = makeWorld({
+      users: [sender, partner],
+      streakDays: [],
+      checkins: new Map([
+        // 相手 B は「B の今日」にチェックイン済み(= B 視点の todayMeDone)
+        [`user-b|${c.partnerToday}`, { photoPath: null }],
+        // 送り手 A は「A の今日」にチェックイン済み。B の今日の分ではない(= todayPartnerDone にならない)
+        [`user-a|${c.senderToday}`, { photoPath: null }],
+      ]),
+    });
+    const { sent, pusher } = makePusher("ok");
+    const result = await handleReact(deps(world, pusher), {
+      userId: "user-a",
+      checkinId: "checkin-b-1",
+      stamp: "❤️",
+    });
+    assertEquals(result.status, 200, c.name);
+    assertEquals(sent.length, 1, c.name);
+    const payload = sent[0].payload as {
+      aps: { alert: { title: string } };
+      lien: { snapshot: PairSnapshot };
+    };
+    const snapshot = payload.lien.snapshot;
+    assertEquals(sent[0].deviceToken, "token-b", c.name);
+    assertEquals(payload.aps.alert.title, "あきら", c.name);
+    assertEquals(snapshot.partnerName, "あきら", `${c.name}: 受信者 B 視点`);
+    assertEquals(
+      snapshot.todayMeDone,
+      true,
+      `${c.name}: B の今日(${c.partnerToday})の B のチェックイン`,
+    );
+    assertEquals(
+      snapshot.todayPartnerDone,
+      false,
+      `${c.name}: B の今日(${c.partnerToday})には A のチェックインが無い`,
+    );
+    assertEquals(snapshot.plantMood, "fidget", c.name);
+  }
 });
 
 Deno.test("react: 自分自身のチェックインには403 not_partner", async () => {

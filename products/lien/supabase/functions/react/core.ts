@@ -5,8 +5,13 @@
 // 仕様の要点(REQUIREMENTS §3.8):
 //   - 相手のチェックイン(と写真)にスタンプ1つ(❤️🔥👏😂🥹💪)。自由入力は無し(語彙外は400)
 //   - 1チェックインにつき1人1つ(reactions テーブルの UNIQUE(checkin_id, from_user))。
-//     同じスタンプの再送は 200 冪等(push を再送しない)。別スタンプへの変更は上書き+再push
+//     別スタンプへの付け替えは上書きできる
+//   - **相手への push は、そのチェックインへの最初のリアクションの1回だけ**(2026-10-12・TASKPLAN §9.4)。
+//     付け替え(別スタンプへの上書き)でも、同じスタンプの再送でも、push は送り直さない
+//     (付け替えのたびに通知が飛ぶと通知過多になる。相手の画面のスタンプは次に開いたときに更新される)
 //   - 通知は「自分の名前名義」(= リアクションした側の名前。alert.title = pushDisplayName(自分))
+//   - 同梱する snapshot は**受信者(相手)視点**で、「今日」は**相手のタイムゾーン**で決まる
+//     (loadSnapshotForUser は対象ユーザーの users.timezone で date_local を出す。送り手の日付は使わない)
 //   - 自分のチェックイン、またはアクティブなペアでない相手のチェックインへは不可(403)
 
 import {
@@ -65,7 +70,11 @@ export interface ReactRequest {
 export type ReactResult =
   | {
     status: 200;
-    /** changed: 新規作成 or スタンプ変更で push した場合 true。同一スタンプ再送(無変更)は false */
+    /**
+     * changed: **保存内容が変わったか**。新規作成 or 別スタンプへの付け替えなら true、
+     * 同じスタンプの再送(無変更)なら false。push を送ったかどうかとは別
+     * (push は新規作成のときだけ。付け替えは changed: true でも push しない)
+     */
     body: { changed: boolean };
   }
   | { status: 400 | 403 | 404 | 409; body: { error: string } };
@@ -105,22 +114,30 @@ export async function handleReact(
     return { status: 403, body: { error: "not_partner" } };
   }
 
-  // 5. 冪等性: 同一スタンプの再送は push せずに 200(通知の二重発火防止)
+  // 5. 既存のリアクション(最初の1回かどうかと、保存内容が変わるかの判定に使う)
   const existing = await deps.repo.getReaction({
     checkinId: req.checkinId,
     fromUserId: req.userId,
   });
-  const changed = !existing || existing.stamp !== req.stamp;
+  const isFirst = existing === null;
+  // 保存内容が変わるか(新規 or 付け替え)。同じスタンプの再送は変わらない=false(冪等)
+  const changed = isFirst || existing.stamp !== req.stamp;
 
+  // スタンプの付け替えは許す(上書き)。同じスタンプの再送は実質 no-op の upsert
   await deps.repo.upsertReaction({
     checkinId: req.checkinId,
     fromUserId: req.userId,
     stamp: req.stamp,
   });
 
-  // 6. 相手(チェックインの持ち主)へ可視push。新規 or スタンプ変更のときだけ送る
-  if (changed && pair.partner.pushToken) {
+  // 6. 相手(チェックインの持ち主)へ可視push。**最初のリアクションの1回だけ**送る。
+  //    付け替え・同一スタンプの再送では送らない(通知過多を避ける — TASKPLAN §9.4)。
+  //    ※ 同じユーザーが同時に2回「最初の」リアクションを送ると、双方が existing=null を見て
+  //      2回送りうる(連打の競合)。端末側でボタンを押下中に無効化する前提で許容する
+  if (isFirst && pair.partner.pushToken) {
     try {
+      // 受信者(相手)視点。todayLocalOverride は渡さない = 「今日」は相手の timezone で決まる
+      // (送り手と相手のタイムゾーンが違っても、相手の日付で todayMeDone / todayPartnerDone が出る)
       const partnerSnapshot: PairSnapshot = await loadSnapshotForUser(
         deps.repo,
         { userId: pair.partner.id, now: now() },
