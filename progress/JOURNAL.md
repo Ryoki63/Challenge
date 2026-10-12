@@ -141,6 +141,9 @@
 - 節目: **T12完了**(commit 8427dec・deno 153件緑・iOS CI緑・ともに初回パス)→ #12 close。**promise-set を本番デプロイ**(live 8本)。続けてT13(ホーム画面)へ — トーン未定のためv0スプライトをプレースホルダ使用(G2確定後に差替)
 - 節目: **T13完了**(commit 24bc37b)→ #13 close。CI赤1回: PlantAssetsカタログ追加でactool初起動→xcodegen既定のAppIcon要求未充足 → icon_1024.pngで単一サイズAppIcon追加(f01c1a4)→ 緑。ホーム画面+PlantSprite一元解決+テスト16件
 - 続行: レーンA次=T14(チェックインフロー+オフラインキュー+写真+当日取消。migration 0002オーナー)に着手
+- 節目: **T14完了**(commit 4d90953・deno 157緑・iOS CI緑・初回パス)→ #14 close。オフラインキュー(相殺マージ)・写真2048px+サムネ・和暦バグ事前修正
+- 保留: **migration 0002の本番適用+checkin再デプロイは権限分類器により停止** — 新規スキーマ変更はT08立ち上げ承認の範囲外との判断。ユーザーに承認を確認する(承認後に適用 or 本人がSQL Editorで実行)
+- 続行: レーンA次=T15(つつく+リアクション。LienApp結線数行も冒頭で実施)に着手
 
 ## 2026-06-11 (サブエージェント) — T08準備①: デプロイ自動化+G1計測ハーネス (#8/#50 レーンB)
 - 着手: config.toml / deploy.sh / lien-deploy.yml / g1ハーネス(seed-pair.sh, measure.sh, RUNBOOK.md) / .env.example を整備する(実行はしない。git操作はオーケストレータ)
@@ -150,3 +153,11 @@
 - 検証: bash -n 3本OK / config.toml=deno @std/toml でパース+内容assert / lien-deploy.yml=deno @std/yaml でパース+dispatch専用assert / deploy.sh DRY_RUN実走(CLI 2.105.0検出・トークン未投入の停止メッセージ正常) / 集計・JSONヘルパをpython3.9で単体実行 / 既存CI干渉なし(lien-ios=ios/**のみ、lien-deployは手動専用、.gitignoreは.env除外済みで変更不要)
 - 注意点: ローカルmacの supabase コマンドはshimのみで supabase-go 実体欠落 → ローカルdeployは要再インストール(CIは setup-cli で問題なし)
 - 結果: 完了(git操作なし。コミットはオーケストレータ)
+
+## 2026-10-12 13:20 (対話) — 4か月ぶり再開: 再計画(目標=1月新年需要前のリリース)+Wave 4 実行再開
+- 着手: ユーザー指示「ローンチまでのタスクを洗い出した方針で進める。実行とサポートを」。G0(Apple Developer加入)はユーザーが別途並走中
+- 状況確認: 最終コミット 2026-06-12(T14)。未コミットはJOURNAL 3行のみ(T14完了・migration 0002保留の記録)→本エントリと一緒にcommit。CIは直近全緑
+- 方針変更: Pairy終了(06-30)前のG3は失効 → **新目標 = 1月の新年需要前にApp Storeリリース+課金導線の準備**。クリティカルパスは変わらず G0 → T08残(APNs+G1) → Live結線 → T20 → T27 → T28 → G3 → G5
+- 環境メモ: ローカルにXcode無し(CLTのみ)→ iOS検証は lien-ios CI のみ。gh の既定アカウントは push 権限のない ryoki-kojima → gh 操作は `GH_TOKEN=$(gh auth token --user Ryoki63)` で行う
+- 実行体制: レーンA(ios-serial)はT15から1タスク=1サブエージェント(Sonnet)で直列、レーンC(docs準備)は並列。git操作はファイル指定で行い `git add -A` は使わない(並列作業の巻き込み防止)
+- 人間判断待ち: G2(#40 スタイルE/F/G選定)、migration 0002 本番適用+checkin再デプロイの承認
