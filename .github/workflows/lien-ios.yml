@@ -5,6 +5,8 @@
 # Xcode は products/lien/ios/.xcode-version の版に固定(lien-release と共通 — issue #28)。
 # 2026-04-28 以降、App Store Connect へのアップロードは Xcode 26 / iOS 26 SDK 以上が必須なので、
 # テストも同じ SDK で回して「TestFlight に上げるビルドと同じコンパイラで通る」ことを毎回確かめる。
+# XcodeGen も版と SHA-256 を固定する(ios/scripts/install-xcodegen.sh。lien-release と共通 — issue #66)。
+# action は commit SHA で固定する(タグは付け替えられる。lien-deploy と同じ方針)。
 name: lien-ios
 
 on:
@@ -22,6 +24,9 @@ on:
       - "products/lien/assets/plant/peek_offsets.json"
       # アプリアイコンの正本。ios の AppIcon.appiconset と同一であることを ReleaseReadinessTests が検査する(issue #28)
       - "products/lien/assets/icon/**"
+      # 罰なし文言の lint(StringsReviewTests)は、サーバー側の禁止ワード BANNED_PATTERN をこのファイルから読み、
+      # Swift 版(PunishmentFreeLint)と一致しているかを検査する。サーバー側だけの変更でも、その整合検査を走らせる(issue #66)
+      - "products/lien/supabase/functions/_shared/messages_test.ts"
       - ".github/workflows/lien-ios.yml"
   workflow_dispatch:
 
@@ -42,23 +47,22 @@ jobs:
       run:
         working-directory: products/lien/ios
     steps:
-      # actions は commit SHA で固定する(タグは付け替えられる。lien-deploy と同じ方針)
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # ios/.xcode-version の Xcode に切り替え、iOS 26 SDK 以上であることを確かめる(lien-release と共通)
       - name: Select Xcode (pinned) + iOS 26 SDK check
         run: scripts/select-xcode.sh
 
-      # リリース用スクリプト(Supabase 接続情報の検証・archive の検査・Package.resolved の比較)の単体テスト。数秒
+      # リリース用スクリプト(Supabase 接続情報の検証・archive の検査・Package.resolved の比較・XcodeGen の導入・
+      # シミュレータの起動・リリース前の CI 確認・必須理由 API の棚卸し)の単体テスト。数秒
       - name: Release script unit tests
         run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
 
-      - name: Install XcodeGen
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: "1"
-          HOMEBREW_NO_INSTALL_CLEANUP: "1"
-        run: brew install xcodegen
+      # XcodeGen は brew の「その時点の最新」ではなく、版と SHA-256 を固定して入れる(lien-release と共通)。
+      # 版は step summary にも出す。上げるときは scripts/install-xcodegen.sh の冒頭の手順に従う(issue #66)
+      - name: Install XcodeGen (pinned)
+        run: scripts/install-xcodegen.sh
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -68,20 +72,31 @@ jobs:
       - name: Pin Swift packages (Package.resolved)
         run: scripts/pin-packages.sh
 
+      # シミュレータの起動を、ビルド・テストから切り離して所要を見えるようにする(issue #66)。
+      # Build & test が 10〜13 分に伸びたとき、ログには「ビルドが終わってからテストが始まるまでの 2〜8 分の空白」があった。
+      # xcodebuild が自分でシミュレータを起動して待っていた時間で、ステップの内訳には出てこなかった。
+      # ここで起動して待てば、起動だけの所要がこのステップの時間とジョブサマリに出る。次のステップは同じ 1 台(UDID)を使う
+      - name: Boot the iOS simulator (iPhone 17)
+        id: simulator
+        timeout-minutes: 15
+        run: python3 scripts/boot_simulator.py "iPhone 17" --github-output "$GITHUB_OUTPUT" --summary "$GITHUB_STEP_SUMMARY"
+
       # xcodebuild test はビルドも行うため、ビルドとテストを1ステップに統合して
       # macOS 分を節約する(T07)。LienTests は Lien スキームの testTargets(project.yml)。
-      # destination の "iPhone 17" は macos-26(Xcode 26.x)の標準シミュレータ
-      # (iPhone 16 は macos-26 のイメージに無い)。OS バージョンは指定せずランナー既載の最新ランタイムに委ねる
+      # destination は、上のステップで起動した "iPhone 17"(macos-26 / Xcode 26.x の標準シミュレータ。iPhone 16 は
+      # macos-26 のイメージに無い)を UDID で指す。OS バージョンは指定せず、ランナー既載の最新ランタイムの 1 台
       #
       # -resultBundlePath: テストが XCTAttachment で保存した植物の実描画の一覧画像(PlantRenderTests。issue #56)を、
       # あとで xcresult から取り出すため
       - name: Build & test (Lien scheme, iOS Simulator)
+        env:
+          SIMULATOR_UDID: ${{ steps.simulator.outputs.udid }}
         run: |
           set -o pipefail
           xcodebuild test \
             -project Lien.xcodeproj \
             -scheme Lien \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination "platform=iOS Simulator,id=${SIMULATOR_UDID}" \
             -onlyUsePackageVersionsFromResolvedFile \
             -resultBundlePath "$RUNNER_TEMP/Lien.xcresult" \
             CODE_SIGNING_ALLOWED=NO

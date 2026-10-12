@@ -6,7 +6,11 @@
 #       Xcode 26 / iOS 26 SDK・版とビルド番号・AppIcon・PrivacyInfo.xcprivacy・Info.plist の Supabase 接続情報。
 #       署名つきの経路(クラウド署名 archive・書き出し+アップロード)は、実行せずコマンドだけを表示する
 #   dry_run = false      : ASC API キーでクラウド署名して archive → 書き出し → TestFlight へアップロード。
-#       下の secrets が 1 つでも未登録なら、最初のステップで理由を出して止まる(黙ってスキップしない)
+#       下の secrets が 1 つでも未登録なら、最初のステップで理由を出して止まる(黙ってスキップしない)。
+#       続けて、このコミット(同じ SHA)の lien-ios と lien-ci が success かを確かめ、緑でなければ止まる(issue #66)。
+#       lien-ios は ios などが変わった push でだけ起動するので、ios 以外だけのコミットで実行が無いときは、
+#       Actions の lien-ios を手動実行してから、もう一度この workflow を実行する。
+#       dry_run = true でも同じ確認を通して結果を表示する(止めない)ので、権限や API の呼び方の不具合は dry-run で見つかる
 #
 # 必要な GitHub secrets(リポジトリ Settings > Secrets and variables > Actions。G0 のあとに人間が登録 — ios/README.md):
 #   ASC_KEY_P8          App Store Connect API キー(.p8)の中身(BEGIN PRIVATE KEY … 。base64 にしたものでも可)
@@ -17,10 +21,11 @@
 #   SUPABASE_ANON_KEY   anon(publishable)キー。service_role / secret キーは入れない(検査で拒否する)
 #
 # ビルド番号(CFBundleVersion)= github.run_number。この workflow を作り直す(ファイル名を変える)と 1 に戻るので注意。
-# Xcode は products/lien/ios/.xcode-version(lien-ios と共通)。
+# Xcode は products/lien/ios/.xcode-version(lien-ios と共通)。XcodeGen は版と SHA-256 を固定する
+# (ios/scripts/install-xcodegen.sh。lien-ios と共通 — issue #66)。
 #
 # 【action は commit SHA で固定する】署名キーを渡す workflow なので、lien-deploy と同じ方針。第三者の action を足さない
-# (xcodegen は brew、署名と書き出しは xcodebuild、検査は ios/scripts の Python)
+# (xcodegen は公式リリースの zip を SHA-256 で照合して入れる、署名と書き出しは xcodebuild、検査は ios/scripts の Python)
 name: lien-release
 
 on:
@@ -37,6 +42,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read # リリース前に、同じコミットの lien-ios / lien-ci が success かを gh api で読む(issue #66)
 
 jobs:
   archive:
@@ -51,7 +57,7 @@ jobs:
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -103,6 +109,19 @@ jobs:
             [ "$has_supabase" = "true" ] || echo "::notice::Supabase の secrets が未登録のため、archive の接続情報は空です(検査は警告にとどめます)"
           fi
 
+      # TestFlight に上げるのは、このコミット(同じ SHA)で lien-ios と lien-ci が success のものだけ(issue #66)。
+      #   dry_run=false: success でなければここで止める(実行中・失敗・実行なし・API を読めない、のどれも止める)
+      #   dry_run=true : 結果を表示するだけで止めない。この経路を毎回通すので、権限(actions: read)や API の呼び方の
+      #                  不具合は、本番のリリースより前に dry-run で見つかる
+      # lien-ios は ios などが変わった push でだけ起動する。このコミットで起動していなければ、Actions の lien-ios を手動実行してから
+      - name: Preflight (CI is green on this commit)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=(--repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA" --workflow lien-ios.yml --workflow lien-ci.yml --summary "$GITHUB_STEP_SUMMARY")
+          if [ "$DRY_RUN" != "true" ]; then args+=(--require); fi
+          python3 scripts/ci_status.py "${args[@]}"
+
       # ios/.xcode-version の Xcode に切り替え、iOS 26 SDK 以上であることを確かめる(lien-ios と共通)
       - name: Select Xcode (pinned) + iOS 26 SDK check
         run: scripts/select-xcode.sh
@@ -110,11 +129,9 @@ jobs:
       - name: Release script unit tests
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
-      - name: Install XcodeGen
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: "1"
-          HOMEBREW_NO_INSTALL_CLEANUP: "1"
-        run: brew install xcodegen
+      # XcodeGen は版と SHA-256 を固定して入れる(lien-ios と共通。版は step summary にも出る — issue #66)
+      - name: Install XcodeGen (pinned)
+        run: scripts/install-xcodegen.sh
 
       # Supabase の接続情報を Secrets.xcconfig(gitignore 済み)にして archive の Info.plist へ入れる(DESIGN §7)。
       # 形式を検証し、service_role / secret キーなら拒否する。値は表示しない

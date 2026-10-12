@@ -1,5 +1,11 @@
 # Lien CI — deno test(DESIGN §8: ubuntu 等倍・全 push で起動)
 # iOS ビルドジョブは T06 で別ワークフロー(products/lien/ios/** 変更時のみ起動)として追加する
+#
+# ジョブ: deno-test(Edge Functions とその契約フィクスチャ)/ ops-tests(ファイルを読む運用の静的テスト — issue #66)/
+#         plant-assets(植物の SVG レイヤーの再生成と検査)/ store-metadata(ストア文言の文字数と禁止ワード)
+#
+# action は commit SHA で固定する(タグは付け替えられる。lien-deploy・lien-ios などと同じ方針)。
+# 更新するときは、新しいタグが指す commit を確かめてから(gh api repos/<owner>/<repo>/commits/<tag> --jq .sha)差し替える
 name: lien-ci
 
 on:
@@ -15,10 +21,10 @@ jobs:
         working-directory: products/lien/supabase/functions
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: v2.x
 
@@ -34,6 +40,26 @@ jobs:
           deno run --allow-read ../../contracts/tools/generate.ts --check
           deno test --allow-read ../../contracts/tools/
 
+  # 運用(products/lien/scripts/ops/)の静的テスト。cron の式・「JST の1日だけ」の条件・呼び先・鍵・本文(migration の文面を検査)、
+  # push を送る Function の push_env の読み忘れ(index.ts / core.ts と _shared の文面を検査)、本番 cron の監視の判定ロジック。
+  # 上の `deno test`(deno-test ジョブ)は --allow-read を付けないので、ファイルを読むこれらはここで別に回す。
+  # 以前は lien-cron-watch の中にあって、関係するファイルが変わったときだけ回っていた。全 push で回すためにここへ統合した(issue #66)
+  ops-tests:
+    name: ops tests (cron static + push_env static + check logic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+
+      - name: Run ops tests
+        run: deno test --allow-read products/lien/scripts/ops/
+
   plant-assets:
     name: plant layers (generate + verify)
     runs-on: ubuntu-latest
@@ -42,7 +68,7 @@ jobs:
         working-directory: products/lien/assets/plant
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # ツールの単体テスト(生成の決定論・verify が禁止要素やレイヤーの過不足を見逃さないこと・重ね順)。標準ライブラリだけ
       - name: Tool unit tests
@@ -85,7 +111,7 @@ jobs:
         working-directory: products/lien/marketing
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: "Verify store_metadata/ja (T32準備: 文字数制限 + 罰なし原則)"
         run: python3 tools/verify_metadata.py

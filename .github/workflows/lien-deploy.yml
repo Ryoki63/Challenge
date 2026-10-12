@@ -9,7 +9,7 @@
 # 【action は commit SHA で固定する】この workflow は全権の SUPABASE_ACCESS_TOKEN と DB パスワードを渡す。
 #   リポジトリは公開で、タグやブランチ(v4・v1 など)は後から別のコミットに付け替えられる。第三者の action が
 #   細工されると、トークンやパスワードが流出しうる。そのため SHA で固定し、末尾のコメントにバージョンを書く。
-#   更新するときは新しいバージョンのタグが指す commit を確かめてから(gh api repos/<owner>/<repo>/git/ref/tags/<tag>)差し替える
+#   更新するときは新しいバージョンのタグが指す commit を確かめてから(gh api repos/<owner>/<repo>/commits/<tag> --jq .sha)差し替える
 name: lien-deploy
 
 on:
@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
