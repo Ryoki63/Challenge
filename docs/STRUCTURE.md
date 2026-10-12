@@ -101,7 +101,7 @@ Lien のドキュメント群。**矛盾したら REQUIREMENTS → DESIGN → CO
 products/lien/
 ├── ios/          # SwiftUI アプリ(XcodeGen)。本体 / ウィジェット / NSE / テスト / xcconfig
 ├── supabase/     # migrations(連番SQL)と Edge Functions(deno)
-├── assets/       # ドット絵スプライト・アイコン
+├── assets/       # 植物のイラスト(SVG レイヤー)・アイコン
 ├── web/invite/   # 招待用静的ページ(GitHub Pages)
 └── marketing/    # ASO文言・スクショ・プライバシーポリシー・利用規約
 ```

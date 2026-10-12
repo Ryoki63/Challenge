@@ -736,7 +736,7 @@ checkin・checkin-cancel・invite-accept・nudge・promise-set・react・snapsho
 |---|---|---|
 | `Lien/Core/Models/PairSnapshot.swift` | 新しいキー3つを省略可で足す(decodeIfPresent / encodeIfPresent)。キーがなければ nil にして、ゲージを出さない | P0 |
 | `Lien/Core/DesignSystem/PlantLayers.swift`(新規) | 状態(段階・表情・自分と相手の完了・ソロ・演出・のぞき)から、重ねるレイヤー名の並びを返す純粋関数。知らない段階は、知っている最大の段階として描く | P0 |
-| `Lien/Core/DesignSystem/PlantCharacterView.swift`(新規) | 全レイヤーを同じキャンバスで重ねる(ZStack)。右の葉は左右反転。花の塗りは色付け用の描画。SwiftUI と Foundation だけに依存させる(ウィジェットとシェア画像でも使うため)。VoiceOver の読み上げ | P0 |
+| `Lien/Core/DesignSystem/PlantCharacterView.swift`(新規) | 全レイヤーを同じキャンバスで重ねる(ZStack)。右の葉は左右反転。花の塗りは `.renderingMode(.template)` にして自分の色(左)・相手の色(右)で着色する(アセットは元の色のまま入れる — mapping.md §7)。SwiftUI と Foundation だけに依存させる(ウィジェットとシェア画像でも使うため)。VoiceOver の読み上げ | P0 |
 | `Lien/Core/DesignSystem/PlantSprite.swift`・`PixelImage.swift` | 植物の表示を PlantCharacterView に置き換え、使わなくなったら削除する。EmptyHomeContent の土の表示も置き換える | P0 |
 | `Lien/Features/Home/HomeView.swift`・`HomeViewModel.swift` | PlantArea を PlantCharacterView に替える。ゲージの文(純粋関数)、段階アップの検出、名前付けへの導線を足す。おかえりとひとことは P1 | P0 / P1 |
 | `Lien/Features/Plant/`(新規) | 段階アップの全画面、名前付けのシート、ゲージ、PlantNaming のプロトコルとモック(モックで先に作る。実際の API への接続は「Live 結線」の作業) | P0 |
@@ -759,7 +759,7 @@ checkin・checkin-cancel・invite-accept・nudge・promise-set・react・snapsho
 | ファイル | 変更内容 | 優先 |
 |---|---|---|
 | `products/lien/assets/plant/svg/`(新規) | レイヤーの SVG(§9)。スクリプトで生成する場合、スクリプトは `tools/` に置く | P0 |
-| `tools/build_asset_catalog.py` | SVG を imageset にする。preserves-vector-representation を true にする。色を付けるレイヤーは template にする | P0 |
+| `tools/build_asset_catalog.py` | SVG を imageset にする。preserves-vector-representation を true にする。**アセットは元の色のまま入れる**(template にしない。`template-rendering-intent` は original)。花の塗り(`petal_sN`)の着色は iOS のコード側で行う: `Image.renderingMode(.template)` + foregroundStyle(`assets/plant/mapping.md` §7。2026-10-13・#56 の実装で決めた。着色し忘れても黒くならず、既定の花色で出る) | P0 |
 | `tools/verify_assets.py` | 次の3点を確かめる。期待するレイヤーがそろっている / 全 SVG の viewBox が同じ / 許可した要素だけを使っている(filter・mask・clipPath・text・style・use・image があれば失敗) | P0 |
 | `tools/gen_sprites.py`・`png/` | 使うのをやめる(ドット絵の13枚は使わない) | P0 |
 | `mapping.md` | レイヤー版に書き直す。中身はレイヤー名・重ねる順・状態との対応・のぞきの位置 | P0 |

@@ -40,7 +40,7 @@ products/lien/
 │   └── functions/           # Edge Functions(deno)
 │       └── _shared/         # streak.ts / tickets.ts / apns.ts / snapshot.ts / messages.ts
 ├── assets/
-│   ├── plant/               # ドット絵スプライト(原寸PNG)
+│   ├── plant/               # 植物「タネの子」の SVG レイヤー34点+PlantAssets.xcassets+生成スクリプト(tools/)。規則は mapping.md
 │   └── icon/
 ├── web/invite/              # 招待用静的ページ(GitHub Pages)
 └── marketing/               # ASO文言・スクショ・privacy-policy.md・terms.md
@@ -70,7 +70,7 @@ products/lien/
 ### 3.3 アプリ内アーキテクチャ
 
 - SwiftUI + Observation(`@Observable`)。ViewModel は画面単位
-- データ層はプロトコル境界(`AuthServicing` / `InviteClient` / `PromiseAPIClient` / `SnapshotClient` / `CheckinAPIClient` など)で隔離し、ViewModel へ注入する(テストはモック)。View から Supabase を直接呼ばない。Edge Functions のクライアントは URLSession ベース(`Core/Api/`・`Core/Repositories/`。共通の下回りは `EdgeFunctionTransport`)で、JWT は `AuthServicing.accessToken()`(supabase-swift のセッション。期限切れは自動更新)から渡す。**supabase-swift を import するのは `SupabaseService.swift` だけ**(匿名サインイン・users の更新・accessToken)
+- データ層はプロトコル境界(`AuthServicing` / `InviteClient` / `PromiseAPIClient` / `SnapshotClient` / `CheckinAPIClient` など)で隔離し、ViewModel へ注入する(テストはモック)。View から Supabase を直接呼ばない。Edge Functions のクライアントは URLSession ベース(`Core/Api/`・`Core/Repositories/`)で、JWT は `AuthServicing.accessToken()`(supabase-swift のセッション。期限切れは自動更新)から渡す。共通の下回り `EdgeFunctionTransport`(URL の組み立て・Bearer・送信・失敗応答の `error` の読み取り)を**使うのは、W1(#55)で足した invite(`EdgeFunctionInviteClient`)・snapshot(`EdgeFunctionSnapshotClient`)・nudge / react(`EdgeFunctionNudgeReactClient`)の3つ**。promise-set(`EdgeFunctionPromiseClient`)と checkin / checkin-cancel(`EdgeFunctionCheckinClient`)は W1 より前に書いた自前の実装のまま(形は同じ — baseURL・tokenProvider・URLSession を注入 — だが下回りは共有していない。完了条件にないリファクタをしない)。相手の当日の checkins 行の読み取り(`PostgRESTPartnerCheckinResolver`)は PostgREST(`/rest/v1/`)を直接読み、`apikey` ヘッダも要るので、これも別の実装。**supabase-swift を import するのは `SupabaseService.swift` だけ**(匿名サインイン・users 行の更新と読み取り — プロフィールと APNs 登録・accessToken)
 - **状態の正はサーバー**。アプリが永続するのは「最後に取得した PairSnapshot」+「未送信キュー」のみ(ローカルDBは持たない。SwiftData不使用)。画面系統を決める「オンボ済み」のような独自の永続フラグも持たない
 - ルートは `AppPhase` enum の **4状態**で画面系統を切り替える。値は純粋関数 `AppRouter.phase(hasSession:snapshot:)` が、「セッションの有無」と「App Group の最後の snapshot」だけから導く(2026-10-13・issue #61。W1 #55 の実装に合わせて改訂した。旧記述は `onboarding` / `solo` / `paired` の3状態で、約束設定の独立画面と下の構成図が無かった)
 
@@ -91,7 +91,7 @@ ios/Lien/
 ├── App/
 │   ├── LienApp.swift              # エントリ。AppServices と AppModel を1回だけ作ってつなぐ
 │   ├── AppServices.swift          # 依存の束(Live / Stub)。Config が無いときの Stub 構成もここ
-│   ├── AppServices+Live.swift     # make(): Config があれば Live、無ければ Stub を返すファクトリ+Live の組み立て
+│   ├── AppServices+Live.swift     # make(): Config があれば Live。無いときは Debug = Stub / Release = 起動時に止める(致命)ファクトリ+Live の組み立て
 │   ├── AppPhase.swift             # onboarding / promiseSetup / solo / paired
 │   ├── AppRouter.swift            # phase の導出(純粋関数)
 │   ├── AppModel.swift             # ルート状態の保持+サーバー同期の司令塔(@Observable)
@@ -99,20 +99,21 @@ ios/Lien/
 │   ├── AppDelegate.swift          # APNs トークン・リモート通知の受け口(→ PushTokenSync / AppModel)
 │   └── DeepLinkHandler.swift      # lien://invite/<token> のパース(純粋関数。§3.6)
 ├── Core/
-│   ├── Config.swift               # xcconfig→Info.plist 経由でURL/キー読込
+│   ├── Config.swift               # xcconfig→Info.plist 経由でURL/キー読込+Config が無いときの扱い(MissingPolicy)
 │   ├── AuthServicing.swift        # 認証の抽象+スタブ(accessToken() もここ)
 │   ├── SupabaseService.swift      # 本実装(匿名サインイン・users 更新・push 登録)。supabase-swift を import する唯一のファイル
 │   ├── SnapshotSynchronizer.swift # GET /snapshot の結果を App Group へ反映(自己修復 — §4)
-│   ├── PushTokenSync.swift        # APNs トークンと push_env を users へ自動保存(§4.1)
+│   ├── PushTokenSync.swift        # APNs トークンと push_env を users へ自動保存+サーバー側のずれの確認(§3.3・§4.1)
+│   ├── APNsEnvironment.swift      # このビルドの APNs 環境(sandbox / production)を署名の aps-environment から判定(§4.1)
 │   ├── PushManager.swift          # 通知許可・APNs 登録
 │   ├── AppGroupStore.swift        # pair_snapshot.json / pending_ops.json の読み書き
 │   ├── CheckinService.swift / PendingOps.swift / PhotoProcessor.swift   # チェックイン+未送信キュー+写真縮小
 │   ├── NudgeReactService.swift / LiveNudgeReactService.swift            # つつく・リアクション
-│   ├── Api/                       # Edge Functions(と PostgREST)の Live クライアント。EdgeFunctionTransport が共通の下回り
-│   ├── Repositories/              # InviteClient とその Live 実装
+│   ├── Api/                       # Edge Functions(と PostgREST)の Live クライアント。共通の下回り EdgeFunctionTransport は snapshot・nudge / react が使う(promise-set・checkin は自前。上の本文)
+│   ├── Repositories/              # InviteClient とその Live 実装(EdgeFunctionInviteClient も EdgeFunctionTransport を使う)
 │   ├── Models/                    # PairSnapshot, Promise, Invite
 │   ├── DesignSystem/              # Colors.swift, Spacing.swift, 植物の描画(§3.5)
-│   └── Strings.swift              # ユーザー向け文言を全て集約
+│   └── Strings.swift              # ユーザー向け文言を全て集約(全リテラルが罰なし文言の lint の検査対象 — §3.8)
 └── Features/                      # 1画面1ディレクトリ(View + ViewModel)
     ├── Onboarding/  ├── PromiseSetup/  ├── Pairing/(招待シート)
     ├── Home/        ├── Checkin/       ├── Nudge/
@@ -121,7 +122,7 @@ ios/Lien/
 
 主要部品の役割(W1・issue #55):
 
-- `AppServices`: アプリ全体の依存の束(`auth` / `inviteClient` / `promiseClient` / `snapshotClient` / `checkinService` / `nudgeService` / `reactionService` / `pendingOps` / `store` / `pushTokenSync` / `reloadWidgets` など)。`AppServices.make()` が **Config(Supabase URL・anon key)があれば Live、無ければ Stub** を返す。Stub はネットワークを一切使わず、オンボ → 約束 → ソロのチェックイン → ペア成立の画面遷移までが動く(CI・Secrets なしのビルド用)。View / ViewModel はどちらの構成かを意識しない。既知: 今は Release ビルドでも Config が欠けると Stub に落ちる(T28準備 #28 で、Release では致命扱いにする予定)
+- `AppServices`: アプリ全体の依存の束(`auth` / `inviteClient` / `promiseClient` / `snapshotClient` / `checkinService` / `nudgeService` / `reactionService` / `pendingOps` / `store` / `pushTokenSync` / `reloadWidgets` など)。`AppServices.make()` が **Config(Supabase URL・anon key)があれば Live** を返す。**無いときは `Config.MissingPolicy` に従い、Debug = Stub / Release = 起動時に `fatalError` で止まる**(2026-10-13・issue #28 で実装済み。**Release の Config 欠落は致命**)。接続情報の無い Stub のビルドを TestFlight / App Store に出すと、誰の端末でもペアになれず原因も分からないため、Release では黙って Stub に落とさない。本体の `makeChecked` が `Config.MissingError` を投げ、`make` だけが `fatalError` にする(テストは `makeChecked` で致命の経路を確かめる)。`Config.load` は空文字・雛形のまま(`YOUR-PROJECT-REF` など)・変数が展開されずに残った値(`$(SUPABASE_URL)`)も「未設定」と見る。さらに lien-release が archive の Info.plist を検査して、接続情報の無い archive をアップロード前に落とす(`ios/README.md` §2・§8.2)。Stub はネットワークを一切使わず、オンボ → 約束 → ソロのチェックイン → ペア成立の画面遷移までが動く(CI・Secrets なしの Debug ビルド用)。View / ViewModel はどちらの構成かを意識しない
 - `AppRouter`: 上の表の導出。入力は「セッションの有無」と「最後の snapshot」だけの純粋関数で、起動時・同期の後・約束の保存後・ペア成立後のたびに再導出する
 - `AppModel`(`@MainActor @Observable`): `phase` を保持し、サーバー同期を起動する司令塔。招待ディープリンクの token も保持する(§3.6)。同期の起点:
   1. 起動(`start()`)
@@ -132,7 +133,7 @@ ios/Lien/
 
   同期は同時に1本だけ走り、走行中に来た要求は、終わった直後に1回だけ取り直す
 - `SnapshotSynchronizer`: GET /snapshot の結果で `pair_snapshot.json` を上書きし、**見た目が変わるときだけ**ウィジェットを reload する(`updatedAt` だけの差では reload しない — §3.5・§10 の reload 予算)。**端末の方が新しい可能性があるときは上書きしない**: ① 未送信キューが残っている(オフラインで記録したチェックインがサーバーへ届く前に上書きすると、画面が一瞬戻る。キューが空になった次回の同期で反映する)② 取得中に端末の snapshot が変わった(ホームのチェックイン完了や NSE の書き込みの方が新しい。取得結果は捨てて1回だけ取り直す)。取得に失敗したときは端末の snapshot を残す(オフラインでも表示は壊れない)
-- `PushTokenSync`(actor): `users.push_token` / `push_env` の自動保存(§4.1)。**トークンの取得とセッションの確立の両方がそろうまで保留**する(どちらが先でもよい)。最後に送信成功した (userID, token, env) を覚えて**変化時だけ**送り、ユーザーが変わった(再インストールで匿名ユーザーが作り直された)ときは同じトークンでも再送する。失敗は保留にして、次のトリガー(前面復帰・トークンの更新・セッションの確立)で再送する。この「最後に送信成功した登録」は、画面の状態ではなく送信の重複防止の記録なので、上の「のみ」の例外として端末ローカルの UserDefaults に置く(App Group には置かない — NSE・ウィジェットは読まない。再インストールで消えるのは正しい挙動で、新しい匿名ユーザー・新しいトークンとして再送される)
+- `PushTokenSync`(actor): `users.push_token` / `push_env` の自動保存(§4.1)。**トークンの取得とセッションの確立の両方がそろうまで保留**する(どちらが先でもよい)。最後に送信成功した (userID, token, env) を覚えて**変化時だけ**送り、ユーザーが変わった(再インストールで匿名ユーザーが作り直された)ときは同じトークンでも再送する。失敗は保留にして、次のトリガー(前面復帰・トークンの更新・セッションの確立)で再送する。**サーバー側のずれの確認**(issue #62): サーバーは APNs が `410` / `400 BadDeviceToken` を返したトークンの `users.push_token` を null にする(§4.1)が、端末の記録は「送信済み」のままなので、変化時だけ送る仕組みだけでは二度と戻らない。そこで、記録の上では送信済みのときに限り、**プロセスの最初の1回(トークンとセッションがそろった最初の機会)と、前回の確認から1時間(`minVerifyInterval`)以上あけた前面復帰のたび**に、自分の `users.push_token` / `push_env` を読んで(`fetchPushRegistration`。RLS により読めるのは自分の行だけ)、送ったはずの内容とずれていれば(null にされた・別の値・`push_env` が未設定)記録を捨てて送り直す。読めなかった(オフライン等)ときは何もせず、次のトリガーで改めて確かめる。確認した時刻はプロセスの中だけで持つので、起動のたびに最初の1回が走る。この「最後に送信成功した登録」は、画面の状態ではなく送信の重複防止の記録なので、上の「のみ」の例外として端末ローカルの UserDefaults に置く(App Group には置かない — NSE・ウィジェットは読まない。再インストールで消えるのは正しい挙動で、新しい匿名ユーザー・新しいトークンとして再送される)
 - 読み取りは RLS の範囲で PostgREST を直接使ってよい(現状: react の対象にする相手の当日の `checkins` 行 — `PartnerCheckinResolving`。PV #59 が `photo_path` と署名付き URL に広げる)。書き込みは、本人の users 行(プロフィール・push 登録 — §4.1)を除いて Edge Functions 経由(§5.2)
 
 ### 3.4 App Group 共有契約(ウィジェットとの境界。変更時は要レビュー)
@@ -176,7 +177,8 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
 
 - TimelineProvider のエントリは2点: `now`(現在状態)と `翌日0:00`(日付跨ぎで両者「未完」表示に戻す)。`policy: .atEnd`
 - reload のトリガーは NSE とアプリ本体のみ(WidgetKit の reload 予算を浪費しない)
-- 植物は SVG のレイヤーを同じキャンバス(viewBox 240×320)で重ねて描く(`PlantCharacterView`)。拡大縮小は自由(ドット絵のときの整数倍・`interpolation(.none)` の制約はない)。レイヤーの規則と重ね順は `products/lien/assets/plant/mapping.md`(取込後)/ 現時点の正本は `products/lien/assets/plant/v4_drafts/README.md`
+- 植物は SVG のレイヤー34点を同じキャンバス(viewBox 240×320)で重ねて描く(`PlantCharacterView`。状態 → 重ねるレイヤーの並びは純粋関数 `PlantLayers.stack`)。拡大縮小は自由(ドット絵のときの整数倍・`interpolation(.none)` の制約はない)。**レイヤーの規則・重ね順・状態との対応は `products/lien/assets/plant/mapping.md` が正本**(2026-10-13・issue #56 で取込済み。承認前の下書き `v4_drafts/README.md` は記録で、更新しない)
+- **花の色(着色はコード側)**: 花の塗り `petal_sN` は左の花だけを単色(既定の花色 `#FFB3C7`)で持つ。**アセットは元の色のまま入れ**(imageset は `template-rendering-intent: original`。template にしない)、`PlantCharacterView` が `Image.renderingMode(.template)` + `foregroundStyle` で着色する。左のレイヤーに自分の色、それを左右反転したものに相手の色(v1.0 は両方とも既定色。v1.1 で各自が自分の側の色を選ぶ)。着色し忘れても黒くならず、既定の花色で出る(`mapping.md` §7)
 - ウィジェットも `PlantCharacterView` を共有する(SwiftUI と Foundation だけに依存させる)。全レイヤーを重ねてメモリに収まるかは実機(G1 / T20)で確かめ、収まらなければ「段階 × 葉の状態」を合成済みの1枚にしたウィジェット専用画像で代える(GROWTH.md §9.5)
 - 表示原則(REQUIREMENTS §3.10): 自分未完=自分側グレー / 相手が先に完了=「(名前)が待ってるよ」
 
@@ -209,6 +211,12 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
 ### 3.8 文言・デザイン
 
 - ユーザー向け文言は全て `Strings.swift`(アプリ)と `_shared/messages.ts`(プッシュ)に集約。**罰・恥系の文言は禁止**(REQUIREMENTS §3.5。「あと◯日で枯れる」「サボり」等のワードを使わない)
+- **罰なし文言の lint(2026-10-13・issue #62。T27 の前倒し分)**: サーバー側は `_shared/messages_test.ts` の `BANNED_PATTERN`(`messages.ts` の全文言が対象)、アプリ側は `LienTests/StringsReviewTests.swift` が、CI で毎回検査する。アプリ側は3層:
+  1. **`Strings.swift` のソース上の全文字列リテラル**を `StringLiteralScanner`(コメントを飛ばし、補間 `\(…)` で固定部分に分ける字句解析器。複数行・生文字列など未対応の記法は黙って飛ばさず失敗にする)で拾い、禁止ワードを含まないこと・空文言でないことを検査する(本線。文言を足した瞬間から対象になる)。ひらがな/カタカナの表記ゆれ(だめ / ダメ、さぼ / サボ)も同じ語として見る
+  2. **`StringsCatalog.all`**(静的な文言+関数型文言の代表的な出力 — 名前・日数・日時の代表値で組み立てる)の実行時の値を検査する(禁止ワード・空文言・補間や書式指定子の組み立て損ない)。T27 本体(全文言の目視レビュー表)の一覧の元にもなる
+  3. 1 で拾った全リテラルが `StringsCatalog.all` に載っていること(カタログの陳腐化防止)。**`Strings.swift` に文言を足したら、`StringsCatalog.all` にも1行足す**(忘れるとこのテストが落ちる)
+  - **サーバーとの整合検査**: アプリ側の禁止ワード(`PunishmentFreeLint.bannedWords`)は `messages_test.ts` の `BANNED_PATTERN` の語をそのまま移したもので、`testBannedWordsMatchServerSide` が `messages_test.ts` を読んで両者が一致することを検査する(サーバー側に語が足されたのにアプリ側が古いままだと落ちる。`BANNED_PATTERN` が単純な語の並びでなくなったときも落ちる)
+  - 機械チェックは補助にすぎない(責めるニュアンスは語では捕まらない)。全文言の目視レビューは T27 本体で行う
 - 色・余白・フォントは DesignSystem の定数のみ。View 内に直書きしない
 
 ## 4. プッシュ → ウィジェット更新パイプライン(M0 の検証対象)
@@ -242,9 +250,9 @@ B端末: LienNSE 起動(通知表示の前に実行される)
 
 APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com`)でエンドポイントが別で、環境が違うトークンは `400 BadDeviceToken` になる。サーバー全体の `APNS_ENV` 1値で切り替えると、開発ビルド(Xcode 直インストール = sandbox)と TestFlight・App Store(= production)が混在した瞬間に片方へ届かない。そこでトークンごとに環境を持つ。
 
-- **保存**: `users.push_env`(`sandbox` | `production` | null。migration 0005)。クライアントは `push_token` と**同時に** `PATCH /rest/v1/users?id=eq.<uid>` で更新する(列 GRANT は本人の行の `push_token` / `push_env`。値は端末が自分の環境から決める。iOS 側の自動保存は issue #55 W1)
+- **保存**: `users.push_env`(`sandbox` | `production` | null。migration 0005)。クライアントは `push_token` と**同時に** `PATCH /rest/v1/users?id=eq.<uid>` で更新する(列 GRANT は本人の行の `push_token` / `push_env`)。値は端末が自分の環境から決める: **署名の `aps-environment`** から判定する(`APNsEnvironment.swift`。シミュレータ = sandbox / `embedded.mobileprovision` が無い = TestFlight・App Store = production / あればその `aps-environment`。DEBUG / Release のコンパイル設定では決めない — Release を development 署名で入れた端末を production と取り違えるため。issue #28)。**iOS 側の自動保存は実装済み**(`PushTokenSync` — §3.3。W1 #55 で実装、#62 でサーバー側のずれの確認を追加)。トークンの取得とセッションの確立がそろったら送り、変化時だけ送る
 - **送信先の選択**: 受信者の `users.push_env` の環境のエンドポイントへ送る。各 Function が送り先の users 行を `push_token` と**一緒に読み**(`_shared/user_rows.ts`)、送信オプションの `environment` に渡す(送信のたびに `push_token` から users を逆引きしない — §5.3 の pusher.ts)。**null(未設定・古い行)は `environment` を付けず `APNS_ENV` にフォールバック**する(`APNS_ENV` は Supabase secrets のまま。5変数のうち1つでも欠ければ push 無効 — §7)
-- **無効トークンの掃除**: APNs が `410`(Unregistered / ExpiredToken)または `400 BadDeviceToken` を返したら、そのトークンを持つ `users.push_token` を null にする(`push_env` は診断用に残す)。次回の起動でクライアントが再登録する。`DeviceTokenNotForTopic`・`403`(JWT)・`429`・5xx はトークンのせいと言い切れないので消さない(設定ミスで全員のトークンを消さないため)。条件は「いまの `push_token` がそのトークンと一致」なので、送信と同時に再登録された新しいトークンは消えない
+- **無効トークンの掃除**: APNs が `410`(Unregistered / ExpiredToken)または `400 BadDeviceToken` を返したら、そのトークンを持つ `users.push_token` を null にする(`push_env` は診断用に残す)。クライアントは次の起動(プロセスの最初の確認)か、1時間以上あけた前面復帰で、自分の行の `push_token` が null にされたことに気づいて再登録する(`PushTokenSync` のずれの確認 — §3.3)。`DeviceTokenNotForTopic`・`403`(JWT)・`429`・5xx はトークンのせいと言い切れないので消さない(設定ミスで全員のトークンを消さないため)。条件は「いまの `push_token` がそのトークンと一致」なので、送信と同時に再登録された新しいトークンは消えない
 - **失敗の扱いは従来どおり**(§5.5): 5xx・ネットワーク断はリトライ1回、失敗しても本処理は成功扱い。無効トークンの掃除の失敗も本処理を止めない(ログに残す)
 - **実装**: `_shared/apns.ts`(`ApnsClient.send` の `environment` 指定・失敗結果の `invalidToken`・`TokenAwarePusher`)と `_shared/pusher.ts`(Supabase 版の `PushTokenStore`=無効トークンの掃除だけ・`createPusher`)・`_shared/user_rows.ts`(users 行の読み出し)。Function の `index.ts` は `createPusher(adminClient, "<関数名>")` を使い、users の読み出しは `USER_COLUMNS` / `PARTNER_SELECT` / `toSnapshotUser` を使う(新しい push 送信 Function もこれを使うこと)。テストは `apns_test.ts` / `pusher_test.ts` / `user_rows_test.ts`(+ `scripts/ops/push_env_static_test.ts`)
 
@@ -377,15 +385,46 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 
 ## 7. シークレットと環境変数(誰が・何を・どこに)
 
+置き場所は3つ。**① Supabase(Function secrets・Vault・自動注入)/ ② GitHub Actions secrets / ③ iOS のビルド設定(xcconfig)**。値はどこでも、画面・ログ・ファイル・コミットに出さない。
+
+### 7.1 Supabase(Function secrets・Vault・自動注入)
+
 | 名前 | 置き場所 | 設定者 | 用途 |
 |---|---|---|---|
-| SUPABASE_URL / SUPABASE_ANON_KEY | `ios/Config/Secrets.xcconfig`(gitignore。`Secrets.example.xcconfig` をコミット) | 人間(G0) | アプリ→Supabase |
-| SUPABASE_SERVICE_ROLE_KEY | Supabase が Function に**自動注入**(自分では設定しない) | プラットフォーム | Function→DB。**このプロジェクトでは default の secret key(`sb_secret_...`)で、legacy の `service_role`(`eyJ...`)ではない**(2026-10-12 実測)。cron の認証には使わない |
+| SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY | Supabase が Function に**自動注入**(自分では設定しない) | プラットフォーム | Function→DB。`SUPABASE_SERVICE_ROLE_KEY` は**このプロジェクトでは default の secret key(`sb_secret_...`)で、legacy の `service_role`(`eyJ...`)ではない**(2026-10-12 実測)。cron の認証には使わない |
 | LIEN_CRON_SECRET | Function secrets と Vault の `lien_cron_secret`(**同じ値**) | エージェント(`scripts/OPS.md` §6。値は誰も画面で見ない) | pg_cron → close-day / grant-tickets の認証(cron 専用。DB には触れない)。SHA-256 の照合を監視が毎朝行う |
-| APNS_AUTH_KEY(.p8) / APNS_KEY_ID / APPLE_TEAM_ID / APNS_ENV / APNS_TOPIC | Supabase secrets | 人間(G0) | push 送信。1つでも欠ければ push 無効。`APNS_ENV` は `users.push_env` が未設定のトークンのフォールバック(§4.1) |
-| REVENUECAT_API_KEY(v1.1) | 同上+xcconfig | 人間(G6) | 課金 |
+| APNS_AUTH_KEY(.p8 の PEM 全文) / APNS_KEY_ID / APPLE_TEAM_ID / APNS_ENV / APNS_TOPIC | Function secrets(`supabase secrets set`) | 人間(G0。`scripts/g1/RUNBOOK.md` §2) | push 送信。**5つのうち1つでも欠ければ push 無効**。`APNS_ENV` は `users.push_env` が未設定のトークンのフォールバック(§4.1)。`APNS_TOPIC` は Bundle ID |
+| INVITE_WEB_BASE_URL(任意) | Function secrets | 人間 | invite-create が返す招待ページ URL の土台。公開 URL でシークレットではない。未設定なら GitHub Pages の既定値(`https://ryoki63.github.io/Challenge`) |
+| REVENUECAT_API_KEY(v1.1) | Function secrets+xcconfig | 人間(G6) | 課金 |
 
+- 現時点で Function のコードが読む環境変数は、上の表の v1.0 分がすべて(`SUPABASE_ANON_KEY` は Function では使わない)
 - Vault には `lien_cron_secret`(cron 用)だけを置く。**万能鍵(service role key)は Vault にも pg_net のキューにも載せない**(2026-10-13・issue #60。以前の `lien_service_role_key` は削除)
+
+### 7.2 GitHub Actions secrets
+
+| 名前 | 使う workflow | 設定者 | 用途 |
+|---|---|---|---|
+| ASC_KEY_P8 | lien-release | 人間(G0 の後) | App Store Connect API キー(.p8)の中身。クラウド署名・TestFlight へのアップロード |
+| ASC_KEY_ID | lien-release | 人間(G0 の後) | 上のキーの Key ID |
+| ASC_ISSUER_ID | lien-release | 人間(G0 の後) | App Store Connect の Issuer ID |
+| APPLE_TEAM_ID | lien-release | 人間(G0 の後) | 署名の Team ID(10 桁の英数字。Function secrets の `APPLE_TEAM_ID` と同じ値) |
+| SUPABASE_URL | lien-release | 人間(G0 の後) | TestFlight 用 archive の Info.plist に入れる接続先(`https://<project-ref>.supabase.co`) |
+| SUPABASE_ANON_KEY | lien-release | 人間(G0 の後) | 同じく anon(publishable)キー。**service_role / `sb_secret_…` は入れない**(`supabase_config.py` が形式を検査して拒否する) |
+| SUPABASE_ACCESS_TOKEN | lien-deploy・lien-cron-watch | 人間 | Management API・CLI(デプロイと、毎朝 00:40 JST の cron 監視) |
+| SUPABASE_DB_PASSWORD | lien-deploy | 人間 | `supabase db push`。未登録なら db push をスキップして警告する |
+
+- **lien-release の6件**(`ASC_KEY_P8`・`ASC_KEY_ID`・`ASC_ISSUER_ID`・`APPLE_TEAM_ID`・`SUPABASE_URL`・`SUPABASE_ANON_KEY`)は G0 の後に人間が登録する(手順は `products/lien/ios/README.md` §8.1)。`dry_run=true`(既定)は secrets なしで無署名 archive まで動く。`dry_run=false` で1つでも未登録なら、最初のステップで足りない名前を出して止まる
+- 状態(2026-10-13 時点。名前だけ確認した): 登録済みは `SUPABASE_ACCESS_TOKEN` のみ
+
+### 7.3 iOS のビルド設定(xcconfig)
+
+| 名前 | 置き場所 | 設定者 | 用途 |
+|---|---|---|---|
+| SUPABASE_URL / SUPABASE_ANON_KEY | `ios/Config/Secrets.xcconfig`(gitignore。`Secrets.example.xcconfig` をコミット) | 人間(G0) | アプリ→Supabase。Info.plist 経由で `Config.swift` が読む。lien-release は 7.2 の secrets から生成し、終了時に消す |
+| DEVELOPMENT_TEAM(任意) | 同上 | 人間 | 実機・Xcode から署名して動かすときのチーム(XcodeGen が毎回プロジェクトを作り直すので、ここに書けば残る) |
+
+### 7.4 共通の約束
+
 - エージェントは `.env` を読めない(settings.json で deny 済み)。**シークレットが必要な検証は人間ゲート([H])に回す**設計を崩さない
 - コードにキーをハードコードしたらその時点でタスク失敗(AGENTS.md 禁止事項)
 
