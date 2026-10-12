@@ -17,3 +17,4 @@
 - [x] T25: privacy-policy+terms+Web公開HTML+CHECKLIST-G4。 — 2026-06-11 (issue #25)
 - [x] T30準備: App Reviewレビューノート草案(marketing/review-notes.md新規)+REQUIREMENTS §8台帳化(全5項目に状態+参照)。issue #30はクローズせず継続(T23/T08実データ投入/T28完了後に本編完了)。 — 2026-10-12 (issue #30)
 - [x] T32準備: ストアメタデータ確定値化(store_metadata/ja/6ファイル+alternatives.md)+verify_metadata.py+lien-ci.ymlにstore-metadataジョブ追加。Pairy終了済み・次の需要=1月新年需要という状況変化を反映しPairy依存語を排除。lien-ci run 38206570833でstore-metadataジョブ緑確認。issue #32はクローズせず継続(G4 #42の人間判断待ち)。 — 2026-10-12 (issue #32)
+- [x] T20準備: 実機E2Eチェックリスト(docs/E2E-M1.md、12項目+ランブック+REQUIREMENTS §3.2〜3.9セルフ検証)+e2e_reset.sql(作成のみ・未実行)。セルフ検証で12項目はM1コアパスとしては十分だが§3.2〜3.9の全要件網羅ではないと判明(5件の既知ギャップを付録Aに明記)。lien-ci run 38207131557で緑確認。issue #20はクローズせず継続(実機2台でのE2E実施はG0/T08/#11-19 close後)。 — 2026-10-12 (issue #20)

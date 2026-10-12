@@ -234,3 +234,5 @@
 - 全テーブル定義(migrations/0001_init.sql)を直接再確認してスクリプトの列名・削除順序を検証: `nudges`(pair_id/from_user)・`reactions`(checkin_id/from_user)・`invites`(from_userのみ、受諾側記録列は無し)・`checkins.promise_id`はon delete cascade無し(NO ACTION)のため`promises`を一切DELETEしない設計で正しいことを確認。全て一致、修正不要
 - T15(#15)の状況を再確認: `nudge`/`react` Edge Functions のバックエンド実装・テストは commit `8b49d50` で既に完了(本タスク着手時点では未実装と記載していたため docs/E2E-M1.md 2箇所を修正)。ただしiOSクライアント結線と本番デプロイは未完了のまま
 - 次: path-scoped commit → push.sh → lien-ci緑確認(lien-iosは発火しないはず)→ BACKLOG/DONE更新 → issue #20へ準備完了コメント
+- commit/push完了: commit ff5417e(docs/E2E-M1.md新規+products/lien/supabase/scripts/e2e_reset.sql新規+本JOURNAL)。lien-ci run 38207131557 success(plant-assets/deno-test/store-metadata全3ジョブ緑、13秒)。lien-iosは期待どおり発火せず(docs/scripts配下のみの変更のためパスフィルタ対象外)
+- 結果: **T20準備(issue #20)完了**。BACKLOG.mdのT20準備行(レーンC節全体、他タスク無し)を削除、DONE.mdに追記。issue #20は進め方コメントの指示どおりクローズしない(実機2台でのE2E実施はG0(#38)+T08(#8)デプロイ+G1合格+#11-19 close後の別セッション)。issue #20へ「準備完了・実機待ち」コメント投稿へ続行。commit時点でT15(つつく+リアクション)エージェントがproducts/lien/ios/Lien/Core/Strings.swift等を並行変更中だったため、本タスクの対象外ファイルには一切触れていないことを確認済み

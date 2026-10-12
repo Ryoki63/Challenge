@@ -32,9 +32,6 @@
 ### レーンB: infra/scripts(レーンAと並列可)
 - [ ] [T08準備①][#8] デプロイ自動化+G1 計測ハーネス(supabase/config.toml verify_jwt=false+scripts/deploy.sh+lien-deploy.yml+scripts/g1/{seed-pair.sh,measure.sh,RUNBOOK.md}) 完了条件: bash -n 構文チェック+lien-ci.yml 緑のまま(issue #8 は close しない)
 
-### レーンC: docs/marketing(レーンA/Bと並列可)
-- [ ] [T20準備][#20] 実機 E2E チェックリスト12項目+ランブック(docs/E2E-M1.md)+e2e_reset.sql 完了条件: 12項目が REQUIREMENTS §3.2〜3.9 を網羅(サブエージェント検証)+issue #20 に「実機待ち」コメント
-
 ### Wave 5以降(参考 — ゲート解放で着手。詳細は #50)
 - Wave 5: [T09v2][#49] G2(#40)回答後、選定スタイルで全コマ制作(assetsレーン・Wave 4と並走可)
 - Wave 6: [T08][#8] G0(#38)後、デプロイ+実機G1計測
