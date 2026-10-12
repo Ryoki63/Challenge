@@ -243,10 +243,10 @@ B端末: LienNSE 起動(通知表示の前に実行される)
 APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com`)でエンドポイントが別で、環境が違うトークンは `400 BadDeviceToken` になる。サーバー全体の `APNS_ENV` 1値で切り替えると、開発ビルド(Xcode 直インストール = sandbox)と TestFlight・App Store(= production)が混在した瞬間に片方へ届かない。そこでトークンごとに環境を持つ。
 
 - **保存**: `users.push_env`(`sandbox` | `production` | null。migration 0005)。クライアントは `push_token` と**同時に** `PATCH /rest/v1/users?id=eq.<uid>` で更新する(列 GRANT は本人の行の `push_token` / `push_env`。値は端末が自分の環境から決める。iOS 側の自動保存は issue #55 W1)
-- **送信先の選択**: 送信時にトークンごとに `users.push_env` を引き、その環境のエンドポイントへ送る。**null(未設定・古い行)は `APNS_ENV` にフォールバック**する(`APNS_ENV` は Supabase secrets のまま。5変数のうち1つでも欠ければ push 無効 — §7)
+- **送信先の選択**: 受信者の `users.push_env` の環境のエンドポイントへ送る。各 Function が送り先の users 行を `push_token` と**一緒に読み**(`_shared/user_rows.ts`)、送信オプションの `environment` に渡す(送信のたびに `push_token` から users を逆引きしない — §5.3 の pusher.ts)。**null(未設定・古い行)は `environment` を付けず `APNS_ENV` にフォールバック**する(`APNS_ENV` は Supabase secrets のまま。5変数のうち1つでも欠ければ push 無効 — §7)
 - **無効トークンの掃除**: APNs が `410`(Unregistered / ExpiredToken)または `400 BadDeviceToken` を返したら、そのトークンを持つ `users.push_token` を null にする(`push_env` は診断用に残す)。次回の起動でクライアントが再登録する。`DeviceTokenNotForTopic`・`403`(JWT)・`429`・5xx はトークンのせいと言い切れないので消さない(設定ミスで全員のトークンを消さないため)。条件は「いまの `push_token` がそのトークンと一致」なので、送信と同時に再登録された新しいトークンは消えない
-- **失敗の扱いは従来どおり**(§5.5): 5xx・ネットワーク断はリトライ1回、失敗しても本処理は成功扱い。環境の取得や掃除の失敗も本処理を止めない(ログに残して `APNS_ENV` で送る)
-- **実装**: `_shared/apns.ts`(`ApnsClient.send` の `environment` 指定・失敗結果の `invalidToken`・`TokenAwarePusher`)と `_shared/pusher.ts`(Supabase 版の `PushTokenStore`・`createPusher`)。Function の `index.ts` は `createPusher(adminClient, "<関数名>")` を使う(新しい push 送信 Function もこれを使うこと)。テストは `apns_test.ts` / `pusher_test.ts`
+- **失敗の扱いは従来どおり**(§5.5): 5xx・ネットワーク断はリトライ1回、失敗しても本処理は成功扱い。無効トークンの掃除の失敗も本処理を止めない(ログに残す)
+- **実装**: `_shared/apns.ts`(`ApnsClient.send` の `environment` 指定・失敗結果の `invalidToken`・`TokenAwarePusher`)と `_shared/pusher.ts`(Supabase 版の `PushTokenStore`=無効トークンの掃除だけ・`createPusher`)・`_shared/user_rows.ts`(users 行の読み出し)。Function の `index.ts` は `createPusher(adminClient, "<関数名>")` を使い、users の読み出しは `USER_COLUMNS` / `PARTNER_SELECT` / `toSnapshotUser` を使う(新しい push 送信 Function もこれを使うこと)。テストは `apns_test.ts` / `pusher_test.ts` / `user_rows_test.ts`(+ `scripts/ops/push_env_static_test.ts`)
 
 ## 5. バックエンド設計(Supabase)
 
@@ -280,12 +280,19 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 | react | POST | checkinId, stamp | リアクション保存(1チェックインにつき1人1つ。別のスタンプへの付け替えは上書き) → 相手へ push は**最初の1回だけ**(付け替え・同じスタンプの再送では送らない。2026-10-12・TASKPLAN §9.4 の仕様修正)。push に同梱する snapshot は相手視点で、「今日」は**相手のタイムゾーン**で決まる(送り手の日付は使わない)。応答 `{ changed }` は**保存内容が変わったか**(新規・付け替え = `true` / 同じスタンプの再送 = `false`)で、push を送ったかとは別 |
 | plant-name | POST | name, mode(`first` \| `rename`) | 植物の名前を付ける・変える(2026-10-12 追加・issue #54。下の補足)→ 自分用 snapshot 返却 + 変わったときだけ相手へサイレント更新(`pair_update`・snapshot 同梱) |
 | snapshot | GET | — | 自分視点の PairSnapshot(起動時の自己修復用)。成長回数は streak_days から数え、昨日の仮判定を含む(§5.4) |
-| close-day | cron 00:10 JST | — | 前日確定(§5.4)。チケット消費・リセットの通知送信。both の確定では plants.grown_days を both の行数で数え直す(stage は書かない) |
-| grant-tickets | cron 毎月1日 00:05 JST | — | free: balance=min(2, balance+2) / premium: balance=min(10, balance+5) |
-| _shared/ | — | — | streak.ts / tickets.ts(純粋ロジック)、apns.ts(JWT発行・送信)、snapshot.ts、messages.ts |
+| close-day | cron 00:10 JST | `dateLocal?`, `notify?` | 前日確定(§5.4)。チケット消費・リセットの通知送信。both の確定では plants.grown_days を both の行数で数え直す(stage は書かない)。cron は本文 `{}`。手動の再実行は `{dateLocal, notify:false}`(リセットの日は行が残らず、再実行で通知を再送するため。下の補足)。今日・未来の日は 400 `date_not_closable`。認証は cron 専用シークレット |
+| grant-tickets | cron 毎月1日 00:05 JST | `dateLocal?` | free: balance=min(2, balance+2) / premium: balance=min(10, balance+5)。**ペア×月の実行記録 `ticket_grant_runs`(migration 0006)で冪等**(上限到達で 0 付与でも記録する)。未来の月は 400 `future_month`。認証は cron 専用シークレット |
+| _shared/ | — | — | streak.ts / tickets.ts(純粋ロジック)、apns.ts(JWT発行・送信・`TokenAwarePusher`・`sendOptionsFor`)、pusher.ts(`createPusher`・無効トークンの掃除)、user_rows.ts(users 行の読み出し)、cron_http.ts(cron 専用 Function の認証・本文)、snapshot.ts、messages.ts |
 
 - **純粋ロジックは I/O から分離**して `_shared/` に置き、`deno test` 可能にする。これが Windows レーンで回せる唯一の自動テストなので、ストリーク・チケットの全エッジケースをここで担保する
 - apns.ts は送信クライアントを注入可能にし、テストではモック
+- **pusher.ts と push_env(2026-10-13・issue #60)**: push を送る 8 関数(checkin / checkin-cancel / close-day / invite-accept / nudge / plant-name / promise-set / react)は、`index.ts` で `createPusher(adminClient, "<関数名>")` を作る。APNs の 5 変数(§7)が揃っていなければ push をスキップする no-op、揃っていれば `TokenAwarePusher`。**送信先の環境は呼び出し側が渡す**: 受信者の users 行を `getUser` / `getActivePair` で読むとき `push_token` と `push_env` を一緒に読み(`USER_COLUMNS` / `PARTNER_SELECT` → `toSnapshotUser` で `SnapshotUserRow.pushEnv`)、`core.ts` が `pusher.send(token, payload, sendOptionsFor(受信者, 〈サイレントなら SILENT_PUSH_OPTS〉))` で `environment` を渡す。以前は送信のたびに `push_token` で users を逆引きして `push_env` を取っていたが、`push_token` には索引が無く users の全件走査になるためやめた。`push_env` が null のユーザーは `environment` を付けず `APNS_ENV` で送る。`TokenAwarePusher` が DB に触るのは、APNs が `410` / `400 BadDeviceToken` を返したトークンの `users.push_token` を null にする掃除だけ(`PushTokenStore.clearPushToken`)
+- **cron 専用 Function の認証と要求(close-day / grant-tickets。2026-10-13・issue #60)**
+  - 認証は `Authorization: Bearer <LIEN_CRON_SECRET>` の**完全一致**(定数時間比較)だけ。`LIEN_CRON_SECRET` は乱数 32 バイト(16 進 64 文字)で、Function secrets と Vault の `lien_cron_secret` に同じ値を置く(§7・`scripts/OPS.md` §6)。**service role key(万能鍵)もユーザー JWT も受け付けない**。未設定・32 文字未満のときは全リクエストを 401 にし、起動ログに理由を出す。cron の秘密は JWT ではないので `verify_jwt = false`(`config.toml`)
+  - 実装は `_shared/cron_http.ts` の `handleCronRequest`(405 → 401 → 400 → 本体 → 500 の順。認証前に本文は読まない)。本文は「空」か「JSON オブジェクト」だけで、壊れた JSON は 400 `invalid_json`(空として扱わない)、知らないキーは 400 `unknown_field`、型違いは 400 `invalid_date_local` / `invalid_notify`。`index.ts` は `createClient` と `handleCronRequest` に本体を渡すだけの薄い層
+  - **close-day の `notify`**: 省略 = `true`(cron の素朴な POST は従来どおり通知する)。`false` なら ticket_used とリセットの push を一切送らない。リセットの日は `streak_days` に行が残らないため、再実行するとその日のリセット通知を再送してしまう(§5.4「close-day の再実行は安全」はデータについての話で、通知は別)。手動の再実行(`scripts/ops/run-cron-fn.sh`)は常に `notify:false`。応答に `notify` を含める。確定できるのは JST の昨日まで(今日・未来は 400 `date_not_closable`)
+  - **grant-tickets の実行記録**: `ticket_grant_runs(pair_id, month_start)` が冪等キー。RPC `apply_monthly_ticket_grant`(service_role 専用)が実行記録・残高・ledger を1トランザクションで書く。応答の `alreadyGranted` は「今月は処理済み」(付与済み + 上限到達で記録だけ残したもの)、`unchanged` は今回 0 付与で記録だけ書いたペア数。旧来の印(同月の ledger monthly 行)も処理済みと見る。月の途中の再実行は二重付与にならない
+  - 定期実行の登録(pg_cron + pg_net)は migration 0003 → 0007。スケジュールの JST 換算・「JST の1日だけ」の条件・呼び先・鍵は `scripts/ops/cron_static_test.ts`、毎朝 00:40 JST の監視(GitHub Actions `lien-cron-watch`)は `scripts/ops/cron_check.ts`。運用は `scripts/OPS.md`
 - **plant-name の仕様(2026-10-12・issue #54 / docs/GROWTH.md §5.3・§8.1)**
   - 入力: `POST { name, mode }`。`mode` は `first`(最初に付ける)か `rename`(あとから変える)。それ以外は 400 `invalid_mode`
   - `name`: 前後の空白を除き、NFC に正規化したうえで **1〜8字**(Unicode コードポイントで数える。ニックネームと同じ字数、promise-set と同じ数え方)。改行・タブなどの制御文字、行/段落区切り、対になっていないサロゲート、**書式文字**(双方向制御 U+202A〜202E・U+2066〜2069、ゼロ幅スペース U+200B、語結合子 U+2060、BOM U+FEFF、ソフトハイフン U+00AD など。相手の画面で表示を崩したり別の名前に見せかけたりできるため。**絵文字をつなぐ ZWJ U+200D だけ許す**。絵文字表示の VS16 U+FE0F は書式文字でなく結合記号なので通る)、見える文字が1つも無い名前(空白・ゼロ幅文字だけ)は 400 `invalid_name`。入力検査は DB を引く前に行う
@@ -352,8 +359,8 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 
 - **checkin Function が Supabase Storage の署名付きアップロードURL(createSignedUploadUrl)を発行**し、クライアントが直接アップロード → checkin 行に photo_path を記録する
 - 理由: Edge Function でのバイナリプロキシはメモリ/実行時間を浪費する。署名URLならバケット非公開・RLS を維持したままクライアント直送できる
-- サムネ(NSE 用 200KB 上限)は**クライアント側で縮小してからアップロード**(サーバー画像処理を持たない=シンプル最優先)。原寸用とサムネ用の2オブジェクトを `pairs/<pair_id>/<date>/photo.jpg` / `photo_thumb.jpg` に置く
-- 必要な storage ポリシー追記は migration 0002 で行う(T14 実装時)
+- サムネ(NSE 用 200KB 上限)は**クライアント側で縮小してからアップロード**(サーバー画像処理を持たない=シンプル最優先)。原寸用とサムネ用の2オブジェクトを `pairs/<pair_id>/<date_local>/<user_id>/photo.jpg` / `photo_thumb.jpg` に置く(**本人単位**の区画。旧 `pairs/<pair_id>/<date>/photo.jpg` はペア×日付単位で、同じ日に2人目が付けると上書きできたため 2026-10-12 に変更 — §5.2・migration 0004・issue #52)
+- storage ポリシー: migration 0002(現役ペアのメンバーのみ読み書き)→ migration 0004(書き込みは**パスの `<user_id>` 区画が `auth.uid()` と一致するときだけ**。`is_valid_own_photo_upload`)。checkin Function は署名付きアップロードURLを**本人の区画にだけ**発行し、`photoPath` が本人の原寸写真パスでなければ 400 `invalid_photo_path`。読み取りは `pairs/<pair_id>/` 配下なら新旧どちらの形式でも可(既存の旧パスの写真は読めるまま)
 
 ### 5.7 仕様ギャップの決定事項(2026-06-11 ユーザー回答・issue #47)
 
@@ -373,10 +380,12 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 | 名前 | 置き場所 | 設定者 | 用途 |
 |---|---|---|---|
 | SUPABASE_URL / SUPABASE_ANON_KEY | `ios/Config/Secrets.xcconfig`(gitignore。`Secrets.example.xcconfig` をコミット) | 人間(G0) | アプリ→Supabase |
-| SERVICE_ROLE_KEY | Supabase Functions 環境変数(ダッシュボード) | 人間(G0) | Function→DB |
-| APNS_AUTH_KEY(.p8) / APNS_KEY_ID / APPLE_TEAM_ID / APNS_ENV | Supabase secrets | 人間(G0) | push 送信 |
+| SUPABASE_SERVICE_ROLE_KEY | Supabase が Function に**自動注入**(自分では設定しない) | プラットフォーム | Function→DB。**このプロジェクトでは default の secret key(`sb_secret_...`)で、legacy の `service_role`(`eyJ...`)ではない**(2026-10-12 実測)。cron の認証には使わない |
+| LIEN_CRON_SECRET | Function secrets と Vault の `lien_cron_secret`(**同じ値**) | エージェント(`scripts/OPS.md` §6。値は誰も画面で見ない) | pg_cron → close-day / grant-tickets の認証(cron 専用。DB には触れない)。SHA-256 の照合を監視が毎朝行う |
+| APNS_AUTH_KEY(.p8) / APNS_KEY_ID / APPLE_TEAM_ID / APNS_ENV / APNS_TOPIC | Supabase secrets | 人間(G0) | push 送信。1つでも欠ければ push 無効。`APNS_ENV` は `users.push_env` が未設定のトークンのフォールバック(§4.1) |
 | REVENUECAT_API_KEY(v1.1) | 同上+xcconfig | 人間(G6) | 課金 |
 
+- Vault には `lien_cron_secret`(cron 用)だけを置く。**万能鍵(service role key)は Vault にも pg_net のキューにも載せない**(2026-10-13・issue #60。以前の `lien_service_role_key` は削除)
 - エージェントは `.env` を読めない(settings.json で deny 済み)。**シークレットが必要な検証は人間ゲート([H])に回す**設計を崩さない
 - コードにキーをハードコードしたらその時点でタスク失敗(AGENTS.md 禁止事項)
 
@@ -408,6 +417,9 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 - サイレントプッシュは配送保証なし → 可視プッシュ+NSE が主経路である理由。逆に「通知を出さない状態変化」はウィジェット反映が遅れてよい仕様と割り切る
 - NSE は実行30秒・メモリ約24MB → サムネ200KB上限、失敗時フォールバック必須
 - WidgetKit の reload には日次予算がある → reload は NSE・アプリ起動時のみに限定
-- APNs は sandbox / production でエンドポイントが別(`APNS_ENV` で切替)。TestFlight は production 側
+- APNs は sandbox / production でエンドポイントが別。環境は**トークン単位**(`users.push_env`。呼び出し側が受信者の users 行から読んで `environment` に渡す — §4.1・§5.3)で、`APNS_ENV` は `push_env` が未設定のトークンのフォールバックにすぎない。TestFlight は production 側(Xcode 直インストールは sandbox)。環境が違うトークンは `400 BadDeviceToken` になり、そのトークンは `push_token` を null にされる
+- close-day の再実行はデータについては冪等だが、**リセットの日は行が残らないので通知を再送する** → 手動の再実行は `notify:false`(§5.3)。確定できるのは終わった日だけ。月をまたいで止まったときは「前月末日の前日まで close-day → grant-tickets → 残り」の順(`scripts/OPS.md` §4)
+- pg_net(`net` スキーマ)の関数・表は `supabase_admin` 所有で `PUBLIC` に EXECUTE / SELECT が付いており、**postgres(migration を流すロール)からは `revoke` しても何も変わらない**(2026-10-13 実測)。守りは「公開 API から net に届かないこと」(PostgREST の公開スキーマは `public, graphql_public` だけ・pg_graphql は無効。監視が毎朝確認)と「万能鍵をキューに載せないこと」(`scripts/OPS.md` §9)
+- pg_net の HTTP 応答(`net._http_response`)は 6 時間で消える。cron の結果の確認は、起動の 30 分後(00:40 JST)の自動監視が担う。Supabase 無料枠の自動停止(D5)も監視が検知する
 - 匿名認証→Apple連携は Supabase の anonymous sign-in + linkIdentity を使う(再インストール時、未連携ユーザーは救済不可 — オンボで明示)
 - App Store の表示名「Lien」単独は重複の可能性 → 「Lien − ふたりの約束」等で回避(G4 で確定)
