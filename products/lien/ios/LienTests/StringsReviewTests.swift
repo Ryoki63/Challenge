@@ -1,0 +1,517 @@
+// StringsReviewTests.swift — 罰なし文言の lint(issue #62 = T27 の前倒し分)
+//
+// アプリが画面に出す文言(Strings.swift)に、罰・恥・煽り系の表現が入っていないことを CI で常に検査する。
+// 正本: docs/REQUIREMENTS.md §3.5 / docs/DESIGN.md §3.8(罰・恥系の文言は禁止)。
+// サーバー側(プッシュ文言)の同じ検査は supabase/functions/_shared/messages_test.ts の BANNED_PATTERN で、
+// その語をそのまま Swift に移した(PunishmentFreeLint.bannedWords。ずれは testBannedWordsMatchServerSide が検知する)。
+//
+// 検査は3層:
+//   1. Strings.swift のソース上の文字列リテラルを全件拾って検査する(本線。文言を足した瞬間から対象になる)
+//   2. StringsCatalog(静的な文言+関数型文言の代表的な出力)を、実行時の値で検査する(組み立て後の文言)
+//   3. 1 で拾った全リテラルが 2 のカタログに載っていることを確かめる(カタログの陳腐化防止)
+//      → Strings.swift に文言を足したら、StringsCatalog にも1行足す(忘れるとここが落ちて教えてくれる)
+//
+// 機械チェックは補助にすぎない(責めるニュアンスは語では捕まらない)。
+// 全文言の目視レビュー(レビュー表)は T27 本体(#27)で行い、StringsCatalog がその一覧の元になる。
+
+import XCTest
+@testable import Lien
+
+// MARK: - 禁止ワード(messages_test.ts の BANNED_PATTERN の移植)
+
+enum PunishmentFreeLint {
+    /// supabase/functions/_shared/messages_test.ts の
+    ///   const BANNED_PATTERN = /枯れ|サボ|罰|恥|ダメ|怒|遅い|まだやってない/;
+    /// と同じ語。サーバー側を拡充したら、ここも同じに直す
+    static let bannedWords: [String] = ["枯れ", "サボ", "罰", "恥", "ダメ", "怒", "遅い", "まだやってない"]
+
+    /// text に含まれる禁止ワード(無ければ空)。
+    /// サーバー側(JS の RegExp)は書いてある通りの表記にしか反応しないが、こちらは
+    /// ひらがな/カタカナの表記ゆれ(だめ / ダメ、さぼ / サボ)も同じ語として扱って、少し厳しめに見る
+    static func violations(in text: String) -> [String] {
+        let folded = foldKana(text)
+        return bannedWords.filter { word in
+            text.contains(word) || folded.contains(foldKana(word))
+        }
+    }
+
+    /// ひらがなをカタカナに寄せる(表記ゆれを同じ語として比べるため)
+    static func foldKana(_ text: String) -> String {
+        text.applyingTransform(.hiraganaToKatakana, reverse: false) ?? text
+    }
+
+    /// ソース上の文字列リテラルに見つかった違反1件
+    struct SourceViolation: Equatable {
+        let line: Int
+        /// 補間の位置を ⟨…⟩ で示した、リテラルの表示
+        let literal: String
+        let words: [String]
+
+        var message: String { "Strings.swift:\(line) 禁止ワード \(words) を含む文言: \(literal)" }
+    }
+
+    /// literals(Strings.swift から拾ったもの)のうち、禁止ワードを含むものを返す。
+    /// 補間 `\( … )` で分かれた固定部分ごとに見る(式の中身は文言ではない)
+    static func violations(in literals: [StringLiteralScanner.Literal]) -> [SourceViolation] {
+        literals.compactMap { literal in
+            let words = literal.fragments.flatMap { violations(in: $0) }
+            return words.isEmpty
+                ? nil
+                : SourceViolation(line: literal.line, literal: literal.display, words: Array(Set(words)).sorted())
+        }
+    }
+}
+
+// MARK: - 文言のカタログ(Strings.swift の全文言)
+
+/// 1つの文言(名前は失敗メッセージ用。例: "Home.inviteButton")
+struct ReviewedString {
+    let name: String
+    let text: String
+}
+
+enum StringsCatalog {
+    /// 関数型文言に渡す代表的な引数(相手の名前・日数・日時の表記)。
+    /// 名前は日本語・英字・絵文字入り、日数は 0 と大きい値を含める
+    static let representativeNames = ["ゆうき", "Aki", "🌱はな"]
+    static let representativeDays = [0, 1, 23, 365]
+    static let representativeDates = ["2026年10月20日 21:00", "Oct 20, 2026 at 9:00 PM"]
+
+    /// Strings.swift の全文言。静的な文言は値そのもの、関数型の文言は代表的な引数で組み立てた出力。
+    /// ※ Strings.swift に文言を足したら、ここにも足すこと
+    static var all: [ReviewedString] {
+        var items: [ReviewedString] = []
+        func add(_ name: String, _ text: String) {
+            items.append(ReviewedString(name: name, text: text))
+        }
+        func addPalette(_ name: String, _ palette: [String]) {
+            for (i, emoji) in palette.enumerated() { add("\(name)[\(i)]", emoji) }
+        }
+
+        // Widget(LienWidget ターゲットと共有する名前空間)
+        add("Widget.displayName", Strings.Widget.displayName)
+        add("Widget.description", Strings.Widget.description)
+        add("Widget.emptyTitle", Strings.Widget.emptyTitle)
+        add("Widget.emptyMessage", Strings.Widget.emptyMessage)
+        add("Widget.meFallbackLabel", Strings.Widget.meFallbackLabel)
+        add("Widget.partnerFallbackLabel", Strings.Widget.partnerFallbackLabel)
+        add("Widget.soloCaption", Strings.Widget.soloCaption)
+        for name in representativeNames {
+            add("Widget.partnerWaiting(\(name))", Strings.Widget.partnerWaiting(name))
+        }
+        for days in representativeDays {
+            add("Widget.streakDays(\(days))", Strings.Widget.streakDays(days))
+        }
+
+        // Onboarding
+        add("Onboarding.conceptTitle", Strings.Onboarding.conceptTitle)
+        add("Onboarding.conceptBody", Strings.Onboarding.conceptBody)
+        add("Onboarding.conceptNote", Strings.Onboarding.conceptNote)
+        add("Onboarding.conceptStart", Strings.Onboarding.conceptStart)
+        add("Onboarding.profileTitle", Strings.Onboarding.profileTitle)
+        add("Onboarding.nicknamePlaceholder", Strings.Onboarding.nicknamePlaceholder)
+        add("Onboarding.nicknameEmptyError", Strings.Onboarding.nicknameEmptyError)
+        add("Onboarding.nicknameTooLongError", Strings.Onboarding.nicknameTooLongError)
+        add("Onboarding.avatarTitle", Strings.Onboarding.avatarTitle)
+        add("Onboarding.profileSubmit", Strings.Onboarding.profileSubmit)
+        add("Onboarding.anonymousStartNote", Strings.Onboarding.anonymousStartNote)
+        add("Onboarding.notificationTitle", Strings.Onboarding.notificationTitle)
+        add("Onboarding.notificationBody", Strings.Onboarding.notificationBody)
+        add("Onboarding.notificationAllow", Strings.Onboarding.notificationAllow)
+        add("Onboarding.notificationLater", Strings.Onboarding.notificationLater)
+        add("Onboarding.submitErrorMessage", Strings.Onboarding.submitErrorMessage)
+        add("Onboarding.retry", Strings.Onboarding.retry)
+        addPalette("Onboarding.avatarPalette", Strings.Onboarding.avatarPalette)
+
+        // Pairing
+        add("Pairing.title", Strings.Pairing.title)
+        add("Pairing.subtitle", Strings.Pairing.subtitle)
+        add("Pairing.inviteSectionTitle", Strings.Pairing.inviteSectionTitle)
+        add("Pairing.inviteExplainer", Strings.Pairing.inviteExplainer)
+        add("Pairing.issueButton", Strings.Pairing.issueButton)
+        add("Pairing.codeCaption", Strings.Pairing.codeCaption)
+        add("Pairing.qrCaption", Strings.Pairing.qrCaption)
+        add("Pairing.shareButton", Strings.Pairing.shareButton)
+        add("Pairing.shareMessage", Strings.Pairing.shareMessage)
+        add("Pairing.closeButton", Strings.Pairing.closeButton)
+        add("Pairing.acceptSectionTitle", Strings.Pairing.acceptSectionTitle)
+        add("Pairing.acceptExplainer", Strings.Pairing.acceptExplainer)
+        add("Pairing.codePlaceholder", Strings.Pairing.codePlaceholder)
+        add("Pairing.acceptButton", Strings.Pairing.acceptButton)
+        add("Pairing.errorAlreadyPaired", Strings.Pairing.errorAlreadyPaired)
+        add("Pairing.errorPartnerAlreadyPaired", Strings.Pairing.errorPartnerAlreadyPaired)
+        add("Pairing.errorInviteNotFound", Strings.Pairing.errorInviteNotFound)
+        add("Pairing.errorInviteExpired", Strings.Pairing.errorInviteExpired)
+        add("Pairing.errorInviteAlreadyUsed", Strings.Pairing.errorInviteAlreadyUsed)
+        add("Pairing.errorCannotAcceptOwnInvite", Strings.Pairing.errorCannotAcceptOwnInvite)
+        add("Pairing.errorInvalidTokenFormat", Strings.Pairing.errorInvalidTokenFormat)
+        add("Pairing.errorNetwork", Strings.Pairing.errorNetwork)
+        for date in representativeDates {
+            add("Pairing.expiresNote(\(date))", Strings.Pairing.expiresNote(date))
+        }
+
+        // PromiseSetup
+        add("PromiseSetup.title", Strings.PromiseSetup.title)
+        add("PromiseSetup.subtitle", Strings.PromiseSetup.subtitle)
+        add("PromiseSetup.titleSectionTitle", Strings.PromiseSetup.titleSectionTitle)
+        add("PromiseSetup.titlePlaceholder", Strings.PromiseSetup.titlePlaceholder)
+        add("PromiseSetup.titleEmptyError", Strings.PromiseSetup.titleEmptyError)
+        add("PromiseSetup.titleTooLongError", Strings.PromiseSetup.titleTooLongError)
+        add("PromiseSetup.emojiSectionTitle", Strings.PromiseSetup.emojiSectionTitle)
+        add("PromiseSetup.remindSectionTitle", Strings.PromiseSetup.remindSectionTitle)
+        add("PromiseSetup.remindToggleLabel", Strings.PromiseSetup.remindToggleLabel)
+        add("PromiseSetup.remindTimeLabel", Strings.PromiseSetup.remindTimeLabel)
+        add("PromiseSetup.saveButton", Strings.PromiseSetup.saveButton)
+        add("PromiseSetup.editKeepsStreakNote", Strings.PromiseSetup.editKeepsStreakNote)
+        add("PromiseSetup.saveErrorMessage", Strings.PromiseSetup.saveErrorMessage)
+        addPalette("PromiseSetup.emojiPalette", Strings.PromiseSetup.emojiPalette)
+
+        // Home
+        add("Home.soloCaption", Strings.Home.soloCaption)
+        add("Home.soloInviteHint", Strings.Home.soloInviteHint)
+        add("Home.inviteButton", Strings.Home.inviteButton)
+        add("Home.streakCaption", Strings.Home.streakCaption)
+        add("Home.todaySectionTitle", Strings.Home.todaySectionTitle)
+        add("Home.meFallbackLabel", Strings.Home.meFallbackLabel)
+        add("Home.partnerFallbackLabel", Strings.Home.partnerFallbackLabel)
+        add("Home.promiseUnsetLabel", Strings.Home.promiseUnsetLabel)
+        add("Home.bothDoneCelebration", Strings.Home.bothDoneCelebration)
+        add("Home.checkinButton", Strings.Home.checkinButton)
+        add("Home.checkinDoneLabel", Strings.Home.checkinDoneLabel)
+        add("Home.checkinErrorMessage", Strings.Home.checkinErrorMessage)
+        add("Home.emptyTitle", Strings.Home.emptyTitle)
+        add("Home.emptyMessage", Strings.Home.emptyMessage)
+        for days in representativeDays {
+            add("Home.streakDays(\(days))", Strings.Home.streakDays(days))
+            add("Home.streakBestNote(\(days))", Strings.Home.streakBestNote(days))
+        }
+        for name in representativeNames {
+            add("Home.partnerWaiting(\(name))", Strings.Home.partnerWaiting(name))
+        }
+
+        // Checkin
+        add("Checkin.attachPhotoButton", Strings.Checkin.attachPhotoButton)
+        add("Checkin.attachPhotoSending", Strings.Checkin.attachPhotoSending)
+        add("Checkin.attachPhotoDoneNote", Strings.Checkin.attachPhotoDoneNote)
+        add("Checkin.attachPhotoErrorMessage", Strings.Checkin.attachPhotoErrorMessage)
+        add("Checkin.cancelButton", Strings.Checkin.cancelButton)
+        add("Checkin.cancelDialogTitle", Strings.Checkin.cancelDialogTitle)
+        add("Checkin.cancelDialogMessage", Strings.Checkin.cancelDialogMessage)
+        add("Checkin.cancelConfirm", Strings.Checkin.cancelConfirm)
+        add("Checkin.cancelKeep", Strings.Checkin.cancelKeep)
+        add("Checkin.cancelErrorMessage", Strings.Checkin.cancelErrorMessage)
+
+        // Nudge
+        add("Nudge.button", Strings.Nudge.button)
+        add("Nudge.sheetTitle", Strings.Nudge.sheetTitle)
+        add("Nudge.sheetSubtitle", Strings.Nudge.sheetSubtitle)
+        add("Nudge.sentNote", Strings.Nudge.sentNote)
+        add("Nudge.limitReachedMessage", Strings.Nudge.limitReachedMessage)
+        add("Nudge.errorMessage", Strings.Nudge.errorMessage)
+
+        // Reaction
+        add("Reaction.button", Strings.Reaction.button)
+        add("Reaction.sheetTitle", Strings.Reaction.sheetTitle)
+        add("Reaction.sentNote", Strings.Reaction.sentNote)
+        add("Reaction.errorMessage", Strings.Reaction.errorMessage)
+
+        return items
+    }
+}
+
+// MARK: - リポジトリ内のファイルの場所
+
+private enum LienSourceFiles {
+    /// products/lien/(このテストファイルは products/lien/ios/LienTests/ にある。
+    /// シミュレータはホストのファイルを読めるので、CI でもソースの場所をそのまま辿れる — ContractFixtures と同じ方式)
+    static func lienRoot(from file: StaticString = #filePath) -> URL {
+        URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent() // LienTests
+            .deletingLastPathComponent() // ios
+            .deletingLastPathComponent() // lien
+    }
+
+    static func read(_ relativePath: String, file: StaticString = #filePath) throws -> String {
+        let url = lienRoot(from: file).appendingPathComponent(relativePath)
+        do {
+            return try String(contentsOf: url, encoding: .utf8)
+        } catch {
+            throw NSError(
+                domain: "StringsReviewTests",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "\(relativePath) が読めません(\(url.path)): \(error)"]
+            )
+        }
+    }
+}
+
+// MARK: - lint 本体
+
+final class StringsReviewTests: XCTestCase {
+    private func stringsSwiftLiterals() throws -> [StringLiteralScanner.Literal] {
+        let source = try LienSourceFiles.read("ios/Lien/Core/Strings.swift")
+        return try StringLiteralScanner.literals(in: source)
+    }
+
+    // MARK: 1. Strings.swift のソース上の全リテラル(本線)
+
+    func testEveryStringLiteralInStringsSwiftIsFreeOfPunitiveWords() throws {
+        let literals = try stringsSwiftLiterals()
+
+        // 読めている確認: 実在する文言が拾えていること(拾えていないのに「違反なし」で通るのを防ぐ)
+        let allFragments = Set(literals.flatMap(\.fragments))
+        XCTAssertTrue(allFragments.contains(Strings.Onboarding.conceptTitle), "Strings.swift の文言を拾えていない")
+        XCTAssertTrue(allFragments.contains(Strings.Home.checkinButton), "Strings.swift の文言を拾えていない")
+
+        let found = PunishmentFreeLint.violations(in: literals)
+        XCTAssertTrue(found.isEmpty, "罰・恥系の禁止ワードを含む文言:\n" + found.map(\.message).joined(separator: "\n"))
+    }
+
+    func testLintFindsPunitiveWordsInSourceLiterals() throws {
+        // lint 自体が働くことの確認(文言の一覧が空振りで「違反なし」にならないように)
+        let source = """
+        enum Strings {
+            // 「枯れる」「サボり」のようなワードを使わない(コメントの中は文言ではないので対象外)
+            static let ok = "ふたりのペースでいこう"
+            static let bad = "あと3日で枯れちゃうよ"
+            static func template(_ name: String) -> String { "\\(name)はサボってる?" }
+            static let hiragana = "だめだよ"
+        }
+        """
+        let found = PunishmentFreeLint.violations(in: try StringLiteralScanner.literals(in: source))
+        XCTAssertEqual(found.map(\.line), [4, 5, 6])
+        XCTAssertEqual(found.map(\.words), [["枯れ"], ["サボ"], ["ダメ"]])
+        XCTAssertEqual(found[1].literal, "⟨…⟩はサボってる?")
+
+        // 責めない文言と、コメントだけの禁止ワードは違反にしない
+        let clean = """
+        // サボらせない、のような説明のコメント
+        static let a = "また明日ね"
+        """
+        XCTAssertEqual(PunishmentFreeLint.violations(in: try StringLiteralScanner.literals(in: clean)), [])
+    }
+
+    func testNoEmptyStringLiteralInStringsSwift() throws {
+        for literal in try stringsSwiftLiterals() {
+            let isBlank = literal.fragments.allSatisfy {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            // 補間だけのリテラル("\(x)")も、見える文言が空になりうるので同じく不可
+            XCTAssertFalse(isBlank, "Strings.swift:\(literal.line) 空(または空白だけ)の文言: \(literal.display)")
+        }
+    }
+
+    // MARK: 2. カタログ(実行時の値。関数型の文言は代表的な引数で組み立てた出力)
+
+    func testCatalogStringsAreFreeOfPunitiveWordsAndWellFormed() {
+        let catalog = StringsCatalog.all
+        XCTAssertGreaterThan(catalog.count, 100)
+
+        for item in catalog {
+            XCTAssertEqual(
+                PunishmentFreeLint.violations(in: item.text),
+                [],
+                "Strings.\(item.name) が罰・恥系の禁止ワードを含む: \(item.text)"
+            )
+            XCTAssertFalse(
+                item.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                "Strings.\(item.name) が空文言"
+            )
+            // 組み立て損ない(補間の取りこぼし・書式指定子の混入)
+            XCTAssertFalse(item.text.contains("\\("), "Strings.\(item.name) に補間の記法が残っている: \(item.text)")
+            XCTAssertFalse(item.text.contains("%@"), "Strings.\(item.name) に書式指定子が残っている: \(item.text)")
+            XCTAssertFalse(item.text.contains("%d"), "Strings.\(item.name) に書式指定子が残っている: \(item.text)")
+        }
+    }
+
+    func testCatalogNamesAreUnique() {
+        var seen = Set<String>()
+        for item in StringsCatalog.all {
+            XCTAssertTrue(seen.insert(item.name).inserted, "カタログの名前が重複: \(item.name)")
+        }
+    }
+
+    func testFunctionStringsEmbedTheirArguments() {
+        // 代表的な引数が文言に反映されている(引数を無視した固定文言になっていない)
+        for name in StringsCatalog.representativeNames {
+            XCTAssertTrue(Strings.Widget.partnerWaiting(name).contains(name))
+            XCTAssertTrue(Strings.Home.partnerWaiting(name).contains(name))
+        }
+        for days in StringsCatalog.representativeDays {
+            XCTAssertTrue(Strings.Widget.streakDays(days).contains("\(days)"))
+            XCTAssertTrue(Strings.Home.streakDays(days).contains("\(days)"))
+            XCTAssertTrue(Strings.Home.streakBestNote(days).contains("\(days)"))
+        }
+        for date in StringsCatalog.representativeDates {
+            XCTAssertTrue(Strings.Pairing.expiresNote(date).contains(date))
+        }
+    }
+
+    // MARK: 3. ソースの全リテラルがカタログに載っている(カタログの陳腐化防止)
+
+    func testCatalogCoversEveryStringLiteralInStringsSwift() throws {
+        let catalogTexts = StringsCatalog.all.map(\.text)
+
+        for literal in try stringsSwiftLiterals() {
+            // 補間で分けた固定部分が、どれもカタログのどれかの文言に含まれていること
+            for fragment in literal.fragments where !fragment.isEmpty {
+                XCTAssertTrue(
+                    catalogTexts.contains { $0.contains(fragment) },
+                    "Strings.swift:\(literal.line) の文言がカタログに無い: \(literal.display) — StringsReviewTests の StringsCatalog.all に足してください"
+                )
+            }
+        }
+    }
+
+    // MARK: 禁止ワード自体の確認
+
+    func testBannedWordsMatchServerSide() throws {
+        let source = try LienSourceFiles.read("supabase/functions/_shared/messages_test.ts")
+        // const BANNED_PATTERN = /枯れ|サボ|罰|恥|ダメ|怒|遅い|まだやってない/;
+        let regex = try NSRegularExpression(pattern: #"const\s+BANNED_PATTERN\s*=\s*/([^/\n]+)/[a-z]*\s*;"#)
+        let range = NSRange(source.startIndex..., in: source)
+        guard
+            let match = regex.firstMatch(in: source, range: range),
+            let patternRange = Range(match.range(at: 1), in: source)
+        else {
+            XCTFail("messages_test.ts に BANNED_PATTERN の定義が見つからない(書き方が変わった?)。この lint の移植元を確かめてください")
+            return
+        }
+        let pattern = String(source[patternRange])
+
+        // 単純な語の並び(a|b|c)だけを受け付ける。正規表現の記号が入ったら、移植のしかたを見直す
+        let metacharacters = CharacterSet(charactersIn: "\\^$.?*+()[]{}")
+        XCTAssertTrue(
+            pattern.unicodeScalars.allSatisfy { !metacharacters.contains($0) },
+            "サーバー側の BANNED_PATTERN が単純な語の並びではなくなった。PunishmentFreeLint の移植を見直してください: \(pattern)"
+        )
+
+        let serverWords = Set(pattern.split(separator: "|").map(String.init))
+        let swiftWords = Set(PunishmentFreeLint.bannedWords)
+        XCTAssertEqual(
+            swiftWords.subtracting(serverWords),
+            [],
+            "Swift 版にだけある禁止ワード(サーバー側へも足すか、Swift 側から外すか決める)"
+        )
+        XCTAssertEqual(
+            serverWords.subtracting(swiftWords),
+            [],
+            "サーバー側(messages_test.ts)に足された禁止ワードが Swift 版に無い — PunishmentFreeLint.bannedWords に足してください"
+        )
+    }
+
+    func testLintDetectsPunitiveExpressions() {
+        // 禁止ワード8語それぞれを含む文を、ひとつずつ検出できること
+        let bad: [(text: String, word: String)] = [
+            ("あと3日で枯れちゃうよ", "枯れ"),
+            ("サボってない?", "サボ"),
+            ("ゲームに負けたら罰ゲーム", "罰"),
+            ("恥ずかしくないの", "恥"),
+            ("ダメだよ、続けなきゃ", "ダメ"),
+            ("まだ怒ってるよ", "怒"),
+            ("今日も遅いなあ", "遅い"),
+            ("まだやってないの?", "まだやってない"),
+        ]
+        for (text, word) in bad {
+            XCTAssertEqual(PunishmentFreeLint.violations(in: text), [word], text)
+        }
+    }
+
+    func testLintTreatsHiraganaAndKatakanaSpellingsAlike() {
+        XCTAssertEqual(PunishmentFreeLint.violations(in: "だめだよ"), ["ダメ"])
+        XCTAssertEqual(PunishmentFreeLint.violations(in: "さぼってる"), ["サボ"])
+        XCTAssertEqual(PunishmentFreeLint.violations(in: "マダヤッテナイ"), ["まだやってない"])
+    }
+
+    func testLintAcceptsGentleExpressions() {
+        // 実際に使っている、責めない言い回し
+        let gentle = [
+            "ゆうきが待ってるよ",
+            "今日はもうたくさんつついたよ。また明日ね",
+            "また今日から。最高記録 40日 はふたりの財産だよ🌱",
+            "通信がうまくいきませんでした。もう一度お試しください",
+            "まちがえてタップしたときのために。いつでもまたチェックインできます",
+            "約束を変えても、ふたりの記録はそのまま続きます",
+        ]
+        for text in gentle {
+            XCTAssertEqual(PunishmentFreeLint.violations(in: text), [], text)
+        }
+    }
+}
+
+// MARK: - 字句解析器そのものの確認(lint の「全件拾える」が土台なので、解析器を信頼できる状態にしておく)
+
+final class StringLiteralScannerTests: XCTestCase {
+    private func fragments(_ source: String) throws -> [[String]] {
+        try StringLiteralScanner.literals(in: source).map(\.fragments)
+    }
+
+    func testPlainLiteralsAndLineNumbers() throws {
+        let source = "let a = \"こんにちは\"\n\nlet b = \"さようなら\"\n"
+        let literals = try StringLiteralScanner.literals(in: source)
+        XCTAssertEqual(literals.map(\.fragments), [["こんにちは"], ["さようなら"]])
+        XCTAssertEqual(literals.map(\.line), [1, 3])
+    }
+
+    func testCommentsAreSkipped() throws {
+        let source = """
+        // "行コメントの中の文言"
+        /// "ドキュメントコメントの中の文言"
+        let a = "拾う" // "行末コメントの中の文言"
+        /* "ブロックコメント"
+           /* "ネストしたブロックコメント" */
+           "まだブロックコメントの中" */
+        let b = "これも拾う"
+        """
+        XCTAssertEqual(try fragments(source), [["拾う"], ["これも拾う"]])
+    }
+
+    func testDoubleSlashInsideLiteralIsNotAComment() throws {
+        XCTAssertEqual(try fragments("let url = \"https://example.com/a\""), [["https://example.com/a"]])
+    }
+
+    func testEscapesAreResolved() throws {
+        // \n \t \" \\ \u{…}
+        let source = #"let a = "行1\n行2\t\"引用\"\\\u{3042}""#
+        XCTAssertEqual(try fragments(source), [["行1\n行2\t\"引用\"\\あ"]])
+    }
+
+    func testInterpolationSplitsFragmentsAndSkipsTheExpression() throws {
+        XCTAssertEqual(try fragments(#"let a = "\(partnerName)が待ってるよ""#), [["", "が待ってるよ"]])
+        XCTAssertEqual(try fragments(#"let a = "\(days)日""#), [["", "日"]])
+        XCTAssertEqual(try fragments(#"let a = "最高記録 \(days)日""#), [["最高記録 ", "日"]])
+        // 式の中の括弧と、式の中の文字列リテラル(これも文言になり得るので別に拾う)
+        let nested = try StringLiteralScanner.literals(in: #"let a = "\(f(g(1), flag ? "あり" : "なし"))です""#)
+        XCTAssertEqual(Set(nested.map(\.fragments)), [["", "です"], ["あり"], ["なし"]])
+    }
+
+    func testEmojiWithVariationSelectorsSurvive() throws {
+        XCTAssertEqual(try fragments(#"let p = ["⭐️", "☕️", "✍️", "🗣️"]"#), [["⭐️"], ["☕️"], ["✍️"], ["🗣️"]])
+    }
+
+    func testEmptyLiteralIsReported() throws {
+        XCTAssertEqual(try fragments("let a = \"\""), [[""]])
+    }
+
+    func testUnsupportedSyntaxThrowsInsteadOfSilentlySkipping() {
+        XCTAssertThrowsError(try StringLiteralScanner.literals(in: "let a = \"\"\"\nline\n\"\"\"")) { error in
+            XCTAssertTrue("\(error)".contains("複数行"), "\(error)")
+        }
+        XCTAssertThrowsError(try StringLiteralScanner.literals(in: ##"let a = #"raw"#"##)) { error in
+            XCTAssertTrue("\(error)".contains("生文字列"), "\(error)")
+        }
+        XCTAssertThrowsError(try StringLiteralScanner.literals(in: "let a = \"閉じていない\nlet b = 1"))
+        XCTAssertThrowsError(try StringLiteralScanner.literals(in: #"let a = "未知のエスケープ\q""#))
+    }
+
+    func testHashDirectivesAreNotRawStrings() throws {
+        // #if / #Preview("…") / #filePath は生文字列ではない
+        let source = """
+        #if DEBUG
+        let a = "デバッグ"
+        #endif
+        #Preview("プレビュー") { }
+        """
+        XCTAssertEqual(try fragments(source), [["デバッグ"], ["プレビュー"]])
+    }
+}

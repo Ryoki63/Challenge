@@ -2,6 +2,8 @@
 //
 // - ユーザーの目に触れる文言は必ずここに置く。View 内に直書きしない
 // - **罰・恥系の表現は禁止**(REQUIREMENTS §3.5。「枯れる」「サボり」等のワードを使わない)
+//   → LienTests/StringsReviewTests.swift が、このファイルの文字列リテラルを全件拾って禁止ワードを CI で検査する。
+//     文言を足したら、同じファイルの StringsCatalog.all にも1行足すこと(足し忘れはテストが教えてくれる)
 // - Widget 名前空間は LienWidget ターゲットにもソース共有される(project.yml 参照)。
 //   このファイルは Foundation 以外に依存させないこと。
 
@@ -163,8 +165,9 @@ enum Strings {
         static let soloCaption = Widget.soloCaption
         /// ソロ状態の誘導(招待の動機付け — §3.9)
         static let soloInviteHint = "招待した相手とペアになると、ふたりの約束がはじまります"
-        /// ソロ状態のホームから招待画面を開くボタン(§3.2: 招待待ちでも使える。招待は任意)
-        static let inviteButton = "パートナーを招待する"
+        /// ソロ状態のホームから招待画面を開くボタン(§3.2: 招待待ちでも使える。招待は任意)。
+        /// 恋人・夫婦・友達・家族のどれにも開く言い方にする(CONCEPT §5-2: カップル限定にしない)
+        static let inviteButton = "相手を招待する"
 
         // ストリーク(§3.5: 最高記録は永続表示。リセット時も「ふたりの財産」として残す)
         static let streakCaption = "ふたりの記録"
