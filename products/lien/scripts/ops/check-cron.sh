@@ -20,7 +20,10 @@
 
 set -euo pipefail
 
-: "${SUPABASE_ACCESS_TOKEN:?SUPABASE_ACCESS_TOKEN を設定してください(set -a; source .env; set +a)}"
+if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+  echo "ERROR: SUPABASE_ACCESS_TOKEN を設定してください(set -a; source .env; set +a)" >&2
+  exit 2
+fi
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
