@@ -40,9 +40,9 @@ targets:
     platform: iOS
     sources:
       - path: Lien
-      # 植物スプライト v0(正本: ../assets/plant — T09/T13)。imageset 名は契約
-      # (PlantSprite.swift が解決の一元点)。G2(#40)後の v2 差し替えはカタログ再生成のみ。
-      # LienWidget ターゲットへの共有追加は T17 の責務(今回はアプリ本体のみ)
+      # 植物キャラクター v4「タネの子」の SVG レイヤー34点(正本: ../assets/plant — issue #56。生成は
+      # assets/plant/tools/)。imageset 名は plant_<レイヤー名>(PlantLayers.assetPrefix)。
+      # 重ねて描くのは PlantCharacterView。LienWidget にも同じカタログを入れる(ウィジェットでも描く)
       - path: ../assets/plant/PlantAssets.xcassets
         buildPhase: resources
     settings:
@@ -95,6 +95,13 @@ targets:
       - path: Lien/Core/Models/PairSnapshot.swift
       - path: Lien/Core/AppGroupStore.swift
       - path: Lien/Core/Strings.swift
+      # 植物の描画(issue #56。S ウィジェットの試作 — 本実装は T17a)。SwiftUI と Foundation と PairSnapshot だけに
+      # 依存する純粋なファイルなので、アプリ本体とソース共有する。カタログも同じものを入れる(全レイヤーを
+      # 重ねてもウィジェットのメモリに収まるかは実機で確かめる — GROWTH §9.5)
+      - path: Lien/Core/DesignSystem/PlantLayers.swift
+      - path: Lien/Core/DesignSystem/PlantCharacterView.swift
+      - path: ../assets/plant/PlantAssets.xcassets
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE).widget"

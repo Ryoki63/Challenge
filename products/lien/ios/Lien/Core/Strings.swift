@@ -33,8 +33,8 @@ enum Strings {
             "\(days)日"
         }
 
-        /// ソロ状態(ペア未成立・鉢は土だけ — REQUIREMENTS §3.9)の一言
-        static let soloCaption = "ペアになると種がまかれるよ"
+        /// ソロ状態(ペア未成立・タネの子は鉢の土の中で眠っている — REQUIREMENTS §3.9)の一言
+        static let soloCaption = "ペアになると、タネの子が目をさますよ"
     }
 
     /// オンボーディング3画面(REQUIREMENTS §3.1, §6 / T10)
@@ -161,7 +161,7 @@ enum Strings {
     enum Home {
         // 植物(§3.9。名前未設定のときは名前行を出さない — フォールバック文言は置かない)
 
-        /// ソロ状態(ペア未成立・鉢は土だけ)の一言(ウィジェットと同文言で統一)
+        /// ソロ状態(ペア未成立・タネの子は鉢の土の中で眠っている)の一言(ウィジェットと同文言で統一)
         static let soloCaption = Widget.soloCaption
         /// ソロ状態の誘導(招待の動機付け — §3.9)
         static let soloInviteHint = "招待した相手とペアになると、ふたりの約束がはじまります"

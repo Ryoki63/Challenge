@@ -143,4 +143,17 @@ gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false   # �
 | `release.sh` | `xcodebuild archive` / `-exportArchive`(`RELEASE_PRINT_ONLY=1` でコマンドの表示のみ) |
 | `verify_archive.py` | `.xcarchive` のアップロード前検査 |
 | `scan_required_reason_apis.py` | 出来上がったバイナリの必須理由 API の棚卸し |
+| `export_attachments.py` | xcresult のテスト添付(植物の実描画の一覧画像)を、読みやすい名前の PNG として取り出す(§10) |
 | `test_*.py` | 上記の単体テスト(`python3 -m unittest discover -s scripts -p 'test_*.py'`。lien-ios でも毎回実行) |
+
+## 10. 植物の描画と、実描画の一覧画像(issue #56)
+
+- 植物「タネの子」は **SVG レイヤー34点の重ね合わせ**。絵の正本は [`../assets/plant/`](../assets/plant/mapping.md)(`svg/` と `PlantAssets.xcassets`。重ね順・状態対応・のぞきの位置は `mapping.md`)
+  - `Lien/Core/DesignSystem/PlantLayers.swift` — 状態 → 重ねるレイヤーの並び(純粋関数)。snapshot からの状態の導出(GROWTH.md §4.1)もここ
+  - `Lien/Core/DesignSystem/PlantCharacterView.swift` — ZStack で重ねる。右の葉・右の花は左右反転、花の塗りはコード側で着色、ダークは背面プレート
+  - ウィジェット(LienWidget)も同じ2ファイルと同じカタログを使う(S ウィジェットは試作 — 本実装は T17a)
+- テスト: `PlantLayersTests`(重ね順の規則・`assets/plant/layer_stacks.json` との一致・導出の表・34レイヤーが空白でなく描けること・着色)/ `PlantRenderTests`(一覧画像)
+- **実描画の一覧画像**: lien-ios の artifact `plant-render-sheets`(`PlantRenderTests` が `ios/build/plant-render/` に書く。ライト/ダーク × 全段階 × 今日の状態・40/60/80pt・表情・のぞき・花の色)。
+  同じ画像を xcresult の添付からも取り出して `plant-render-sheets-xcresult` に、xcresult 自体を `xcresult` に残す(テストが失敗しても残る)
+  - 取り出し: `gh run download <run-id> --repo Ryoki63/Challenge -n plant-render-sheets`
+  - 承認ゲート(GROWTH.md §9.5)は、この画像と下書きのプレビュー(`../assets/plant/v4_drafts/preview_*.png`)を見比べて行う

@@ -14,9 +14,12 @@ on:
       # 契約フィクスチャ(サーバーの実ハンドラ出力)は LienTests のリソース(project.yml が ../contracts を参照 — issue #55)。
       # サーバーの応答形が変わって再生成されたときも iOS のデコード検証を走らせる
       - "products/lien/contracts/**"
-      # 植物スプライトのカタログは Lien ターゲットのリソース(project.yml が ../assets/ を参照 — T13)。
-      # アセット側だけの変更でも iOS ビルドが走るようにする
+      # 植物の SVG レイヤーのカタログは Lien / LienWidget ターゲットのリソース(project.yml が ../assets/ を参照 — T13・issue #56)。
+      # アセット側だけの変更でも iOS ビルドが走るようにする。PlantLayersTests は重ね順の基準(layer_stacks.json)と
+      # のぞきの位置(peek_offsets.json)も読むので、その変更でも走らせる
       - "products/lien/assets/plant/PlantAssets.xcassets/**"
+      - "products/lien/assets/plant/layer_stacks.json"
+      - "products/lien/assets/plant/peek_offsets.json"
       # アプリアイコンの正本。ios の AppIcon.appiconset と同一であることを ReleaseReadinessTests が検査する(issue #28)
       - "products/lien/assets/icon/**"
       - ".github/workflows/lien-ios.yml"
@@ -69,6 +72,9 @@ jobs:
       # macOS 分を節約する(T07)。LienTests は Lien スキームの testTargets(project.yml)。
       # destination の "iPhone 17" は macos-26(Xcode 26.x)の標準シミュレータ
       # (iPhone 16 は macos-26 のイメージに無い)。OS バージョンは指定せずランナー既載の最新ランタイムに委ねる
+      #
+      # -resultBundlePath: テストが XCTAttachment で保存した植物の実描画の一覧画像(PlantRenderTests。issue #56)を、
+      # あとで xcresult から取り出すため
       - name: Build & test (Lien scheme, iOS Simulator)
         run: |
           set -o pipefail
@@ -77,4 +83,48 @@ jobs:
             -scheme Lien \
             -destination 'platform=iOS Simulator,name=iPhone 17' \
             -onlyUsePackageVersionsFromResolvedFile \
+            -resultBundlePath "$RUNNER_TEMP/Lien.xcresult" \
             CODE_SIGNING_ALLOWED=NO
+
+      # ---- 植物の実描画の一覧画像(GROWTH §9.5 の承認ゲート。テストが失敗しても残す = if: always())
+      # 一覧画像は PlantRenderTests が 2 か所に保存する。どちらかが取れれば見られる:
+      #   1. ios/build/plant-render/*.png(ホストのファイルとして直接書く)→ artifact「plant-render-sheets」
+      #   2. XCTAttachment(xcresult の中)→ xcresulttool で取り出して artifact「plant-render-sheets-xcresult」
+      # xcresult 自体も artifact「xcresult」に残す(Xcode で開いて、失敗したテストの詳細を見られる)
+      - name: Export plant render sheets from the xcresult
+        if: always()
+        continue-on-error: true
+        run: python3 scripts/export_attachments.py "$RUNNER_TEMP/Lien.xcresult" "$RUNNER_TEMP/plant-render-xcresult" --prefix plant_
+
+      - name: List plant render sheets
+        if: always()
+        run: |
+          echo "--- ios/build/plant-render/"; ls -la build/plant-render 2>&1 || true
+          echo "--- exported from the xcresult"; ls -la "$RUNNER_TEMP/plant-render-xcresult" 2>&1 || true
+
+      - name: Upload plant render sheets (written by the tests)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: plant-render-sheets
+          path: products/lien/ios/build/plant-render/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload plant render sheets (exported from the xcresult)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: plant-render-sheets-xcresult
+          path: ${{ runner.temp }}/plant-render-xcresult/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload xcresult
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xcresult
+          path: ${{ runner.temp }}/Lien.xcresult
+          if-no-files-found: warn
+          retention-days: 7

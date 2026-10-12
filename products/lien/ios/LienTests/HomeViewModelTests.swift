@@ -3,7 +3,8 @@
 // 検証対象:
 //   - 楽観更新が App Group snapshot に永続化される+ウィジェット reload が呼ばれる
 //   - 完了済みは二重チェックイン不可(1日1回 — REQUIREMENTS §3.4)
-//   - snapshot 無しの空状態 / ソロ状態(pairId=null)の表示分岐(§3.9 土だけ)
+//   - snapshot 無しの空状態 / ソロ状態(pairId=null)の表示分岐(§3.9 土の中で眠るタネの子)
+//   - 植物の描画状態 plantState(snapshot → PlantCharacterState。導出の表は PlantLayersTests)
 //   - 失敗時は責めない文言+リトライ可能(§3.5)
 // 実 API(POST /checkin)・オフラインキューの検証は T14 のテストで行う。
 
@@ -96,7 +97,7 @@ final class HomeViewModelTests: XCTestCase {
         XCTAssertFalse(vm.isSolo)
         XCTAssertFalse(vm.showsStreak)
         XCTAssertNil(vm.partnerWaitingText)
-        XCTAssertEqual(vm.plantAssetName, "plant_soil", "未取得時は土を出す")
+        XCTAssertEqual(vm.plantState, .solo, "未取得時は、土の中で眠るタネの子を出す")
         XCTAssertEqual(service.callCount, 0)
         XCTAssertEqual(reloadCount(), 0)
     }
@@ -168,7 +169,7 @@ final class HomeViewModelTests: XCTestCase {
     func testSoloSnapshotShowsSoilAndHidesPairSections() {
         let (store, tempDir) = makeTempStore()
         defer { try? FileManager.default.removeItem(at: tempDir) }
-        // 防御確認のため stage/mood をあえて非ゼロにする(ソロは常に土 — §3.9)
+        // 防御確認のため stage/mood をあえて非ゼロにする(ソロは常に土の中で眠るタネの子 — §3.9)
         try? store.saveSnapshot(makeSnapshot(
             pairId: nil,
             todayPartnerDone: true,
@@ -180,7 +181,11 @@ final class HomeViewModelTests: XCTestCase {
         vm.load()
 
         XCTAssertTrue(vm.isSolo)
-        XCTAssertEqual(vm.plantAssetName, "plant_soil", "ソロ状態は鉢に土だけ(§3.9)")
+        XCTAssertEqual(
+            vm.plantState,
+            PlantCharacterState(stage: 0, isSolo: true, soilGlow: false),
+            "ソロ状態は、段階・表情によらず土の中で眠るタネの子(§3.9)"
+        )
         XCTAssertFalse(vm.showsStreak, "ふたりストリークはペア成立後のみ")
         XCTAssertNil(vm.partnerWaitingText)
         XCTAssertFalse(vm.showsBothDoneCelebration)
@@ -212,12 +217,34 @@ final class HomeViewModelTests: XCTestCase {
     func testFidgetMoodTriggersSwayAnimation() {
         let (store, tempDir) = makeTempStore()
         defer { try? FileManager.default.removeItem(at: tempDir) }
-        try? store.saveSnapshot(makeSnapshot(plantMood: .fidget))
+        // 片方だけ完了(相手だけ)= fidget。葉の開閉と視線は plantState、揺れは付け足し
+        try? store.saveSnapshot(makeSnapshot(todayMeDone: false, todayPartnerDone: true, plantMood: .fidget))
         let (vm, _, _) = makeViewModel(store: store)
         vm.load()
 
-        XCTAssertTrue(vm.plantSways, "fidget は揺れアニメ(v0 は normal 画像で代用 — mapping.md)")
-        XCTAssertEqual(vm.plantAssetName, "plant_stage3_normal")
+        XCTAssertTrue(vm.plantSways, "fidget は小さな揺れ(REQUIREMENTS §3.9)")
+        XCTAssertEqual(
+            vm.plantState,
+            PlantCharacterState(stage: 3, meOpen: false, partnerOpen: true, expression: .lookRight),
+            "相手だけ完了 → 相手(右)の葉がひらき、顔はそちらを見る(GROWTH §4.1)"
+        )
+    }
+
+    func testPlantStateFollowsTheCheckin() async {
+        let (store, tempDir) = makeTempStore()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        try? store.saveSnapshot(makeSnapshot(todayMeDone: false, todayPartnerDone: false, plantMood: .normal))
+        let (vm, _, _) = makeViewModel(store: store)
+        vm.load()
+        XCTAssertEqual(vm.plantState, PlantCharacterState(stage: 3), "朝: 葉は2枚ともたたんでいる")
+
+        await vm.performCheckin()
+
+        XCTAssertEqual(
+            vm.plantState,
+            PlantCharacterState(stage: 3, meOpen: true, partnerOpen: false, expression: .lookLeft),
+            "自分がチェックインしたら、mood が古いままでも自分(左)の葉がすぐにひらく"
+        )
     }
 
     // MARK: 失敗(責めない文言+リトライ可能 — §3.5)

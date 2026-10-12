@@ -1,11 +1,11 @@
 // HomeView.swift — ホーム画面(T13+T14 / REQUIREMENTS §3.4, §3.5, §3.9, §3.10 / §6)
 //
-// 構成: 植物(ドット絵+名前)/ ストリーク / ふたりの今日(自分・相手チップ)/
+// 構成: 植物(SVG レイヤーの重ね合わせ+名前)/ ストリーク / ふたりの今日(自分・相手チップ)/
 //       チェックインフロー(CheckinFlowView — 1タップ完了+写真添付+当日取消)。
 // 文言は Strings.Home / Strings.Checkin、色・余白は DesignSystem の定数に集約(DESIGN §3.8)。
 // 表示原則(§3.10)はウィジェット(LienWidgetEntryView)と揃える:
 //   自分未完 = 自分側グレー / 相手が先に完了 =「(名前)が待ってるよ」。
-// ソロ状態(pairId = null)は土+誘導文言+「相手を招待する」導線(招待 UI 本体は T11 PairingView —
+// ソロ状態(pairId = null)は土の中で眠るタネの子+誘導文言+「相手を招待する」導線(招待 UI 本体は T11 PairingView —
 // RootView がシートで開く。issue #55)。チェックインはソロでもできる(写真・つつく・リアクションはペア後)。
 // 未送信キュー(pending_ops.json)の再送は表示時+フォアグラウンド復帰時(DESIGN §3.7)。
 // サーバーとの同期(GET /snapshot)は AppModel が行い、結果は App Group 経由で reloadToken の変化として届く。
@@ -73,13 +73,13 @@ private struct SnapshotContent: View {
     var body: some View {
         VStack(spacing: LienSpacing.m) {
             PlantArea(
-                assetName: viewModel.plantAssetName,
+                state: viewModel.plantState,
                 sways: viewModel.plantSways,
                 plantName: snapshot.pairId != nil ? snapshot.plantName : nil
             )
 
             if viewModel.isSolo {
-                // ソロ状態: 土+誘導文言+招待導線(§3.2, §3.9。招待画面本体は PairingView — T11)
+                // ソロ状態: 眠るタネの子+誘導文言+招待導線(§3.2, §3.9。招待画面本体は PairingView — T11)
                 VStack(spacing: LienSpacing.xs) {
                     Text(Strings.Home.soloCaption)
                         .font(.subheadline)
@@ -115,11 +115,11 @@ private struct SnapshotContent: View {
     }
 }
 
-// MARK: - 植物(§3.9。ドット絵は整数倍+ニアレストネイバー — DESIGN §3.5)
+// MARK: - 植物(§3.9。SVG レイヤーの重ね合わせ — PlantCharacterView / assets/plant/mapping.md)
 
 private struct PlantArea: View {
-    let assetName: String
-    /// fidget(そわそわ)の揺れアニメ(v0 は normal 画像+揺れで代用 — mapping.md)
+    let state: PlantCharacterState
+    /// fidget(片方だけ完了のそわそわ)の揺れアニメ
     let sways: Bool
     let plantName: String?
 
@@ -127,7 +127,8 @@ private struct PlantArea: View {
 
     var body: some View {
         VStack(spacing: LienSpacing.s) {
-            PixelImage(assetName: assetName, scale: 8)
+            PlantCharacterView(state: state)
+                .frame(width: 180, height: 240) // 3:4(キャンバス 240×320 と同じ比率)
                 .rotationEffect(.degrees(swayAngle), anchor: .bottom)
                 .onAppear { updateSway() }
                 .onChange(of: sways) { updateSway() }
@@ -140,7 +141,7 @@ private struct PlantArea: View {
         }
     }
 
-    /// CSS 的な揺れのみ(REQUIREMENTS §3.9。アニメ専用スプライトは持たない)
+    /// 揺れのみ(REQUIREMENTS §3.9。アニメ専用の絵は持たない。葉の開閉は PlantCharacterView が差し替えで見せる)
     private func updateSway() {
         if sways {
             swayAngle = -2
@@ -362,7 +363,8 @@ private struct ReactionArea: View {
 private struct EmptyHomeContent: View {
     var body: some View {
         VStack(spacing: LienSpacing.m) {
-            PixelImage(assetName: PlantSprite.soloAssetName, scale: 6)
+            PlantCharacterView(state: .solo)
+                .frame(width: 150, height: 200) // 3:4
                 .padding(.top, LienSpacing.xl)
             Text(Strings.Home.emptyTitle)
                 .font(.title3.bold())
@@ -438,7 +440,7 @@ extension PairSnapshot {
     )
 }
 
-#Preview("ソロ(土だけ)") {
+#Preview("ソロ(土の中で眠るタネの子)") {
     HomeView(
         store: AppGroupStore.preview(snapshot: PairSnapshot.previewValue(
             pairId: nil,

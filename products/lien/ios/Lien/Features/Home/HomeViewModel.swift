@@ -129,13 +129,15 @@ final class HomeViewModel {
         return snapshot.pairId == nil
     }
 
-    /// 植物の imageset 名。解決規則は PlantSprite が正本(ソロ・未取得は土)
-    var plantAssetName: String {
-        guard let snapshot, snapshot.pairId != nil else { return PlantSprite.soloAssetName }
-        return PlantSprite.assetName(stage: snapshot.plantStage, mood: snapshot.plantMood)
+    /// 植物の描画状態(GROWTH §4.1 の表。snapshot → PlantCharacterState。重ねるレイヤーは PlantLayers が決める)。
+    /// ソロ(pairId が null)と snapshot 未取得は、鉢の土の中で眠る姿
+    var plantState: PlantCharacterState {
+        guard let snapshot else { return .solo }
+        return PlantCharacterState(snapshot: snapshot)
     }
 
-    /// fidget(そわそわ)は v0 では normal 画像+View 側の揺れアニメで表現(mapping.md)
+    /// fidget(片方だけ完了のそわそわ)は View 側の小さな揺れで表す(REQUIREMENTS §3.9)。
+    /// 葉の開閉と視線は plantState が表すので、揺れは付け足し
     var plantSways: Bool {
         snapshot?.plantMood == .fidget
     }

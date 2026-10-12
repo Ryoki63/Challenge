@@ -135,7 +135,11 @@ final class SoloModeTests: XCTestCase {
         XCTAssertFalse(rig.vm.canNudge, "つつく相手がいない")
         XCTAssertFalse(rig.vm.canReact, "リアクションする相手がいない")
         XCTAssertFalse(rig.vm.showsStreak, "ふたりストリークはペア成立日から")
-        XCTAssertEqual(rig.vm.plantAssetName, PlantSprite.soloAssetName, "ソロの鉢は土だけ(§3.9)")
+        XCTAssertEqual(
+            rig.vm.plantState,
+            PlantCharacterState(stage: 0, isSolo: true, soilGlow: true),
+            "ソロは土の中で眠るタネの子。自分がチェックインした日は土がほのかに光る(§3.9)"
+        )
         XCTAssertNil(rig.vm.partnerWaitingText)
         XCTAssertFalse(rig.vm.showsBothDoneCelebration)
 

@@ -4,11 +4,11 @@
 //   - 自分が未完なら自分側をグレー
 //   - 相手が先に完了していたら「(名前)が待ってるよ」を見せる
 //
-// ドット絵方針(DESIGN §3.5):
-//   植物スプライト(T09 で作成、T13/T17 で結線)は必ず
-//     Image("plant_<stage>_<mood>").resizable().interpolation(.none)
-//   で**整数倍拡大**する(にじみ禁止)。
-//   T07 時点ではアセットが無いため SF Symbols で代替している。
+// 植物(issue #56 の試作。本実装は T17a):
+//   アプリ本体と同じ PlantCharacterView(SVG レイヤーの重ね合わせ。PlantAssets.xcassets を共有)で描く。
+//   ウィジェットで全レイヤーを重ねて描けるか・メモリに収まるかを実機で確かめる(GROWTH §9.5)。
+//   収まらないときの代わりの案は、段階 × 葉の状態をあらかじめ1枚に合成した画像を持つこと。
+//   T17a で: 「色合い(accented)」表示でも単色にならないよう、各 Image に widgetAccentedRenderingMode(.fullColor) を付ける。
 
 import SwiftUI
 import WidgetKit
@@ -31,12 +31,12 @@ private struct SnapshotView: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            plantPlaceholder
-                .font(.system(size: 28))
-                .foregroundStyle(.green)
+            // 3:4 を保ったまま、残りの高さに収まるまで縮む(下の文字・チップを優先する)
+            PlantCharacterView(state: PlantCharacterState(snapshot: snapshot))
+                .frame(maxHeight: 84)
 
             if snapshot.pairId == nil {
-                // ソロ状態: 鉢は土だけ(REQUIREMENTS §3.9)
+                // ソロ状態: タネの子は鉢の土の中で眠っている(REQUIREMENTS §3.9)
                 Text(Strings.Widget.soloCaption)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -72,20 +72,6 @@ private struct SnapshotView: View {
             }
         }
         .padding(4)
-    }
-
-    /// 植物のプレースホルダ(T09 のスプライト完成後に interpolation(.none) の Image へ差し替える)
-    private var plantPlaceholder: some View {
-        Image(systemName: plantSymbolName)
-    }
-
-    private var plantSymbolName: String {
-        switch snapshot.plantStage {
-        case ..<1: return "circle.dashed"      // 土(ソロ/開始前)
-        case 1...2: return "leaf"              // 芽〜双葉
-        case 3...4: return "leaf.fill"         // 若葉〜つぼみ
-        default: return "camera.macro"         // 開花
-        }
     }
 }
 
