@@ -161,3 +161,11 @@
 - 環境メモ: ローカルにXcode無し(CLTのみ)→ iOS検証は lien-ios CI のみ。gh の既定アカウントは push 権限のない ryoki-kojima → gh 操作は `GH_TOKEN=$(gh auth token --user Ryoki63)` で行う
 - 実行体制: レーンA(ios-serial)はT15から1タスク=1サブエージェント(Sonnet)で直列、レーンC(docs準備)は並列。git操作はファイル指定で行い `git add -A` は使わない(並列作業の巻き込み防止)
 - 人間判断待ち: G2(#40 スタイルE/F/G選定)、migration 0002 本番適用+checkin再デプロイの承認
+
+## 2026-10-12 13:21 (サブエージェント) — T32準備: ストアメタデータ確定値化+verify_metadata.py+CIジョブ (issue #32)
+- 着手: #32の「進め方」コメント(2026-06-11記載)に従い、aso.md(T26案)を store_metadata/ja/ に確定値化する。前提変化(Pairy 2026-06-30終了済み・現在2026-10・次の山=1月新年需要)を反映し、Pairy依存文言は外す/alternatives.mdへ退避する
+
+## 2026-10-12 (サブエージェント/レーンA ios-serial) — T15 つつく+リアクション(issue #15)着手
+- 着手: issue #15 の「進め方(実行計画 2026-06-11)」10手順に従い実装開始。ユーザー指示によりスコープ拡張: T13/T14完了済みのため、計画が先送りしていた「ホームへの結線」も本タスク内でモック注入経由で実施する(つつくボタンの表示条件+リアクションUIの導線)。本番Supabaseへのデプロイ・実機push検証は対象外(モック注入のみ)
+- 事前調査で判明: migrations/0001_init.sqlに`nudges`/`reactions`テーブルとRLSが既に存在(新規マイグレーション不要)。`_shared/apns.ts`の`LienPushType`に`nudge`/`reaction`は既に含まれる。`checkin-cancel`のcore.ts/index.tsパターン(repo/pusher注入+薄いI/O層)を踏襲して`functions/nudge`・`functions/react`を新設する。config.tomlは関数ごとに`verify_jwt=false`を明記する既存慣習を確認(デプロイはしない)
+- 進め方: バックエンド(messages.ts拡張+nudge/react函数+deno test全緑)→commit1 → iOS(NudgeReactService+NudgeSheet+ReactionPicker+ホーム結線+Strings.swift追加+NudgeReactTests)→commit2→push→lien-ci/lien-ios CI緑確認→BACKLOG/DONE更新→issue完了コメント+close
