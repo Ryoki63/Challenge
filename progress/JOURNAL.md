@@ -260,3 +260,4 @@
 - 起票: #51 cron / #52 写真パス / #53 push_env / #54 成長ルール(サーバー)/ #55 W1 アプリ結線 / #56 植物描画 / #57 植物体験 / #58 仕様改定。ラベル on-hold・v1.0.1 を新設し #21・#24・#33〜#36 に付与(ループから外す)。#19 は分割、#35 は計画の作り直しを記録。#40・#50 に決定を記録し needs-approval を外した(human-gate の close は人間)
 - 整理: BACKLOG を第1波の計画で作り直し(T10〜T14 の残骸を削除)。DONE に T08準備①②・T10〜T14 の追記漏れを補完(JOURNAL の事実のみ)
 - 次: 第1波を並列実行 — backend(#51→#52→#53→#54、Sonnet)∥ docs(#58、Sonnet)∥ ios-serial(#55、Sonnet)。各ステップ後に Opus でレビュー→必要なら修正。サブエージェントは JOURNAL に直接書かず、オーケストレータが集約して記録する
+- 第1波 起動(Workflow wf_1eabad77-d26): backend(#51 cron → #52 写真パス → #53 push_env → #54 成長ルール)∥ docs(#58)∥ ios-serial(#55 W1)。実行 Sonnet max、各ステップ後に Opus max レビュー → must_fix があれば Sonnet で修正。本番変更は D4 の範囲(cron・migration 0003〜0005・関数の一括デプロイ)。進捗は完了時にここへ集約して記録する
