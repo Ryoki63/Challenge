@@ -1,0 +1,86 @@
+# Lien cron watch — 本番の定期実行(pg_cron → close-day / grant-tickets)の毎朝の監視(issue #60)
+#
+# 毎朝 00:40 JST(= 15:40 UTC。close-day の 00:10 JST の30分後)に本番 DB を **読むだけ** で確認し、
+# 失敗があれば workflow を赤にする(GitHub から失敗の通知が届く)。確認する内容は
+# products/lien/scripts/ops/cron_check.ts(判定は evaluate。フィクスチャ付きの deno test あり):
+#   - 前夜の close-day の応答が 200 で errors が空・確定した日が昨日(pg_net の応答は6時間で消えるので朝に見る)
+#   - cron.job_run_details が succeeded で、1日以上止まっていない / 月初は grant-tickets を呼び、それ以外の日は呼んでいない
+#   - Vault の cron 専用シークレットと Function secrets が同じ値・Vault に万能鍵が無い・pg_net のキューが空
+#   - プロジェクトが ACTIVE_HEALTHY(無料枠の自動停止 = D5)・公開 API から net / cron / vault に届かない
+# 必要な GitHub secrets: SUPABASE_ACCESS_TOKEN(lien-deploy.yml と同じ。https://supabase.com/dashboard/account/tokens)
+#
+# 失敗時に赤になることの確認(テスト用の入力): Actions の「Run workflow」で max_age_hours に 0 を入れる
+#   (最後の起動が「0 時間より古い」ので必ず赤になる)。本番の状態は変えない
+#
+# ops-tests ジョブは push のたびに(関係するファイルが変わったときだけ)、cron の静的テスト
+# (スケジュール・JST の1日だけの条件・呼び先・鍵)と監視の判定ロジックのテストを回す。
+# lien-ci の `deno test` は --allow-read を付けないので、ファイルを読むこれらのテストはここで回す
+name: lien-cron-watch
+
+on:
+  schedule:
+    - cron: "40 15 * * *" # 毎日 00:40 JST(UTC 15:40)。GitHub の schedule は混んでいると数分〜数十分遅れる
+  workflow_dispatch:
+    inputs:
+      max_age_hours:
+        description: "最後の close-day / grant-tickets の起動の許容経過時間(時間)。既定 26。0 にすると必ず赤になる(失敗時の動作確認用)"
+        type: string
+        default: "26"
+  push:
+    paths:
+      - ".github/workflows/lien-cron-watch.yml"
+      - "products/lien/scripts/ops/**"
+      - "products/lien/supabase/migrations/**"
+      - "products/lien/supabase/config.toml"
+      - "products/lien/supabase/functions/close-day/index.ts"
+      - "products/lien/supabase/functions/grant-tickets/index.ts"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lien-cron-watch-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ops-tests:
+    name: ops tests (cron static + check logic)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Run ops tests
+        run: deno test --allow-read products/lien/scripts/ops/
+
+  watch:
+    name: watch production cron
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Check production cron
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          MAX_AGE_HOURS: ${{ inputs.max_age_hours }}
+        run: |
+          deno run \
+            --allow-net=api.supabase.com \
+            --allow-env=SUPABASE_ACCESS_TOKEN,PROJECT_REF,MAX_AGE_HOURS,GITHUB_ACTIONS,GITHUB_STEP_SUMMARY \
+            --allow-write="$GITHUB_STEP_SUMMARY" \
+            products/lien/scripts/ops/cron_check.ts
