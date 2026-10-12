@@ -146,6 +146,7 @@ T33 RevenueCat 組込+ペイウォール(3文脈) [W→G6] / T34 曜日指定 [W
 - 状態の正は GitHub Issues。本書は計画の要約。仕様への反映は [REQUIREMENTS.md](REQUIREMENTS.md) §0.1 と DESIGN §3.5(DESIGN §3.4・§4・§5 は backend レーンが #54 などで更新する)
 - §7 の更新: 「Live 結線は T08・T20 でまとめて行い、CI 緑だが未結線は許容する」は撤回する。**W1(#55)を T15 の直後に入れ**、以降のタスクは完了条件に「Live 実装+契約テスト(本番の実応答を JSON フィクスチャにしたもの)」を含める。バックエンドは 6月から本番で動いているので、G0 を待つ必要があるのは APNs だけ
 - §8 の更新: 「G2 = スタイル F で確定」は D1 で撤回し、v4「タネの子」に置き換える。「成長カーブ10段階案は回答待ち」は D2 で確定した。律速は人間の待ち(G0・決定事項)で、**10/16 までに G0 と決定がそろえば、公開目標 12/11 に間に合う**(余裕は 1.5〜2週間)
+- 2026-10-13 の更新(#61): ios-serial の順序を W1 → W1 手直し+T27 の lint → T28準備 → **PA → PV → T23 → PB** → … に直した(PA の前倒し。理由は §9.3 の箇条書き)。第2波の新タスク #60〜#62 を §9.3 の表に加えた
 
 ### 9.1 決定 D1〜D6
 
@@ -175,8 +176,8 @@ D3 で外す機能と行き先:
 | 期間 | 人間 | エージェント |
 |---|---|---|
 | 〜10/16 | G0 完了・Xcode 26 導入・決定への回答(済)・テスター募集開始 | 起票と BACKLOG の整理(済) |
-| 10/13〜10/20 | — | ios-serial: **W1 結線** → T27(罰なし文言の lint だけ)→ **T28準備**(Xcode 26 固定・ExportOptions・PrivacyInfo・1.0.0・v4 アイコン。W1 と同じ `project.yml`・`lien-ios.yml` を触るので、W1 の後に直列)∥ backend: cron 登録・写真パス修正・push_env・関数の本番デプロイ(D4) |
-| 10/19〜10/25 | APNs secrets(production)→ **初回の内部 TestFlight(〜10/23。T28a)** → G1 計測(〜10/25) | ios-serial: **PV(相手の写真の表示)** → T23(審査対応一式)→ PA 植物の描画切替(v4 の取込+PlantCharacterView)→ PB ∥ backend: 成長ルール(サーバー。GS) |
+| 10/13〜10/20 | — | ios-serial: **W1 結線** → **W1 手直し+T27 の lint**(#62。罰なし文言の lint だけ)→ **T28準備**(Xcode 26 固定・ExportOptions・PrivacyInfo・1.0.0・v4 アイコン。W1 と同じ `project.yml`・`lien-ios.yml` を触るので、W1 の後に直列)∥ backend: cron 登録・写真パス修正・push_env・関数の本番デプロイ(D4) |
+| 10/19〜10/25 | APNs secrets(production)→ **初回の内部 TestFlight(〜10/23。T28a)** → G1 計測(〜10/25) | ios-serial: **PA 植物の描画切替**(v4 の取込+PlantCharacterView。新しいイラストを初回の内部 TestFlight に載せるため前倒し — 2026-10-13)→ **PV(相手の写真の表示)** → T23(審査対応一式)→ PB(ゲージ・段階アップ演出・名前付け)∥ backend: 成長ルール(サーバー。GS) |
 | 10/26〜11/08 | G4a(法務の記入・連絡先・公開先、〜11/6)/ テスター確定(〜11/6) | T16(縮小版)→ T17a(S+ロック画面)→ T18 → T22 ∥ 内部 TestFlight で段階的に E2E ∥ Pages 公開(invite+legal)── **11/8 機能凍結** |
 | 11/09〜11/13 | — | T27(文言の総点検)→ 最終 E2E → **外部テスト申請(〜11/13)** ∥ スクショを新画風で作り直す |
 | 11/16〜11/22 | G3 開始 / G4b(ストア素材の確定、〜11/20) | T29 トリアージ ∥ T30 完了(デモペア・年齢レーティング・App Privacy) |
@@ -188,9 +189,9 @@ D3 で外す機能と行き先:
 - 年末は審査が遅れる(2024 年の告知では 12/20〜26)。2026 年の告知を 11月に確認して日程を見直す
 - G3 の D7 は審査提出を止めるゲートではない(§5 では、未達のとき優先順位を変えるための KPI)
 
-### 9.3 新タスク #51〜#59 とレーン
+### 9.3 新タスク #51〜#62 とレーン
 
-第1波(2026-10-12 起動)は、backend(#51→#52→#53→#54)∥ docs(#58)∥ ios-serial(#55)を並列に進める。
+第1波(2026-10-12 起動)は、backend(#51→#52→#53→#54)∥ docs(#58)∥ ios-serial(#55)を並列に進める。第2波(2026-10-13 起動。第1波の Opus レビューの持ち越し)は、backend(#60)∥ docs(#61)∥ ios-serial(#62 → #28 T28準備 → #56 PA)を並列に進める。
 
 | issue | ID | 内容 | タグ | レーン | 決定 |
 |---|---|---|---|---|---|
@@ -203,19 +204,23 @@ D3 で外す機能と行き先:
 | #57 | PB | 植物 v2-b(体験): ゲージ・段階アップ演出・名前付け | W | ios-serial | D2 |
 | #58 | DOC | 仕様改定: 成長ルール v2・v1.0 のスコープ削減・計測方針(本改定) | W | docs | D1〜D3・D6 |
 | #59 | PV | 相手の今日の写真をホームに表示する(閲覧)。署名付き URL をクライアントで作る(RLS で足りるので migration・新関数なし)。#58 のレビューで判明した担当漏れ | W | ios-serial | D3 |
+| #60 | B3 | backend 堅牢化(第1波のレビューの持ち越し): close-day の手動再実行でリセット通知を再送しない・grant-tickets の冪等性(月単位の実行記録。追加系 migration)・毎朝の監視 workflow・cron 専用シークレット・net の権限を絞る・push_env を getUser と一緒に読む・DESIGN §5.3・§5.6・§7・§10 の更新 | W | backend | D4 |
+| #61 | DOC2 | DESIGN §3.3・§3.6 と review-notes §1.1・§1.2 を W1 の実装に合わせる+本節の ios-serial の順序の更新(PA の前倒し) | W | docs | — |
+| #62 | W1FU | W1 の手直し(push_token の再送・AppModel の復帰・Live 構成のテスト・招待シートの同期間隔・文言「パートナー」→「相手」)+罰なし文言 lint の前倒し(T27 の一部。§9.4) | W | ios-serial | — |
 
 | レーン | 範囲 | 順序・並列性 |
 |---|---|---|
-| backend | `products/lien/supabase/`。DESIGN §3.4・§4・§5.2〜§5.4 のオーナー | 直列: X1 → X2 → X3 → GS。snapshot の形を変える作業は GS → T19 → T33 → T35 の順に1つずつ。migration 連番は 0003=cron(#51)/ 0004=写真パス(#52)/ 0005=push_env(#53)。T16 の notif_prefs は v1.1 に移ったので v1.0 では連番を使わない。以降は着手時に採番 |
-| ios-serial | `products/lien/ios/`。`Strings.swift`・`project.yml`・`LienApp.swift` の単独オーナー | 1タスク=1サブエージェントで厳密に直列(BACKLOG の順): W1 → T27(罰なし文言の lint だけ。§9.4)→ T28準備 → PV → T23 → PA → PB → T16 / T17a / T18 / T19a / T22(11/8 の機能凍結まで)→ T27 本体(11/9〜11/12)。順序の理由は下の箇条書き |
-| docs | `docs/`・`products/lien/marketing/store_metadata/`。DESIGN は §3.5 だけ | 並列可。本改定で REQUIREMENTS・TASKPLAN・CONCEPT・E2E-M1・GROWTH の状態行・DESIGN §3.5・ストアの説明文を更新 |
+| backend | `products/lien/supabase/`。DESIGN §3.4・§4・§5.2〜§5.4 のオーナー(第2波の #60 は §5.3・§5.6・§7・§10 も) | 直列: X1 → X2 → X3 → GS → B3(#60)。snapshot の形を変える作業は GS → T19 → T33 → T35 の順に1つずつ。migration 連番は 0003=cron(#51)/ 0004=写真パス(#52)/ 0005=push_env(#53)。T16 の notif_prefs は v1.1 に移ったので v1.0 では連番を使わない。以降は着手時に採番 |
+| ios-serial | `products/lien/ios/`。`Strings.swift`・`project.yml`・`LienApp.swift` の単独オーナー | 1タスク=1サブエージェントで厳密に直列(BACKLOG の順。2026-10-13 に PA を前倒し — #61): W1 → W1 手直し+T27 の lint(#62。§9.4)→ T28準備 → **PA** → PV → T23 → **PB** → T16 / T17a / T18 / T19a / T22(11/8 の機能凍結まで)→ T27 本体(11/9〜11/12)。順序の理由は下の箇条書き |
+| docs | `docs/`・`products/lien/marketing/`(store_metadata/ と review-notes.md)。DESIGN は第1波が §3.5 だけ、第2波(#61)が §3.3 と §3.6 だけ | 並列可。第1波(#58)で REQUIREMENTS・TASKPLAN・CONCEPT・E2E-M1・GROWTH の状態行・DESIGN §3.5・ストアの説明文を更新。第2波(#61)で DESIGN §3.3・§3.6、review-notes §1.1・§1.2、本書の ios-serial の順序を W1 の実装に合わせた |
 | assets | `products/lien/assets/plant/` | 旧13枚・`gen_sprites.py`・`png/` は廃止。v4 の取込は #56(ios-serial の中)で行い、`lien-ci.yml` の plant-assets ジョブもそこで SVG 用に直す |
 
-- ios-serial の順序の理由(#58 のレビュー指摘で、REVIEW §3 に合わせて直した。BACKLOG の並びも同じにする)
-  - **T28準備を W1 の直後に置く**: 初回の内部 TestFlight(10/23)と G1 計測(〜10/25)を、植物の刷新より先に出すため。T28準備は W1 と同じ `project.yml`・`lien-ios.yml` を触るので、W1 と並列にはできない
+- ios-serial の順序の理由(2026-10-13 に更新: PA を PV・T23 の前へ前倒し — #61。#58 のレビュー指摘で REVIEW §3 に合わせて直した順序からの変更。BACKLOG の並びも同じにする)
+  - **PA は T28準備の直後(PV・T23 の前)**: 新しいイラストを最初の内部 TestFlight(10/23)に載せるため前倒しした。PA は PV にも T23 にも依存しない(描画の差し替えだけ)
+  - **T28準備は W1 手直しの直後**: 初回の内部 TestFlight(10/23。T28a)のアップロードに要る準備(Xcode 26 固定・ExportOptions・PrivacyInfo・1.0.0・v4 アイコン)を先に済ませる。T28準備は W1 と同じ `project.yml`・`lien-ios.yml` を触るので、W1 の系列と並列にはできない
   - **PV は T23 の前**: T23 の「写真の長押しからの通報」は、PV が表示する写真に付けるため
-  - **PA・PB は T23 の後**: REVIEW §3 は T23 を PlantCharacterView より前に置いている(審査に直結する T23 を先に終える)
-  - **T27 の lint は W1 の直後**: §9.4 のとおり。以降の CI で常に検査する
+  - **PB は PA と T23 の後**: PB(ゲージ・段階アップ演出・名前付け)は PA の `PlantCharacterView` の上に作る(#57 は「P-A の後」)。審査に直結する PV・T23 を先に終える(REVIEW §3 の考え方。前倒しするのは PA だけ)
+  - **W1 手直しと T27 の lint は W1 の直後**: §9.4 のとおり。以降の CI で常に検査する
 - 並列実行の約束: `git add -A` は使わず、パス指定でコミットする。`progress/JOURNAL.md`・`tasks/BACKLOG.md`・`tasks/DONE.md` は、並列で動くときは各エージェントが直接書かず、節目を最終出力(journal_lines)で親のオーケストレータに返し、親が集約して書く(並列エージェントが直接書くと交錯するため。AGENTS.md「JOURNAL こまめ更新ポリシー」の運用上の例外。単独で動く対話セッション・ループは AGENTS.md のとおり自分で書く)
 
 ### 9.4 既存タスクの範囲変更(REVIEW-2026-10-12.md §4 の統合判断の要約)
@@ -226,7 +231,7 @@ D3 で外す機能と行き先:
 | T08 残 #8 / G1 #39 | 内部 TestFlight(production APNs)で計測する。受信側を「背景」5回・「強制終了」5回に分け、p50 / p90 と生データを #8・#39 に記録する |
 | T09v2 #49 / G2 #40 | #49 の取込は #56 が引き継ぐ。G2 は決定済み(D1・D2・アイコンは空色) |
 | T15 #15 | 完了(5552670)。残り: nudge・react の Live クライアント(W1)・deploy.sh への追加(GS)・本番デプロイ(D4)。**react の仕様修正も GS に含める**(REVIEW §4.1 の QR の指摘。nudge・react は本番に未デプロイなので、初めて出す前に直す): ① リアクションの push は最初の1回だけにする(今の `react/core.ts` は、スタンプを変えると push を送り直す)② 相手の当日判定は相手のタイムゾーンで行う(要テスト。今の実装が正しいかをテストで確かめる)。**→ 2026-10-12 に #54 の再オープン分で完了**: ① は `handleReact` が既存のリアクションが無い(最初の1回)ときだけ push する(付け替えは上書きのみ。`changed` は保存内容が変わったか)。② は今の実装で正しく(同梱する相手視点の snapshot は相手の timezone の「今日」で決まる)、送り手 Asia/Tokyo・相手 Pacific/Honolulu(と逆)のテストで固定した。react を含む 9 関数を本番へ再デプロイしてスモーク済み。なお nudge の「相手が未完か」の判定は送り手の timezone の今日で行う(ペアは同一 TZ 前提 — REQUIREMENTS §3.4。時差ペアの厳密対応は v2+) |
-| PV #59(新規) | **v1.0 必須。相手の今日の写真をホームに表示する(閲覧)**。ios-serial で W1 の後・T23 の前。W1 の PostgREST 読み(相手の当日の `checkins` 行。リアクション用)を `photo_path` まで広げ、`photos` バケットの署名付き URL をクライアントで作る。既存の RLS(`checkins_select_pair` = 現役ペアの相手の行を読める / `photos_select_pair_member` = パスの第2セグメントが自分の現役 pair_id なら、パスの深さを問わず読める。0004 の `<user_id>/` 区画でも読める)で足りるので、migration も新関数も要らない。snapshot にパスや URL を足す案は採らない(署名付き URL は短寿命で、snapshot は push と App Group に載るため。足すなら backend の snapshot 変更の順 GS → T19 → T33 → T35 に入れる)。完了条件は #59 のとおり(CI 緑・テスト・契約フィクスチャ・RLS の本番確認)。実機の確認(E2E-M1 ⑧)は T20 |
+| PV #59(新規) | **v1.0 必須。相手の今日の写真をホームに表示する(閲覧)**。ios-serial で W1 の後・T23 の前(2026-10-13 から PA の後 — §9.3)。W1 の PostgREST 読み(相手の当日の `checkins` 行。リアクション用)を `photo_path` まで広げ、`photos` バケットの署名付き URL をクライアントで作る。既存の RLS(`checkins_select_pair` = 現役ペアの相手の行を読める / `photos_select_pair_member` = パスの第2セグメントが自分の現役 pair_id なら、パスの深さを問わず読める。0004 の `<user_id>/` 区画でも読める)で足りるので、migration も新関数も要らない。snapshot にパスや URL を足す案は採らない(署名付き URL は短寿命で、snapshot は push と App Group に載るため。足すなら backend の snapshot 変更の順 GS → T19 → T33 → T35 に入れる)。完了条件は #59 のとおり(CI 緑・テスト・契約フィクスチャ・RLS の本番確認)。実機の確認(E2E-M1 ⑧)は T20 |
 | T16 #16 | 縮小版: ローカル通知(リマインド・21時のストリーク危機)+ messages.ts の streakRisk / milestone + ローカル通知の ON/OFF。サーバー側の通知設定・migration・ワンタップ返事は後ろへ(D3) |
 | T17 #17 | T17a(v1.0 必須): S ウィジェットに新画風の植物+ロック画面の円形・インライン。T17b(1.0.1): M+写真サムネ(checkin の push に photoThumbUrl を追加。ペイロードが 4096 バイト未満であることをテスト)。T17b に回ったもの(DESIGN 本文は未更新。T17b の起票時に注記する。§3.4 は backend レーン): DESIGN §3.1 の `systemMedium`、§3.4 の `photo_thumb.jpg`(NSE がダウンロードして App Group に置く契約)。v1.0 のウィジェットは systemSmall とロック画面の2種だけ。サムネの生成・アップロード(T14)はそのまま残す |
 | T18 #18 | v1.0 必須。完了条件を「Live の HistoryRepository+骨格からの導線+ streak.ts と同じ意味論のテスト」に変える |
@@ -235,9 +240,9 @@ D3 で外す機能と行き先:
 | T21 #21 / T24 #24 | v1.0 の範囲外(on-hold)。T21 は v1.1、T24 は 1.0.1 |
 | T22 #22 | v1.0。植物の描画切替と T17a の後。遅れたら最初に削る候補 |
 | T23 #23 | 前倒しして「審査対応一式」に広げる(通報とブロック=解消・初回の規約同意・完全削除・端末側のサインアウト。REQUIREMENTS §8)。PV(#59)の後に着手する — 写真の長押しからの通報は、PV が表示する写真に付けるため |
-| T27 #27 | 罰なし文言の lint だけを W1 の直後に前倒しし(§9.3 の ios-serial の順序に入れた)、以降の CI で常に検査する。本体(全文言のレビュー表)は 11/9〜11/12 |
-| T28 #28 | 分割。**T28準備**(W1 と T27 の lint の直後。ios-serial。`project.yml`・`lien-ios.yml` を触るので W1 とは並列にしない): Xcode 26 固定・ExportOptions・archive スクリプト・PrivacyInfo.xcprivacy・MARKETING_VERSION 1.0.0・アイコン差し替え(完了条件は dry_run の無署名 archive 緑)/ **T28a**(G0 直後〜10/23): 機能が未完成でも内部 TestFlight に1本上げる / **T28b**(〜11/13): 外部テスト申請(申請ボタンは人間が押す) |
-| T30 #30 | W1 の実装を実ビルドで確かめてから review-notes §1.1 を確定する。審査用デモ運用(開発者が操作する相手役ユーザー+期限を延ばした招待+相手側の操作スクリプト)を作る。年齢レーティングの UGC 設問・プライバシーマニフェストを review-notes §2 に追加する。**#58 のレビューで見つかった文書の食い違いも直す**(表の下の「T30 への引き継ぎ」) |
+| T27 #27 | 罰なし文言の lint だけを W1 の直後に前倒しし(W1 の手直しと一緒に #62 にまとめた。§9.3 の ios-serial の順序に入れた)、以降の CI で常に検査する。本体(全文言のレビュー表)は 11/9〜11/12 |
+| T28 #28 | 分割。**T28準備**(W1 手直し+T27 の lint(#62)の直後。ios-serial。`project.yml`・`lien-ios.yml` を触るので W1 とは並列にしない): Xcode 26 固定・ExportOptions・archive スクリプト・PrivacyInfo.xcprivacy・MARKETING_VERSION 1.0.0・アイコン差し替え(完了条件は dry_run の無署名 archive 緑)/ **T28a**(G0 直後〜10/23): 機能が未完成でも内部 TestFlight に1本上げる / **T28b**(〜11/13): 外部テスト申請(申請ボタンは人間が押す) |
+| T30 #30 | W1 の実装を実ビルドで確かめてから review-notes §1.1 を確定する(§1.1・§1.2 の書き直しは 2026-10-13 に #61 で済み。T30 に残るのは実ビルドでの確認と確定)。審査用デモ運用(開発者が操作する相手役ユーザー+期限を延ばした招待+相手側の操作スクリプト)を作る。年齢レーティングの UGC 設問・プライバシーマニフェストを review-notes §2 に追加する。**#58 のレビューで見つかった文書の食い違いも直す**(表の下の「T30 への引き継ぎ」) |
 | T32 #32 | Pairy 語は全廃。説明文は新ルール(ふたりそろった日の数だけ育つ・すやすや眠って待つ)に直した(#58)。スクショは UI とアートの凍結後に CI のシミュレータで撮る別タスク |
 | スクショ(T26 #26 の設計書 `marketing/screenshots/plan.md` と SVG 下絵) | 旧画風・旧範囲が前提なので、UI とアートの凍結後に作り直す(11/9〜11/13)。Frame 2(M ウィジェット+相手の写真)と Frame 3 のサブコピー(「写真をそえると、相手のウィジェットに届く」)は、D3 で v1.0 の事実と合わなくなる。作り直しで直す(審査 2.3 の正確さ) |
 | web/invite と legal の公開 | 「Pages 公開」の1タスクに統合(/lien/i/ と /lien/legal/)。G4a の記入後、外部テストの前(〜11/10) |
@@ -247,9 +252,9 @@ D3 で外す機能と行き先:
 
 - **PV(相手の写真の閲覧)を足した理由**: D3 で M ウィジェットの写真(T17b)とアルバム(T21)を外したため、v1.0 で相手が写真を見られる経路は「当日のホーム」だけになった(REQUIREMENTS §0・§3.10・§3.11)。ところが担当のタスクが無く、iOS は添付するだけ・snapshot は `hasPartnerPhotoToday` の bool だけ・読み取りの署名付き URL の発行もホームでの表示も無かった。このままだと、添付した写真は相手から一度も見えないのに、相手へは「今日の写真を添えたよ📷」の push が届く(#58 のレビューで判明。REVIEW §2 M9 の割り振り漏れ)。署名付き URL の発行は、migration 0001 のコメントにある想定(Function が主経路)ではなく、クライアントが RLS の範囲で作る — 新しい関数を増やさずに済み、「現役ペアのメンバーだけ」という条件は DB が同じく強制する(DESIGN §5.2 の「署名付きURLで配布」にこの経路を足す場合は、§5.2 のオーナーである backend レーンが行う)。PV が機能凍結(11/8)に間に合わないときは、写真の添付・通知「写真が届いた」・E2E-M1 ⑧・description の「写真をそえてもOK」・review-notes §1.1 を、そろえて v1.0.1 に移す(添付できるのに見えない状態では出さない)
 - **T30 への引き継ぎ**(#58 のレビューで見つかった、担当外の文書の食い違い。T30 が実ビルドの確認と一緒に直す)
-  1. `marketing/review-notes.md` §1.1 は、ソロ状態でも「写真を添えられる」と読める書き方をしている(「optionally attach a photo」)。写真はペア成立後で、ソロの checkin に `photoPath` を付けると 400 `no_pair` になる(REQUIREMENTS §3.2)。§1.1 の記述と確認手順を直す
+  1. `marketing/review-notes.md` §1.1 は、ソロ状態でも「写真を添えられる」と読める書き方をしている(「optionally attach a photo」)。写真はペア成立後で、ソロの checkin に `photoPath` を付けると 400 `no_pair` になる(REQUIREMENTS §3.2)。§1.1 の記述と確認手順を直す。**→ 2026-10-13 に #61 で直した**(§1.1・§1.2 を W1 の実装に合わせて書き直した: ソロでは写真を添えられない・約束設定は独立画面・ソロの植物は土のまま・招待は Home のボタン・相手のアバターは出ない)。T30 に残るのは実ビルドでの確認
   2. D6(計測は SDK なし・SQL)に合わせて見直す: `marketing/privacy-policy.md` §1 の「利用状況」の行(`marketing/legal/privacy.html` も同じ)、review-notes §2.1 の「利用状況の統計情報」の行・その下の「状態」の段落・§4 の人間判断項目、`marketing/legal/CHECKLIST-G4.md` の「自前テーブル or TelemetryDeck」の項目。アプリは計測のために何も送らない(REQUIREMENTS §7)。App Privacy の最終確認は T30
-  3. Sign in with Apple は v1.0.1 に移った(D3)ので、v1.0 の機能と読める記述を直す: `privacy-policy.md` §1 の「Sign in with Apple の識別子」の行と §8、`legal/privacy.html`、review-notes §1.2・§2
+  3. Sign in with Apple は v1.0.1 に移った(D3)ので、v1.0 の機能と読める記述を直す: `privacy-policy.md` §1 の「Sign in with Apple の識別子」の行と §8、`legal/privacy.html`、review-notes §2(§1.2 は 2026-10-13 に #61 で直した。残りは §2.1 の `users.apple_sub` の行)
 
 ### 9.5 on-hold の扱い
 

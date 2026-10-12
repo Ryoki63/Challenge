@@ -70,25 +70,70 @@ products/lien/
 ### 3.3 アプリ内アーキテクチャ
 
 - SwiftUI + Observation(`@Observable`)。ViewModel は画面単位
-- データ層は `Core/Repositories/`(SupabaseService をラップ)。View から Supabase を直接呼ばない
-- **状態の正はサーバー**。アプリが永続するのは「最後に取得した PairSnapshot」+「未送信キュー」のみ(ローカルDBは持たない。SwiftData不使用)
-- ルートは `AppPhase` enum(`onboarding` / `solo` / `paired`)で画面系統を切替
+- データ層はプロトコル境界(`AuthServicing` / `InviteClient` / `PromiseAPIClient` / `SnapshotClient` / `CheckinAPIClient` など)で隔離し、ViewModel へ注入する(テストはモック)。View から Supabase を直接呼ばない。Edge Functions のクライアントは URLSession ベース(`Core/Api/`・`Core/Repositories/`。共通の下回りは `EdgeFunctionTransport`)で、JWT は `AuthServicing.accessToken()`(supabase-swift のセッション。期限切れは自動更新)から渡す。**supabase-swift を import するのは `SupabaseService.swift` だけ**(匿名サインイン・users の更新・accessToken)
+- **状態の正はサーバー**。アプリが永続するのは「最後に取得した PairSnapshot」+「未送信キュー」のみ(ローカルDBは持たない。SwiftData不使用)。「オンボ済み」のような独自の永続フラグも持たない
+- ルートは `AppPhase` enum の **4状態**で画面系統を切り替える。値は純粋関数 `AppRouter.phase(hasSession:snapshot:)` が、「セッションの有無」と「App Group の最後の snapshot」だけから導く(2026-10-13・issue #61。W1 #55 の実装に合わせて改訂した。旧記述は `onboarding` / `solo` / `paired` の3状態で、約束設定の独立画面と下の構成図が無かった)
+
+| AppPhase | 条件 | 出す画面 |
+|---|---|---|
+| `onboarding` | セッションが無い | オンボ3画面(コンセプト → ニックネーム/アイコン → 通知)。ニックネームの送信で匿名サインインする |
+| `promiseSetup` | セッションがあり、現役の約束が無い(`myPromiseTitle` が null か空白だけ。snapshot が未取得もここ) | 約束設定(**Home の前の独立画面**。REQUIREMENTS §3.3)。snapshot が未取得の間は、初回同期の結果が来るまで読み込み表示にする(`isResolving`。再インストールで、サーバーに既にある約束・ペアを取りこぼして約束設定を見せないため) |
+| `solo` | 約束があり、`pairId` が null | ホーム(ソロ): 土の鉢+チェックイン+招待ボタン。写真・つつく・リアクション・ストリークはペア後 |
+| `paired` | 約束があり、`pairId` がある | ホーム(ペア) |
+
+- `solo` と `paired` はどちらもホームを出す(`AppPhase.isHome`)。ペア成立による `solo` → `paired` も、ペア解消による `paired` → `solo` も、同じ導出で扱う(分岐を増やさない)
+- 約束はユーザーに属する(REQUIREMENTS §3.3)ので、ペアがあっても自分の約束が無ければ先に `promiseSetup` になる
+
+構成図(`products/lien/ios/Lien/`。主要なファイルだけ):
 
 ```
 ios/Lien/
-├── App/            LienApp.swift, AppPhase.swift, DeepLinkHandler.swift
+├── App/
+│   ├── LienApp.swift              # エントリ。AppServices と AppModel を1回だけ作ってつなぐ
+│   ├── AppServices.swift          # 依存の束(Live / Stub)。Config が無いときの Stub 構成もここ
+│   ├── AppServices+Live.swift     # make(): Config があれば Live、無ければ Stub を返すファクトリ+Live の組み立て
+│   ├── AppPhase.swift             # onboarding / promiseSetup / solo / paired
+│   ├── AppRouter.swift            # phase の導出(純粋関数)
+│   ├── AppModel.swift             # ルート状態の保持+サーバー同期の司令塔(@Observable)
+│   ├── RootView.swift             # phase で画面系統を切替+招待シート+onOpenURL
+│   ├── AppDelegate.swift          # APNs トークン・リモート通知の受け口(→ PushTokenSync / AppModel)
+│   └── DeepLinkHandler.swift      # lien://invite/<token> のパース(純粋関数。§3.6)
 ├── Core/
-│   ├── Config.swift            # xcconfig→Info.plist 経由でURL/キー読込
-│   ├── SupabaseService.swift   # auth + functions呼び出し
-│   ├── AppGroupStore.swift     # pair_snapshot.json / pending_ops.json の読み書き
-│   ├── PushManager.swift       # 許可・トークン登録
-│   ├── Models/                 # PairSnapshot, Promise, CheckinDay, ...
-│   ├── DesignSystem/           # Colors.swift, Spacing.swift, PixelImage.swift
-│   └── Strings.swift           # ユーザー向け文言を全て集約
-└── Features/
-    ├── Onboarding/  ├── Pairing/  ├── PromiseSetup/
-    ├── Home/        ├── History/  ├── Album/        └── Settings/
+│   ├── Config.swift               # xcconfig→Info.plist 経由でURL/キー読込
+│   ├── AuthServicing.swift        # 認証の抽象+スタブ(accessToken() もここ)
+│   ├── SupabaseService.swift      # 本実装(匿名サインイン・users 更新・push 登録)。supabase-swift を import する唯一のファイル
+│   ├── SnapshotSynchronizer.swift # GET /snapshot の結果を App Group へ反映(自己修復 — §4)
+│   ├── PushTokenSync.swift        # APNs トークンと push_env を users へ自動保存(§4.1)
+│   ├── PushManager.swift          # 通知許可・APNs 登録
+│   ├── AppGroupStore.swift        # pair_snapshot.json / pending_ops.json の読み書き
+│   ├── CheckinService.swift / PendingOps.swift / PhotoProcessor.swift   # チェックイン+未送信キュー+写真縮小
+│   ├── NudgeReactService.swift / LiveNudgeReactService.swift            # つつく・リアクション
+│   ├── Api/                       # Edge Functions(と PostgREST)の Live クライアント。EdgeFunctionTransport が共通の下回り
+│   ├── Repositories/              # InviteClient とその Live 実装
+│   ├── Models/                    # PairSnapshot, Promise, Invite
+│   ├── DesignSystem/              # Colors.swift, Spacing.swift, 植物の描画(§3.5)
+│   └── Strings.swift              # ユーザー向け文言を全て集約
+└── Features/                      # 1画面1ディレクトリ(View + ViewModel)
+    ├── Onboarding/  ├── PromiseSetup/  ├── Pairing/(招待シート)
+    ├── Home/        ├── Checkin/       ├── Nudge/
+    └── Debug/(DEBUG ビルドのみ)     ※ History/(T18)・Settings/(T23)は未実装、Album/ は v1.1
 ```
+
+主要部品の役割(W1・issue #55):
+
+- `AppServices`: アプリ全体の依存の束(`auth` / `inviteClient` / `promiseClient` / `snapshotClient` / `checkinService` / `nudgeService` / `reactionService` / `pendingOps` / `store` / `pushTokenSync` / `reloadWidgets` など)。`AppServices.make()` が **Config(Supabase URL・anon key)があれば Live、無ければ Stub** を返す。Stub はネットワークを一切使わず、オンボ → 約束 → ソロのチェックイン → ペア成立の画面遷移までが動く(CI・Secrets なしのビルド用)。View / ViewModel はどちらの構成かを意識しない。既知: 今は Release ビルドでも Config が欠けると Stub に落ちる(T28準備 #28 で、Release では致命扱いにする予定)
+- `AppRouter`: 上の表の導出。入力は「セッションの有無」と「最後の snapshot」だけの純粋関数で、起動時・同期の後・約束の保存後・ペア成立後のたびに再導出する
+- `AppModel`(`@MainActor @Observable`): `phase` を保持し、サーバー同期を起動する司令塔。招待ディープリンクの token も保持する(§3.6)。同期の起点:
+  1. 起動(`start()`)
+  2. 前面復帰(`sceneDidBecomeActive()`。起動直後の二重取得を避けるため、直前の同期から数秒以内は省く)
+  3. リモート通知の受信(`remoteNotificationReceived()`。AppDelegate → `RemoteNotificationRelay`。可視 push・サイレント push・通知のタップ。**サイレント push の更新(取消・約束変更・ペア更新)はこの同期が主経路** — §4。サイレントで起こすには `UIBackgroundModes: remote-notification` が要る)
+  4. 招待シートが開いている間の定期同期(招待した側が、相手の受諾=ペア成立を push なしでも画面上で知る。成立するとシートは自動で閉じる)
+  5. 画面側の変更の直後(`onboardingFinished` / `promiseSaved` / `pairingSucceeded`。App Group の snapshot を読み直して phase を導き直し、そのうえでサーバーとも突き合わせる)
+
+  同期は同時に1本だけ走り、走行中に来た要求は、終わった直後に1回だけ取り直す
+- `SnapshotSynchronizer`: GET /snapshot の結果で `pair_snapshot.json` を上書きし、**見た目が変わるときだけ**ウィジェットを reload する(`updatedAt` だけの差では reload しない — §3.5・§10 の reload 予算)。**端末の方が新しい可能性があるときは上書きしない**: ① 未送信キューが残っている(オフラインで記録したチェックインがサーバーへ届く前に上書きすると、画面が一瞬戻る。キューが空になった次回の同期で反映する)② 取得中に端末の snapshot が変わった(ホームのチェックイン完了や NSE の書き込みの方が新しい。取得結果は捨てて1回だけ取り直す)。取得に失敗したときは端末の snapshot を残す(オフラインでも表示は壊れない)
+- `PushTokenSync`(actor): `users.push_token` / `push_env` の自動保存(§4.1)。**トークンの取得とセッションの確立の両方がそろうまで保留**する(どちらが先でもよい)。最後に送信成功した (userID, token, env) を覚えて**変化時だけ**送り、ユーザーが変わった(再インストールで匿名ユーザーが作り直された)ときは同じトークンでも再送する。失敗は保留にして、次のトリガー(前面復帰・トークンの更新・セッションの確立)で再送する
+- 読み取りは RLS の範囲で PostgREST を直接使ってよい(現状: react の対象にする相手の当日の `checkins` 行 — `PartnerCheckinResolving`。PV #59 が `photo_path` と署名付き URL に広げる)。書き込みは、本人の users 行(プロフィール・push 登録 — §4.1)を除いて Edge Functions 経由(§5.2)
 
 ### 3.4 App Group 共有契約(ウィジェットとの境界。変更時は要レビュー)
 
@@ -137,8 +182,22 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
 
 ### 3.6 ディープリンク
 
-- カスタムスキーム `lien://invite/<token>`(v1.0)
-- `onOpenURL` → invite-accept 呼び出し → 失敗時はコード手入力画面へ誘導
+- カスタムスキーム `lien://invite/<token>`(v1.0。token は8文字英数 — §5.1)。Info.plist の `CFBundleURLTypes`(project.yml)で登録する。静的招待ページの URL(`https://<GH_PAGES>/lien/i/?t=<token>`)がそのまま貼り付けられた場合も、同じ関数(`DeepLinkHandler.inviteToken(from:)`)で token を拾う(この URL は OS からは飛んでこない — ユニバーサルリンクではないため)
+- **自動受諾はしない**(2026-10-13 決定・issue #61。W1 #55 の実装に合わせた。旧記述は「`onOpenURL` → invite-accept 呼び出し → 失敗時はコード手入力画面へ誘導」)。流れ: `onOpenURL` → `AppModel.handleDeepLink` が token を保持 → **ソロのホームで招待シート(`PairingView`)を開き、コード入力欄にプリフィルする** → 利用者が「ペアになる」を**明示的にタップ**して初めて invite-accept を呼ぶ
+  - 理由1: T23(ペア解消)が入るまで、成立したペアを取り消せない。リンクを開いただけ・誤って開いただけでペアが成立すると戻せない
+  - 理由2: 受諾は同意の表明にあたる。招待してくれた人の名前は invite-accept の応答で初めて分かる(リンクの中には無い)ので、受諾の前に確認の一歩を置く
+  - T23 のあとに自動受諾へ戻すかは、実機 E2E の結果で判断する(戻すなら本節と `PairingView` を同時に直す)
+- 受け口の状態別の振る舞い(`AppModel.applyPendingInvite`):
+
+| phase | 振る舞い |
+|---|---|
+| `onboarding` / `promiseSetup` | token を保持するだけでシートは出さない。約束設定を終えてソロのホームに着いた時点で、招待シートが自動で開く |
+| `solo` | すぐ招待シートを開き、プリフィルする |
+| `paired` | 無視する(保持中のコードも捨てる。1ユーザー1ペア — REQUIREMENTS §1) |
+
+  招待リンクでない URL・8文字英数でない token は、どの phase でも無視する
+- 招待の発行・コードの手入力・リンク経由の受諾は、すべてこの1つのシート(`PairingView`)で行う。入口はソロのホームの招待ボタンで、ペア成立後は出ない
+- 受諾に失敗したとき(期限切れ・使用済み・存在しない・どちらかが別のペア済みなど): invite-accept のエラーを `Strings.Pairing` の責めない文言でシート内に出し、コード入力欄はそのまま残す(直して再試行できる)。コードの手入力は最初から同じシートにあるので、別画面へ誘導する必要がなくなった
 - ユニバーサルリンクは独自ドメイン取得(G4 で判断)後の v1.1
 
 ### 3.7 オフライン

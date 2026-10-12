@@ -1,8 +1,8 @@
 # App Review Notes — Lien (v1.0)
 
 - Status: **DRAFT** (T30準備 / issue #30 — prepared ahead of full backend deploy; see "状態" per section)
-- Last updated: 2026-10-12
-- Related issues: #30 (this task) / #8 (Supabase deploy, G0 待ち) / #23 (settings/report/delete UI, 未着手) / #28 (release build, 未着手)
+- Last updated: 2026-10-13
+- Related issues: #30 (this task) / #8 (Supabase deploy, G0 待ち) / #23 (settings/report/delete UI, 未着手) / #28 (release build, 未着手) / #55 (W1: ソロモード・招待シート。完了) / #61 (§1.1・§1.2 を W1 の実装に合わせた)
 - 正本の優先順位: `docs/REQUIREMENTS.md` → `docs/DESIGN.md` → `docs/CONCEPT.md`(矛盾時はこの順で優先)
 
 > このファイルは2段構えです。**今回のコミット(T30準備)は「草案」**であり、TBDプレースホルダを含みます。T23(設定画面)・T08(G0後の本番デプロイ)・T28(TestFlightビルド)が完了した後、別コミットでTBDを実値に差し替えて完成させます(issue #30 の進め方コメントに記載された2段構え)。
@@ -13,33 +13,63 @@
 
 ### 1.1 Solo mode works without a pair (no "must have 2 users" blocker)
 
-Lien is a 2-person habit-tracking app, but **the app is fully usable before a pair is formed.**
+Lien is a 2-person habit-tracking app, but **the app is fully usable before a pair is formed.** A new user can finish onboarding, set their own daily promise and check in without ever inviting anyone. One device is enough for everything in this section.
 
-- After onboarding (concept → nickname → notification permission), the user lands on the Home screen in a "solo" state.
-- The user can set their own daily promise (title + emoji + optional reminder time) and check in (mark today as done, optionally attach a photo) **without ever pairing with anyone.**
-- The "ふたりストリーク" (shared streak) only starts counting from the day a pair is formed; it does not block any core action beforehand.
+- New-install flow: onboarding (3 screens: concept → nickname + emoji icon → notification permission) → **promise setup (a screen of its own, shown right after onboarding)** → **Home in the "solo" state**. There is no sign-in screen (see §1.2).
+- **Promise setup**: type a promise title (up to 20 characters), pick an emoji, optionally set a daily reminder time, then tap "この約束にする" (Set this promise). The promise can be edited later.
+- **Home in the solo state** shows the user's own promise, the check-in button "できた!" (Done!), a pot of bare soil with a short caption saying the plant starts to grow once a pair is formed, and an invite button ("相手を招待する", i.e. "Invite your partner").
+- **Checking in works in solo.** Tapping "できた!" records today's check-in; the button is replaced by the label "今日のぶんは完了" (Today's done) and an "取り消す" (Undo) button appears for same-day mis-taps. No pairing prompt blocks any of this.
+- Deliberately **not available in solo** (these appear only once a pair exists): the shared streak, the partner's status, nudges, reactions and **photo attachment**. A photo is shared only with the paired partner, so in solo there is nothing to share it with and the "写真を添える" (Attach a photo) button is not shown. The plant also stays as bare soil in solo; it grows from the days on which both partners complete their promise.
+- The "ふたりストリーク" (shared streak) starts counting from the day a pair is formed; it does not block any core action beforehand.
+- Inviting is optional. The invite button on Home opens a sheet (title "ふたりをつなぐ") that can be closed at any time with "あとで" (Later).
 - Reviewer verification steps:
-  1. Complete onboarding (no sign-in credentials required — see §1.2 below).
-  2. On the Home screen, set a promise (title + emoji).
-  3. Tap the check-in button. Confirm the action completes and the plant sprite reacts, with no pairing prompt blocking the flow.
-  4. (Optional) Open Settings → confirm an invite code/link can be generated, but is not required to continue using the app.
-- Source of truth: `docs/REQUIREMENTS.md` §3.2 "招待待ちでも使える: ペア未成立でも約束設定とチェックインは可能(ソロ状態)" — this was an explicit design decision made specifically to avoid an App Review rejection risk and first-day churn.
+  1. Launch the app and tap "はじめる". Enter any nickname (up to 8 characters), pick an icon and tap "これではじめる". On the notification screen, tap "通知を許可する" (Allow) or "あとで" (Later); either one continues.
+  2. On the promise screen, type any title (e.g. "Walk"), pick an emoji and tap "この約束にする".
+  3. You are now on Home in the solo state. Tap "できた!". Confirm that the check-in completes (the button is replaced by "今日のぶんは完了") and that nothing asks you to pair.
+  4. (Optional) Tap the invite button, then "招待をつくる" (Create invite). A QR code, an 8-character invite code and a share-link button appear. Close the sheet with "あとで"; pairing is never required to keep using the app.
+- Source of truth: `docs/REQUIREMENTS.md` §3.2 "招待待ちでも使える: ペア未成立でも約束設定とチェックインは可能(ソロ状態。写真はペア内の共有なので、ペア成立後に添付できる — #55)" — this was an explicit design decision made specifically to avoid an App Review rejection risk and first-day churn.
 
-**状態: 準備済み(文章済み)。実機/TestFlightビルドでの最終確認は T28(#28)完了後(G3後)に実施し、§8①にチェックを入れる。**
+**状態: 2026-10-13 に W1(#55)の実装に合わせて書き直した(#61)。** 草案が実装とずれていた点:
+
+| # | 草案の記述 | 実装(W1) |
+|---|---|---|
+| ① | Home で約束を設定する | オンボの後に**約束設定の独立画面**があり、保存すると Home に進む |
+| ② | 写真を任意で添えられる(ペアなしでも) | **ソロでは写真を添えられない**(「写真を添える」は出ない。端末側で止めており、サーバーも photoPath 付きのソロの checkin を 400 `no_pair` で拒否する) |
+| ③ | 植物が反応する | **ソロの植物は土のまま**(チェックインしても絵は変わらない。土がほのかに光る演出とソロの一言の差し替えは PA #56 / PB #57) |
+| ④ | Settings を開いて招待を発行する | **招待は Home のボタン**から開くシート(設定画面は T23 で、まだ無い) |
+
+実ビルドでの最終確認は T28a の内部 TestFlight 以降(T30)。そのとき合わせるもの:
+- PA(#56)・PB(#57)が入ったら、土の見た目と一言(現行の文言は「ペアになると種がまかれるよ」)を見て、英文の「bare soil」「short caption」の記述を確かめる
+- 招待ボタンのラベルは、#62 が「パートナーを招待する」から「相手を招待する」に変える(CONCEPT §5-2: カップル限定にしない)。英文のボタン名は変更後のラベルで書いた。実ビルドで合っているか確かめる
+- PV(#59)が機能凍結(11/8)に間に合わず、写真を v1.0.1 に移す場合は、写真に触れる記述(本節の「写真を添える」・§1.4 の UGC)をそろえて外す(TASKPLAN §9.4)
 
 ### 1.2 No demo account is required — authentication is anonymous
 
-Lien v1.0 uses **anonymous authentication only** (Supabase anonymous sign-in). There is no username/password, and no email/password login screen exists in the app.
+Lien v1.0 uses **anonymous authentication only** (Supabase anonymous sign-in). There is no username/password and no email login, and the app offers no third-party or social sign-in at all. Sign in with Apple, for carrying data over to a new device, is planned for a later update and is not part of v1.0.
 
+- The anonymous session is created automatically when the user submits the nickname screen of the onboarding; the user is never asked for credentials. A note on the same screen explains that no registration is needed and that progress may not carry over when changing devices or reinstalling the app.
 - Because there is no credential-gated login, the standard "demo account username/password" field in App Store Connect does not apply in the traditional sense.
-- Recommended answer for the "Sign-In Information" / demo account section: **"No login is required. The app creates an anonymous session automatically on first launch. To demonstrate the 2-person pairing feature, follow the steps below to pair two instances of the app via an invite code."**
-- Pairing demo procedure (for the reviewer, using two devices/simulators or two TestFlight testers):
-  1. Device A: complete onboarding → Settings (or onboarding step) → generate an invite (8-digit code, QR, or link).
-  2. Device B: complete onboarding → "招待コードを入力" (enter invite code) → enter the 8-digit code from Device A.
-  3. Confirm both devices now show each other's nickname/avatar and promise on the Home screen, and that a check-in on one device reflects (within ~60s) on the other's widget/home.
-- Sign in with Apple (T24, 未実装) is an **optional** account-linking feature for device-migration continuity, not a required login — so it does not change the above answer.
+- Recommended answer for the "Sign-In Information" / demo account section: **"No login is required. The app creates an anonymous session automatically after the nickname is entered during onboarding. To try the 2-person features, pair two devices with an invite code — steps below."**
+- Pairing demo procedure (two devices/simulators, or two TestFlight testers). The invite sheet opens from the Home screen, so each device first completes onboarding and promise setup (§1.1, steps 1–2).
+  1. **Device A**, on Home: tap the invite button ("相手を招待する"), then "招待をつくる" (Create invite). A QR code, an 8-character alphanumeric invite code (case-sensitive, e.g. "AbCd2345") and a share-link button ("リンクをおくる") appear. An invite is valid for 72 hours and can be used once.
+  2. **Device B**, on Home: tap the invite button, scroll to the "コードを入力" (Enter a code) section, type the 8-character code from Device A and tap "ペアになる" (Pair up).
+     - Alternative: open the invite link on Device B. The "アプリで開く" (Open in app) button of the invite web page starts the app through `lien://invite/<code>`, and the same sheet opens with the code already filled in. The user still has to tap "ペアになる"; the app never pairs automatically.
+  3. Both devices now show the paired Home screen. Device A's invite sheet closes by itself (while the sheet is open, Device A re-checks with the server every few seconds; the app also refreshes at launch and whenever it returns to the foreground).
+  4. Confirm that each device shows the other's nickname and promise (emoji + title) on Home, together with the shared streak and the plant. The icon emoji picked during onboarding is not shown to the partner in v1.0.
+  5. Check in on Device A ("できた!"). Device B receives a push notification and its Home screen (and widget, if installed) update. The target is within about a minute; opening the app on Device B also refreshes it.
 
-**状態: 文言(回答方針)は準備済み。実際の提出時に App Store Connect のテキスト欄へ転記するのは T28/G5 の作業。**
+**状態: 2026-10-13 に W1(#55)の実装に合わせて書き直した(#61)。** 草案からの変更点:
+- 招待コードは「8桁」ではなく**8文字英数**(大文字小文字を区別。紛らわしい 0/O/1/l は使わない — DESIGN §5.1)
+- コードを入れる場所は、「招待コードを入力」ではなく、招待シートの「コードを入力」欄と「ペアになる」ボタン。招待の発行も受諾も、**Home のボタンから開くシート**で行う(Settings やオンボの途中ではない)。そのため、両端末とも約束設定まで済ませないとシートに着けない
+- 招待リンクを開くとシートが開いてコードが入るが、**受諾は明示のタップ**(自動受諾しない — DESIGN §3.6)
+- 相手の画面に出るのは**ニックネームと約束(絵文字+タイトル)**。オンボで選ぶアイコン絵文字(アバター)は出ない(snapshot に含まれず、アプリも描かない)
+- Sign in with Apple は v1.0 に無い(v1.0.1 — D3)。草案の「任意の連携機能」という一文を、v1.0 の機能ではないと明記する形に直した。ガイドライン 4.8 の対象外と判断した根拠は REQUIREMENTS §3.1。残る `users.apple_sub` の行(§2.1)は T30 が直す(TASKPLAN §9.4「T30 への引き継ぎ」3)
+
+実ビルドでの最終確認は T28a の内部 TestFlight 以降(T30)。確認点:
+- 招待ページ(`web/invite`)を Pages で公開した後に、「アプリで開く」の経路を実機で通す(G3 の前までに公開する)
+- オンボの注意書き(`Strings.Onboarding.anonymousStartNote`)は「あとから Apple ID 連携(設定画面)が必要」と読める。SIWA が v1.0.1 に移った(D3)ので、T27 で「機種変更で記録を引き継げない場合がある」に直す。直ったら、英文の該当の一文も合わせる
+- 端末1台の審査員向けに、開発者が操作する相手役の招待コード(期限を延ばしたもの)を §1.3 に用意する(T30)。用意できたら本節の末尾に1行足す
+- 相手の写真の表示は PV(#59)の担当。PV の後に、ペア後の写真の手順(添付 → 相手のホームに表示)を足す
 
 ### 1.3 Test pair accounts (2 pairs, as requested by App Review guidance)
 
@@ -49,13 +79,13 @@ Because authentication is anonymous, "test accounts" are provided as **two pre-p
 
 | ペア | ユーザーA | ユーザーB | 招待コード/手順 | 状態 |
 |---|---|---|---|---|
-| テストペア1 | `TBD: 実行後に実値`(匿名UUID) | `TBD: 実行後に実値` | `TBD: 実行後に実値`(seed-pair.sh実行時に発行される8桁コードを記載) | **TBD — 審査専用ペアの作成実行待ち** |
+| テストペア1 | `TBD: 実行後に実値`(匿名UUID) | `TBD: 実行後に実値` | `TBD: 実行後に実値`(seed-pair.sh実行時に発行される8文字コードを記載) | **TBD — 審査専用ペアの作成実行待ち** |
 | テストペア2 | `TBD: 実行後に実値` | `TBD: 実行後に実値` | `TBD: 実行後に実値` | **TBD — 審査専用ペアの作成実行待ち** |
 
 **作成手順(次段コミットまたは人間が実行)**:
 1. `products/lien/scripts/g1/seed-pair.sh` を実行する(`SUPABASE_URL` / `SUPABASE_ANON_KEY` 必須、`SUPABASE_SERVICE_ROLE_KEY` 推奨 — 約束のseedに必要)。このスクリプトは匿名ユーザー2人を作成し、invite-create→invite-acceptでペアを成立させる(詳細: `products/lien/scripts/g1/RUNBOOK.md`)。Supabaseバックエンド自体は稼働中のため、シークレット(`.env.keys`等)が揃えば即実行可能。
 2. 本番用には**審査専用に新規のペアを2組作成**し、既存のG1計測用ペアとは分離する(使い捨て前提。シークレット・トークンはコミットしない)。
-3. 発行された招待コード(8桁英数)と、各ユーザーに設定したニックネームをこの表に転記する。パスワード等は存在しない(匿名認証のため)。
+3. 発行された招待コード(8文字英数)と、各ユーザーに設定したニックネームをこの表に転記する。パスワード等は存在しない(匿名認証のため)。
 4. TestFlightの外部テスト(T28/G3)でも同じペアをそのまま審査用デモとして使い回せる。
 
 **状態: TBD(実行待ち)。ハーネス(seed-pair.sh)・バックエンド(Supabase)はいずれも実装済み・稼働確認済み。実データ投入は本タスクのスコープ外のため次段階(T30コミット②、または人間)に委ねる。**
