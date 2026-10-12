@@ -18,7 +18,6 @@
 - [ ] [T12][#12] 約束設定(functions promise-set 新設+PromiseSetupView。LienApp.swift には触れない) 完了条件: deno test 緑+lien-ios.yml 緑+DESIGN §5.3 に promise-set 追記
 - [ ] [T13][#13] ホーム画面(PlantSprite.swift と PlantAssets.xcassets 取込の単独オーナー。CheckinPerforming はローカルエコー注入) 完了条件: lien-ios.yml 緑+PlantSpriteTests/HomeViewModelTests 緑
 - [ ] [T14][#14] チェックインフロー+オフラインキュー+写真(migration 0002_photo_storage_policies — 着手時に最新連番を再確認) 完了条件: deno test 緑+lien-ios.yml 緑+PendingOpsQueueTests 緑
-- [ ] [T15][#15] つつく+リアクション(functions nudge/react 新設。messages.ts の nudge/reply/reaction 文言オーナー) 完了条件: deno test 全緑(+約20件)+lien-ios.yml 緑+罰なし文言の機械検証
 - [ ] [T16][#16] 通知一式(messages.ts は streakRisk/milestone 等の残りに限定=nudge 系は T15 委譲。prefs+migration 0003_notif_prefs+ReminderScheduler) 完了条件: deno test 緑+lien-ios.yml 緑+ReminderSchedulerTests 緑
 - [ ] [T17][#17] ウィジェット3種(M/円形/インライン)+NSE サムネ(T13 作成の PlantSprite.swift を LienWidget sources へ共有追加。photoThumbUrl 契約を DESIGN §4 に追記) 完了条件: lien-ios.yml 緑+ペイロード/サムネ/日付跨ぎテスト緑
 - [ ] [T18][#18] カレンダー履歴(HistoryCalendarBuilder 純粋ロジック+モック repo。streak.ts と同一意味論をテストで突合) 完了条件: lien-ios.yml 緑+月境界・both/ticket 判定テスト緑
