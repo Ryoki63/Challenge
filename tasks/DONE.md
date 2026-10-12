@@ -16,3 +16,4 @@
 - [x] T09: 植物スプライトv0 13枚+AssetCatalog取込+プレビュー。G2(#40)へ提出済み。 — 2026-06-11 (issue #9)
 - [x] T25: privacy-policy+terms+Web公開HTML+CHECKLIST-G4。 — 2026-06-11 (issue #25)
 - [x] T30準備: App Reviewレビューノート草案(marketing/review-notes.md新規)+REQUIREMENTS §8台帳化(全5項目に状態+参照)。issue #30はクローズせず継続(T23/T08実データ投入/T28完了後に本編完了)。 — 2026-10-12 (issue #30)
+- [x] T32準備: ストアメタデータ確定値化(store_metadata/ja/6ファイル+alternatives.md)+verify_metadata.py+lien-ci.ymlにstore-metadataジョブ追加。Pairy終了済み・次の需要=1月新年需要という状況変化を反映しPairy依存語を排除。lien-ci run 38206570833でstore-metadataジョブ緑確認。issue #32はクローズせず継続(G4 #42の人間判断待ち)。 — 2026-10-12 (issue #32)
