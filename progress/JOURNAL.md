@@ -226,3 +226,11 @@
 - `.github/workflows/lien-ci.yml` に `store-metadata` ジョブを追加(既存 deno-test/plant-assets は無変更、diffは追加18行のみ)。PyYAMLでパースし3ジョブとも正しく読めることを確認(ステップ名のコロンでYAML構文エラーが出たため name をクオートして修正済み)。pushしてlien-ci run緑化を確認する
 - commit/push完了: commit 37e12ed(store_metadata/ja/6ファイル+alternatives.md+tools/verify_metadata.py+lien-ci.yml store-metadataジョブ+本JOURNAL)。lien-ci run 38206570833 success(全3ジョブ緑、store-metadataは4秒)で緑確認
 - 結果: **T32準備(issue #32)完了**。BACKLOG.mdのT32準備行を削除、DONE.mdに追記。issue #32は進め方コメントの指示どおりクローズしない(G4 #42の人間判断=本編完了は別フェーズ)。issue #42へG4決定依頼コメント投稿へ続行
+
+## 2026-10-12 14:14 (サブエージェント/レーンD docs) — T20準備: ドラフト完成+セルフ検証 (issue #20)
+- 節目: `docs/E2E-M1.md`(12項目チェックリスト+§1ランブック+付録A網羅性セルフ検証+付録B既知リスク)と `products/lien/supabase/scripts/e2e_reset.sql` のドラフトを完成(作成のみ・未実行)
+- セルフ検証(別サブエージェント起動不可のため自ら実施)で判明: 12項目はM1コアパス(ペア成立→約束→チェックイン→ストリーク→つつく→通知)としては十分だが、REQUIREMENTS §3.2〜3.9の**全要件網羅ではない**。未カバー5点: ①ペア解消(§3.2、T23/#23未実装)②ストリークリセット罰なし文言+21時危機通知(§3.5、T16/#16未close)③チケット月次付与+お休み宣言(§3.6、T19/#19未close、一部のみ)④植物命名+そわそわ/しょんぼり状態(§3.9、一部のみ/未カバー)⑤招待72h失効の実時間確認等(ロジックのみ・E2E手順未明示)。この限定事項は本書と issue #20 完了コメントの両方に明記する方針(完了条件の文言どおり「網羅」を名乗らない)
+- e2e_reset.sqlのレビューで安全確認ブロックの実装リスクを発見・修正: 当初 `do $$ ... $$`(PL/pgSQL)ブロック内で psql変数展開(`:'test_user_a'`)に依存していたが、dollar-quote内側での展開可否を手元で実機確認できず(psql未インストール、web_search使用不可のためPostgreSQL公式ドキュメントをweb_fetchで確認したが dollar-quote内側の挙動は明記箇所を発見できず)。**曖昧さを許容せず**、dollar-quoteを一切使わない「素のSQL+`\gset`+`\if`+`:{?name}`(未定義判定、公式ドキュメントのSQL Interpolation節に明記された標準機能)」に書き直して解消。合わせて使い方コメントの `-v test_user_a="'<uuid>'"` という誤った例(`:'name'`展開は自動でクォートを付けるため二重クォートになり壊れる)も発見し、引用符なしの生UUIDを渡す正しい例に修正
+- 全テーブル定義(migrations/0001_init.sql)を直接再確認してスクリプトの列名・削除順序を検証: `nudges`(pair_id/from_user)・`reactions`(checkin_id/from_user)・`invites`(from_userのみ、受諾側記録列は無し)・`checkins.promise_id`はon delete cascade無し(NO ACTION)のため`promises`を一切DELETEしない設計で正しいことを確認。全て一致、修正不要
+- T15(#15)の状況を再確認: `nudge`/`react` Edge Functions のバックエンド実装・テストは commit `8b49d50` で既に完了(本タスク着手時点では未実装と記載していたため docs/E2E-M1.md 2箇所を修正)。ただしiOSクライアント結線と本番デプロイは未完了のまま
+- 次: path-scoped commit → push.sh → lien-ci緑確認(lien-iosは発火しないはず)→ BACKLOG/DONE更新 → issue #20へ準備完了コメント
