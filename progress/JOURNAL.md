@@ -273,3 +273,4 @@
 - 本番のテストデータ: 台帳を OPS.md §8 に記録(KPI 集計から除外する SQL つき)
 - 持ち越し(第2波へ): OPS の再実行手順の誤り(リセット通知の再送・grant-tickets の判定)/ 監視の自動化(毎朝 00:40 JST の Actions)/ cron 専用シークレット・net の権限 revoke / Release ビルドで Config 欠落時に Stub へ黙って落ちる / supabase-swift の版固定 / push_token のコールドスタート再送 / review-notes §1.1・§1.2 と実装のずれ5点 / DESIGN §3.3・§3.6・§5.6・§7・§10 の更新
 - 次(第2波): backend 堅牢化 B3 ∥ docs 整合 DOC2 ∥ ios-serial(W1 手直し+罰なし lint → T28準備 → PA 新イラスト取込)。順序変更: 新イラストを最初の内部 TestFlight(10/23 目標)に載せるため PA を PV・T23 の前へ(PA は PV・T23 に依存しない)
+- 第2波 起動(Workflow wf_cc8900bd-a55): backend #60 堅牢化 ∥ docs #61 ∥ ios-serial(#62 W1 手直し+罰なし lint → #28 T28準備 → #56 新イラスト取込)。新規起票 #60・#61・#62。各ステップ後に Opus max レビュー
