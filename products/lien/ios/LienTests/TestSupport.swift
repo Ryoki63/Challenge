@@ -196,15 +196,27 @@ enum ContractFixtures {
 
     private final class BundleToken {}
 
-    /// 拡張子 .json を除いた名前(例: "snapshot.paired")で読み込む
-    static func data(_ name: String) throws -> Data {
+    /// 拡張子 .json を除いた名前(例: "snapshot.paired")で読み込む。
+    /// 探す順: ① テストバンドルのリソース(project.yml が ../contracts/*.json を含める)
+    ///        ② 環境変数 LIEN_CONTRACTS_DIR のディレクトリ(Xcode 外で swiftc から直接実行する手元の検証用)
+    ///        ③ このソースファイルから辿ったリポジトリ内の contracts/(シミュレータはホストのファイルを読める)
+    static func data(_ name: String, file: StaticString = #filePath) throws -> Data {
         let bundle = Bundle(for: BundleToken.self)
         if let url = bundle.url(forResource: name, withExtension: "json") {
             return try Data(contentsOf: url)
         }
-        // Xcode 外(swiftc で直接テストを実行する手元の検証)では、環境変数のディレクトリから読む
         if let dir = ProcessInfo.processInfo.environment["LIEN_CONTRACTS_DIR"] {
             return try Data(contentsOf: URL(fileURLWithPath: dir).appendingPathComponent("\(name).json"))
+        }
+        // LienTests/TestSupport.swift → ios/ → lien/ → lien/contracts/
+        let sourceRelative = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent() // LienTests
+            .deletingLastPathComponent() // ios
+            .deletingLastPathComponent() // lien
+            .appendingPathComponent("contracts")
+            .appendingPathComponent("\(name).json")
+        if let data = try? Data(contentsOf: sourceRelative) {
+            return data
         }
         throw LoadError.missing(name)
     }
