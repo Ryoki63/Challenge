@@ -17,8 +17,5 @@ ios/Config/Secrets.xcconfig
 supabase/.temp/
 supabase/.branches/
 
-# 植物レイヤーのローカル用プレビュー(tools/gen_layers.py --previews。Chrome が要るので CI では作らない)
-assets/plant/_preview/
-
 # OS
 .DS_Store

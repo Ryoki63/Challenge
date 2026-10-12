@@ -1,0 +1,2 @@
+# tools/gen_layers.py --previews のローカル用プレビュー(ヘッドレス Chrome と Pillow が要る。CI では作らない)
+_preview/
