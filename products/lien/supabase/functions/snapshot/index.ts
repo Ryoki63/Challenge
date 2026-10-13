@@ -8,6 +8,7 @@
 // _shared に置けるのは apns/snapshot/messages のみ(T04 スコープ)のため重複を許容している。
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { isAuthServiceUnavailable } from "../_shared/auth_errors.ts";
 import { handleSnapshot } from "./core.ts";
 import type {
   SnapshotCheckinRow,
@@ -157,6 +158,11 @@ Deno.serve(async (req: Request) => {
     token,
   );
   if (authError || !authData?.user) {
+    // 認証サーバーに聞けなかった/不調(通信の失敗・5xx)は 401 にしない: アプリが「ログインが無効」と取り違えて、
+    // 「はじめからやり直す」へ誘導しないため(_shared/auth_errors.ts)
+    if (authError && isAuthServiceUnavailable(authError)) {
+      return json(503, { error: "auth_unavailable" });
+    }
     return json(401, { error: "unauthorized" });
   }
 

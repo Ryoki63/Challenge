@@ -1,5 +1,6 @@
 {
   "snapshot": {
+    "auth_unavailable": [503],
     "internal_error": [500],
     "method_not_allowed": [405],
     "unauthorized": [401],
@@ -95,12 +96,14 @@
     "user_not_found": [404]
   },
   "pair-dissolve": {
+    "auth_unavailable": [503],
     "internal_error": [500],
     "method_not_allowed": [405],
     "unauthorized": [401],
     "user_not_found": [404]
   },
   "delete-account": {
+    "auth_unavailable": [503],
     "internal_error": [500],
     "method_not_allowed": [405],
     "unauthorized": [401]

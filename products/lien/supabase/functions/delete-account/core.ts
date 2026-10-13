@@ -16,9 +16,14 @@
 //      旧形式(#52 より前の pairs/<pair_id>/<date>/photo.jpg)も、本人の行が指すものに限って消す。
 //      存在しないキーの削除は何も起きない(Storage の remove はエラーにしない)ので、取り消した日の写真・
 //      行を作る前にアップロードだけ済んだ写真などの取りこぼし(DB から辿れない孤児)も回収できる
-//   3. 関連データ: 本人のペア所属(pair_members)を消し、誰も残らなくなったペア(相手が先にアカウントを
-//      消していた)の行を消す(plants・streak_days・ticket_ledger・nudges が連鎖して消える)。相手が
-//      残るペアは、相手のアーカイブとして残す
+//   3. 関連データ(順序が大事 — 各手順を冪等にするため):
+//        a. 本人しか所属していないペア(相手が先にアカウントを消していた)を、ペアの行ごと消す
+//           (pair_members・plants・streak_days・ticket_ledger・nudges が連鎖して消える)。
+//           **所属を消す前に行う**: 先に所属を消すと、このあと失敗してやり直したとき listMemberships が空になり、
+//           そのペアの行を辿れずに(植物の名前・ストリーク・台帳が)残り続ける
+//        b. 本人のペア所属(pair_members)を消す。相手が残るペアは、相手のアーカイブとして残す
+//        c. 念のため、いま所属を消したペアのうち誰も居なくなったものを消す(本人と相手が同時に削除したときの
+//           取りこぼし。a は「まだ相手が居る」と見て残し、b のあとには誰も居なくなる)
 //   4. auth ユーザーを消す(auth.admin.deleteUser)。public.users と、そこから ON DELETE CASCADE で
 //      つながる本人の行(promises・checkins・reactions・nudges・invites。migration 0001)がここで消える。
 //      すでに無い(やり直しの 2 回目など)ときは成功として扱う
@@ -64,8 +69,12 @@ export interface DeleteAccountRepo extends PairDissolveRepo {
   removePhotos(paths: string[]): Promise<void>;
   /** 本人の pair_members 行を全部消す */
   deleteMemberships(userId: string): Promise<void>;
-  /** 与えたペアのうち、pair_members が 1 行も残っていないペアを消す(連鎖で plants など) */
-  deleteOrphanPairs(pairIds: string[]): Promise<void>;
+  /**
+   * 与えたペアのうち、pair_members が 1 行も残っていないペアを消す(連鎖で pair_members・plants など)。
+   * exceptUserId を渡すと、その人の所属は「居ないもの」として数える
+   * (本人が所属を消す前に、本人しか居ないペアを消すのに使う)
+   */
+  deleteOrphanPairs(pairIds: string[], exceptUserId?: string): Promise<void>;
   /** auth ユーザーを消す(public.users 以下は ON DELETE CASCADE)。すでに無ければ成功 */
   deleteAuthUser(userId: string): Promise<void>;
 }
@@ -266,9 +275,11 @@ export async function handleDeleteAccount(
     await repo.removePhotos(part);
   }
 
-  // 3. 関連データ(ペアの所属。誰も残らなくなったペアは行ごと消す)
-  await repo.deleteMemberships(req.userId);
-  await repo.deleteOrphanPairs(memberships.map((m) => m.pairId));
+  // 3. 関連データ(ペアの所属)。順序の理由は冒頭のコメント: 本人しか居ないペアを先にペアごと消し、そのあとで本人の所属を消す
+  const pairIds = memberships.map((m) => m.pairId);
+  await repo.deleteOrphanPairs(pairIds, req.userId); // a
+  await repo.deleteMemberships(req.userId); // b
+  await repo.deleteOrphanPairs(pairIds); // c
 
   // 4. auth ユーザー(public.users 以下は連鎖して消える)。最後に消す = ここまでの失敗はやり直せる
   await repo.deleteAuthUser(req.userId);

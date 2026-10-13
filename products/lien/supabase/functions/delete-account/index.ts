@@ -13,6 +13,7 @@
 //   APNS_AUTH_KEY / APNS_KEY_ID / APPLE_TEAM_ID / APNS_ENV / APNS_TOPIC(人間が G0 で設定)
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { isAuthServiceUnavailable } from "../_shared/auth_errors.ts";
 import {
   type DeleteAccountRepo,
   handleDeleteAccount,
@@ -209,13 +210,19 @@ function makeRepo(db: SupabaseClient): DeleteAccountRepo {
       if (error) throw error;
     },
 
-    async deleteOrphanPairs(pairIds: string[]): Promise<void> {
+    async deleteOrphanPairs(
+      pairIds: string[],
+      exceptUserId?: string,
+    ): Promise<void> {
       if (pairIds.length === 0) return;
       // メンバーが 1 行でも残っているペアは相手のアーカイブとして残す
-      const { data, error } = await db
-        .from("pair_members")
-        .select("pair_id")
-        .in("pair_id", pairIds);
+      // (exceptUserId があれば、その人の所属は数えない = その人しか居ないペアが「誰も残らない」ペアになる)
+      let members = db.from("pair_members").select("pair_id").in(
+        "pair_id",
+        pairIds,
+      );
+      if (exceptUserId) members = members.neq("user_id", exceptUserId);
+      const { data, error } = await members;
       if (error) throw error;
       const alive = new Set((data ?? []).map((r) => r.pair_id as string));
       const orphans = pairIds.filter((id) => !alive.has(id));
@@ -271,6 +278,11 @@ Deno.serve(async (req: Request) => {
     token,
   );
   if (authError || !authData?.user) {
+    // 認証サーバーに聞けなかった/不調(通信の失敗・5xx)は 401 にしない: アプリが「ログインが無効」と取り違えて、
+    // 「はじめからやり直す」へ誘導しないため(_shared/auth_errors.ts)
+    if (authError && isAuthServiceUnavailable(authError)) {
+      return json(503, { error: "auth_unavailable" });
+    }
     return json(401, { error: "unauthorized" });
   }
 

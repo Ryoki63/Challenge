@@ -86,9 +86,17 @@ interface World {
   removeSizes: number[];
   /** true にしたメソッドは 1 回だけ失敗する(その後は直る = やり直しの再現) */
   failOnce: Record<string, boolean>;
+  /** メソッドごとの呼び出し回数(failAt が数える) */
+  callCounts: Record<string, number>;
+  /** そのメソッドの N 回目(1 始まり)の呼び出しだけ失敗する(同じメソッドを複数回呼ぶ手順の、途中の失敗の再現) */
+  failAt: Record<string, number>;
 }
 
 function maybeFail(world: World, name: string): void {
+  world.callCounts[name] = (world.callCounts[name] ?? 0) + 1;
+  if (world.failAt[name] === world.callCounts[name]) {
+    throw new Error(`${name} の ${world.callCounts[name]} 回目が失敗(注入)`);
+  }
   if (world.failOnce[name]) {
     world.failOnce[name] = false;
     throw new Error(`${name} が失敗(注入)`);
@@ -172,12 +180,19 @@ function makeRepo(world: World): DeleteAccountRepo {
       world.members = world.members.filter((m) => m.userId !== userId);
       return Promise.resolve();
     },
-    deleteOrphanPairs: (pairIds) => {
+    deleteOrphanPairs: (pairIds, exceptUserId) => {
       world.calls.push("deleteOrphanPairs");
       maybeFail(world, "deleteOrphanPairs");
       for (const id of pairIds) {
-        if (world.members.some((m) => m.pairId === id)) continue;
+        // exceptUserId の所属は数えない(その人しか居ないペアも「誰も残らない」ペア)
+        if (
+          world.members.some((m) =>
+            m.pairId === id && m.userId !== exceptUserId
+          )
+        ) continue;
         world.pairs = world.pairs.filter((p) => p.pairId !== id);
+        // pair_members・plants・streak_days は pairs への ON DELETE CASCADE
+        world.members = world.members.filter((m) => m.pairId !== id);
         world.plants.delete(id);
         delete world.streakDays[id];
       }
@@ -330,6 +345,8 @@ function makeWorld(overrides: Partial<World> = {}): World {
     calls: [],
     removeSizes: [],
     failOnce: {},
+    callCounts: {},
+    failAt: {},
     ...overrides,
   };
 }
@@ -362,11 +379,11 @@ Deno.test("delete-account: ペアあり — 解消 → 写真 → 関連デー�
       "listMemberships",
       "listPhotoPaths",
       "removePhotos",
+      "deleteOrphanPairs", // 本人しか居ないペアを先に(所属を消す前)
       "deleteMemberships",
-      "deleteOrphanPairs",
       "deleteAuthUser",
     ],
-    "auth ユーザーは最後(それまでの失敗はやり直せる)",
+    "auth ユーザーは最後(それまでの失敗はやり直せる)。本人しか居ないペアは所属を消す前に消す",
   );
   assertEquals(world.authUsers.has("user-a"), false);
   assertEquals(world.users.some((u) => u.id === "user-a"), false);
@@ -555,60 +572,161 @@ Deno.test("delete-account: 写真の削除に失敗 → 例外・DB の関連デ
   assertEquals(sent.length, 1, "やり直しでは相手に二重に知らせない");
 });
 
+/** 失敗を注入する手順(name は repo のメソッド、at はそのメソッドの何回目か)と、その失敗の後に実行されてはいけない手順 */
+const FAILURE_POINTS: Array<{
+  label: string;
+  name: string;
+  at: number;
+  notAfter: string[];
+}> = [
+  {
+    label: "dissolvePair",
+    name: "dissolvePair",
+    at: 1,
+    notAfter: ["listMemberships", "deleteAuthUser"],
+  },
+  {
+    label: "listMemberships",
+    name: "listMemberships",
+    at: 1,
+    notAfter: ["removePhotos", "deleteAuthUser"],
+  },
+  {
+    label: "listPhotoPaths",
+    name: "listPhotoPaths",
+    at: 1,
+    notAfter: ["removePhotos", "deleteAuthUser"],
+  },
+  {
+    label: "removePhotos",
+    name: "removePhotos",
+    at: 1,
+    notAfter: ["deleteOrphanPairs", "deleteMemberships", "deleteAuthUser"],
+  },
+  {
+    label: "deleteOrphanPairs(a: 本人しか居ないペアを先に消す)",
+    name: "deleteOrphanPairs",
+    at: 1,
+    notAfter: ["deleteMemberships", "deleteAuthUser"],
+  },
+  {
+    label: "deleteMemberships(b)",
+    name: "deleteMemberships",
+    at: 1,
+    notAfter: ["deleteAuthUser"],
+  },
+  {
+    label: "deleteOrphanPairs(c: 所属を消したあとの取りこぼし)",
+    name: "deleteOrphanPairs",
+    at: 2,
+    notAfter: ["deleteAuthUser"],
+  },
+  { label: "deleteAuthUser", name: "deleteAuthUser", at: 1, notAfter: [] },
+];
+
 Deno.test("delete-account: どの手順で失敗しても、後ろの手順は実行されず、やり直しで完了する", async () => {
-  const steps = [
-    "dissolvePair",
-    "listMemberships",
-    "listPhotoPaths",
-    "deleteMemberships",
-    "deleteOrphanPairs",
-    "deleteAuthUser",
-  ];
-  const later: Record<string, string[]> = {
-    dissolvePair: ["listMemberships", "deleteAuthUser"],
-    listMemberships: ["removePhotos", "deleteAuthUser"],
-    listPhotoPaths: ["removePhotos", "deleteAuthUser"],
-    deleteMemberships: ["deleteOrphanPairs", "deleteAuthUser"],
-    deleteOrphanPairs: ["deleteAuthUser"],
-    deleteAuthUser: [],
-  };
-  for (const step of steps) {
-    const world = makeWorld({ failOnce: { [step]: true } });
+  for (const point of FAILURE_POINTS) {
+    const world = makeWorld({ failAt: { [point.name]: point.at } });
     const { pusher } = makePusher();
     const d = deps(world, pusher);
 
     await assertRejects(
       () => handleDeleteAccount(d, { userId: "user-a" }),
-      step,
+      point.label,
     );
-    for (const name of later[step]) {
+    for (const name of point.notAfter) {
       assertEquals(
         world.calls.includes(name),
         false,
-        `${step} の失敗後に ${name}`,
+        `${point.label} の失敗後に ${name}`,
       );
     }
-    if (step !== "deleteAuthUser") {
+    if (point.name !== "deleteAuthUser") {
       assertEquals(
         world.authUsers.has("user-a"),
         true,
-        `${step}: 認証は有効のまま`,
+        `${point.label}: 認証は有効のまま`,
       );
     }
 
     const retry = await handleDeleteAccount(d, { userId: "user-a" });
-    assertEquals(retry.body, { deleted: true }, step);
+    assertEquals(retry.body, { deleted: true }, point.label);
     assertEquals(
       world.authUsers.has("user-a"),
       false,
-      `${step}: やり直しで完了`,
+      `${point.label}: やり直しで完了`,
     );
     assertEquals(
       world.members.some((m) => m.userId === "user-a"),
       false,
-      step,
+      point.label,
     );
   }
+});
+
+Deno.test("delete-account: 相手が先に消えていて本人しか居ないペアは、どの手順で失敗しても、やり直しでペアの行(植物・ストリーク)ごと消える", async () => {
+  for (const point of FAILURE_POINTS) {
+    // 現役のペアが無い世界なので、ペアの解消(dissolvePair)は呼ばれない
+    if (point.name === "dissolvePair") continue;
+    const world = makeWorld({
+      streakDays: {
+        "pair-1": [{ dateLocal: "2026-06-05", kind: "both" }],
+        "pair-2": [],
+      },
+    });
+    const { pusher } = makePusher();
+    // B が先に削除 → pair-1 は解消済みで、A だけが所属するアーカイブとして残る
+    await handleDeleteAccount(deps(world, pusher), { userId: "user-b" });
+    assertEquals(world.pairs.some((p) => p.pairId === "pair-1"), true);
+    assertEquals(
+      world.members.filter((m) => m.pairId === "pair-1").map((m) => m.userId),
+      ["user-a"],
+      "A しか居ない",
+    );
+
+    // A の削除。注入した手順で失敗 → 同じ要求をやり直す(呼び出し回数は A の削除から数え直す)
+    world.callCounts = {};
+    world.failAt = { [point.name]: point.at };
+    const d = deps(world, pusher);
+    await assertRejects(
+      () => handleDeleteAccount(d, { userId: "user-a" }),
+      point.label,
+    );
+    const retry = await handleDeleteAccount(d, { userId: "user-a" });
+
+    assertEquals(retry.body, { deleted: true }, point.label);
+    assertEquals(
+      world.pairs.map((p) => p.pairId),
+      ["pair-2"],
+      `${point.label}: 誰も居ないペアの行が残らない`,
+    );
+    assertEquals(world.plants.has("pair-1"), false, point.label);
+    assertEquals(world.streakDays["pair-1"], undefined, point.label);
+    assertEquals(
+      world.members.some((m) => m.pairId === "pair-1"),
+      false,
+      point.label,
+    );
+    assertEquals(world.plants.has("pair-2"), true, "ほかのペアは無傷");
+  }
+});
+
+Deno.test("delete-account: 所属を消す前に本人しか居ないペアを消す — 相手が居るペアは(解消後も)相手のアーカイブとして残す", async () => {
+  const world = makeWorld();
+  const { pusher } = makePusher();
+
+  await handleDeleteAccount(deps(world, pusher), { userId: "user-a" });
+
+  assertEquals(
+    world.pairs.map((p) => p.pairId).sort(),
+    ["pair-1", "pair-2"],
+    "pair-1 には相手 B が残るので、行を消さない",
+  );
+  assertEquals(world.plants.get("pair-1")?.name, "みどり");
+  assertEquals(
+    world.members.filter((m) => m.pairId === "pair-1").map((m) => m.userId),
+    ["user-b"],
+  );
 });
 
 Deno.test("delete-account: 2 回目(すでに消えた後の再実行)も例外にならない — users 行が無くても auth ユーザー削除まで進む", async () => {
