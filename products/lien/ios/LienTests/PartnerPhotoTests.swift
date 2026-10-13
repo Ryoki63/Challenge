@@ -789,6 +789,7 @@ final class PartnerPhotoStorageTests: XCTestCase {
             "Lien/Core/PartnerPhotoService.swift",
             "Lien/Core/Api/StoragePhotoURLSigner.swift",
             "Lien/Features/Home/PartnerPhotoModel.swift",
+            "Lien/Features/Home/PartnerPhotoModel+State.swift",
             "Lien/Features/Home/PartnerPhotoView.swift",
         ]
         let forbidden = [

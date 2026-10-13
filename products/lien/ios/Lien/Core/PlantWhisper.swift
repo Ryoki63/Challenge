@@ -95,13 +95,16 @@ enum WhisperBubbleMetrics {
     static let gap: CGFloat = 2
     /// 吹き出しの幅
     static let width: CGFloat = 260
-    /// 標準の文字の大きさ(Large)での `.footnote` の行の高さ。ScaledMetric の基準にする(Apple の HIG: 13pt の行送りは 18pt)
+    /// 標準の文字の大きさ(Large)での `.footnote`(13pt)の行の高さ(Apple の HIG: 行送り 18pt)。ScaledMetric の基準にする。
+    /// iOS の実描画(CI の一覧画像 bubble_*.png)では、日本語の2行の吹き出し(しっぽとすき間を含む)は、標準で 55pt
+    /// (本体 46pt = 行 約17pt の2行 + 上下 12pt)・最大の文字サイズ(accessibility5)で 126pt。
+    /// CoreText(macOS)の測定は iOS より低く出る(標準で行 16pt)ので、基準は 16pt でなく 18pt にして、余裕(safetyMargin)を足す
     static let baseLineHeight: CGFloat = 18
     /// 親(ホームの ScrollView)が内容の上に空けている余白。吹き出しは、この余白にもはみ出してよい(LienSpacing.l と同じ 24pt)
     static let parentTopPadding: CGFloat = 24
     /// 植物の枠の上に最低限空ける余白(吹き出しが出ていないときの、植物の上の空き。LienSpacing.xl と同じ 32pt)
     static let minimumRoom: CGFloat = 32
-    /// 上の端から空けておく余裕。日本語の行は、かなと漢字のフォントの違いで、基準の行の高さより少し高くなることがある
+    /// 上の端から空けておく余裕(行の高さの見積もりと実測のずれの分。実描画では、上の端まで標準で 6pt・最大の文字サイズで 3pt あいた)
     static let safetyMargin: CGFloat = 4
 
     /// 最大の行数の吹き出しが、植物の枠の上にはみ出す高さ(文字 + 上下の余白 + しっぽ + すき間)
@@ -110,7 +113,7 @@ enum WhisperBubbleMetrics {
     }
 
     /// 植物の枠の上に空けておく余白。吹き出しの高さのうち、親の余白に収まらない分(と余裕)を足す。
-    /// 標準の文字の大きさでは、従来の 32pt に近い(37pt)
+    /// 標準の文字の大きさでは、従来の 32pt に近い(37pt)— ホームのレイアウトをほとんど動かさない
     static func roomAbovePlant(lineHeight: CGFloat) -> CGFloat {
         max(minimumRoom, extent(lineHeight: lineHeight) - parentTopPadding + safetyMargin)
     }

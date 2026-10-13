@@ -568,6 +568,9 @@ final class WhisperBubbleMetricsTests: XCTestCase {
         let room = WhisperBubbleMetrics.roomAbovePlant(lineHeight: WhisperBubbleMetrics.baseLineHeight)
         XCTAssertEqual(room, 32, accuracy: 6)
         XCTAssertGreaterThanOrEqual(room, 32)
+        // iOS の実描画(CI の一覧画像)で、日本語の2行の吹き出しは標準で 55pt。親の余白と合わせて、上の端まで 3pt 以上あく
+        let measuredOnIOS: CGFloat = 55
+        XCTAssertGreaterThanOrEqual(room + WhisperBubbleMetrics.parentTopPadding - measuredOnIOS, 3, "上の端まで 3pt 以上の余裕")
     }
 
     func testTheRoomGrowsWithTheTextSize() {

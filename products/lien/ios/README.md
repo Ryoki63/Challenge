@@ -202,5 +202,5 @@ gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false -f in
     実機の VoiceOver・大きい文字での見え方は T20 で確認する
 - 相手の今日の写真(PV #59)の仕上げ: 全画面で原寸が取れなかったらスピナーを止める(`PartnerPhotoModel.Viewer.Original`)/ 15 分たって取り直すとき、オフラインでも出している写真は消さない
   (行の読み取り・トークンの更新の通信失敗を `PartnerPhotoError.network` にそろえる)/ 読めなかった日は 3 分間取り直さない(通信の失敗は覚えない)/ 縦長の写真でも、枠と角丸とタップ範囲が写真そのもの(`PartnerPhotoCardLayout`)。
-  画素での確認は `HomeRenderChecksTests`(CI のみ。見た目は artifact の `photo_01_partner_photo_cards.png`・`bubble_*.png`)
+  画素での確認は `HomeRenderChecksTests`(CI のみ。見た目は artifact の `photo_01_partner_photo_cards.png`・`bubble_*.png`)。実機での見た目(縦長の写真の角丸・オフラインでの取り直し)は T20 で確認する
 - 手元の下見(`scripts/macos-check/check.sh test <ファイル名...>`)で絞って走らせるとき、`PunishmentFreeLint`(`StringsReviewTests`)・`MockSnapshotClient`(`SnapshotSynchronizerTests`)などほかのテストファイルの部品を使うテストは、それらのファイル名も並べる
