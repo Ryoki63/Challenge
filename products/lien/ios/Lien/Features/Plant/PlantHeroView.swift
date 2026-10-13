@@ -40,6 +40,10 @@ struct PlantHeroView: View {
 
     @State private var swayAngle: Double = 0
 
+    /// 植物の枠の大きさ(3:4。キャンバス 240×320 と同じ比率)
+    private static let plantWidth: CGFloat = 180
+    private static let plantHeight: CGFloat = 240
+
     var body: some View {
         VStack(spacing: LienSpacing.s) {
             PlantCharacterView(
@@ -49,7 +53,7 @@ struct PlantHeroView: View {
                 swayDegrees: swayAngle,
                 accessibilityText: accessibilityText
             )
-            .frame(width: 180, height: 240) // 3:4(キャンバス 240×320 と同じ比率)
+            .frame(width: Self.plantWidth, height: Self.plantHeight)
             .overlay(alignment: .top) { whisperBubble }
             .padding(.top, LienSpacing.xl) // 吹き出しが植物の上に出る分の余白(出ていないときも同じ。レイアウトを動かさない)
             .contentShape(Rectangle())
@@ -79,6 +83,8 @@ struct PlantHeroView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    // 植物の読み上げ文(accessibilityText — GROWTH §5.4)の最後の文と同じなので、重ねて読み上げない
+                    .accessibilityHidden(accessibilityText != nil)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: whisper)
@@ -98,6 +104,7 @@ struct PlantHeroView: View {
                         Image(systemName: "pencil")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true) // 鉛筆の絵は装飾(ボタンの意味はヒントで伝える)
                     }
                 }
                 .buttonStyle(.plain)
@@ -118,13 +125,16 @@ struct PlantHeroView: View {
 
     // MARK: 吹き出し(今日のひとこと)
 
-    /// 植物の枠の上に、枠の外へはみ出して出す(下端を枠の上端にそろえる)。タップは植物に通す
+    /// 植物の枠の上に、枠の外へはみ出して出す(下端が枠の上端の 2pt 上)。レイアウトは動かさない。タップは植物に通す。
+    /// 位置は、枠と同じ高さの入れ物の下端に吹き出しを置き、その分だけ上へずらして決める
+    /// (alignmentGuide は、実描画のテスト(ImageRenderer)で効かなかったので使わない — 吹き出しが植物の絵に重なっていた)
     @ViewBuilder
     private var whisperBubble: some View {
         if let whisper {
             WhisperBubble(text: whisper)
                 .frame(width: 260)
-                .alignmentGuide(.top) { dimensions in dimensions[.bottom] + 2 }
+                .frame(height: Self.plantHeight, alignment: .bottom)
+                .offset(y: -(Self.plantHeight + 2))
                 .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .bottom)))
                 .allowsHitTesting(false)
         }

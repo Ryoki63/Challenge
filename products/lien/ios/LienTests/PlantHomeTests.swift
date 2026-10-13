@@ -51,6 +51,11 @@ private final class DayClock {
     func advance(days: Int) { now = now.addingTimeInterval(TimeInterval(days) * 86_400) }
 }
 
+/// 既定の記録: 版の最初の観測は済んでいて、pair-A の段階は全部お祝い済み(演出が出ない)。
+/// 演出を確かめるテストは、記録を渡して始める(ファイル直下に置く: @MainActor のテストクラスの static にすると、
+/// 既定引数から参照したときに隔離の警告が出る)
+private let quietMemory = PlantMemory(initialized: true, celebratedStage: ["pair-A": 9])
+
 private var utcCalendar: Calendar {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
@@ -109,13 +114,9 @@ final class PlantHomeTests: XCTestCase {
         var store: AppGroupStore { temp.store }
     }
 
-    /// 既定の記録: 版の最初の観測は済んでいて、pair-A の段階は全部お祝い済み(演出が出ない)。
-    /// 演出を確かめるテストは、記録を渡して始める
-    private static let quietMemory = PlantMemory(initialized: true, celebratedStage: ["pair-A": 9])
-
     private func makeHarness(
         _ initial: PairSnapshot?,
-        memory: PlantMemory = PlantHomeTests.quietMemory,
+        memory: PlantMemory = quietMemory,
         withNaming: Bool = true
     ) -> Harness {
         let temp = TempStore()

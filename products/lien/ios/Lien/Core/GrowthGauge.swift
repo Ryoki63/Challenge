@@ -10,6 +10,7 @@
 //   | 長い区間の後半(半分以上)                     | 「ふたりそろって あと4回で よりそい」   |
 //   | 次の段階が無い(v1.0 のみのり以降)            | 「ふたりで 128回 そろったよ」          |
 //   | アプリが知らない段階をサーバーが返したとき     | 「あと25回で つぎの おたのしみ」        |
+//   |   (みのりの次の段階の回数を返したときも)     |                                      |
 //
 // ソロのときや、snapshot に新しいキーが無いとき(古いサーバー・古いキャッシュ)は、ゲージを出さない(nil)。
 // 区間の前半でまだ1回もそろっていない(段階に入った直後)ときは、「0回そろったよ」とは言わず、次の段階までの文にする。
@@ -34,6 +35,11 @@ enum GrowthGauge {
         // 次の段階が無い(みのり)
         guard let remaining = progress.remaining else {
             return Strings.Plant.gaugeLast(progress.grownDays)
+        }
+        // みのりの次の段階(1.0.1 の花壇。サーバーはみのりの区間にも次の回数を返し、段階10 は 125 回から)は、
+        // アプリがまだ知らないので、名前を出せない: 「あと25回で つぎの おたのしみ」(GROWTH §3.5)
+        if progress.stage + 1 > PlantLayers.stageRange.upperBound {
+            return Strings.Plant.gaugeUnknownNext(remaining)
         }
         let nextStageName = Strings.Plant.stageName(progress.stage + 1)
         let remainingText = Strings.Plant.gaugeRemaining(remaining, nextStageName: nextStageName)

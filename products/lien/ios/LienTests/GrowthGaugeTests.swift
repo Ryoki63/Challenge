@@ -117,6 +117,19 @@ final class GrowthGaugeTests: XCTestCase {
         XCTAssertEqual(GrowthGauge.text(for: unknown), "ふたりで 128回 そろったよ")
     }
 
+    func testLastKnownStageWithANextTargetFromALaterServerShowsTheNextTreat() {
+        // 1.0.1 のサーバーは、みのり(段階9)の区間にも次の回数(125 回 = 花壇の段階10)を返す。
+        // 今のアプリは段階10 の名前を知らないので、「みのり」と誤って言わず、次のおたのしみと言う
+        var later = snapshot(grown: 110)
+        XCTAssertEqual(later.plantStage, 9)
+        later.plantNextStageAt = 125
+        XCTAssertEqual(GrowthGauge.text(for: later), "あと15回で つぎの おたのしみ")
+        XCTAssertEqual(
+            PlantVoiceOver.label(for: later),
+            "みどり、みのり。あなた: まだ、ゆうき: まだ。あと15回で つぎの おたのしみ"
+        )
+    }
+
     func testGaugeIsHiddenForSoloMissingKeysAndInconsistentValues() {
         // ソロ(pairId が null): 植物は土の中で眠っていて、進み具合は無い(キーがあっても出さない)
         XCTAssertNil(GrowthGauge.text(for: snapshot(grown: 5, pairId: nil)))

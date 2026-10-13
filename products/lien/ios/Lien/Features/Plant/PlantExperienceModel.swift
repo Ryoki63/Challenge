@@ -66,8 +66,10 @@ final class PlantExperienceModel {
         latestSnapshot = snapshot
         guard let snapshot else { return }
         var memory = memoryStore.load()
+        let before = memory
         let observation = memory.observe(snapshot)
-        memoryStore.save(memory)
+        // 同じ snapshot を何度も見る(ホームを開く・前面復帰・同期のたび)ので、変わったときだけ書く
+        if memory != before { memoryStore.save(memory) }
 
         if let celebration = observation.celebration {
             // 演出の中で名前を見せる・付ける。おかえり・ひとことより優先
