@@ -12,7 +12,9 @@
 //      (再起動後の最初のアンロック前にバックグラウンド起動されると Keychain を読めない — issue #62)
 //   7. アカウント・ペアの操作(AccountOperating — issue #23): ペアの解消(= ブロック)・アカウントの削除・
 //      サインアウトのあとの端末の後始末(記録を消し、ウィジェットを更新し、オンボーディングへ戻る)と、
-//      セッションが使えなくなったとき(snapshot の取得が 401 / user_not_found で続く)の確認
+//      セッションが使えなくなったとき(snapshot の取得が 401 / user_not_found で続き、認証サーバーに直接たしかめても
+//      確かに拒否される)の確認。認証 SDK がセッションを破棄したとき(アカウントがサーバーで消えたあと、トークンの更新が
+//      拒否された)は、確認なしで同じ後始末を通す(もう戻れないので、端末の古い記録だけを残さない)
 //
 // 同期は同時に1本だけ走らせる。走行中に要求が来たら、終わった直後に1回だけ取り直す。
 
@@ -60,6 +62,10 @@ final class AppModel {
     private var sessionMonitor = SessionHealthMonitor()
     /// 端末の記録を消してサインアウトしている最中(同期と二重の後始末を止める)
     private var isEndingSession = false
+    /// セッションが消えたように見えたときの、読み直しの回数と間隔(Keychain の読み出しが一瞬失敗しただけで記録を消さない)
+    private let sessionRecheck: (count: Int, interval: TimeInterval)
+    /// セッションが消えたかの確認の最中か(重複して走らせない)
+    private var sessionVanishedCheck: Task<Void, Never>?
 
     private var isRefreshing = false
     /// 同期の走行中に別の要求が来た(終了直後に1回だけ取り直す)。テストが観測する
@@ -73,9 +79,14 @@ final class AppModel {
     /// 前面復帰の同期を省く最短間隔(起動直後の start() との二重取得を避ける。push 起点は省かない)
     static let minForegroundRefreshInterval: TimeInterval = 2
 
-    init(services: AppServices, now: @escaping () -> Date = Date.init) {
+    init(
+        services: AppServices,
+        now: @escaping () -> Date = Date.init,
+        sessionRecheck: (count: Int, interval: TimeInterval) = (count: 3, interval: 0.5)
+    ) {
         self.services = services
         self.now = now
+        self.sessionRecheck = sessionRecheck
         let pendingOps = services.pendingOps
         let gate = SyncGate()
         self.syncGate = gate
@@ -199,16 +210,29 @@ final class AppModel {
                 // 取得中にホームが新しい状態を保存した: 取得結果は捨てて1回だけ取り直す
                 outcome = await synchronizer.sync()
             }
-            noteSyncOutcome(outcome)
+            await noteSyncOutcome(outcome)
             isResolving = false
             reloadFromStore()
         } while rerunRequested && !isEndingSession
     }
 
-    /// 同期の結果からセッションの状態を見張る。401 / user_not_found が連続したら確認を出す
-    private func noteSyncOutcome(_ outcome: SnapshotSynchronizer.Outcome) {
-        if sessionMonitor.record(outcome) == .lost {
+    /// 同期の結果からセッションの状態を見張る。401 / user_not_found が連続したら、認証サーバーに直接たしかめ、
+    /// 確かに拒否されているときだけ確認を出す(自分たちのサーバーの 401 は、認証サーバーの一時的な不調や設定の誤りでも出る。
+    /// 「はじめからやり直す」は取り返せないので、別の経路で裏を取る)
+    private func noteSyncOutcome(_ outcome: SnapshotSynchronizer.Outcome) async {
+        guard sessionMonitor.record(outcome) == .lost else { return }
+        guard let verifier = services.sessionVerifier else {
+            sessionLost = true // たしかめる手段が無い構成(Stub)
+            return
+        }
+        switch await verifier.verify() {
+        case .rejected:
             sessionLost = true
+        case .valid:
+            // 認証サーバーはこのログインを受け付けている: 自分たちのサーバーの側の問題。数え直す
+            sessionMonitor.reset()
+        case .unknown:
+            break // たしかめられなかった(通信の失敗など)。次の同期でもう一度たしかめる
         }
     }
 
@@ -241,14 +265,48 @@ final class AppModel {
         return phase != .onboarding
     }
 
-    /// App Group の snapshot とセッションから phase を再導出し、ホームに読み直しを促す
+    /// App Group の snapshot とセッションから phase を再導出し、ホームに読み直しを促す。
+    /// セッションがあった(オンボーディングの外だった)のに無くなっていたら、認証 SDK がセッションを破棄した可能性があるので、
+    /// 端末の記録の後始末を確かめる(confirmSessionVanished)
     private func reloadFromStore() {
+        let hadSession = phase != .onboarding
         phase = AppRouter.phase(
             hasSession: services.auth.currentUserID != nil,
             snapshot: services.store?.loadSnapshot()
         )
         snapshotRevision += 1
         applyPendingInvite()
+        if hadSession, phase == .onboarding, !isEndingSession {
+            scheduleSessionVanishedCheck()
+        }
+    }
+
+    /// セッションが消えたように見えたときの確認を、重複させずに始める
+    private func scheduleSessionVanishedCheck() {
+        guard sessionVanishedCheck == nil else { return }
+        sessionVanishedCheck = Task { [weak self] in
+            await self?.confirmSessionVanished()
+            self?.sessionVanishedCheck = nil
+        }
+    }
+
+    /// 認証 SDK は、トークンの更新が「セッション/更新用の鍵がもう無い」と拒否されると(アカウントがサーバーで消えた・
+    /// セッションが取り消された)、端末のセッションを破棄する。何もしないと、端末の記録(snapshot・未送信キュー)を残したまま
+    /// オンボーディングへ落ち、作り直した新しいアカウントの phase を古い snapshot が決めてしまう。
+    /// Keychain の読み出しが一瞬失敗しただけの可能性を避けるため、少し間をおいて読み直し、それでも無いときだけ後始末する
+    /// (確認は出さない: もう戻れないセッションなので、選べることがない)
+    private func confirmSessionVanished() async {
+        for _ in 0..<sessionRecheck.count {
+            if sessionRecheck.interval > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(sessionRecheck.interval * 1_000_000_000))
+            }
+            if isEndingSession { return }
+            if services.auth.currentUserID != nil {
+                reloadFromStore() // 読めるようになっていた: phase を戻す
+                return
+            }
+        }
+        await endSession(unregisterPush: false)
     }
 
     /// 保留中の招待コードに応じて招待画面を開閉する:
@@ -290,7 +348,13 @@ extension AppModel: AccountOperating {
     /// 無くても成功し、端末はソロの形になる。失敗(通信など)は投げ、何も変えない
     func dissolvePair() async throws {
         guard let client = services.accountClient else { throw AccountClientError.unavailable }
-        let snapshot = try await client.dissolvePair()
+        var snapshot = try await client.dissolvePair()
+        // 未送信のチェックインが残っているとき、サーバーのソロの snapshot は「今日は未完」だが、端末はもう完了にしている。
+        // 楽観の状態を巻き戻さない(キューが空になった次の同期で、サーバーの値に揃う)
+        if let pending = services.pendingOps, !pending.isEmpty,
+           let local = services.store?.loadSnapshot(), local.todayMeDone {
+            snapshot.todayMeDone = true
+        }
         try? services.store?.saveSnapshot(snapshot)
         services.reloadWidgets()
         reloadFromStore() // paired → solo(相手の写真の表示も消える)
@@ -298,13 +362,35 @@ extension AppModel: AccountOperating {
     }
 
     /// アカウントを削除する。サーバーの削除が成功してから、端末の記録を消してサインアウトし、オンボーディングへ戻る。
-    /// サーバーの削除に失敗したときは投げ、端末は何も変えない(やり直せる)。
-    /// 401 / user_not_found は成功とみなさない(認証サーバーの一時的な不調でも 401 になる。アカウントが残っているのに
-    /// 端末の記録だけ消すと、削除できないまま戻れなくなる)
+    /// サーバーの削除に失敗したときは投げ、端末の記録は変えない(やり直せる)。途中まで進んだ失敗(現役のペアの解消は
+    /// 済んでいる)に備えて、端末のペアの表示をサーバーに追いつかせるための同期を促す。
+    /// 401 / user_not_found だけでは成功とみなさない(認証サーバーの一時的な不調でも 401 になる。アカウントが残っているのに
+    /// 端末の記録だけ消すと、削除できないまま戻れなくなる)。ただし、応答だけを取りこぼして、サーバーでは削除済みのとき、
+    /// やり直しは 401 になって先へ進めなくなる。そこで認証サーバーに直接たしかめ、「ユーザーが居ない」と確かに答えたなら、
+    /// 削除は済んでいたものとして端末を片づける
     func deleteAccount() async throws {
         guard let client = services.accountClient else { throw AccountClientError.unavailable }
-        try await client.deleteAccount()
+        do {
+            try await client.deleteAccount()
+        } catch {
+            if await accountIsAlreadyGone(after: error) {
+                await endSession(unregisterPush: false)
+                return
+            }
+            Task { await refresh() }
+            throw error
+        }
         await endSession(unregisterPush: false)
+    }
+
+    /// 削除の失敗が、実は「すでにアカウントが無い」ことの現れか。認証サーバーが確かに「ユーザー/セッションが居ない」と答えたときだけ true
+    private func accountIsAlreadyGone(after error: Error) async -> Bool {
+        guard
+            let error = error as? AccountClientError,
+            error == .unauthorized || error == .userNotFound,
+            let verifier = services.sessionVerifier
+        else { return false }
+        return await verifier.verify() == .rejected
     }
 
     /// サインアウト: この端末のセッションを破棄し、端末の記録を消して、オンボーディングへ戻る。
@@ -346,6 +432,7 @@ extension AppModel: AccountOperating {
             await services.pushTokenSync.forgetLocalRecord()
         }
         await services.auth.signOut()
+        services.pendingOps?.invalidate() // 送信の最中だった再送が、消したあとにキューを書き戻さない
         services.store?.eraseAll()
 
         sessionMonitor.reset()

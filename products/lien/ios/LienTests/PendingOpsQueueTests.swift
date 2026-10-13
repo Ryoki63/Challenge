@@ -152,6 +152,59 @@ final class PendingOpsQueueTests: XCTestCase {
         XCTAssertFalse(queue.containsCheckin(dateLocal: "2026-06-12"))
     }
 
+    // MARK: 端末の記録を消したあとの書き戻し(アカウントの削除・サインアウト — T23 #23)
+
+    func testInvalidateClearsTheQueueAndRefusesWritesFromARunStartedBefore() {
+        let (store, tempDir) = makeTempStore()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let queue = PendingOpsQueue(store: store)
+        queue.enqueue(.checkin(dateLocal: "2026-06-10", photoPath: nil))
+        queue.enqueue(.checkin(dateLocal: "2026-06-11", photoPath: nil))
+        let generation = queue.generation // 再送の開始時に控える値
+
+        queue.invalidate() // 再送の最中に、サインアウトで端末の記録を消した
+
+        XCTAssertTrue(queue.isEmpty, "キューは捨てる")
+        XCTAssertNotEqual(queue.generation, generation)
+        let written = queue.replaceAll(
+            [.checkin(dateLocal: "2026-06-11", photoPath: nil)],
+            ifGeneration: generation
+        )
+        XCTAssertFalse(written, "消す前に始めた再送は、あとから古いキューを書き戻さない")
+        XCTAssertTrue(queue.isEmpty)
+    }
+
+    func testReplaceAllWithTheCurrentGenerationWritesAsBefore() {
+        let (store, tempDir) = makeTempStore()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let queue = PendingOpsQueue(store: store)
+        queue.enqueue(.checkin(dateLocal: "2026-06-10", photoPath: nil))
+        queue.enqueue(.checkin(dateLocal: "2026-06-11", photoPath: nil))
+
+        let written = queue.replaceAll(
+            [.checkin(dateLocal: "2026-06-11", photoPath: nil)],
+            ifGeneration: queue.generation
+        )
+
+        XCTAssertTrue(written)
+        XCTAssertEqual(queue.load(), [.checkin(dateLocal: "2026-06-11", photoPath: nil)])
+        // 世代を渡さない書き方(従来)も同じ
+        XCTAssertTrue(queue.replaceAll([]))
+        XCTAssertTrue(queue.isEmpty)
+    }
+
+    func testNewRunsAfterInvalidateWriteNormally() {
+        let (store, tempDir) = makeTempStore()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let queue = PendingOpsQueue(store: store)
+        queue.invalidate()
+
+        // 次のアカウントの操作は、新しい世代で普通に積める・書ける
+        queue.enqueue(.checkin(dateLocal: "2026-06-11", photoPath: nil))
+        XCTAssertTrue(queue.replaceAll([], ifGeneration: queue.generation))
+        XCTAssertTrue(queue.isEmpty)
+    }
+
     // MARK: 壊れた JSON への耐性
 
     func testCorruptedFileIsTreatedAsEmptyQueue() throws {

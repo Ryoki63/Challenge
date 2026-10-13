@@ -46,7 +46,8 @@ final class PartnerPhotoModel {
     private(set) var state: State = .hidden
     private(set) var viewer: Viewer = .closed
 
-    /// 写真の長押しメニューの項目(T23 が通報・ブロックを入れる)。空なら長押しは何も起きない
+    /// 写真の長押しメニューの項目(T23 が通報・ブロックを入れる)。空なら長押しは何も起きない。
+    /// 全画面の写真にも同じ項目が出る(右上の「…」と長押し — 拡大したままでも通報できる)
     let actions: [PartnerPhotoAction]
 
     // MARK: 依存
@@ -79,6 +80,8 @@ final class PartnerPhotoModel {
     /// 走っている取得(テストが完了を待つのに使う)
     @ObservationIgnored private(set) var fetchTask: Task<Void, Never>?
     @ObservationIgnored private(set) var viewerTask: Task<Void, Never>?
+    /// 全画面が閉じ終わってから行う操作(全画面の通報・ブロック。→ closeViewer(then:))
+    @ObservationIgnored private var afterViewerDismissed: (@MainActor () -> Void)?
 
     init(
         provider: PartnerPhotoProviding,
@@ -132,6 +135,7 @@ final class PartnerPhotoModel {
     /// カードのタップ。サムネを大きく出して、原寸を取りに行く(取れたら差し替える)
     func openViewer() {
         guard case .ready(let photo) = state else { return }
+        afterViewerDismissed = nil // 開き直したら、前の「閉じたあとに行う操作」は無かったことにする
         viewerTask?.cancel()
         viewer = .open(thumbnail: photo.image, original: nil)
         let reference = photo.reference
@@ -145,6 +149,24 @@ final class PartnerPhotoModel {
         viewerTask?.cancel()
         viewerTask = nil
         if viewer != .closed { viewer = .closed }
+    }
+
+    /// 全画面を閉じ、閉じ終わってから `work` を行う(全画面の通報・ブロックの項目)。通報の確認やブロックの説明は
+    /// ホームに出すもので、全画面を出したままでは、その下のホームから提示できない。全画面が出ていなければ、すぐ行う
+    func closeViewer(then work: @escaping @MainActor () -> Void) {
+        guard isViewerOpen else {
+            work()
+            return
+        }
+        afterViewerDismissed = work
+        closeViewer()
+    }
+
+    /// 全画面が閉じ終わった(`.fullScreenCover` の onDismiss)。`closeViewer(then:)` で待たせていた操作を行う
+    func viewerDidDismiss() {
+        guard let work = afterViewerDismissed else { return }
+        afterViewerDismissed = nil
+        work()
     }
 
     var isViewerOpen: Bool {

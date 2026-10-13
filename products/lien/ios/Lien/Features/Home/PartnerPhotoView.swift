@@ -76,7 +76,9 @@ private struct PartnerPhotoCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: PartnerPhotoLayout.cornerRadius))
             }
             .buttonStyle(.plain)
-            .modifier(PartnerPhotoActionsModifier(actions: model.actions, reference: photo.reference))
+            .modifier(PartnerPhotoActionsModifier(actions: model.actions) { action in
+                action.perform(photo.reference)
+            })
             .accessibilityLabel(caption)
             .accessibilityHint(Strings.PartnerPhoto.openHint)
 
@@ -87,10 +89,11 @@ private struct PartnerPhotoCard: View {
     }
 }
 
-/// 長押しのメニュー(と VoiceOver のアクション)。項目が空なら何も付けない — T23 の取り付け口
+/// 長押しのメニュー(と VoiceOver のアクション)。項目が空なら何も付けない — T23 の取り付け口。
+/// `perform` が項目を実行する(カードはそのまま実行、全画面は閉じてから実行)
 private struct PartnerPhotoActionsModifier: ViewModifier {
     let actions: [PartnerPhotoAction]
-    let reference: PartnerPhotoReference
+    let perform: (PartnerPhotoAction) -> Void
 
     func body(content: Content) -> some View {
         if actions.isEmpty {
@@ -100,7 +103,7 @@ private struct PartnerPhotoActionsModifier: ViewModifier {
                 .contextMenu {
                     ForEach(actions) { action in
                         Button(role: action.isDestructive ? .destructive : nil) {
-                            action.perform(reference)
+                            perform(action)
                         } label: {
                             Label(action.title, systemImage: action.systemImage)
                         }
@@ -110,7 +113,7 @@ private struct PartnerPhotoActionsModifier: ViewModifier {
                 .accessibilityActions {
                     ForEach(actions) { action in
                         Button(action.title) {
-                            action.perform(reference)
+                            perform(action)
                         }
                     }
                 }
@@ -128,14 +131,17 @@ struct PartnerPhotoViewerHost: View {
 
     var body: some View {
         Color.clear
-            .fullScreenCover(isPresented: $model.isViewerPresented) {
+            // 全画面の通報・ブロックは、閉じ終わってから(onDismiss)ホームの確認を出す(model.closeViewer(then:))
+            .fullScreenCover(isPresented: $model.isViewerPresented, onDismiss: { model.viewerDidDismiss() }) {
                 PartnerPhotoViewer(model: model, partnerName: partnerName)
             }
     }
 }
 
 /// 原寸の写真を全画面で見る。原寸が届くまではサムネを大きく出し、届いたら差し替える
-/// (取れなかったときもサムネのまま — 文言は出さない)。背景のタップか閉じるボタンで閉じる
+/// (取れなかったときもサムネのまま — 文言は出さない)。背景のタップか閉じるボタンで閉じる。
+/// 通報・ブロック(T23 #23)は、左上の「…」メニューと写真の長押し、VoiceOver のアクション。選ぶと全画面を閉じてから、
+/// ホームに確認を出す(拡大したままでも通報できる — App Store ガイドライン 1.2)
 @MainActor
 struct PartnerPhotoViewer: View {
     let model: PartnerPhotoModel
@@ -143,6 +149,18 @@ struct PartnerPhotoViewer: View {
 
     private var displayName: String {
         partnerName ?? Strings.Home.partnerFallbackLabel
+    }
+
+    /// 開いている写真の指し先(通報の対象)。カードの写真が無くなっていれば nil
+    private var reference: PartnerPhotoReference? {
+        if case .ready(let photo) = model.state { return photo.reference }
+        return nil
+    }
+
+    /// 項目を実行する: 全画面を閉じ、閉じ終わってから実行する
+    private func perform(_ action: PartnerPhotoAction) {
+        guard let reference else { return }
+        model.closeViewer { action.perform(reference) }
     }
 
     var body: some View {
@@ -163,6 +181,7 @@ struct PartnerPhotoViewer: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onTapGesture { model.closeViewer() }
+                .modifier(PartnerPhotoActionsModifier(actions: model.actions, perform: perform))
 
                 if original == nil {
                     ProgressView()
@@ -170,6 +189,26 @@ struct PartnerPhotoViewer: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .allowsHitTesting(false)
                 }
+            }
+
+            if !model.actions.isEmpty, reference != nil {
+                Menu {
+                    ForEach(model.actions) { action in
+                        Button(role: action.isDestructive ? .destructive : nil) {
+                            perform(action)
+                        } label: {
+                            Label(action.title, systemImage: action.systemImage)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle.fill")
+                        .font(.title)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(LienColors.photoControl)
+                        .padding(LienSpacing.m)
+                }
+                .accessibilityLabel(Strings.PartnerPhoto.viewerMenuButton)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
 
             Button {

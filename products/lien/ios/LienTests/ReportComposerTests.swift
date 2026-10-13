@@ -170,6 +170,22 @@ final class ReportComposerTests: XCTestCase {
         XCTAssertEqual(current.appVersion, "1.0.0 (3)")
     }
 
+    // MARK: メールを開けなかったとき
+
+    func testMailFailureMessageAddsTheAddressSoThatDevicesWithoutMailCanStillReport() {
+        let message = ReportComposer.mailFailureMessage(email: "support@example.com")
+
+        XCTAssertTrue(message.contains(Strings.Report.mailFailedMessage), "もとの案内は残す")
+        XCTAssertTrue(message.contains("support@example.com"), "宛先を示す(メールアプリを使わずに直接送れる)")
+        XCTAssertEqual(message, Strings.Report.mailFailedMessage(contactAddress: "support@example.com"))
+    }
+
+    func testMailFailureMessageHasNoAddressUntilItIsDecided() {
+        // 連絡先が確定する前(G4 前)は、もとの案内だけ
+        XCTAssertEqual(ReportComposer.mailFailureMessage(email: ""), Strings.Report.mailFailedMessage)
+        XCTAssertEqual(ReportComposer.mailFailureMessage(email: "  \n"), Strings.Report.mailFailedMessage)
+    }
+
     // MARK: リンク
 
     func testLegalLinksAreHTTPSPagesURLs() {

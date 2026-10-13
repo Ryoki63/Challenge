@@ -539,6 +539,53 @@ final class PartnerPhotoModelTests: XCTestCase {
 
         XCTAssertTrue(makeRig().model.actions.isEmpty, "既定は長押しなし")
     }
+
+    // MARK: 全画面の通報・ブロック(T23 #23)
+
+    private func openedViewer() async -> Rig {
+        let rig = makeRig()
+        rig.provider.thumbnailResult = .success(PartnerPhotoFixtures.thumbnail())
+        rig.provider.originalResult = .success(TestImages.photoImage())
+        await rig.model.update(with: PartnerPhotoFixtures.pairedSnapshot())
+        rig.model.openViewer()
+        return rig
+    }
+
+    func testClosingTheViewerThenRunsTheWorkOnlyAfterTheDismissal() async {
+        let rig = await openedViewer()
+        var ran = 0
+
+        rig.model.closeViewer { ran += 1 }
+
+        XCTAssertEqual(rig.model.viewer, .closed, "全画面を閉じる")
+        XCTAssertEqual(ran, 0, "通報の確認はホームに出すので、全画面が閉じ終わる(onDismiss)までは出さない")
+        rig.model.viewerDidDismiss()
+        XCTAssertEqual(ran, 1)
+        rig.model.viewerDidDismiss()
+        XCTAssertEqual(ran, 1, "二重には行わない")
+    }
+
+    func testClosingTheViewerThenRunsImmediatelyWhenTheViewerIsNotOpen() async {
+        let rig = makeRig()
+        var ran = 0
+
+        rig.model.closeViewer { ran += 1 }
+
+        XCTAssertEqual(ran, 1, "全画面が出ていなければ、待たずに行う")
+        rig.model.viewerDidDismiss()
+        XCTAssertEqual(ran, 1)
+    }
+
+    func testOpeningTheViewerAgainDropsTheWorkThatWasWaiting() async {
+        let rig = await openedViewer()
+        var ran = 0
+        rig.model.closeViewer { ran += 1 }
+
+        rig.model.openViewer() // 閉じ終わる前に開き直した
+        rig.model.viewerDidDismiss()
+
+        XCTAssertEqual(ran, 0, "前に待たせた操作は、開き直したあとで急に行わない")
+    }
 }
 
 // MARK: - HomeViewModel との結線

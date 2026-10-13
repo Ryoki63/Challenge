@@ -30,6 +30,9 @@ private final class MockCheckinAPIClient: CheckinAPIClient {
     /// cancel だけ別モードにしたいとき(nil なら mode と同じ)
     var cancelMode: Mode?
 
+    /// checkin の送信の最中に実行される(アカウントの削除・サインアウトが割り込む状況を模す)
+    var duringCheckin: (() -> Void)?
+
     private(set) var checkinCalls: [(dateLocal: String, photoPath: String?, requestPhotoUpload: Bool)] = []
     private(set) var cancelCalls: [String] = []
     private(set) var uploads: [(byteCount: Int, target: PhotoUploadTarget)] = []
@@ -44,6 +47,7 @@ private final class MockCheckinAPIClient: CheckinAPIClient {
         requestPhotoUpload: Bool
     ) async throws -> CheckinResponse {
         checkinCalls.append((dateLocal, photoPath, requestPhotoUpload))
+        duringCheckin?()
         switch mode {
         case .offline: throw CheckinClientError.network
         case .reject(let error): throw error
@@ -295,6 +299,21 @@ final class CheckinServiceTests: XCTestCase {
     }
 
     // MARK: flush の順序と部分成功
+
+    func testFlushInterruptedByEndOfSessionDoesNotWriteTheOldQueueBack() async {
+        // 再送の最中に、サインアウト(端末の記録を消す)が割り込む。送信が終わっても、古いアカウントの残りのキューを書き戻さず、
+        // 次の op も送らない(T23 #23)
+        let (service, api, queue, tempDir) = makeService(serverSnapshot: makeSnapshot())
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        queue.enqueue(.checkin(dateLocal: yesterday, photoPath: nil))
+        queue.enqueue(.checkin(dateLocal: today, photoPath: nil))
+        api.duringCheckin = { queue.invalidate() }
+
+        _ = await service.flushPendingOps()
+
+        XCTAssertEqual(api.checkinCalls.count, 1, "消されたあとは、次の op を送らない")
+        XCTAssertTrue(queue.isEmpty, "古いアカウントのキューを書き戻さない")
+    }
 
     func testFlushStopsOnNetworkErrorAndKeepsRemainingOps() async {
         let (service, api, queue, tempDir) = makeService(serverSnapshot: makeSnapshot())

@@ -126,6 +126,12 @@ extension AppServices {
                 baseURL: baseURL,
                 tokenProvider: tokenProvider,
                 session: session
+            ),
+            sessionVerifier: GoTrueSessionVerifier(
+                baseURL: baseURL,
+                apiKey: config.supabaseAnonKey,
+                tokenProvider: tokenProvider,
+                session: session
             )
         )
     }

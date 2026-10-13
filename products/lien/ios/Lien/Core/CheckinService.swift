@@ -187,15 +187,17 @@ final class CheckinService: CheckinPerforming, CheckinCanceling, PhotoAttaching,
     private func drainQueue() async -> DrainResult {
         var result = DrainResult()
         var remaining = queue.load()
+        // 送信の最中にアカウントの削除・サインアウトで端末の記録が消されたら、古いキューを書き戻さず、そこで止める
+        let generation = queue.generation
         while let op = remaining.first {
             do {
                 result.lastSnapshot = try await send(op)
                 remaining.removeFirst()
-                queue.replaceAll(remaining)
+                guard queue.replaceAll(remaining, ifGeneration: generation) else { break }
             } catch let error as CheckinClientError where !error.isRetryable {
                 result.rejections.append((op, error))
                 remaining.removeFirst()
-                queue.replaceAll(remaining)
+                guard queue.replaceAll(remaining, ifGeneration: generation) else { break }
             } catch {
                 break // 通信エラー(または不明エラー)は再送対象として残す
             }

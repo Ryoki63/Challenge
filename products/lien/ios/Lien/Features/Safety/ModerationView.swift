@@ -157,7 +157,7 @@ struct ModerationPresentation: ViewModifier {
             .alert(Strings.Report.mailFailedTitle, isPresented: mailFailureBinding(isShown: isMailFailureShown)) {
                 Button(Strings.Report.mailFailedOK, role: .cancel) {}
             } message: {
-                Text(Strings.Report.mailFailedMessage)
+                Text(ReportComposer.mailFailureMessage())
             }
             .sheet(isPresented: blockBinding(isShown: isBlockSheetShown)) {
                 NavigationStack {

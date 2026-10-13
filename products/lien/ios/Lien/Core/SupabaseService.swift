@@ -187,6 +187,7 @@ final class SupabaseService: AuthServicing, PushRegistrationUpdating {
             .from("promises")
             .select("id, title, emoji, remind_at, archived_at")
             .eq("user_id", value: userID)
+            .is("archived_at", value: nil) // 現役だけ。アーカイブ済みの過去の約束は読まない
             .execute()
             .value
         guard let row = rows.first(where: { $0.archivedAt == nil }) else { return nil }

@@ -39,9 +39,29 @@ enum PendingOp: Equatable, Codable {
 /// 保存は都度ファイルへ(read-modify-write)。呼び出しは MainActor(HomeViewModel 経由)前提
 final class PendingOpsQueue {
     private let store: AppGroupStore
+    /// 端末の記録を消した回数(→ invalidate)。ロックで守る(再送はメインスレッドの外で走りうる)
+    private let lock = NSLock()
+    private var invalidations = 0
 
     init(store: AppGroupStore) {
         self.store = store
+    }
+
+    /// 端末の記録を消した回数。再送(CheckinService.drainQueue)は始めたときの値を控え、
+    /// 送信の最中にアカウントの削除・サインアウトで消されたら、あとからキューを書き戻さない(T23 #23)
+    var generation: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return invalidations
+    }
+
+    /// アカウントの削除・サインアウトで端末の記録を消すとき、キューを捨てて世代を進める。
+    /// 走っている再送が、送信を終えたあとに古いアカウントのキューを書き戻すのを止める
+    func invalidate() {
+        lock.lock()
+        invalidations += 1
+        lock.unlock()
+        try? store.clearPendingOps()
     }
 
     /// 現在のキュー(送信順)。ファイル無し・壊れた JSON は空キュー
@@ -90,9 +110,19 @@ final class PendingOpsQueue {
         save(ops)
     }
 
-    /// flush 後の残りを書き戻す(全送信成功なら空 = ファイル削除)
-    func replaceAll(_ ops: [PendingOp]) {
+    /// flush 後の残りを書き戻す(全送信成功なら空 = ファイル削除)。
+    /// `generation` を渡したときは、その世代のままの場合だけ書く(戻り値は書いたか。消されていたら false)
+    @discardableResult
+    func replaceAll(_ ops: [PendingOp], ifGeneration generation: Int? = nil) -> Bool {
+        if let generation {
+            lock.lock()
+            defer { lock.unlock() }
+            guard invalidations == generation else { return false }
+            save(ops)
+            return true
+        }
         save(ops)
+        return true
     }
 
     // MARK: private

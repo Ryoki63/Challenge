@@ -154,6 +154,14 @@ enum ReportComposer {
         return lines.joined(separator: "\n")
     }
 
+    /// メールを開けなかったとき(メールアプリが無い・設定が無い端末)のアラートの本文。
+    /// 運営の連絡先が決まっていれば、メールアプリを使わずに直接送れるよう宛先を添える(決まるまでは添えない)
+    static func mailFailureMessage(email: String = SupportLinks.contactEmail) -> String {
+        let address = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !address.isEmpty else { return Strings.Report.mailFailedMessage }
+        return Strings.Report.mailFailedMessage(contactAddress: address)
+    }
+
     /// `mailto:<address>?subject=…&body=…`。件名と本文は RFC 3986 の非予約文字以外をすべて % エンコードする
     /// (`&`・`=`・`+`・改行・日本語が、別の意味に読まれたり欠けたりしない)。
     /// 宛先が空なら `mailto:?subject=…`(宛先なしの下書き)。宛先に使えない文字が入っていれば nil

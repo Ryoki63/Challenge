@@ -297,7 +297,9 @@ final class ContractFixtureTests: XCTestCase {
             label: "snapshot",
             functions: ["snapshot"],
             mapped: ["user_not_found", "unauthorized"],
-            generic: ["internal_error", "method_not_allowed"],
+            // auth_unavailable(503): 認証サーバーの不調。「ログインが無効」ではないので専用 case にせず、一般のサーバー失敗として
+            // 扱う(SessionHealthMonitor は .failed(.server) を数えも消しもしない)
+            generic: ["internal_error", "method_not_allowed", "auth_unavailable"],
             isMapped: { SnapshotClientError(serverCode: $0) != .server(code: $0) }
         )
     }
@@ -344,7 +346,7 @@ final class ContractFixtureTests: XCTestCase {
             label: "account",
             functions: ["pair-dissolve", "delete-account"],
             mapped: ["user_not_found", "unauthorized"],
-            generic: ["internal_error", "method_not_allowed"],
+            generic: ["internal_error", "method_not_allowed", "auth_unavailable"],
             isMapped: { AccountClientError(serverCode: $0) != .server(code: $0) }
         )
     }

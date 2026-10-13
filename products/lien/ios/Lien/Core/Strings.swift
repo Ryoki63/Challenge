@@ -66,7 +66,7 @@ enum Strings {
         /// 匿名開始の注意(DESIGN §10: Apple ID 未連携のまま再インストールすると
         /// データを引き継げないことをオンボで明示する義務がある)
         static let anonymousStartNote =
-            "登録なしですぐ始められます。機種変更やアプリの入れ直しで続きを引き継ぐには、あとから Apple ID 連携(設定画面)が必要です。"
+            "登録なしですぐ始められます。機種変更やアプリの入れ直しでは、記録を引き継げない場合があります。"
 
         // ページ3: 通知プレ許可(OS ダイアログの前にひと言説明 — issue #10)
         static let notificationTitle = "おしらせを受け取る"
@@ -270,6 +270,8 @@ enum Strings {
         }
         /// 全画面を閉じるボタンの VoiceOver 名
         static let viewerCloseButton = "とじる"
+        /// 全画面の通報・ブロックのメニューボタンの VoiceOver 名(App Store ガイドライン 1.2: 拡大したままでも通報できる)
+        static let viewerMenuButton = "通報・ブロック"
     }
 
     /// 設定画面(REQUIREMENTS §3.15 / T23 #23)。罰・恥系の表現は使わない(§3.5)
@@ -331,7 +333,7 @@ enum Strings {
     /// サインアウトの確認(1段階。端末の記録は消え、登録なしで始めたアカウントには戻れない)
     enum SignOut {
         static let confirmTitle = "サインアウトしますか?"
-        static let confirmMessage = "この端末の記録は消えます。登録なしで始めたので、同じ記録には戻れません。ペアの相手とのつながりも、この端末からは戻せなくなります。"
+        static let confirmMessage = "この端末の記録は消えます。登録なしで始めたので、同じ記録には戻れません。ペアの相手とのつながりも、この端末からは戻せなくなります。サーバーに残る記録は、サインアウトしたあとでは削除できません。記録も消したいときは、先に「アカウントを削除する」を選んでください。"
         static let confirmButton = "サインアウト"
         static let cancel = "やめる"
     }
@@ -386,6 +388,10 @@ enum Strings {
         static let cancel = "やめる"
         static let mailFailedTitle = "メールを開けませんでした"
         static let mailFailedMessage = "メールアプリの設定を確認してから、もう一度お試しください。"
+        /// 運営の連絡先が決まっているとき(SupportLinks.contactEmail)は、メールの設定が無い端末でも通報できるよう宛先を添える
+        static func mailFailedMessage(contactAddress: String) -> String {
+            "\(mailFailedMessage)\nメールアプリを使わずに、次の宛先へ直接お送りいただいてもかまいません。\n\(contactAddress)"
+        }
         static let mailFailedOK = "閉じる"
 
         // 通報の対象(メールの「種別」)

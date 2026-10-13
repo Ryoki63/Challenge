@@ -71,7 +71,7 @@ struct SettingsView: View {
         .alert(Strings.Report.mailFailedTitle, isPresented: $showsMailFailure) {
             Button(Strings.Report.mailFailedOK, role: .cancel) {}
         } message: {
-            Text(Strings.Report.mailFailedMessage)
+            Text(ReportComposer.mailFailureMessage())
         }
     }
 

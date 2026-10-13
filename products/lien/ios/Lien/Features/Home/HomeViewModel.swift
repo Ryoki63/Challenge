@@ -293,6 +293,9 @@ final class HomeViewModel {
     func flushPendingOps() async {
         guard let opsFlusher, !isBusy else { return }
         if let server = await opsFlusher.flushPendingOps() {
+            // 送信の最中に画面が閉じられた(サインアウト・アカウントの削除でオンボーディングへ戻った)ときは、
+            // 古いアカウントの snapshot を端末へ書き戻さない
+            if Task.isCancelled { return }
             apply(server)
         }
     }

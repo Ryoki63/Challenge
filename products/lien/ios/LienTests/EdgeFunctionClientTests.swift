@@ -194,6 +194,8 @@ final class EdgeFunctionSnapshotClientTests: XCTestCase {
             (401, "unauthorized", .unauthorized),
             (500, "internal_error", .server(code: "internal_error")),
             (405, "method_not_allowed", .server(code: "method_not_allowed")),
+            // 認証サーバーの不調(通信の失敗・5xx)。「ログインが無効」(401)とは別物: セッションの見張りは数えない
+            (503, "auth_unavailable", .server(code: "auth_unavailable")),
         ]
         for (status, code, expected) in table {
             let client = makeClient()

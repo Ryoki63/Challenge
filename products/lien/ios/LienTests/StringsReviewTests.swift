@@ -76,6 +76,8 @@ enum StringsCatalog {
     static let representativeNames = ["ゆうき", "Aki", "🌱はな"]
     static let representativeDays = [0, 1, 23, 365]
     static let representativeDates = ["2026年10月20日 21:00", "Oct 20, 2026 at 9:00 PM"]
+    /// 運営の連絡先として文言に入るメールアドレスの代表(メールを開けなかったときの案内)
+    static let representativeAddresses = ["support@example.com"]
     /// 通報メールの件名に入る「種別」(Strings.Report.kind*)
     static let representativeKinds = [
         Strings.Report.kindPhoto, Strings.Report.kindNickname, Strings.Report.kindPromise,
@@ -224,6 +226,7 @@ enum StringsCatalog {
         add("PartnerPhoto.openHint", Strings.PartnerPhoto.openHint)
         add("PartnerPhoto.loadingLabel", Strings.PartnerPhoto.loadingLabel)
         add("PartnerPhoto.viewerCloseButton", Strings.PartnerPhoto.viewerCloseButton)
+        add("PartnerPhoto.viewerMenuButton", Strings.PartnerPhoto.viewerMenuButton)
         for name in representativeNames {
             add("PartnerPhoto.caption(\(name))", Strings.PartnerPhoto.caption(name))
             add("PartnerPhoto.viewerLabel(\(name))", Strings.PartnerPhoto.viewerLabel(name))
@@ -326,6 +329,9 @@ enum StringsCatalog {
         add("Report.cancel", Strings.Report.cancel)
         add("Report.mailFailedTitle", Strings.Report.mailFailedTitle)
         add("Report.mailFailedMessage", Strings.Report.mailFailedMessage)
+        for address in representativeAddresses {
+            add("Report.mailFailedMessage(\(address))", Strings.Report.mailFailedMessage(contactAddress: address))
+        }
         add("Report.mailFailedOK", Strings.Report.mailFailedOK)
         add("Report.kindPhoto", Strings.Report.kindPhoto)
         add("Report.kindNickname", Strings.Report.kindNickname)

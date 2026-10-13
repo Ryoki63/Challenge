@@ -36,6 +36,10 @@ struct AppServices {
     /// ペアの解消(= ブロック)・アカウントの削除(T23 #23)。nil のときは、それらの操作が失敗として扱われる
     /// (AccountClientError.unavailable)。Live / Stub のどちらの構成でも AppServices.make が入れる
     var accountClient: AccountAPIClient?
+    /// 認証サーバーへ直接ログイン状態をたしかめる口(T23 #23)。「ログイン状態を確認できません」の確認を出す前と、
+    /// アカウントの削除の応答だけ取りこぼしたときに使う。Live 構成だけ。nil のとき(Stub 構成)は、たしかめずに自分たちの
+    /// サーバーの答えをそのまま信じる
+    var sessionVerifier: SessionVerifying?
 }
 
 extension AppServices {
