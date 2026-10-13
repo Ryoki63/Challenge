@@ -285,3 +285,14 @@
 - 片付け: v4_drafts/composed の重複ファイル(正式ファイルとバイト一致の未追跡コピー)を削除。BACKLOG の順序を TASKPLAN §9 に揃えた(PA → PV → T23 → PB)
 - 次(第3波): ios-serial(#59 PV 相手の写真 → #23 審査対応一式 → #57 PB 成長の体験+VoiceOver ほか)∥ docs(DESIGN/GROWTH/TASKPLAN/E2E/README の持ち越し)∥ CI 保守(ops テストの統合・xcodegen 固定・リリース前の CI 緑確認ほか)∥ backend(本番に対する2ユーザーの API E2E スクリプト)
 - 第3波 起動(Workflow wf_13c84c7c-f34): ios-serial(#59 PV 相手の写真 → #23 審査対応一式 → #57 PB 成長の体験)∥ docs #65 ∥ ci #66 ∥ backend #67 本番 API 通しテスト。新規起票 #65・#66・#67、#57 に追加範囲をコメント
+
+## 2026-10-13 12:30 (対話/Opus) — 第3波 完了の集約(Workflow wf_13c84c7c-f34・14エージェント・約7.6時間)
+- **#59 PV 相手の写真**: 相手の当日 checkins の photo_path を RLS の範囲で読み、署名付き URL をクライアントで作ってホームに表示(サムネ優先・タップで原寸・メモリのみ・失敗は静かに植物だけ)。migration・新関数なし。lien-ios 447テスト緑。レビュー ok(改善7件は次波)。Xcode の無い Mac で push 前に約30秒で下見できる ios/scripts/macos-check/ を追加
+- **#23 審査対応一式(本番)**: 新関数 pair-dissolve(ブロック=解消)・delete-account(写真→データ→auth の順の完全削除)を本番デプロイ。設定画面(約束の編集・規約/ポリシー/お問い合わせ・解消・削除・サインアウト)、長押しの通報(mailto)とブロック、オンボでの規約への明示同意、セッション無効時のオンボ復帰。本番スモーク 48+8 PASS(使い捨てユーザーは全削除)。**Opus レビュー must_fix 1件**=REQUIREMENTS §3.15 のプロフィール編集(ニックネーム+アイコン)が未実装 → 実装して修正
+- **#57 PB 成長の体験**: snapshot の新キー3つ(省略可)・ゲージの文・段階アップの全画面演出(各段階1回)・名前付け(plant-name の Live)・VoiceOver 文・葉の下の約束の絵文字・のぞき・PA の手直し。lien-ios 747テスト緑。レビュー ok
+- **#65 文書**: DESIGN §3.3/§3.5/§3.8/§4.1/§7・8文字コード・E2E 順序・review-notes・README を実装に合わせた。レビュー ok
+- **#66 CI 保守**: ops テストを lien-ci に統合・XcodeGen 2.46.0 を SHA-256 で固定・リリース前に同じ SHA の CI 緑を確認・codesign 構文・棚卸しスクリプトのテスト・checkout を Node 24 版に・シミュレータ起動の分離。lien-release dry_run 緑。レビュー ok
+- **#67 本番 API 通しテスト**: 匿名ユーザー3人で S01〜S21 を本番に流し **244項目 PASS / FAIL 0**(PV の経路・PushTokenSync の経路・RLS の拒否を含む)。契約フィクスチャとのずれ1件(署名発行の失敗が 404 でなく 400)→ アプリ側の写像を修正済み。テストデータは全削除。レビュー must_fix 1件(招待トークンの正規表現が大文字 I を誤って除外)→ 修正。lien-ci に e2e-tests ジョブ
+- 新規 issue(エージェント起票): #68 取消後も写真の実体が Storage に残る / #64 公開後の規模対応(on-hold)/ **#63 net 権限の件を代わりの守りで受け入れるか(人間判断)**
+- G0(#38)は未完了のまま(最終更新 6/11)
+- 次(第4波): ios-serial(#16 通知 縮小版 → #17 ウィジェット S+ロック → #18 履歴 → #19 チケット残数 → #22 シェア画像)∥ backend(#19 サーバー側 ticketBalance+#68 写真の削除+バケット制限 → #16 サーバー側 節目の通知)∥ docs
