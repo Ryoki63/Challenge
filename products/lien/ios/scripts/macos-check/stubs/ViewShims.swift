@@ -12,3 +12,16 @@ extension View {
         sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
     }
 }
+
+/// 約束設定の画面(Features/PromiseSetup/PromiseSetupView.swift)は iOS 専用の API を使うので、型検査の対象から外している。
+/// 設定画面(SettingsView)が使うので、同じ初期化子を持つ代役を置く。PromiseSetupView の初期化子を変えたら、ここも同じに直す
+struct PromiseSetupView: View {
+    init(
+        client: PromiseAPIClient,
+        store: AppGroupStore?,
+        existing: Promise? = nil,
+        onSaved: @escaping (Promise) -> Void = { _ in }
+    ) {}
+
+    var body: some View { EmptyView() }
+}

@@ -114,4 +114,34 @@ final class AppGroupStoreTests: XCTestCase {
         XCTAssertNotNil(store.loadSnapshot())
         XCTAssertEqual(store.loadPendingOps([String].self), ["op-1"])
     }
+
+    // MARK: - eraseAll(アカウントの削除・サインアウトのあと — T23 #23)
+
+    func testEraseAllRemovesSnapshotPendingOpsAndPhotoThumb() throws {
+        try store.saveSnapshot(makeSnapshot())
+        try store.savePendingOps([PendingOp.checkin(dateLocal: "2026-06-11", photoPath: nil)])
+        try Data("jpeg".utf8).write(to: store.photoThumbFileURL)
+
+        store.eraseAll()
+
+        XCTAssertNil(store.loadSnapshot())
+        XCTAssertNil(store.loadPendingOps([PendingOp].self))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.snapshotFileURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.pendingOpsFileURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.photoThumbFileURL.path))
+    }
+
+    func testEraseAllSucceedsWhenThereIsNothingToErase() {
+        // コンテナが無い・ファイルが無くても落ちない(オンボのまま呼ばれても安全)
+        store.eraseAll()
+        store.eraseAll()
+        XCTAssertNil(store.loadSnapshot())
+    }
+
+    func testStoreIsUsableAfterErasing() throws {
+        try store.saveSnapshot(makeSnapshot(streak: 5))
+        store.eraseAll()
+        try store.saveSnapshot(makeSnapshot(streak: 9))
+        XCTAssertEqual(store.loadSnapshot()?.streakCurrent, 9, "消したあとも、次のアカウントの記録を書ける")
+    }
 }

@@ -116,6 +116,9 @@ private struct NicknamePage: View {
                     }
                 }
 
+                // 規約への明示の同意(チェック)。同意ボタン(下の「同意してはじめる」)はチェックが入るまで押せない
+                ConsentSection(isAgreed: $viewModel.agreedToTerms)
+
                 if let errorMessage = viewModel.submitErrorMessage {
                     Text(errorMessage)
                         .font(.footnote)
@@ -163,6 +166,45 @@ private struct NicknamePage: View {
         viewModel.submitErrorMessage == nil
             ? Strings.Onboarding.profileSubmit
             : Strings.Onboarding.retry
+    }
+}
+
+// MARK: - 規約への同意(ページ2)
+
+/// 利用規約・プライバシーポリシーへの同意のチェックと、それぞれを読むリンク(App Store ガイドライン 1.2 / issue #23)
+private struct ConsentSection: View {
+    @Binding var isAgreed: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                isAgreed.toggle()
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: isAgreed ? "checkmark.square.fill" : "square")
+                        .font(.title3)
+                        .foregroundStyle(isAgreed ? Color.accentColor : Color.secondary)
+                    Text(Strings.Onboarding.consentLabel)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(
+                isAgreed ? Strings.Onboarding.consentCheckedValue : Strings.Onboarding.consentUncheckedValue
+            )
+
+            HStack(spacing: 16) {
+                Link(Strings.Onboarding.consentTermsLink, destination: SupportLinks.termsURL)
+                Link(Strings.Onboarding.consentPrivacyLink, destination: SupportLinks.privacyURL)
+            }
+            .font(.footnote)
+
+            Text(Strings.Onboarding.consentNote)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

@@ -23,11 +23,20 @@ struct HomeView: View {
     private let reloadToken: Int
     /// ソロ状態の「相手を招待する」。nil なら導線を出さない(ペア成立後・プレビュー)
     private let onInvite: (() -> Void)?
+    /// 相手のコンテンツ(ニックネーム・約束の文・植物の名前)の長押しメニュー(通報・ブロック)と、その確認の表示。
+    /// nil(Stub 構成・プレビュー)なら付けない(写真の長押しは PartnerPhotoModel.actions — T23 #23)
+    private let moderation: ModerationViewModel?
 
-    init(viewModel: HomeViewModel, reloadToken: Int = 0, onInvite: (() -> Void)? = nil) {
+    init(
+        viewModel: HomeViewModel,
+        reloadToken: Int = 0,
+        onInvite: (() -> Void)? = nil,
+        moderation: ModerationViewModel? = nil
+    ) {
         _viewModel = State(initialValue: viewModel)
         self.reloadToken = reloadToken
         self.onInvite = onInvite
+        self.moderation = moderation
     }
 
     /// プレビュー・簡易構成用(本番の依存は RootView が HomeViewModel として渡す)
@@ -39,7 +48,7 @@ struct HomeView: View {
         ScrollView {
             Group {
                 if let snapshot = viewModel.snapshot {
-                    SnapshotContent(viewModel: viewModel, snapshot: snapshot, onInvite: onInvite)
+                    SnapshotContent(viewModel: viewModel, snapshot: snapshot, onInvite: onInvite, moderation: moderation)
                 } else {
                     EmptyHomeContent()
                 }
@@ -52,6 +61,8 @@ struct HomeView: View {
                 .padding(.horizontal, LienSpacing.l)
             #endif
         }
+        // 通報の確認・メールを開けなかったときのアラート・ブロック(ペア解消)の説明シート(T23 #23)
+        .moderationPresentation(moderation)
         .onAppear { viewModel.load() }
         .task { await viewModel.flushPendingOps() }
         // 前面に出したまま日付が変わったら、相手の写真を消す(PV #59。View が消えるとキャンセルされる)
@@ -79,13 +90,15 @@ private struct SnapshotContent: View {
     let viewModel: HomeViewModel
     let snapshot: PairSnapshot
     let onInvite: (() -> Void)?
+    let moderation: ModerationViewModel?
 
     var body: some View {
         VStack(spacing: LienSpacing.m) {
             PlantArea(
                 state: viewModel.plantState,
                 sways: viewModel.plantSways,
-                plantName: snapshot.pairId != nil ? snapshot.plantName : nil
+                plantName: snapshot.pairId != nil ? snapshot.plantName : nil,
+                moderation: moderation
             )
 
             if viewModel.isSolo {
@@ -112,7 +125,7 @@ private struct SnapshotContent: View {
                 StreakArea(current: snapshot.streakCurrent, best: snapshot.streakBest)
             }
 
-            TodayArea(viewModel: viewModel, snapshot: snapshot)
+            TodayArea(viewModel: viewModel, snapshot: snapshot, moderation: moderation)
 
             // チェックイン+写真添付+当日取消(T14 — Features/Checkin/CheckinFlowView.swift)
             CheckinFlowView(viewModel: viewModel)
@@ -132,6 +145,7 @@ private struct PlantArea: View {
     /// fidget(片方だけ完了のそわそわ)の揺れアニメ
     let sways: Bool
     let plantName: String?
+    let moderation: ModerationViewModel?
 
     @State private var swayAngle: Double = 0
 
@@ -147,6 +161,8 @@ private struct PlantArea: View {
             if let plantName, !plantName.isEmpty {
                 Text(plantName)
                     .font(.headline)
+                    // 名前はどちらのペアも付けられる。気になるときは長押しで通報・ブロックできる(T23 #23)
+                    .plantNameMenu(moderation, plantName: plantName)
             }
         }
     }
@@ -191,6 +207,7 @@ private struct StreakArea: View {
 private struct TodayArea: View {
     let viewModel: HomeViewModel
     let snapshot: PairSnapshot
+    let moderation: ModerationViewModel?
 
     var body: some View {
         VStack(spacing: LienSpacing.s) {
@@ -213,6 +230,13 @@ private struct TodayArea: View {
                         emoji: snapshot.partnerPromiseEmoji,
                         title: snapshot.partnerPromiseTitle,
                         done: snapshot.todayPartnerDone
+                    )
+                    // 相手のニックネームと約束の文: 長押しで通報・ブロック(ペア解消)できる(T23 #23)
+                    .partnerChipMenu(
+                        moderation,
+                        nickname: snapshot.partnerName,
+                        promiseEmoji: snapshot.partnerPromiseEmoji,
+                        promiseTitle: snapshot.partnerPromiseTitle
                     )
                 }
             }

@@ -25,6 +25,9 @@ private final class MockRegistrar: PushRegistrationUpdating {
     /// サーバーの users 行の代わり。更新が成功すると書き換わる。
     /// テストが直接書き換えれば「サーバー側が 410 で push_token を null にした」状況も作れる
     var serverRegistration = ServerPushRegistration(token: nil, environment: nil)
+    /// 登録を取り消した(サインアウトの前)回数 / 取り消しの失敗
+    private(set) var clearCount = 0
+    var clearFails = false
 
     private struct Offline: Error {}
 
@@ -44,6 +47,12 @@ private final class MockRegistrar: PushRegistrationUpdating {
             throw Offline()
         }
         return serverRegistration
+    }
+
+    func clearPushRegistration() async throws {
+        clearCount += 1
+        if clearFails { throw Offline() }
+        serverRegistration = ServerPushRegistration(token: nil, environment: nil)
     }
 }
 
@@ -446,5 +455,84 @@ final class PushTokenSyncTests: XCTestCase {
         // users.push_env の check(push_env in ('sandbox','production')) — migration 0005 / issue #53
         XCTAssertEqual(PushEnvironment.sandbox.rawValue, "sandbox")
         XCTAssertEqual(PushEnvironment.production.rawValue, "production")
+    }
+
+    // MARK: サインアウトの前の登録の取り消し(T23 #23)
+
+    func testUnregisterClearsTheServerRegistrationAndForgetsTheLocalRecord() async {
+        let registrar = MockRegistrar()
+        let session = SessionBox()
+        session.userID = UUID()
+        let ledger = InMemoryPushRegistrationLedger()
+        let sync = makeSync(registrar: registrar, session: session, ledger: ledger)
+        await sync.receive(token: "aabbcc")
+        XCTAssertNotNil(ledger.lastSynced)
+        XCTAssertEqual(registrar.serverRegistration.token, "aabbcc")
+
+        let cleared = await sync.unregister()
+
+        XCTAssertTrue(cleared)
+        XCTAssertEqual(registrar.clearCount, 1)
+        XCTAssertNil(registrar.serverRegistration.token, "サーバー側のこの端末への登録を外す(サインアウト後に古いアカウントの通知が届かない)")
+        XCTAssertNil(ledger.lastSynced, "端末の記録も捨てる")
+    }
+
+    func testUnregisterFailureStillForgetsTheLocalRecord() async {
+        let registrar = MockRegistrar()
+        registrar.clearFails = true
+        let session = SessionBox()
+        session.userID = UUID()
+        let ledger = InMemoryPushRegistrationLedger()
+        let sync = makeSync(registrar: registrar, session: session, ledger: ledger)
+        await sync.receive(token: "aabbcc")
+
+        let cleared = await sync.unregister()
+
+        XCTAssertFalse(cleared, "外せなかったことは戻り値で分かる(サインアウトは止めない)")
+        XCTAssertNil(ledger.lastSynced)
+    }
+
+    func testUnregisterWithoutSessionSendsNothing() async {
+        let registrar = MockRegistrar()
+        let session = SessionBox() // セッション無し(すでに失効している)
+        let ledger = InMemoryPushRegistrationLedger()
+        let sync = makeSync(registrar: registrar, session: session, ledger: ledger)
+        await sync.receive(token: "aabbcc")
+
+        let cleared = await sync.unregister()
+
+        XCTAssertTrue(cleared)
+        XCTAssertEqual(registrar.clearCount, 0, "セッションが無ければ、サーバーへは何も送らない")
+    }
+
+    func testDeviceTokenIsKeptSoTheNextAccountCanRegisterIt() async {
+        let registrar = MockRegistrar()
+        let session = SessionBox()
+        session.userID = UUID()
+        let sync = makeSync(registrar: registrar, session: session)
+        await sync.receive(token: "aabbcc")
+        await sync.unregister()
+        session.userID = nil
+
+        session.userID = UUID() // 同じ端末で、新しい匿名アカウント
+        await sync.sessionDidChange()
+
+        XCTAssertEqual(registrar.calls.count, 2, "デバイストークンは端末のもの。次のアカウントへ改めて登録する")
+        XCTAssertEqual(registrar.calls.last?.token, "aabbcc")
+    }
+
+    func testForgetLocalRecordResendsToTheSameAccount() async {
+        let registrar = MockRegistrar()
+        let session = SessionBox()
+        session.userID = UUID()
+        let sync = makeSync(registrar: registrar, session: session)
+        await sync.receive(token: "aabbcc")
+        XCTAssertEqual(registrar.calls.count, 1)
+
+        await sync.forgetLocalRecord() // アカウント削除のあと(サーバー側の行は無い): 記録だけ捨てる
+        await sync.flush()
+
+        XCTAssertEqual(registrar.calls.count, 2, "記録が無ければ、変化時だけ送る判定は『未送信』と見る")
+        XCTAssertEqual(registrar.clearCount, 0)
     }
 }

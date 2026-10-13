@@ -121,7 +121,12 @@ extension AppServices {
                 ledger: UserDefaultsPushRegistrationLedger()
             ),
             reloadWidgets: reloadWidgets,
-            partnerPhotos: partnerPhotos
+            partnerPhotos: partnerPhotos,
+            accountClient: EdgeFunctionAccountClient(
+                baseURL: baseURL,
+                tokenProvider: tokenProvider,
+                session: session
+            )
         )
     }
 }

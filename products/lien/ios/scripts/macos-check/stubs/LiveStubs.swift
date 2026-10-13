@@ -13,6 +13,10 @@ final class SupabaseService: AuthServicing, PushRegistrationUpdating {
     func fetchPushRegistration() async throws -> ServerPushRegistration {
         ServerPushRegistration(token: nil, environment: nil)
     }
+    func clearPushRegistration() async throws {}
+    func fetchProfile() async throws -> UserProfile { UserProfile(nickname: "", avatarEmoji: "") }
+    func fetchMyPromise() async throws -> Promise? { nil }
+    func signOut() async {}
 }
 
 final class PushManager: PushAuthorizing {

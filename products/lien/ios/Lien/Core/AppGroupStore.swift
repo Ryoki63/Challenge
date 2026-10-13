@@ -102,6 +102,16 @@ struct AppGroupStore {
         try fileManager.removeItem(at: pendingOpsFileURL)
     }
 
+    // MARK: - 全消去(アカウントの削除・サインアウト・セッション無効のあと — T23 #23)
+
+    /// 端末に置いた記録をすべて消す(snapshot・未送信キュー・相手の写真のサムネ)。
+    /// ウィジェットは次の reload で空の表示になる(呼び出し側が reload する)。ファイルが無くても成功する
+    func eraseAll(fileManager: FileManager = .default) {
+        for url in [snapshotFileURL, pendingOpsFileURL, photoThumbFileURL] {
+            try? fileManager.removeItem(at: url) // 無いファイルの削除エラーは無視する
+        }
+    }
+
     // MARK: - private
 
     private func writeAtomically(_ data: Data, to url: URL) throws {

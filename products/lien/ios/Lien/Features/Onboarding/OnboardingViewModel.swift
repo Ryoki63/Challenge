@@ -5,6 +5,9 @@
 //   テストはモック)。通知許可は PushAuthorizing 経由
 // - ニックネーム検証は DB の check 制約 char_length(Unicode コードポイント数)に合わせて
 //   unicodeScalars.count で数える(絵文字込みでも DB とズレない — issue #10)
+// - 利用規約・プライバシーポリシーへの明示の同意(チェック)が入るまで、プロフィールを送信できない。
+//   送信が匿名サインイン(= アカウントの作成)を兼ねるので、同意のないままアカウントを作らない
+//   (写真を共有するアプリの審査要件 — App Store ガイドライン 1.2 / issue #23)
 
 import Foundation
 import Observation
@@ -31,6 +34,8 @@ final class OnboardingViewModel {
 
     var nickname = ""
     var avatarEmoji = Strings.Onboarding.avatarPalette.first ?? "🌱"
+    /// 利用規約とプライバシーポリシーに同意したか(チェック)。入るまで送信できない
+    var agreedToTerms = false
 
     // MARK: - 画面状態
 
@@ -79,7 +84,7 @@ final class OnboardingViewModel {
     }
 
     var canSubmitProfile: Bool {
-        nicknameError == nil && !isSubmitting
+        nicknameError == nil && agreedToTerms && !isSubmitting
     }
 
     // MARK: - 遷移・送信

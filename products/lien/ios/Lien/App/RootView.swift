@@ -3,9 +3,12 @@
 //   onboarding   : オンボーディング3画面(T10)。完了で AppModel.onboardingFinished
 //   promiseSetup : 約束設定(T12)を本番導線に。保存で AppModel.promiseSaved → ホームへ
 //   solo / paired: ホーム(T13)。ソロは土の鉢+チェックイン+「相手を招待する」導線で、
-//                  招待画面(T11)はホームからシートで開く(招待コードのディープリンクでも自動で開く)
+//                  招待画面(T11)はホームからシートで開く(招待コードのディープリンクでも自動で開く)。
+//                  右上の歯車から設定画面(T23 #23)をシートで開く。相手の写真・ニックネーム・約束の文・植物の名前の
+//                  長押しメニュー(通報・ブロック)は ModerationViewModel(AppModel が 1 つ持つ)
 //
 // 前面復帰・起動・ディープリンクは AppModel に委ねる(サーバー同期と phase 更新はそちらの責務)。
+// セッションが使えなくなったとき(snapshot の取得が 401 / user_not_found で続く)の確認もここで出す。
 
 import SwiftUI
 
@@ -36,23 +39,53 @@ struct RootView: View {
                     }
                 }
             case .solo, .paired:
-                HomeView(
-                    viewModel: HomeViewModel(
-                        store: model.services.store,
-                        checkinService: model.services.checkinService,
-                        nudgeService: model.services.nudgeService,
-                        reactionService: model.services.reactionService,
-                        // 相手の今日の写真(PV #59)。Live 構成だけ。T23 が長押しメニュー(通報・ブロック)の項目を渡す
-                        partnerPhoto: model.services.partnerPhotos.map { PartnerPhotoModel(provider: $0) },
-                        reloadWidgets: model.services.reloadWidgets
-                    ),
-                    reloadToken: model.snapshotRevision,
-                    onInvite: model.phase == .solo ? { model.presentPairing() } : nil
-                )
+                NavigationStack {
+                    HomeView(
+                        viewModel: HomeViewModel(
+                            store: model.services.store,
+                            checkinService: model.services.checkinService,
+                            nudgeService: model.services.nudgeService,
+                            reactionService: model.services.reactionService,
+                            // 相手の今日の写真(PV #59)。Live 構成だけ。長押しメニューは通報とブロック(ペア解消 — T23 #23)
+                            partnerPhoto: model.services.partnerPhotos.map {
+                                PartnerPhotoModel(provider: $0, actions: model.moderation.photoActions)
+                            },
+                            reloadWidgets: model.services.reloadWidgets
+                        ),
+                        reloadToken: model.snapshotRevision,
+                        onInvite: model.phase == .solo ? { model.presentPairing() } : nil,
+                        moderation: model.moderation
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                model.presentSettings()
+                            } label: {
+                                Image(systemName: "gearshape")
+                            }
+                            .accessibilityLabel(Strings.Settings.openButtonLabel)
+                        }
+                    }
+                }
             }
         }
         .sheet(isPresented: $model.showsPairing) {
             PairingSheet(model: model)
+        }
+        .sheet(isPresented: $model.showsSettings) {
+            SettingsSheetView(model: model)
+        }
+        // セッションが使えなくなったとき: 一時的な不調かもしれないので、勝手には消さない。「はじめからやり直す」を選んだときだけ
+        // サインアウトして端末の記録を消し、オンボーディングへ戻る(登録なしで始めたアカウントには戻れない)
+        .alert(Strings.Session.lostTitle, isPresented: sessionLostBinding) {
+            Button(Strings.Session.restart, role: .destructive) {
+                Task { await model.restartAfterSessionLost() }
+            }
+            Button(Strings.Session.later, role: .cancel) {
+                model.dismissSessionLostPrompt()
+            }
+        } message: {
+            Text(Strings.Session.lostMessage)
         }
         .onOpenURL { url in
             // 招待リンクの受け口(DESIGN §3.6)。招待以外・不正形式は無視する
@@ -64,6 +97,18 @@ struct RootView: View {
                 Task { await model.sceneDidBecomeActive() }
             }
         }
+    }
+}
+
+extension RootView {
+    /// 「ログイン状態を確認できません」の確認を出しているか。閉じられたら(「あとで」・外側のタップ)数え直す
+    fileprivate var sessionLostBinding: Binding<Bool> {
+        Binding(
+            get: { model.sessionLost },
+            set: { isPresented in
+                if !isPresented { model.dismissSessionLostPrompt() }
+            }
+        )
     }
 }
 

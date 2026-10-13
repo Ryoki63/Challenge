@@ -10,6 +10,9 @@
 //   5. 招待ディープリンク(lien://invite/<token>)を保持し、ソロのホームで招待画面を開く
 //   6. オンボーディングのまま起動したあとでセッションが読めるようになったら、phase を導き直す
 //      (再起動後の最初のアンロック前にバックグラウンド起動されると Keychain を読めない — issue #62)
+//   7. アカウント・ペアの操作(AccountOperating — issue #23): ペアの解消(= ブロック)・アカウントの削除・
+//      サインアウトのあとの端末の後始末(記録を消し、ウィジェットを更新し、オンボーディングへ戻る)と、
+//      セッションが使えなくなったとき(snapshot の取得が 401 / user_not_found で続く)の確認
 //
 // 同期は同時に1本だけ走らせる。走行中に要求が来たら、終わった直後に1回だけ取り直す。
 
@@ -33,12 +36,30 @@ final class AppModel {
     var pendingInviteToken: String?
     /// 招待画面(ソロのホームから開くシート)を出すか
     var showsPairing = false
+    /// 設定画面(ホームの歯車から開くシート)を出すか
+    var showsSettings = false
+    /// セッションが使えなくなったと判断して、「はじめからやり直しますか?」の確認を出しているか
+    /// (snapshot の取得が 401 / user_not_found で連続した — SessionHealthMonitor)
+    private(set) var sessionLost = false
+
+    /// ホームの通報・ブロックの状態(アプリで 1 つ。相手の写真・ニックネームと約束の文・植物の名前の長押しと、
+    /// 確認の表示が同じものを見る — T23 #23)
+    @ObservationIgnored lazy var moderation: ModerationViewModel = ModerationViewModel(
+        store: services.store,
+        account: self
+    )
 
     // MARK: - 依存
 
     let services: AppServices
     private let synchronizer: SnapshotSynchronizer
     private let now: () -> Date
+    /// 同期の結果を端末へ書いてよいか(アカウントの削除・サインアウトで端末の記録を消している間は閉じる)
+    private let syncGate: SyncGate
+    /// セッションが連続して拒否されているかの見張り
+    private var sessionMonitor = SessionHealthMonitor()
+    /// 端末の記録を消してサインアウトしている最中(同期と二重の後始末を止める)
+    private var isEndingSession = false
 
     private var isRefreshing = false
     /// 同期の走行中に別の要求が来た(終了直後に1回だけ取り直す)。テストが観測する
@@ -56,11 +77,14 @@ final class AppModel {
         self.services = services
         self.now = now
         let pendingOps = services.pendingOps
+        let gate = SyncGate()
+        self.syncGate = gate
         self.synchronizer = SnapshotSynchronizer(
             client: services.snapshotClient,
             store: services.store,
             hasPendingOps: { !(pendingOps?.isEmpty ?? true) },
-            reloadWidgets: services.reloadWidgets
+            reloadWidgets: services.reloadWidgets,
+            canApply: { gate.isOpen }
         )
         self.phase = AppRouter.phase(
             hasSession: services.auth.currentUserID != nil,
@@ -157,6 +181,8 @@ final class AppModel {
     /// GET /snapshot で端末の snapshot を最新にして phase を再導出する。
     /// 同時に1本だけ。走行中に呼ばれたら、終わった直後に1回だけ取り直す
     func refresh() async {
+        // 端末の記録を消している最中は同期しない(古いアカウントの snapshot を書き戻さない)
+        guard !isEndingSession else { return }
         guard !isRefreshing else {
             rerunRequested = true
             return
@@ -173,9 +199,17 @@ final class AppModel {
                 // 取得中にホームが新しい状態を保存した: 取得結果は捨てて1回だけ取り直す
                 outcome = await synchronizer.sync()
             }
+            noteSyncOutcome(outcome)
             isResolving = false
             reloadFromStore()
-        } while rerunRequested
+        } while rerunRequested && !isEndingSession
+    }
+
+    /// 同期の結果からセッションの状態を見張る。401 / user_not_found が連続したら確認を出す
+    private func noteSyncOutcome(_ outcome: SnapshotSynchronizer.Outcome) {
+        if sessionMonitor.record(outcome) == .lost {
+            sessionLost = true
+        }
     }
 
     // MARK: - private
@@ -229,5 +263,101 @@ final class AppModel {
         case .onboarding, .promiseSetup:
             showsPairing = false
         }
+    }
+}
+
+// MARK: - 同期の書き込み許可
+
+/// アカウントの削除・サインアウトで端末の記録を消している間、同期の結果の書き込みを止める栓
+/// (SnapshotSynchronizer.canApply が読む。init の途中で self を捕まえずに済むよう、参照型の小さな箱にしてある)
+@MainActor
+final class SyncGate {
+    var isOpen = true
+}
+
+// MARK: - アカウント・ペアの操作(AccountOperating — issue #23)
+
+extension AppModel: AccountOperating {
+    /// 設定画面を開く(ホームの歯車。ホームを出していないときは開かない)
+    func presentSettings() {
+        guard phase.isHome else { return }
+        showsSettings = true
+    }
+
+    /// 現役のペアを解消する(= ブロック)。サーバーがソロの形の snapshot を返すので、端末の snapshot と
+    /// ウィジェットを即座にソロへ更新する(相手には、サーバーがサイレントで知らせる)。冪等: すでにペアが
+    /// 無くても成功し、端末はソロの形になる。失敗(通信など)は投げ、何も変えない
+    func dissolvePair() async throws {
+        guard let client = services.accountClient else { throw AccountClientError.unavailable }
+        let snapshot = try await client.dissolvePair()
+        try? services.store?.saveSnapshot(snapshot)
+        services.reloadWidgets()
+        reloadFromStore() // paired → solo(相手の写真の表示も消える)
+        Task { await refresh() } // サーバーとも突き合わせる(未送信のチェックインが残っていれば上書きしない)
+    }
+
+    /// アカウントを削除する。サーバーの削除が成功してから、端末の記録を消してサインアウトし、オンボーディングへ戻る。
+    /// サーバーの削除に失敗したときは投げ、端末は何も変えない(やり直せる)。
+    /// 401 / user_not_found は成功とみなさない(認証サーバーの一時的な不調でも 401 になる。アカウントが残っているのに
+    /// 端末の記録だけ消すと、削除できないまま戻れなくなる)
+    func deleteAccount() async throws {
+        guard let client = services.accountClient else { throw AccountClientError.unavailable }
+        try await client.deleteAccount()
+        await endSession(unregisterPush: false)
+    }
+
+    /// サインアウト: この端末のセッションを破棄し、端末の記録を消して、オンボーディングへ戻る。
+    /// サーバー側のアカウントは残る(登録なしで始めたので、同じ記録には戻れない)。先に、この端末への push を止める
+    func signOut() async {
+        await endSession(unregisterPush: true)
+    }
+
+    /// 「ログイン状態を確認できません」の「あとで」: 何も消さずに、数え直す
+    func dismissSessionLostPrompt() {
+        sessionLost = false
+        sessionMonitor.reset()
+    }
+
+    /// 「ログイン状態を確認できません」の「はじめからやり直す」: サインアウトして端末の記録を消し、オンボーディングへ戻る。
+    /// セッションはもうサーバーに受け付けられないので、push の登録を外す通信は試みない
+    func restartAfterSessionLost() async {
+        sessionLost = false
+        await endSession(unregisterPush: false)
+    }
+
+    /// 端末の後始末(アカウントの削除・サインアウト・セッション無効のあと):
+    /// 走っている同期の完了を待ち → push の登録を外し(または端末の記録だけ捨て)→ サインアウト →
+    /// App Group の記録(snapshot・未送信キュー・相手の写真のサムネ)を消す → ウィジェットを更新 → オンボーディングへ
+    private func endSession(unregisterPush: Bool) async {
+        guard !isEndingSession else { return }
+        isEndingSession = true
+        syncGate.isOpen = false // 走っている同期の結果は、書かずに捨てる
+        rerunRequested = false
+        var waited = 0
+        while isRefreshing, waited < 100 { // 最大 5 秒
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            waited += 1
+        }
+
+        if unregisterPush {
+            await services.pushTokenSync.unregister()
+        } else {
+            await services.pushTokenSync.forgetLocalRecord()
+        }
+        await services.auth.signOut()
+        services.store?.eraseAll()
+
+        sessionMonitor.reset()
+        sessionLost = false
+        pendingInviteToken = nil
+        showsPairing = false
+        showsSettings = false
+        moderation.reset() // 開いていた通報・ブロックの確認を閉じる(次のアカウントに持ち越さない)
+        isResolving = false
+        services.reloadWidgets()
+        reloadFromStore() // セッションが無いので onboarding
+
+        syncGate.isOpen = true
+        isEndingSession = false
     }
 }

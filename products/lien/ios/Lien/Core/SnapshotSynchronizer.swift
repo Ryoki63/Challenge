@@ -12,6 +12,8 @@
 //      画面が一瞬戻って見える。キューが空になった次回の同期で反映される
 //   2. 取得中に端末の snapshot が変わった — ホームのチェックイン完了や NSE の書き込みが
 //      この取得より後の状態を保存した。取得結果の方が古いので捨てる
+//   3. アカウントの削除・サインアウトで端末の記録を消している最中(canApply が false)— 古いアカウントの
+//      snapshot を、消したあとに書き戻さない(T23 #23)
 // 取得に失敗したときは端末の snapshot をそのまま残す(オフラインでも表示は壊れない)。
 
 import Foundation
@@ -34,6 +36,8 @@ final class SnapshotSynchronizer {
         case skippedPendingOps
         /// 取得中に端末の snapshot が更新されたため、取得結果を捨てた
         case skippedLocalChanged
+        /// アカウントの削除・サインアウトで端末の記録を消している最中のため、取得結果を捨てた
+        case skippedSessionEnded
         case failed(Failure)
     }
 
@@ -41,17 +45,21 @@ final class SnapshotSynchronizer {
     private let store: AppGroupStore?
     private let hasPendingOps: () -> Bool
     private let reloadWidgets: () -> Void
+    private let canApply: @MainActor () -> Bool
 
+    /// - canApply: false の間は、取得できても端末へ書かない(アカウントの削除・サインアウトの最中 — T23 #23)
     init(
         client: SnapshotClient,
         store: AppGroupStore?,
         hasPendingOps: @escaping () -> Bool = { false },
-        reloadWidgets: @escaping () -> Void = {}
+        reloadWidgets: @escaping () -> Void = {},
+        canApply: @escaping @MainActor () -> Bool = { true }
     ) {
         self.client = client
         self.store = store
         self.hasPendingOps = hasPendingOps
         self.reloadWidgets = reloadWidgets
+        self.canApply = canApply
     }
 
     func sync() async -> Outcome {
@@ -67,6 +75,7 @@ final class SnapshotSynchronizer {
             return .failed(.network)
         }
 
+        if !canApply() { return .skippedSessionEnded }
         if hasPendingOps() { return .skippedPendingOps }
         if store?.loadSnapshot() != before { return .skippedLocalChanged }
 

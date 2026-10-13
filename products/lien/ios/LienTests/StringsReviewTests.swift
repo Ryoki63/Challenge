@@ -76,6 +76,11 @@ enum StringsCatalog {
     static let representativeNames = ["ゆうき", "Aki", "🌱はな"]
     static let representativeDays = [0, 1, 23, 365]
     static let representativeDates = ["2026年10月20日 21:00", "Oct 20, 2026 at 9:00 PM"]
+    /// 通報メールの件名に入る「種別」(Strings.Report.kind*)
+    static let representativeKinds = [
+        Strings.Report.kindPhoto, Strings.Report.kindNickname, Strings.Report.kindPromise,
+        Strings.Report.kindPlantName, Strings.Report.kindGeneral,
+    ]
 
     /// Strings.swift の全文言。静的な文言は値そのもの、関数型の文言は代表的な引数で組み立てた出力。
     /// ※ Strings.swift に文言を足したら、ここにも足すこと
@@ -224,6 +229,126 @@ enum StringsCatalog {
             add("PartnerPhoto.viewerLabel(\(name))", Strings.PartnerPhoto.viewerLabel(name))
         }
 
+
+        // Onboarding(規約への同意 — T23 #23)
+        add("Onboarding.consentLabel", Strings.Onboarding.consentLabel)
+        add("Onboarding.consentTermsLink", Strings.Onboarding.consentTermsLink)
+        add("Onboarding.consentPrivacyLink", Strings.Onboarding.consentPrivacyLink)
+        add("Onboarding.consentNote", Strings.Onboarding.consentNote)
+        add("Onboarding.consentCheckedValue", Strings.Onboarding.consentCheckedValue)
+        add("Onboarding.consentUncheckedValue", Strings.Onboarding.consentUncheckedValue)
+
+        // Settings
+        add("Settings.title", Strings.Settings.title)
+        add("Settings.closeButton", Strings.Settings.closeButton)
+        add("Settings.openButtonLabel", Strings.Settings.openButtonLabel)
+        add("Settings.profileSection", Strings.Settings.profileSection)
+        add("Settings.nicknameLabel", Strings.Settings.nicknameLabel)
+        add("Settings.loadFailed", Strings.Settings.loadFailed)
+        add("Settings.retry", Strings.Settings.retry)
+        add("Settings.promiseSection", Strings.Settings.promiseSection)
+        add("Settings.promiseUnset", Strings.Settings.promiseUnset)
+        add("Settings.promiseEditRow", Strings.Settings.promiseEditRow)
+        add("Settings.promiseSavedNote", Strings.Settings.promiseSavedNote)
+        add("Settings.notificationSection", Strings.Settings.notificationSection)
+        add("Settings.notificationRow", Strings.Settings.notificationRow)
+        add("Settings.notificationFooter", Strings.Settings.notificationFooter)
+        add("Settings.pairSection", Strings.Settings.pairSection)
+        add("Settings.partnerLabel", Strings.Settings.partnerLabel)
+        add("Settings.soloNote", Strings.Settings.soloNote)
+        add("Settings.dissolveRow", Strings.Settings.dissolveRow)
+        add("Settings.dissolveFooter", Strings.Settings.dissolveFooter)
+        add("Settings.dissolvedNote", Strings.Settings.dissolvedNote)
+        add("Settings.supportSection", Strings.Settings.supportSection)
+        add("Settings.contactRow", Strings.Settings.contactRow)
+        add("Settings.reportRow", Strings.Settings.reportRow)
+        add("Settings.termsRow", Strings.Settings.termsRow)
+        add("Settings.privacyRow", Strings.Settings.privacyRow)
+        add("Settings.supportFooter", Strings.Settings.supportFooter)
+        add("Settings.accountSection", Strings.Settings.accountSection)
+        add("Settings.signOutRow", Strings.Settings.signOutRow)
+        add("Settings.deleteRow", Strings.Settings.deleteRow)
+        add("Settings.accountFooter", Strings.Settings.accountFooter)
+        add("Settings.versionLabel", Strings.Settings.versionLabel)
+
+        // SignOut
+        add("SignOut.confirmTitle", Strings.SignOut.confirmTitle)
+        add("SignOut.confirmMessage", Strings.SignOut.confirmMessage)
+        add("SignOut.confirmButton", Strings.SignOut.confirmButton)
+        add("SignOut.cancel", Strings.SignOut.cancel)
+
+        // Dissolve
+        add("Dissolve.screenTitle", Strings.Dissolve.screenTitle)
+        add("Dissolve.lead", Strings.Dissolve.lead)
+        add("Dissolve.effectPhotos", Strings.Dissolve.effectPhotos)
+        add("Dissolve.effectNudges", Strings.Dissolve.effectNudges)
+        add("Dissolve.effectArchive", Strings.Dissolve.effectArchive)
+        add("Dissolve.effectHistory", Strings.Dissolve.effectHistory)
+        add("Dissolve.partnerNote", Strings.Dissolve.partnerNote)
+        add("Dissolve.button", Strings.Dissolve.button)
+        add("Dissolve.finalTitle", Strings.Dissolve.finalTitle)
+        add("Dissolve.finalMessage", Strings.Dissolve.finalMessage)
+        add("Dissolve.finalConfirm", Strings.Dissolve.finalConfirm)
+        add("Dissolve.cancel", Strings.Dissolve.cancel)
+        add("Dissolve.working", Strings.Dissolve.working)
+        add("Dissolve.errorMessage", Strings.Dissolve.errorMessage)
+
+        // DeleteAccount
+        add("DeleteAccount.screenTitle", Strings.DeleteAccount.screenTitle)
+        add("DeleteAccount.lead", Strings.DeleteAccount.lead)
+        add("DeleteAccount.effectProfile", Strings.DeleteAccount.effectProfile)
+        add("DeleteAccount.effectPhotos", Strings.DeleteAccount.effectPhotos)
+        add("DeleteAccount.effectPair", Strings.DeleteAccount.effectPair)
+        add("DeleteAccount.irreversible", Strings.DeleteAccount.irreversible)
+        add("DeleteAccount.button", Strings.DeleteAccount.button)
+        add("DeleteAccount.finalTitle", Strings.DeleteAccount.finalTitle)
+        add("DeleteAccount.finalMessage", Strings.DeleteAccount.finalMessage)
+        add("DeleteAccount.finalConfirm", Strings.DeleteAccount.finalConfirm)
+        add("DeleteAccount.cancel", Strings.DeleteAccount.cancel)
+        add("DeleteAccount.working", Strings.DeleteAccount.working)
+        add("DeleteAccount.errorMessage", Strings.DeleteAccount.errorMessage)
+
+        // Report
+        add("Report.menuReportPhoto", Strings.Report.menuReportPhoto)
+        add("Report.menuReportNickname", Strings.Report.menuReportNickname)
+        add("Report.menuReportPromise", Strings.Report.menuReportPromise)
+        add("Report.menuReportPlantName", Strings.Report.menuReportPlantName)
+        add("Report.menuBlock", Strings.Report.menuBlock)
+        add("Report.confirmTitle", Strings.Report.confirmTitle)
+        add("Report.confirmMessage", Strings.Report.confirmMessage)
+        add("Report.openMail", Strings.Report.openMail)
+        add("Report.cancel", Strings.Report.cancel)
+        add("Report.mailFailedTitle", Strings.Report.mailFailedTitle)
+        add("Report.mailFailedMessage", Strings.Report.mailFailedMessage)
+        add("Report.mailFailedOK", Strings.Report.mailFailedOK)
+        add("Report.kindPhoto", Strings.Report.kindPhoto)
+        add("Report.kindNickname", Strings.Report.kindNickname)
+        add("Report.kindPromise", Strings.Report.kindPromise)
+        add("Report.kindPlantName", Strings.Report.kindPlantName)
+        add("Report.kindGeneral", Strings.Report.kindGeneral)
+        add("Report.bodyIntro", Strings.Report.bodyIntro)
+        add("Report.kindLabel", Strings.Report.kindLabel)
+        add("Report.pairIdLabel", Strings.Report.pairIdLabel)
+        add("Report.dateLabel", Strings.Report.dateLabel)
+        add("Report.targetLabel", Strings.Report.targetLabel)
+        add("Report.noPair", Strings.Report.noPair)
+        add("Report.appVersionLabel", Strings.Report.appVersionLabel)
+        add("Report.notesLabel", Strings.Report.notesLabel)
+        for kind in representativeKinds {
+            add("Report.subject(\(kind))", Strings.Report.subject(kind))
+        }
+
+        // Contact
+        add("Contact.subject", Strings.Contact.subject)
+        add("Contact.bodyIntro", Strings.Contact.bodyIntro)
+        add("Contact.bodyPlaceholder", Strings.Contact.bodyPlaceholder)
+
+        // Session
+        add("Session.lostTitle", Strings.Session.lostTitle)
+        add("Session.lostMessage", Strings.Session.lostMessage)
+        add("Session.restart", Strings.Session.restart)
+        add("Session.later", Strings.Session.later)
+
         return items
     }
 }
@@ -355,6 +480,9 @@ final class StringsReviewTests: XCTestCase {
         }
         for date in StringsCatalog.representativeDates {
             XCTAssertTrue(Strings.Pairing.expiresNote(date).contains(date))
+        }
+        for kind in StringsCatalog.representativeKinds {
+            XCTAssertTrue(Strings.Report.subject(kind).contains(kind))
         }
     }
 

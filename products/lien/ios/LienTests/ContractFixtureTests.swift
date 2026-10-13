@@ -338,6 +338,27 @@ final class ContractFixtureTests: XCTestCase {
         )
     }
 
+    func testAccountErrorCodesMatchTheServer() throws {
+        // ペア解消(pair-dissolve)とアカウント削除(delete-account)— T23 #23
+        try assertErrorMap(
+            label: "account",
+            functions: ["pair-dissolve", "delete-account"],
+            mapped: ["user_not_found", "unauthorized"],
+            generic: ["internal_error", "method_not_allowed"],
+            isMapped: { AccountClientError(serverCode: $0) != .server(code: $0) }
+        )
+    }
+
+    func testPairDissolveAndDeleteAccountFixturesDecode() throws {
+        let dissolved = try ContractFixtures.decode(PairDissolveResponse.self, from: "pair-dissolve.ok")
+        XCTAssertTrue(dissolved.dissolved)
+        XCTAssertNil(dissolved.snapshot.pairId)
+        XCTAssertEqual(AppRouter.phase(hasSession: true, snapshot: dissolved.snapshot), .solo, "解消後はソロのホーム")
+        let already = try ContractFixtures.decode(PairDissolveResponse.self, from: "pair-dissolve.already")
+        XCTAssertFalse(already.dissolved)
+        XCTAssertEqual(try ContractFixtures.decode(AccountDeleteResponse.self, from: "delete-account.ok").deleted, true)
+    }
+
     func testNudgeLimitIsTheOnlyNudgeErrorWithItsOwnHomeMessage() {
         // サーバーの 429 nudge_limit_exceeded だけが専用文言(責めない — §3.5)。他は一般失敗
         XCTAssertEqual(NudgeReactClientError(serverCode: "nudge_limit_exceeded").asNudgeSendError, .limitReached)

@@ -44,6 +44,14 @@ protocol PushRegistrationUpdating: AnyObject {
     func updatePushRegistration(token: String, environment: PushEnvironment) async throws
     /// 自分の users 行の push_token / push_env を読む(サーバー側で無効にされていないかの確認用)
     func fetchPushRegistration() async throws -> ServerPushRegistration
+    /// サインアウトの前に、この端末への push を止める(自分の users 行の push_token / push_env を null に)。
+    /// 残すと、サインアウト後も古いアカウントの通知がこの端末に届き続け、別のアカウントで入り直しても混ざる(T23 #23)
+    func clearPushRegistration() async throws
+}
+
+extension PushRegistrationUpdating {
+    /// 登録の取り消しに対応しない実装(テストのモックなど)は何もしない
+    func clearPushRegistration() async throws {}
 }
 
 /// サーバーに保存したい APNs 登録の1組
@@ -159,6 +167,30 @@ actor PushTokenSync {
     }
 
     private static let maxSendsPerFlush = 3
+
+    /// サインアウトの前: サーバー側のこの端末への登録を外し(users.push_token / push_env を null に)、
+    /// 端末の記録も捨てる。失敗してもサインアウトは止めない(戻り値は、サーバー側を外せたか)。
+    /// セッションが無い(すでに失効している)ときはサーバーへは何も送らない
+    @discardableResult
+    func unregister() async -> Bool {
+        var cleared = true
+        if currentUserID() != nil {
+            do {
+                try await registrar.clearPushRegistration()
+            } catch {
+                cleared = false
+            }
+        }
+        forgetLocalRecord()
+        return cleared
+    }
+
+    /// 端末の記録(送信済みの登録・確認の時刻)だけを捨てる。デバイストークン自体は端末のもので、アカウントとは無関係なので残す
+    /// (次にサインインしたアカウントへ、同じトークンを改めて送るため)
+    func forgetLocalRecord() {
+        ledger.lastSynced = nil
+        lastVerifiedAt = nil
+    }
 
     /// 記録の上では送信済みの登録について、サーバーの実際の値を読んで確かめる。
     /// ずれていれば(push_token が null にされた / 別の値 / push_env が未設定)記録を捨て、

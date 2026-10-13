@@ -188,6 +188,32 @@ final class SnapshotSynchronizerTests: XCTestCase {
         XCTAssertEqual(temp.store.loadSnapshot(), newer)
     }
 
+    func testResultIsDiscardedWhileTheSessionIsBeingEnded() async throws {
+        // アカウントの削除・サインアウトで端末の記録を消している間に、走っていた同期の結果が届いても書き戻さない(T23 #23)
+        let temp = TempStore()
+        defer { temp.cleanup() }
+        let reloads = ReloadCounter()
+        var open = true
+        let sync = SnapshotSynchronizer(
+            client: MockSnapshotClient(result: .success(SnapshotFactory.paired(todayMeDone: true))),
+            store: temp.store,
+            reloadWidgets: { reloads.value += 1 },
+            canApply: { open }
+        )
+
+        open = false
+        let outcome = await sync.sync()
+
+        XCTAssertEqual(outcome, .skippedSessionEnded)
+        XCTAssertNil(temp.store.loadSnapshot(), "書かない")
+        XCTAssertEqual(reloads.value, 0)
+
+        open = true // 次のアカウントの同期は書ける
+        let next = await sync.sync()
+        XCTAssertEqual(next, .applied(SnapshotFactory.paired(todayMeDone: true)))
+        XCTAssertNotNil(temp.store.loadSnapshot())
+    }
+
     // MARK: 失敗
 
     func testFailureKeepsLocalSnapshot() async throws {

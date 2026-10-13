@@ -45,6 +45,47 @@ final class SupabaseService: AuthServicing, PushRegistrationUpdating {
         }
     }
 
+    /// APNs 登録の取り消しペイロード(push_token / push_env を null にする。nil は明示的に null として書く —
+    /// synthesized な Encodable は nil のキーを省くので、自前で encodeNil する)
+    private struct PushRegistrationClear: Encodable {
+        enum CodingKeys: String, CodingKey {
+            case pushToken = "push_token"
+            case pushEnv = "push_env"
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeNil(forKey: .pushToken)
+            try container.encodeNil(forKey: .pushEnv)
+        }
+    }
+
+    /// 自分の users 行から読むプロフィール(users_select_self により、読めるのは自分の行だけ)
+    private struct ProfileRow: Decodable, Sendable {
+        let nickname: String?
+        let avatarEmoji: String?
+
+        enum CodingKeys: String, CodingKey {
+            case nickname
+            case avatarEmoji = "avatar_emoji"
+        }
+    }
+
+    /// 自分の promises 行(promises_select_pair のうち user_id が自分のもの)。archived_at が null が現役
+    private struct PromiseRow: Decodable, Sendable {
+        let id: String
+        let title: String
+        let emoji: String
+        let remindAt: String?
+        let archivedAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, title, emoji
+            case remindAt = "remind_at"
+            case archivedAt = "archived_at"
+        }
+    }
+
     private let client: SupabaseClient
 
     init(config: Config) {
@@ -90,6 +131,55 @@ final class SupabaseService: AuthServicing, PushRegistrationUpdating {
             .update(PushRegistrationUpdate(pushToken: token, pushEnv: environment.rawValue))
             .eq("id", value: userID)
             .execute()
+    }
+
+    /// サインアウトの前に、この端末への push を止める(users.push_token / push_env を null に)。
+    /// RLS(users_update_self)と列レベル GRANT により、更新できるのは自分の行のこの列だけ
+    func clearPushRegistration() async throws {
+        guard let userID = currentUserID else { throw AuthServiceError.notSignedIn }
+        _ = try await client
+            .from("users")
+            .update(PushRegistrationClear())
+            .eq("id", value: userID)
+            .execute()
+    }
+
+    /// 設定画面のニックネーム表示。行が無い・列が null なら空文字
+    func fetchProfile() async throws -> UserProfile {
+        guard let userID = currentUserID else { throw AuthServiceError.notSignedIn }
+        let rows: [ProfileRow] = try await client
+            .from("users")
+            .select("nickname, avatar_emoji")
+            .eq("id", value: userID)
+            .execute()
+            .value
+        let row = rows.first
+        return UserProfile(nickname: row?.nickname ?? "", avatarEmoji: row?.avatarEmoji ?? "")
+    }
+
+    /// 設定画面の約束の編集用。自分の約束のうち現役(archived_at が null)の 1 件。無ければ nil。
+    /// remind_at は time 型("20:00:00")で来るので、API の表現 "HH:MM" に切る
+    func fetchMyPromise() async throws -> Promise? {
+        guard let userID = currentUserID else { throw AuthServiceError.notSignedIn }
+        let rows: [PromiseRow] = try await client
+            .from("promises")
+            .select("id, title, emoji, remind_at, archived_at")
+            .eq("user_id", value: userID)
+            .execute()
+            .value
+        guard let row = rows.first(where: { $0.archivedAt == nil }) else { return nil }
+        return Promise(
+            id: row.id,
+            title: row.title,
+            emoji: row.emoji,
+            remindAt: row.remindAt.map { String($0.prefix(5)) }
+        )
+    }
+
+    /// サインアウト。端末のセッション(Keychain)の破棄は端末側で完結する(scope: .local)。
+    /// サーバーへのログアウト通信に失敗しても、端末のセッションは消える
+    func signOut() async {
+        try? await client.auth.signOut(scope: .local)
     }
 
     /// users.push_token と users.push_env を読む(PushTokenSync が、サーバー側で APNs 登録が

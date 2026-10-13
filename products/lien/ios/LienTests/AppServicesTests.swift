@@ -67,6 +67,7 @@ final class AppServicesTests: XCTestCase {
         XCTAssertTrue(services.checkinService is LocalEchoCheckinService)
         XCTAssertNil(services.pendingOps, "スタブ構成にオフラインキューは無い")
         XCTAssertNil(services.partnerPhotos, "スタブ構成に相手の写真は無い(ホームは写真を扱わない — PV #59)")
+        XCTAssertTrue(services.accountClient is StubAccountClient, "ペア解消・アカウント削除の口はスタブにもある(T23 #23)")
     }
 
     func testLocalFallbackStoreLivesInApplicationSupport() {
@@ -105,6 +106,7 @@ final class AppServicesTests: XCTestCase {
         XCTAssertTrue(services.nudgeService is LiveNudgeReactService)
         XCTAssertTrue(services.reactionService is LiveNudgeReactService)
         XCTAssertTrue(services.partnerPhotos is LivePartnerPhotoService, "相手の今日の写真(PV #59)")
+        XCTAssertTrue(services.accountClient is EdgeFunctionAccountClient, "ペア解消・アカウント削除(T23 #23)")
         XCTAssertNotNil(services.pendingOps)
         XCTAssertEqual(services.store?.containerURL, temp.store.containerURL)
         XCTAssertTrue(
@@ -222,6 +224,7 @@ final class AppServicesTests: XCTestCase {
         )
         onboarding.advanceFromConcept()
         onboarding.nickname = "あきら"
+        onboarding.agreedToTerms = true // 規約への同意(T23 #23)
         await onboarding.submitProfile()
         await onboarding.requestNotifications()
         XCTAssertTrue(onboardingFinished)

@@ -170,6 +170,6 @@ struct PartnerPhotoAction: Identifiable {
     let systemImage: String
     /// 破壊的な操作(通報・ブロックなど)は赤で出す
     var isDestructive = false
-    /// 長押ししたときの写真の指し先を受け取る
-    let perform: (PartnerPhotoReference) -> Void
+    /// 長押ししたときの写真の指し先を受け取る(画面の状態を触るので MainActor 上で呼ぶ — T23 #23)
+    let perform: @MainActor (PartnerPhotoReference) -> Void
 }

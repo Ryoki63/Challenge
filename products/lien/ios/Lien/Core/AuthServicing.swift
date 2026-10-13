@@ -28,6 +28,26 @@ protocol AuthServicing: AnyObject {
     /// 期限切れの場合は提供側(supabase-swift のセッション)が自動更新してから返す。
     /// 未サインインなら AuthServiceError.notSignedIn
     func accessToken() async throws -> String
+
+    /// 自分の users 行のプロフィール(設定画面のニックネーム表示)。RLS により読めるのは自分の行だけ。
+    /// 未サインインなら AuthServiceError.notSignedIn
+    func fetchProfile() async throws -> UserProfile
+
+    /// 自分の現役の約束(無ければ nil)。設定画面で約束の編集を開くとき、**リマインド時刻まで含めた元の値**を
+    /// 約束設定の画面に埋めるために読む(snapshot には remindAt が無く、無いまま保存するとリマインドを消してしまう)。
+    /// 未サインインなら AuthServiceError.notSignedIn
+    func fetchMyPromise() async throws -> Promise?
+
+    /// サインアウト: この端末のセッションを破棄する(サーバー側のアカウントは消さない)。
+    /// 破棄は端末側で完結させる(サーバーへのログアウト通信に失敗しても、端末のセッションは消える)。
+    /// 戻ったあと `currentUserID` は nil
+    func signOut() async
+}
+
+/// users 行のプロフィール(設定画面の表示用)
+struct UserProfile: Equatable, Sendable {
+    let nickname: String
+    let avatarEmoji: String
 }
 
 enum AuthServiceError: Error, Equatable {
@@ -43,6 +63,8 @@ final class StubAuthService: AuthServicing, PushRegistrationUpdating {
     private(set) var signedInUserID: UUID?
     /// サーバーの users 行の代わり(updatePushRegistration で書き、fetchPushRegistration で読む)
     private var storedPushRegistration = ServerPushRegistration(token: nil, environment: nil)
+    /// サーバーの users 行のプロフィールの代わり(updateProfile で書き、fetchProfile で読む)
+    private var storedProfile = UserProfile(nickname: "", avatarEmoji: "")
 
     var currentUserID: UUID? { signedInUserID }
 
@@ -56,7 +78,25 @@ final class StubAuthService: AuthServicing, PushRegistrationUpdating {
 
     func updateProfile(nickname: String, avatarEmoji: String, timezone: String) async throws {
         guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
-        // メモリ内スタブ: 何も送信しない
+        // メモリ内スタブ: 何も送信しない(読み戻し用に覚えるだけ)
+        storedProfile = UserProfile(nickname: nickname, avatarEmoji: avatarEmoji)
+    }
+
+    func fetchProfile() async throws -> UserProfile {
+        guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
+        return storedProfile
+    }
+
+    func fetchMyPromise() async throws -> Promise? {
+        guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
+        // スタブにはサーバーの約束が無い(約束は端末の snapshot にしか無い)。設定画面は snapshot で代える
+        return nil
+    }
+
+    func signOut() async {
+        signedInUserID = nil
+        storedProfile = UserProfile(nickname: "", avatarEmoji: "")
+        storedPushRegistration = ServerPushRegistration(token: nil, environment: nil)
     }
 
     func accessToken() async throws -> String {
@@ -73,5 +113,10 @@ final class StubAuthService: AuthServicing, PushRegistrationUpdating {
     func fetchPushRegistration() async throws -> ServerPushRegistration {
         guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
         return storedPushRegistration
+    }
+
+    func clearPushRegistration() async throws {
+        guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
+        storedPushRegistration = ServerPushRegistration(token: nil, environment: nil)
     }
 }

@@ -33,6 +33,9 @@ struct AppServices {
     /// 相手の今日の写真の取得(PV #59)。Live 構成だけ。Stub 構成は nil で、ホームは写真を出さない
     /// (末尾に既定値つきで足したので、これを渡さない既存の組み立てはそのまま動く)
     var partnerPhotos: PartnerPhotoProviding?
+    /// ペアの解消(= ブロック)・アカウントの削除(T23 #23)。nil のときは、それらの操作が失敗として扱われる
+    /// (AccountClientError.unavailable)。Live / Stub のどちらの構成でも AppServices.make が入れる
+    var accountClient: AccountAPIClient?
 }
 
 extension AppServices {
@@ -61,7 +64,8 @@ extension AppServices {
                 currentUserID: { auth.currentUserID },
                 ledger: InMemoryPushRegistrationLedger()
             ),
-            reloadWidgets: reloadWidgets
+            reloadWidgets: reloadWidgets,
+            accountClient: StubAccountClient(store: store)
         )
     }
 }

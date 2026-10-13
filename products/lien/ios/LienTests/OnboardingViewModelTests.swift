@@ -47,6 +47,20 @@ private final class MockAuthService: AuthServicing {
         guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
         return "test-access-token"
     }
+
+    func fetchProfile() async throws -> UserProfile {
+        guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
+        return UserProfile(nickname: lastNickname ?? "", avatarEmoji: lastAvatarEmoji ?? "")
+    }
+
+    func fetchMyPromise() async throws -> Promise? {
+        guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
+        return nil
+    }
+
+    func signOut() async {
+        signedInUserID = nil
+    }
 }
 
 private final class MockPushAuthorizer: PushAuthorizing {
@@ -68,12 +82,16 @@ private enum TestError: Error {
 
 @MainActor
 final class OnboardingViewModelTests: XCTestCase {
+    /// 規約に同意済みのオンボ VM(同意の有無を見るテストは agreed: false)
     private func makeViewModel(
         auth: MockAuthService,
         push: MockPushAuthorizer,
+        agreed: Bool = true,
         onFinished: @escaping () -> Void = {}
     ) -> OnboardingViewModel {
-        OnboardingViewModel(authService: auth, pushAuthorizer: push, onFinished: onFinished)
+        let vm = OnboardingViewModel(authService: auth, pushAuthorizer: push, onFinished: onFinished)
+        vm.agreedToTerms = agreed
+        return vm
     }
 
     // MARK: ステップ遷移
@@ -214,6 +232,7 @@ final class OnboardingViewModelTests: XCTestCase {
             onProfileSubmitStarted: { signInCountAtNotification.append(auth.signInCallCount) },
             onFinished: {}
         )
+        vm.agreedToTerms = true
         vm.advanceFromConcept()
         vm.nickname = "ゆき"
 
@@ -232,10 +251,55 @@ final class OnboardingViewModelTests: XCTestCase {
             onProfileSubmitStarted: { notified += 1 },
             onFinished: {}
         )
+        vm.agreedToTerms = true
         vm.advanceFromConcept()
         vm.nickname = "   "
         await vm.submitProfile()
         XCTAssertEqual(notified, 0, "送信に進まなかったときは通知しない")
+    }
+
+    // MARK: 規約への同意(T23 #23: 同意するまで、アカウントを作る送信ができない)
+
+    func testCannotSubmitProfileWithoutAgreeingToTerms() async {
+        let auth = MockAuthService()
+        let vm = makeViewModel(auth: auth, push: MockPushAuthorizer(), agreed: false)
+        vm.advanceFromConcept()
+        vm.nickname = "ゆき"
+
+        XCTAssertNil(vm.nicknameError, "ニックネームは有効")
+        XCTAssertFalse(vm.agreedToTerms)
+        XCTAssertFalse(vm.canSubmitProfile, "同意のチェックが無ければ送信ボタンは押せない")
+
+        await vm.submitProfile()
+
+        XCTAssertEqual(auth.signInCallCount, 0, "同意が無ければ匿名サインイン(アカウントの作成)をしない")
+        XCTAssertEqual(auth.updateProfileCallCount, 0)
+        XCTAssertEqual(vm.step, .nickname)
+    }
+
+    func testAgreeingToTermsEnablesSubmitAndWithdrawingDisablesAgain() async {
+        let auth = MockAuthService()
+        let vm = makeViewModel(auth: auth, push: MockPushAuthorizer(), agreed: false)
+        vm.advanceFromConcept()
+        vm.nickname = "ゆき"
+
+        vm.agreedToTerms = true
+        XCTAssertTrue(vm.canSubmitProfile)
+        vm.agreedToTerms = false // 外した
+        XCTAssertFalse(vm.canSubmitProfile)
+        await vm.submitProfile()
+        XCTAssertEqual(auth.signInCallCount, 0)
+
+        vm.agreedToTerms = true
+        await vm.submitProfile()
+        XCTAssertEqual(auth.signInCallCount, 1)
+        XCTAssertEqual(vm.step, .notification)
+    }
+
+    func testAgreementIsRequiredEvenForInvalidNicknameCombination() {
+        let vm = makeViewModel(auth: MockAuthService(), push: MockPushAuthorizer(), agreed: true)
+        vm.nickname = "   "
+        XCTAssertFalse(vm.canSubmitProfile, "同意していてもニックネームが無効なら送れない")
     }
 
     // MARK: 通知プレ許可

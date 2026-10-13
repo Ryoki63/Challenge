@@ -51,7 +51,17 @@ enum Strings {
         static let nicknameEmptyError = "ニックネームを入力してね"
         static let nicknameTooLongError = "ニックネームは8文字までです"
         static let avatarTitle = "アイコンをえらんでね"
-        static let profileSubmit = "これではじめる"
+        /// 規約への同意ボタンを兼ねる(同意のチェックが入るまで押せない — 下の consent*)
+        static let profileSubmit = "同意してはじめる"
+
+        // 規約への明示の同意(写真を共有するアプリは、利用の前に規約への同意を求める — App Store ガイドライン 1.2 / T23 #23)
+        static let consentLabel = "利用規約とプライバシーポリシーに同意します"
+        static let consentTermsLink = "利用規約を読む"
+        static let consentPrivacyLink = "プライバシーポリシーを読む"
+        static let consentNote = "不適切な写真や言葉、迷惑行為は認められていません。気になる内容は、画面を長押しして通報したり、ペアを解消したりできます。"
+        /// 同意のチェック(VoiceOver の値)
+        static let consentCheckedValue = "同意済み"
+        static let consentUncheckedValue = "未同意"
 
         /// 匿名開始の注意(DESIGN §10: Apple ID 未連携のまま再インストールすると
         /// データを引き継げないことをオンボで明示する義務がある)
@@ -260,5 +270,150 @@ enum Strings {
         }
         /// 全画面を閉じるボタンの VoiceOver 名
         static let viewerCloseButton = "とじる"
+    }
+
+    /// 設定画面(REQUIREMENTS §3.15 / T23 #23)。罰・恥系の表現は使わない(§3.5)
+    enum Settings {
+        static let title = "設定"
+        static let closeButton = "閉じる"
+        /// ホームの歯車ボタンの VoiceOver 名
+        static let openButtonLabel = "設定"
+
+        // プロフィール(ニックネームの表示)
+        static let profileSection = "プロフィール"
+        static let nicknameLabel = "ニックネーム"
+        static let loadFailed = "読み込めませんでした"
+        static let retry = "もう一度ためす"
+
+        // 約束(編集は約束設定の画面を開く)
+        static let promiseSection = "約束"
+        static let promiseUnset = "まだ決めていません"
+        static let promiseEditRow = "約束を変える"
+        static let promiseSavedNote = "約束を保存しました"
+
+        // 通知(OS の設定アプリを開く)
+        static let notificationSection = "通知"
+        static let notificationRow = "通知の設定を開く"
+        static let notificationFooter = "通知のオン・オフは、iOS の設定アプリで変えられます。リマインドの時刻は「約束」から変えられます。"
+
+        // ペア
+        static let pairSection = "ペア"
+        static let partnerLabel = "ペアの相手"
+        static let soloNote = "いまはひとりで使っています。相手を招待すると、ここからペアの管理ができます。"
+        static let dissolveRow = "ペアを解消する"
+        static let dissolveFooter = "ペアを解消すると、相手との共有がすべて止まります。いつでもまた新しい相手を招待できます。"
+        static let dissolvedNote = "ペアを解消しました"
+
+        // サポート
+        static let supportSection = "サポート"
+        static let contactRow = "お問い合わせ"
+        static let reportRow = "不適切な内容を通報する"
+        static let termsRow = "利用規約"
+        static let privacyRow = "プライバシーポリシー"
+        static let supportFooter = "相手の写真・ニックネーム・約束の文は、ホームで長押しして通報することもできます。"
+
+        // アカウント
+        static let accountSection = "アカウント"
+        static let signOutRow = "サインアウト"
+        static let deleteRow = "アカウントを削除する"
+        static let accountFooter = "登録なしで始めたので、機種変更やアプリの入れ直しで記録を引き継げない場合があります。"
+
+        static let versionLabel = "バージョン"
+    }
+
+    /// サインアウトの確認(1段階。端末の記録は消え、登録なしで始めたアカウントには戻れない)
+    enum SignOut {
+        static let confirmTitle = "サインアウトしますか?"
+        static let confirmMessage = "この端末の記録は消えます。登録なしで始めたので、同じ記録には戻れません。ペアの相手とのつながりも、この端末からは戻せなくなります。"
+        static let confirmButton = "サインアウト"
+        static let cancel = "やめる"
+    }
+
+    /// ペアの解消(= ブロック。REQUIREMENTS §3.2・§8)。確認は2段階(説明の画面 → 最後の確認)
+    enum Dissolve {
+        static let screenTitle = "ペアを解消する"
+        static let lead = "ペアを解消すると、相手との共有がすべて止まります。"
+        static let effectPhotos = "相手の写真・約束・チェックインは、お互いに見えなくなります"
+        static let effectNudges = "つつく・リアクション・通知も、相手とのあいだで届かなくなります"
+        static let effectArchive = "植物とストリークの記録はアーカイブされ、同じ相手と組み直しても復活しません"
+        static let effectHistory = "あなたのチェックイン履歴は、あなたの記録として残ります"
+        static let partnerNote = "相手には通知は届きません。次にアプリを開いたときに、ペアが終わったことがわかります。"
+        static let button = "ペアを解消する"
+        static let finalTitle = "本当にペアを解消しますか?"
+        static let finalMessage = "この操作は取り消せません。"
+        static let finalConfirm = "解消する"
+        static let cancel = "やめる"
+        static let working = "解消しています…"
+        static let errorMessage = "うまくいきませんでした。通信状態を確認して、もう一度お試しください"
+    }
+
+    /// アカウントの削除(App Store ガイドライン 5.1.1(v) / terms 第8条)。確認は2段階
+    enum DeleteAccount {
+        static let screenTitle = "アカウントを削除する"
+        static let lead = "アカウントを削除すると、次のものがすべて消えます。"
+        static let effectProfile = "ニックネーム・約束・チェックインの記録"
+        static let effectPhotos = "添えた写真"
+        static let effectPair = "ペアの相手との共有(いまのペアは解消されます)"
+        static let irreversible = "削除したあとは、元に戻せません。"
+        static let button = "アカウントを削除する"
+        static let finalTitle = "本当に削除しますか?"
+        static let finalMessage = "削除すると元に戻せません。"
+        static let finalConfirm = "削除する"
+        static let cancel = "やめる"
+        static let working = "削除しています…"
+        static let errorMessage = "削除できませんでした。通信状態を確認して、もう一度お試しください。もう一度押せば、続きから進みます"
+    }
+
+    /// 通報(UGC。App Store ガイドライン 1.2)。ホームで相手の写真・ニックネーム・約束の文・植物の名前を長押し、
+    /// または設定から。運営宛のメールの下書きを開く(対象の ID を入れる)
+    enum Report {
+        // 長押しのメニュー(ホームの相手の写真・ニックネームと約束の文・植物の名前)
+        static let menuReportPhoto = "写真を通報する"
+        static let menuReportNickname = "ニックネームを通報する"
+        static let menuReportPromise = "約束の文を通報する"
+        static let menuReportPlantName = "植物の名前を通報する"
+        static let menuBlock = "ブロック(ペアを解消)"
+        static let confirmTitle = "この内容を通報しますか?"
+        static let confirmMessage = "運営に送るメールの下書きが開きます。内容を確認して、そのまま送信してください。"
+        static let openMail = "メールを開く"
+        static let cancel = "やめる"
+        static let mailFailedTitle = "メールを開けませんでした"
+        static let mailFailedMessage = "メールアプリの設定を確認してから、もう一度お試しください。"
+        static let mailFailedOK = "閉じる"
+
+        // 通報の対象(メールの「種別」)
+        static let kindPhoto = "写真"
+        static let kindNickname = "ニックネーム"
+        static let kindPromise = "約束の文"
+        static let kindPlantName = "植物の名前"
+        static let kindGeneral = "その他"
+
+        // 通報メール(運営が読む。対象の ID を入れる)
+        static func subject(_ kind: String) -> String {
+            "【Lien】通報: \(kind)"
+        }
+        static let bodyIntro = "このまま送信してください。気づいたことがあれば、下に書き足してもかまいません。"
+        static let kindLabel = "種別"
+        static let pairIdLabel = "ペアID"
+        static let dateLabel = "日付"
+        static let targetLabel = "対象"
+        static let noPair = "(ペアなし)"
+        static let appVersionLabel = "アプリのバージョン"
+        static let notesLabel = "補足(任意)"
+    }
+
+    /// お問い合わせ(設定 → サポート)。運営宛のメールの下書きを開く
+    enum Contact {
+        static let subject = "【Lien】お問い合わせ"
+        static let bodyIntro = "お問い合わせの内容を、下に書いてください。"
+        static let bodyPlaceholder = "(お問い合わせの内容)"
+    }
+
+    /// ログイン状態が使えなくなったとき(セッション無効。snapshot の取得が 401 / user_not_found で続く)
+    enum Session {
+        static let lostTitle = "ログイン状態を確認できません"
+        static let lostMessage = "この端末のログイン情報が使えなくなっているようです。通信状態が悪いだけのときは「あとで」を選んでください。「はじめからやり直す」を選ぶと、この端末の記録を消して、最初の画面に戻ります。"
+        static let restart = "はじめからやり直す"
+        static let later = "あとで"
     }
 }
