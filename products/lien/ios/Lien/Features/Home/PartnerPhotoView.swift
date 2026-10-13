@@ -3,7 +3,8 @@
 // 状態は PartnerPhotoModel が持つ。ここは描くだけ:
 //   .hidden  : 何も出さない(写真が無い日・取得に失敗した・ソロ・日付またぎ — 文言も出さない)
 //   .loading : 枠だけ(進行表示)。VoiceOver には「写真を読み込んでいます」
-//   .ready   : サムネ(タップで原寸を全画面)+「(名前)の今日の写真」
+//   .ready   : サムネ(タップで原寸を全画面)+「(名前)の今日の写真」。写真と同じ大きさの枠に、角丸の切り抜きとタップ範囲を合わせる
+//              (PartnerPhotoCardLayout.fittedSize — 縦長の写真で外枠だけが広がり、角が四角く残るのを避ける)
 //
 // 長押し(T23 の通報・ブロック)は PartnerPhotoModel.actions に項目が入ったときだけ付く。
 // 項目の文言・動作は T23 が持つ。VoiceOver には同じ操作がアクションとして出る。
@@ -25,13 +26,21 @@ struct PartnerPhotoArea: View {
     }
 }
 
-private enum PartnerPhotoLayout {
-    /// カードの最大の大きさ(サムネは長辺 512px 以下なので、これ以上に広げてもぼやけるだけ)
-    static let maxWidth: CGFloat = 260
-    static let maxHeight: CGFloat = 300
-    /// 読み込み中の枠の高さ(横長の写真が多いので 4:3 に近い大きさ)
-    static let placeholderHeight: CGFloat = 180
-    static let cornerRadius: CGFloat = 16
+/// カードのサムネ。写真の縦横比から大きさを計算で決め(PartnerPhotoCardLayout.fittedSize)、その大きさの枠で
+/// 角丸に切り抜く。`.frame(maxWidth:maxHeight:)` の後に切り抜くと、縦長の写真では外枠(幅いっぱい)が切り抜かれて
+/// 写真の角が四角く残り、左右の透明な余白までタップ範囲に入る
+struct PartnerPhotoThumbnailImage: View {
+    let image: PartnerPhotoImage
+
+    var body: some View {
+        let size = PartnerPhotoCardLayout.fittedSize(aspectRatio: image.aspectRatio)
+        let shape = RoundedRectangle(cornerRadius: PartnerPhotoCardLayout.cornerRadius)
+        Image(decorative: image.cgImage, scale: 1, orientation: .up)
+            .resizable()
+            .frame(width: size.width, height: size.height)
+            .clipShape(shape)
+            .contentShape(shape) // タップ範囲も、角丸の写真そのもの
+    }
 }
 
 @MainActor
@@ -49,10 +58,10 @@ private struct PartnerPhotoCard: View {
             EmptyView()
         case .loading:
             ProgressView()
-                .frame(maxWidth: .infinity, minHeight: PartnerPhotoLayout.placeholderHeight)
-                .frame(maxWidth: PartnerPhotoLayout.maxWidth)
+                .frame(maxWidth: .infinity, minHeight: PartnerPhotoCardLayout.placeholderHeight)
+                .frame(maxWidth: PartnerPhotoCardLayout.maxWidth)
                 .background(
-                    RoundedRectangle(cornerRadius: PartnerPhotoLayout.cornerRadius)
+                    RoundedRectangle(cornerRadius: PartnerPhotoCardLayout.cornerRadius)
                         .fill(LienColors.chipBackground)
                 )
                 .accessibilityElement(children: .ignore)
@@ -69,11 +78,7 @@ private struct PartnerPhotoCard: View {
             Button {
                 model.openViewer()
             } label: {
-                Image(decorative: photo.image.cgImage, scale: 1, orientation: .up)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: PartnerPhotoLayout.maxWidth, maxHeight: PartnerPhotoLayout.maxHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: PartnerPhotoLayout.cornerRadius))
+                PartnerPhotoThumbnailImage(image: photo.image)
             }
             .buttonStyle(.plain)
             .modifier(PartnerPhotoActionsModifier(actions: model.actions) { action in
@@ -138,8 +143,8 @@ struct PartnerPhotoViewerHost: View {
     }
 }
 
-/// 原寸の写真を全画面で見る。原寸が届くまではサムネを大きく出し、届いたら差し替える
-/// (取れなかったときもサムネのまま — 文言は出さない)。背景のタップか閉じるボタンで閉じる。
+/// 原寸の写真を全画面で見る。原寸が届くまではサムネを大きく出し(スピナー付き)、届いたら差し替える
+/// (取れなかったときは、スピナーを止めてサムネのまま — 文言は出さない)。背景のタップか閉じるボタンで閉じる。
 /// 通報・ブロック(T23 #23)は、左上の「…」メニューと写真の長押し、VoiceOver のアクション。選ぶと全画面を閉じてから、
 /// ホームに確認を出す(拡大したままでも通報できる — App Store ガイドライン 1.2)
 @MainActor
@@ -169,8 +174,7 @@ struct PartnerPhotoViewer: View {
                 .ignoresSafeArea()
                 .onTapGesture { model.closeViewer() }
 
-            if case .open(let thumbnail, let original) = model.viewer {
-                let image = original ?? thumbnail
+            if let image = model.viewer.displayedImage {
                 Image(
                     image.cgImage,
                     scale: 1,
@@ -183,7 +187,8 @@ struct PartnerPhotoViewer: View {
                 .onTapGesture { model.closeViewer() }
                 .modifier(PartnerPhotoActionsModifier(actions: model.actions, perform: perform))
 
-                if original == nil {
+                // 原寸を取りに行っている間だけ。取れなかったあとは止める(サムネのまま。文言は出さない)
+                if model.viewer.isLoadingOriginal {
                     ProgressView()
                         .tint(LienColors.photoControl)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)

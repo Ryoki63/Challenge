@@ -5,6 +5,7 @@
 //   - PartnerPhotoReference : 表示している写真の指し先(T23 の通報が、ペア・日付・パスを控えるのに使う)
 //   - PartnerPhotoImage     : ダウンロードして縮小した画像(メモリ上だけ。ディスクにも App Group にも書かない)
 //   - PartnerPhotoLimits    : ダウンロードの上限(バイト数)と、デコード後の大きさ
+//   - PartnerPhotoCardLayout: ホームのカードの大きさ(縦横比から、最大の大きさに収まる大きさを決める)
 //   - PartnerPhotoError     : 署名・ダウンロードの失敗理由
 //   - PartnerPhotoAction    : 写真の長押しメニューの取り付け口(T23 が通報・ブロックを入れる)
 //
@@ -132,6 +133,29 @@ struct PartnerPhotoLimits: Equatable, Sendable {
     static let thumbnailFromOriginal = PartnerPhotoLimits(maxBytes: 6 * 1024 * 1024, maxPixelSize: 800)
 }
 
+// MARK: - ホームのカードの大きさ
+
+/// ホームの「相手の今日の写真」カードの大きさ(点)。
+/// 写真の縦横比から、最大の大きさ(260×300)に収まる大きさを**計算で決める**。SwiftUI の `.frame(maxWidth:maxHeight:)` に
+/// 任せると、縦長の写真(384×512 など)で写真は 225×300 に収まるのに、枠だけが幅いっぱい(260)のまま残り、
+/// 角丸が写真ではなく外枠に掛かって角が四角く見え、左右の透明な余白までタップ範囲に入る(PV の Opus レビューで実測)。
+/// 写真と同じ大きさの枠にすれば、角丸もタップ範囲も写真そのものになる
+enum PartnerPhotoCardLayout {
+    /// カードの最大の大きさ(サムネは長辺 512px 以下なので、これ以上に広げてもぼやけるだけ)
+    static let maxWidth: CGFloat = 260
+    static let maxHeight: CGFloat = 300
+    /// 読み込み中の枠の高さ(横長の写真が多いので 4:3 に近い大きさ)
+    static let placeholderHeight: CGFloat = 180
+    static let cornerRadius: CGFloat = 16
+
+    /// 縦横比(横 ÷ 縦)の写真を、最大の大きさに収める大きさ。縦横比は保つ。縦横比が 0 以下・有限でない壊れた値は 1 として扱う
+    static func fittedSize(aspectRatio: CGFloat) -> CGSize {
+        let ratio = (aspectRatio.isFinite && aspectRatio > 0) ? aspectRatio : 1
+        let width = min(maxWidth, maxHeight * ratio)
+        return CGSize(width: width, height: width / ratio)
+    }
+}
+
 // MARK: - 失敗理由
 
 /// 署名・ダウンロードの失敗理由。ユーザーには見せない(失敗したら静かに写真を出さない — 罰なし・§3.5)ので、
@@ -155,6 +179,14 @@ enum PartnerPhotoError: Error, Equatable {
     case invalidResponse
     /// 規約に合わないパス
     case invalidPath
+}
+
+extension PartnerPhotoError {
+    /// 通信が切れていただけ(写真が読めなくなったのではない)の失敗か。
+    /// そうなら、出している今日の写真は捨てず、読めなかった日としても覚えない(電波が戻った次の機会にすぐ取り直す)
+    var isConnectivityFailure: Bool {
+        self == .network
+    }
 }
 
 // MARK: - 長押しメニューの取り付け口(T23)

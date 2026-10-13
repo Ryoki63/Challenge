@@ -205,7 +205,7 @@ final class PartnerPhotoModelTests: XCTestCase {
 
     // MARK: ③ 失敗
 
-    func testFailureHidesSilentlyAndTheNextUpdateRetries() async {
+    func testFailureHidesSilentlyAndIsTriedAgainAfterTheRetryInterval() async {
         let rig = makeRig()
         rig.provider.thumbnailResult = .failure(PartnerPhotoError.expired)
         let snapshot = PartnerPhotoFixtures.pairedSnapshot()
@@ -213,7 +213,10 @@ final class PartnerPhotoModelTests: XCTestCase {
         await rig.model.update(with: snapshot)
         XCTAssertEqual(rig.model.state, .hidden, "失敗したら植物だけに戻る(文言なし)")
 
+        // 失敗は固定されない: 間隔(PartnerPhotoModel.unreadableRetryInterval)を過ぎた次の機会に取り直す。
+        // 間隔の間は取り直さない(同期のたびに通信しない — PartnerPhotoRevalidationTests)
         rig.provider.thumbnailResult = .success(PartnerPhotoFixtures.thumbnail())
+        rig.clock.now = rig.clock.now.addingTimeInterval(PartnerPhotoModel.unreadableRetryInterval + 1)
         await rig.model.update(with: snapshot)
         XCTAssertNotNil(readyPhoto(rig.model), "失敗は固定されない。次の機会に取り直す")
         XCTAssertEqual(rig.provider.thumbnailCalls.count, 2)
@@ -452,12 +455,16 @@ final class PartnerPhotoModelTests: XCTestCase {
         await rig.model.update(with: PartnerPhotoFixtures.pairedSnapshot())
 
         rig.model.openViewer()
-        XCTAssertEqual(rig.model.viewer, .open(thumbnail: photo.image, original: nil), "原寸が届くまではサムネを大きく出す")
+        XCTAssertEqual(rig.model.viewer, .open(thumbnail: photo.image, original: .loading), "原寸が届くまではサムネを大きく出す")
+        XCTAssertEqual(rig.model.viewer.displayedImage, photo.image)
+        XCTAssertTrue(rig.model.viewer.isLoadingOriginal, "取りに行っている間はスピナー")
         XCTAssertTrue(rig.model.isViewerOpen)
 
         rig.provider.release()
         await rig.model.viewerTask?.value
-        XCTAssertEqual(rig.model.viewer, .open(thumbnail: photo.image, original: original))
+        XCTAssertEqual(rig.model.viewer, .open(thumbnail: photo.image, original: .loaded(original)))
+        XCTAssertEqual(rig.model.viewer.displayedImage, original, "届いたら原寸に差し替える")
+        XCTAssertFalse(rig.model.viewer.isLoadingOriginal)
         XCTAssertEqual(rig.provider.originalCalls, [photo.reference], "原寸は、サムネの指し先(原寸のパス)で取る")
 
         rig.model.closeViewer()
@@ -473,9 +480,47 @@ final class PartnerPhotoModelTests: XCTestCase {
         await rig.model.update(with: PartnerPhotoFixtures.pairedSnapshot())
 
         rig.model.openViewer()
+        XCTAssertTrue(rig.model.viewer.isLoadingOriginal)
         await rig.model.viewerTask?.value
 
-        XCTAssertEqual(rig.model.viewer, .open(thumbnail: photo.image, original: nil), "原寸が取れなくても文言は出さず、サムネのまま")
+        XCTAssertEqual(rig.model.viewer, .open(thumbnail: photo.image, original: .failed), "原寸が取れなくても文言は出さず、サムネのまま")
+        XCTAssertEqual(rig.model.viewer.displayedImage, photo.image)
+        XCTAssertFalse(rig.model.viewer.isLoadingOriginal, "取れなかったあとにスピナーを回し続けない(読み込み中と失敗を区別する)")
+        XCTAssertTrue(rig.model.isViewerOpen, "全画面は開いたまま(閉じるのは本人)")
+
+        // 閉じて開き直せば、原寸を取り直す
+        rig.model.closeViewer()
+        rig.provider.originalResult = .success(TestImages.photoImage(width: 160, height: 120))
+        rig.model.openViewer()
+        await rig.model.viewerTask?.value
+        XCTAssertEqual(rig.provider.originalCalls.count, 2)
+        XCTAssertFalse(rig.model.viewer.isLoadingOriginal)
+        XCTAssertNotEqual(rig.model.viewer.displayedImage, photo.image, "取り直した原寸が出る")
+    }
+
+    func testClosingTheViewerDiscardsALateFailureToo() async {
+        // 閉じたあとに届いた失敗で、全画面を開き直したり、次に開いた全画面を「失敗」にしたりしない
+        let rig = makeRig()
+        let photo = PartnerPhotoFixtures.thumbnail()
+        rig.provider.thumbnailResult = .success(photo)
+        rig.provider.originalResult = .failure(PartnerPhotoError.network)
+        rig.provider.holdOriginal()
+        await rig.model.update(with: PartnerPhotoFixtures.pairedSnapshot())
+
+        rig.model.openViewer()
+        let running = rig.model.viewerTask
+        await waitUntil { rig.provider.originalCalls.count == 1 }
+        rig.model.closeViewer()
+        rig.provider.release()
+        await running?.value
+
+        XCTAssertEqual(rig.model.viewer, .closed, "閉じたあとに届いた失敗で、全画面を開き直さない")
+
+        rig.provider.originalResult = .success(TestImages.photoImage(width: 160, height: 120))
+        rig.model.openViewer()
+        XCTAssertEqual(rig.model.viewer, .open(thumbnail: photo.image, original: .loading), "開き直した全画面は、読み込み中から始まる")
+        await rig.model.viewerTask?.value
+        XCTAssertTrue(rig.model.viewer.displayedImage != photo.image, "新しい取得の原寸が出る")
     }
 
     func testClosingTheViewerDiscardsALateOriginal() async {

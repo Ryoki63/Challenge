@@ -14,8 +14,12 @@
 // (同じパスへの差し替え — 相手が同じ日に写真を貼り直した — を拾うため、それを過ぎたら次の機会に取り直す)。
 // 取得は同じ写真について同時に1本だけ。日付またぎ・ペア解消・別の取得への置き換えで、古い取得の結果は捨てる。
 //
-// HomeViewModel.load / apply が snapshotDidChange を呼ぶ(同期的に状態を決め、通信だけを Task で走らせる)。
-// テストは update(with:) を await する。
+// 読めなかった日(行が無い・photo_path が無い・規約に合わない・署名が弾かれた・サーバーの失敗)は、(ペア, 日付)ごとに
+// `unreadableRetryInterval` の間は取り直さない。覚えないと、同期・前面復帰・自分の操作のたびに通信(最大5本)をやり直し、
+// 読み込みの枠が出ては消えてレイアウトが跳ねる(例: 同じ日にペアを組み直して photo_path が前のペアのまま)。
+// 通信が切れていただけの失敗は覚えない(電波が戻った次の機会にすぐ取り直す)。
+//
+// HomeViewModel.load / apply が snapshotDidChange を呼ぶ(同期的に状態を決め、通信だけを Task で走らせる。テストは update(with:) を await)。
 
 import Foundation
 import Observation
@@ -23,31 +27,15 @@ import Observation
 @MainActor
 @Observable
 final class PartnerPhotoModel {
-    /// ホームのカードの状態
-    enum State: Equatable {
-        /// 何も出さない
-        case hidden
-        /// 取りに行っている(枠だけ出す)
-        case loading
-        /// サムネを出す
-        case ready(PartnerPhotoThumbnail)
-    }
-
-    /// タップで開く全画面の状態
-    enum Viewer: Equatable {
-        case closed
-        /// original が nil の間はサムネを大きく出して、取れたら差し替える。取れなければ(失敗しても)サムネのまま
-        case open(thumbnail: PartnerPhotoImage, original: PartnerPhotoImage?)
-    }
-
     /// 同じ日の写真を取り直すまでの間隔(秒)。この間はキャッシュをそのまま出し、通信しない
     static let revalidateInterval: TimeInterval = 15 * 60
+    /// 読めなかった日を取り直すまでの間隔(秒)。この間は通信せず、何も出さない(通信が切れていただけの失敗には使わない)
+    static let unreadableRetryInterval: TimeInterval = 3 * 60
 
     private(set) var state: State = .hidden
     private(set) var viewer: Viewer = .closed
 
-    /// 写真の長押しメニューの項目(T23 が通報・ブロックを入れる)。空なら長押しは何も起きない。
-    /// 全画面の写真にも同じ項目が出る(右上の「…」と長押し — 拡大したままでも通報できる)
+    /// 写真の長押しメニューの項目(通報・ブロック — T23)。空なら長押しは何も起きない。全画面の写真にも同じ項目が出る
     let actions: [PartnerPhotoAction]
 
     // MARK: 依存
@@ -58,20 +46,10 @@ final class PartnerPhotoModel {
     /// 日付またぎの見張りが待つ(テストは差し替える)。取り消されたら早く戻る
     @ObservationIgnored private let sleep: (TimeInterval) async -> Void
 
-    // MARK: 内部状態(メモリだけ)
-
-    private struct Key: Equatable {
-        let pairID: String
-        let dateLocal: String
-    }
-
-    private struct CacheEntry {
-        let key: Key
-        let thumbnail: PartnerPhotoThumbnail
-        let loadedAt: Date
-    }
+    // MARK: 内部状態(メモリだけ。型は PartnerPhotoModel+State.swift)
 
     @ObservationIgnored private var cache: CacheEntry?
+    @ObservationIgnored private var unreadable: UnreadableEntry?
     /// 取得中の写真(同じ写真の二重取得を避ける)
     @ObservationIgnored private var inFlight: Key?
     /// 取得の世代。置き換え・消去のたびに進め、古い取得の結果が新しい状態を上書きしないようにする
@@ -137,7 +115,7 @@ final class PartnerPhotoModel {
         guard case .ready(let photo) = state else { return }
         afterViewerDismissed = nil // 開き直したら、前の「閉じたあとに行う操作」は無かったことにする
         viewerTask?.cancel()
-        viewer = .open(thumbnail: photo.image, original: nil)
+        viewer = .open(thumbnail: photo.image, original: .loading)
         let reference = photo.reference
         viewerTask = Task { [weak self] in
             await self?.loadOriginal(for: reference)
@@ -151,8 +129,8 @@ final class PartnerPhotoModel {
         if viewer != .closed { viewer = .closed }
     }
 
-    /// 全画面を閉じ、閉じ終わってから `work` を行う(全画面の通報・ブロックの項目)。通報の確認やブロックの説明は
-    /// ホームに出すもので、全画面を出したままでは、その下のホームから提示できない。全画面が出ていなければ、すぐ行う
+    /// 全画面を閉じ、閉じ終わってから `work` を行う(全画面の通報・ブロックの項目)。確認はホームに出すもので、
+    /// 全画面を出したままでは、その下のホームから提示できない。全画面が出ていなければ、すぐ行う
     func closeViewer(then work: @escaping @MainActor () -> Void) {
         guard isViewerOpen else {
             work()
@@ -174,19 +152,13 @@ final class PartnerPhotoModel {
         return false
     }
 
-    /// 全画面の提示の入口(`.fullScreenCover(isPresented: $model.isViewerPresented)` 用)。
-    /// 開くのは openViewer だけ。ここへ false を書くと(下へスワイプなどで)閉じる
+    /// 全画面の提示の入口(`.fullScreenCover(isPresented:)` 用)。開くのは openViewer だけ。false を書くと(スワイプなどで)閉じる
     var isViewerPresented: Bool {
         get { isViewerOpen }
         set { if !newValue { closeViewer() } }
     }
 
     // MARK: private — 状態の決定(同期)
-
-    private struct FetchRequest {
-        let key: Key
-        let generation: Int
-    }
 
     /// 今の snapshot と時刻から、表示の状態を決める。通信が要るときだけ取得の依頼を返す
     private func reconcile() -> FetchRequest? {
@@ -199,12 +171,15 @@ final class PartnerPhotoModel {
         let current = now()
         let today = DayBoundary.dateLocalString(for: current, calendar: calendar)
 
-        // ペアが変わった・日付が変わった: 古い写真は捨てる
+        // ペアが変わった・日付が変わった: 古い写真と、読めなかった記録は捨てる
         if let entry = cache, entry.key.pairID != pair || entry.key.dateLocal != today {
             dropCache()
         }
         if let key = inFlight, key.pairID != pair || key.dateLocal != today {
             cancelFetch()
+        }
+        if let miss = unreadable, miss.key.pairID != pair || miss.key.dateLocal != today {
+            unreadable = nil
         }
 
         // 写真が無い日は何も出さない。snapshot が昨日のものなら hasPartnerPhotoToday は昨日の値かもしれないので、
@@ -218,6 +193,11 @@ final class PartnerPhotoModel {
         let key = Key(pairID: pair, dateLocal: today)
         if let entry = cache, current.timeIntervalSince(entry.loadedAt) < Self.revalidateInterval {
             state = .ready(entry.thumbnail)
+            return nil
+        }
+        // 読めなかったばかりの(ペア, 日付)は、しばらく取り直さない(読み込みの枠を出し直さない。写真は持っていない)
+        if let miss = unreadable, current.timeIntervalSince(miss.at) < Self.unreadableRetryInterval {
+            if state != .hidden { state = .hidden }
             return nil
         }
         if inFlight == key { return nil }
@@ -251,36 +231,46 @@ final class PartnerPhotoModel {
         switch outcome {
         case .success(let thumbnail?):
             cache = CacheEntry(key: request.key, thumbnail: thumbnail, loadedAt: now())
+            unreadable = nil
             state = .ready(thumbnail)
         case .success(nil):
             // 行が無い・photo_path が無い・規約に合わない: 出さない
-            hide()
+            giveUp(on: request.key)
         case .failure(let error):
-            // 失敗(署名付き URL が弾かれた・RLS・失効・通信)。文言は出さない。
-            // 通信が切れていただけで、すでに出している今日の写真があるなら、そのまま出しておく。
-            // それ以外(読めなくなった)は、持っていた写真も捨てる(ペア解消の反映より先に RLS が閉じた場合など)
-            if let entry = cache, (error as? PartnerPhotoError) == .network {
-                state = .ready(entry.thumbnail)
+            // 失敗は文言を出さない(罰なし・§3.5)
+            if (error as? PartnerPhotoError)?.isConnectivityFailure == true {
+                // 通信が切れていただけ: すでに出している今日の写真があるなら、そのまま出しておく。
+                // 覚えない(電波が戻った次の機会にすぐ取り直す)
+                if let entry = cache { state = .ready(entry.thumbnail) } else { hide() }
             } else {
-                hide()
+                // 読めなくなった(署名付き URL が弾かれた・ペア解消の反映より先に RLS が閉じた・サーバーの失敗)
+                giveUp(on: request.key)
             }
         }
     }
 
+    /// 出せるものが無い: 持っている写真も捨てて、しばらく取り直さない(読めなかった日として覚える)
+    private func giveUp(on key: Key) {
+        hide()
+        unreadable = UnreadableEntry(key: key, at: now())
+    }
+
     private func loadOriginal(for reference: PartnerPhotoReference) async {
+        let original: Viewer.Original
         do {
-            let original = try await provider.loadOriginal(of: reference)
-            // 閉じられた・別の写真に替わった・取り消された結果は使わない
-            guard
-                !Task.isCancelled,
-                case .open(let thumbnail, _) = viewer,
-                case .ready(let photo) = state,
-                photo.reference == reference
-            else { return }
-            viewer = .open(thumbnail: thumbnail, original: original)
+            original = .loaded(try await provider.loadOriginal(of: reference))
         } catch {
-            // 取れなくても何も出さない: サムネを大きく出したまま(閉じれば戻る)
+            // 取れなかった: スピナーを止めて、サムネのまま(文言は出さない)。閉じて開き直せば取り直す
+            original = .failed
         }
+        // 閉じられた・別の写真に替わった・取り消された結果は(成功も失敗も)使わない
+        guard
+            !Task.isCancelled,
+            case .open(let thumbnail, _) = viewer,
+            case .ready(let photo) = state,
+            photo.reference == reference
+        else { return }
+        viewer = .open(thumbnail: thumbnail, original: original)
     }
 
     // MARK: private — 消去
@@ -290,6 +280,7 @@ final class PartnerPhotoModel {
     private func hide() {
         cancelFetch()
         dropCache()
+        unreadable = nil
         // 変わらないときは書かない(同期のたびに画面を更新させない)
         if state != .hidden { state = .hidden }
     }

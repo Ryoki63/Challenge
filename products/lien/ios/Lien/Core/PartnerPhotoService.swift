@@ -54,8 +54,14 @@ final class LivePartnerPhotoService: PartnerPhotoProviding {
     }
 
     func loadThumbnail(pairID: String, dateLocal: String) async throws -> PartnerPhotoThumbnail? {
+        let row: PartnerCheckin?
+        do {
+            row = try await checkins.partnerCheckin(dateLocal: dateLocal)
+        } catch {
+            throw PartnerPhotoError.normalizingConnectivity(error)
+        }
         guard
-            let row = try await checkins.partnerCheckin(dateLocal: dateLocal),
+            let row,
             let rawPath = row.photoPath,
             let path = PartnerPhotoPath(rawPath),
             // 今のペアの、今日の写真だけを出す(別のペア・別の日のパスが混ざっても出さない)
@@ -87,17 +93,43 @@ final class LivePartnerPhotoService: PartnerPhotoProviding {
 
     /// 署名付き URL を作って取る。署名付き URL の失効で弾かれたら、署名からやり直して1回だけ再試行する
     private func fetch(objectPath: String, limits: PartnerPhotoLimits) async throws -> PartnerPhotoImage {
-        let signed = try await signer.signedURL(forPath: objectPath)
+        let signed = try await sign(objectPath)
         do {
             return try await loader.loadImage(from: signed.url, limits: limits)
         } catch PartnerPhotoError.expired {
-            let renewed = try await signer.signedURL(forPath: objectPath)
+            let renewed = try await sign(objectPath)
             return try await loader.loadImage(from: renewed.url, limits: limits)
+        }
+    }
+
+    /// 署名付き URL を作る。トークンの更新が通信の失敗で落ちたとき(URLError)も、`.network` にそろえる
+    private func sign(_ objectPath: String) async throws -> SignedPhotoURL {
+        do {
+            return try await signer.signedURL(forPath: objectPath)
+        } catch {
+            throw PartnerPhotoError.normalizingConnectivity(error)
         }
     }
 }
 
 extension PartnerPhotoError {
+    /// 行の読み取りや署名(トークンの取得を含む)で起きた失敗のうち、**通信が切れていただけ**のものを `.network` にそろえる
+    /// (それ以外は、そのまま)。
+    ///   - PostgRESTPartnerCheckinResolver は、応答が返らない失敗を NudgeReactClientError.network にして投げる
+    ///   - トークンの更新(supabase-swift)は、オフラインだと URLError をそのまま投げる
+    /// そろえないと、PartnerPhotoModel が「読めなくなった」と取り違えて、出している今日の写真まで捨て、
+    /// 読めなかった日として覚えてしまう(取り直しの間隔の間、電波が戻っても出ない)。
+    /// 取り消し(URLError.cancelled)は失敗ではないので CancellationError にする(取り消された取得の結果は捨てられる)
+    static func normalizingConnectivity(_ error: Error) -> Error {
+        if let client = error as? NudgeReactClientError, client == .network {
+            return PartnerPhotoError.network
+        }
+        if let urlError = error as? URLError {
+            return urlError.code == .cancelled ? CancellationError() : PartnerPhotoError.network
+        }
+        return error
+    }
+
     /// サムネが取れなかったとき、原寸で代わりを作ってよいか。
     /// サムネそのものが無い・壊れている・大きすぎる(= 原寸なら読めるかもしれない)ときだけ。
     /// 通信が切れている・認証で弾かれた・失効が続くときは、原寸でも同じ結果なので試さない
