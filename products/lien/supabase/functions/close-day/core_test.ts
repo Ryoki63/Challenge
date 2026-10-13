@@ -93,6 +93,8 @@ function makeRepo(world: World): CloseDayRepo {
       return Promise.resolve({
         pairId: p.pairId,
         startedOn: p.startedOn,
+        // pairs.ticket_balance(updateTicketBalance で更新される)。snapshot の ticketBalance になる(issue #19)
+        ticketBalance: p.ticketBalance,
         partner,
       });
     },
@@ -328,6 +330,31 @@ Deno.test("close-day: 片方未達+チケットあり → balance-1・ledger con
     "ticket の日も継続日(6/5〜6/10 で 6)",
   );
   assertEquals(payload.lien.snapshot.todayMeDone, false, "新しい日はまだ未完");
+});
+
+Deno.test("close-day: ticket_used の push が運ぶ snapshot の ticketBalance は消費後の残数(両者とも。残数バッジが古いまま残らない — issue #19)", async () => {
+  const world = makeWorld({ pairs: [basePair({ ticketBalance: 2 })] });
+  world.checkins.add(`user-a|${D}`); // B が未達 → 2 → 1
+  const { sent, pusher } = makePusher();
+
+  await handleCloseDay(deps(world, pusher), {});
+
+  assertEquals(sent.length, 2);
+  for (const s of sent) {
+    const snapshot = (s.payload as { lien: { snapshot: PairSnapshot } }).lien
+      .snapshot;
+    assertEquals(snapshot.ticketBalance, 1, `${s.deviceToken}: 消費後の 1 枚`);
+  }
+
+  // 最後の 1 枚を使い切ると 0 枚(null ではなく 0。バッジは 0 枚でも出す)
+  const last = makeWorld({ pairs: [basePair({ ticketBalance: 1 })] });
+  const second = makePusher();
+  await handleCloseDay(deps(last, second.pusher), {});
+  const lastSnapshot = (second.sent[0].payload as {
+    lien: { snapshot: PairSnapshot };
+  }).lien.snapshot;
+  assertEquals(last.pairs[0].ticketBalance, 0);
+  assertEquals(lastSnapshot.ticketBalance, 0);
 });
 
 Deno.test("close-day: 2人とも未達でも消費は1日1枚(人数で数えない — DESIGN §5.4)", async () => {

@@ -77,6 +77,15 @@ deno test --allow-read products/lien/contracts/tools/
 - 成長ルール v2(#54)で snapshot に `plantGrownDays` / `plantStageFloor` / `plantNextStageAt` の3キーが足された
   (ソロは 0 / 0 / null。最後の段階も `plantNextStageAt` は null。DESIGN §3.4)。iOS の `PairSnapshot` が
   これらを省略可で受けるようになったら(#56・#57)、`ContractFixtureTests` で値まで検査する。
+- お休みチケットの残数(#19、2026-10-13)で snapshot に `ticketBalance` が足された(ペア共有の残数 = `pairs.ticket_balance`。
+  0 以上の整数・0 枚は `0`。**ソロは `null`**(キーは省略せず `null` で出す)。DESIGN §3.4)。フィクスチャの値: ペアのもの
+  (`snapshot.paired.json` ほか)は `2`(無料プランの月次付与のまま。`invite-accept.ok.json` は初期付与の 2 枚)、
+  ソロのもの(`snapshot.solo.json` / `snapshot.empty.json` / `pair-dissolve.*.json` / `push.pair-dissolved.json`)は `null`。
+  iOS の `PairSnapshot` が省略可(`Int?`。キーが無い古いサーバーも `null` も nil)で受けるようになったら、
+  `ContractFixtureTests` で値まで検査する(今は未知のキーとして無視される)。
+- 写真の実体の削除(#68、2026-10-13): `checkin-cancel` は応答の形を変えずに、取消のとき Storage の写真(原寸 + サムネ)も消す。
+  取消のあと、その写真の署名付き URL は作れない(HTTP 400 `{"statusCode":"404","error":"not_found"}` = `storage-sign.not-found.json`)。
+  署名付きアップロードは、上限 6 MiB・`image/jpeg` だけ(超えると **HTTP 400** + 本文の `statusCode` 413 / 415)。DESIGN §5.2
 - 認証サーバー(Supabase Auth)の不調(通信の失敗・5xx)は、`snapshot` / `pair-dissolve` / `delete-account` が **503 `auth_unavailable`** で返す
   (確定した拒否 = 期限切れ・ユーザーが居ない、は 401 `unauthorized` のまま。`_shared/auth_errors.ts`)。iOS はこのコードを専用の case にせず、
   一般のサーバー失敗(`.server`)として扱う — セッションの見張り(`SessionHealthMonitor`)が数えないため、「ログイン状態を確認できません」の誤検知にならない

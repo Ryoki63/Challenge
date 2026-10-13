@@ -270,6 +270,7 @@ PY
 | 2026-10-13 02:33〜02:36 | **#60 の Opus レビュー修正を反映**。① 監視(`ops/cron_check.ts`)を直した: 直近の予定の回(close-day は JST 00:10・grant-tickets は 00:05。猶予 5 分)の起動を必須にし、前夜の回が抜けたら赤・月初の付与の回が抜けたら赤にした(以前は最後の起動が 26 時間以内なら OK で、どちらも見逃していた)。ジョブ定義(スケジュール・呼び先・鍵・本文)のずれと想定外のジョブも赤。手動実行 38285007571 が緑(redact 版)、`max_age_hours=0` の 38285073541 が赤になることを確認。本番の状態は変えていない ② grant-tickets を再デプロイ(v5 → v6。旧来の印のコメントの修正だけで動作は同じ。デプロイ物 = main の HEAD を保つため。他の 10 関数は変更なし)。デプロイ後に副作用のないスモーク 6 項目が PASS(GET 405 / 認証なし・別の秘密 401 / cron 秘密 + 未来の月・知らないキー・壊れた JSON が 400)。`ticket_grant_runs` は 0 行のまま・データは変わっていない ③ lien-cron-watch・lien-deploy の action を commit SHA で固定(lien-deploy の dry_run 手動実行 38285254685 が緑)。lien-cron-watch の ops-tests を functions/ 配下の変更でも回すようにした ④ 上の 01:43〜01:50 の行の関数の版数を実測に訂正 |
 | 2026-10-13 05:07〜05:21 | **issue #67: 本番に対する 2 ユーザーの API 通しテストを初めて実行**(`scripts/e2e/run.sh`。§12)。開発中の 3 回(05:07・05:11・05:14)と最終の 1 回(05:20)で、各回 匿名ユーザー 3 人・ペア 1 組・写真 2 枚を作り、すべて削除した(後片付けのあと、users・pairs・Storage のオブジェクトが実行前と同じ件数に戻ったことを SELECT で確認。作った ID は §8 の末尾)。最終回は **244 項目 PASS・FAIL 0**・契約フィクスチャ(`contracts/`)とのずれ 1(署名付き URL の発行の失敗は HTTP 404 でなく 400。手書きフィクスチャの説明が 404 を想定)・NOTE 3(取消後も写真の実体が Storage に残る = issue #68 / 署名の失敗が 400 / APNs の secrets が未設定 = G0 待ち)。#59 PV の経路(相手が `checkins.photo_path` を読み、署名付き URL で画像を取れる。ペア外・未ログインは取れない)と、PushTokenSync の経路(自分の `users.push_token` / `push_env` の書き込みと読み戻し)も本番で通った。close-day / grant-tickets は呼んでいない(§10)。本番のスキーマ・関数・設定は変えていない |
 | 2026-10-13 05:55〜06:00 | **issue #67 の Opus レビュー修正の確認として、通しテストを本番で 3 回流し直した**(`scripts/e2e/run.sh`。§12)。① `run --cleanup`(匿名ユーザー 3 人・ペア 1 組・写真 2 枚): **263 項目 PASS・FAIL 0**・契約フィクスチャとのずれ 0 ② `run`(データを残す)→ `list` → `cleanup --user …`(厳格な確認の経路)→ 削除。同じ状態で、`--user` に A だけ・本番にもともとあるテストユーザー(§8 の台帳のもの)を指定すると止まる(dry-run)ことも確認 ③ 契約フィクスチャ(`storage-sign.not-found.json`)を隠した複製で `run --cleanup --no-outsider`(ずれ 1 件で終了コード 1 になり、後片付けは済む)。3 回とも作ったデータをすべて削除し、users・pairs・invites・Storage のオブジェクトの件数が実行前と同じに戻ったことを SELECT で確認。本番のスキーマ・関数・設定は変えていない。close-day / grant-tickets は呼んでいない(§10) |
+| 2026-10-13 12:45〜13:00 | **issue #19(サーバー側)・#68・写真バケットの制限を本番へ**。① migration 0008(`photos` バケットの `file_size_limit` = 6291456 バイト(6 MiB)・`allowed_mime_types` = `image/jpeg`。Management API で `begin; <migration の SQL>; insert into supabase_migrations.schema_migrations(version, name) values ('0008', 'photo_bucket_limits'); commit;` を流し、読み戻して確認。migration にしたのは、バケット自体が 0001 の SQL で作られていて、設定も履歴に残り、環境を作り直しても戻るため)② snapshot を使う Edge Functions 11 本を再デプロイ(ローカルの `supabase functions deploy`。checkin v11 / checkin-cancel v8 / close-day v8 / delete-account v4 / invite-accept v8 / nudge v7 / pair-dissolve v3 / plant-name v7 / promise-set v8 / react v7 / snapshot v9。verify_jwt はすべて false のまま。invite-create・grant-tickets は snapshot を使わないので対象外)。内容は snapshot の `ticketBalance`(`pairs.ticket_balance`)・checkin-cancel が取消のとき本人の区画の写真の実体(原寸 + サムネ)を消す・checkin が写真の差し替えで参照されなくなった古い実体を消す ③ スモーク: 通しテスト(§12)を 2 回。1 回目は 325 PASS・FAIL 6(どれも通しテスト側の期待のずれ — 上限超え・JPEG 以外の断られ方が HTTP 413 / 415 でなく **400 + 本文の `statusCode`**・S18 で取得済みの署名付き URL が CDN から返った・S24 の期待の誤り(今日は 2 人ともチェックイン済み))。直した 2 回目は **331 PASS・FAIL 0**・NOTE 1(APNs 未設定)・契約フィクスチャとのずれ 0。どちらも後片付けのあと残り 0 件 ④ 一回限りの調査(CDN。使い捨てのユーザーは delete-account で削除済み): 取得(GET)済みの署名付き URL は、削除のあとも Smart CDN のキャッシュから画像が返ることがある(取得 → 差し替え → 削除で約 55 秒、削除の直後に切れたこともある。`expires` は 1 時間後)。取消のあとに新しく作った URL・取得していない URL は即 400。DESIGN §5.2 に記録 |
 
 ## 8. 本番のテストデータ(台帳)
 
@@ -395,17 +396,17 @@ bash products/lien/scripts/e2e/run.sh list              # 残っている通し�
 | S07 | ソロ: 写真の要求は 400 `no_pair`・日付の検査・C のソロのチェックイン(`checkin.solo.json`)と冪等 |
 | S08 | `invite-create` → `invite-accept`(`invite-accept.ok.json`)・失敗系(形式・存在しない token・自分の招待・使用済み)・**1 ユーザー 1 ペア**: ペア済みの B が未ペアの C の招待を受けると 409 `already_paired`、未ペアの C が、ペア済みの A が成立前に作った 2 つ目の招待を受けると 409 `partner_already_paired`(どちらも claim の前に返るので、ペアも招待の使用状態も変わらない = 本番で安全に起こせる)・ペア成立後の `invite-create` は 409。「存在しない token」は `ZZZZ0000`(`0` はサーバーの生成器が出さない文字なので、実ユーザーの有効な招待と一致しない) |
 | S09, S11, S15, S16 | 各段階の snapshot: 成立直後(段階 0・回数 0・次は 1 回)・A だけ完了(fidget・相手の写真あり)・ふたり達成(ストリーク 1・成長 1 回・段階 1・次は 3 回・happy)・A と B で共通の項目が同じ |
-| S10 | 写真つきチェックイン: `requestPhotoUpload` → 署名付きアップロード(原寸 + サムネ)→ `photoPath` 付きで再送 → 差し替え(x-upsert)・本人の区画以外のパスは 400 `invalid_photo_path` |
+| S10 | 写真つきチェックイン: `requestPhotoUpload` → 署名付きアップロード(原寸 + サムネ)→ `photoPath` 付きで再送 → 差し替え(x-upsert)・**バケットの制限(migration 0008。issue #68)**: 上限(6 MiB)を 1 バイト超える JPEG・`image/png`・`application/octet-stream` は署名付きアップロードでも断られる(**HTTP 400** + 本文の `statusCode` 413 `Payload too large` / 415 `invalid_mime_type`。HTTP ステータスは 413 / 415 でない)。断られたあとも置いてある写真は変わらない(S12 が SHA-256 で確かめる)・本人の区画以外のパスは 400 `invalid_photo_path` |
 | S12 | **#59 PV の経路**: 相手(B)が PostgREST で `checkins.photo_path` を読む → `POST /storage/v1/object/sign/photos/<path>` で署名付き URL を作る → ヘッダなしで GET して同じバイト列(SHA-256)が取れる。ペア外(C)・未ログイン・署名を改ざんした URL(署名部の途中の 1 文字を変える)は取れない。署名の**発行**の失敗は HTTP 400 + 本文の `statusCode` / `error` を `contracts/storage-sign.not-found.json`(#59 側の手書きフィクスチャ)と突き合わせる(HTTP 400 でなくなったら FAIL。フィクスチャが無い間は「ずれ」として FAIL) |
 | S13, S14 | `nudge`(3 回まで・4 回目は 429・語彙外 400・完了済みの相手は 409)・`react`(新規 / 同じスタンプは `changed:false` / 6 種すべてに付け替え・自分のチェックインは 403・ペアなしは 409)・ペア外(C)・未ログインから `reactions` は見えない |
 | S17 | `plant-name`: `first` は先着(2 人目は 409 `already_named` と今の名前)・`rename` は上書き・不正な名前(空・9 字・ゼロ幅・改行)は 400 |
-| S18 | `checkin-cancel`(冪等・当日以外は 400)→ 成長回数が戻る → やり直しで「ふたり達成」に戻る・ソロの取消 |
+| S18 | `checkin-cancel`(冪等・当日以外は 400)→ **写真の実体(原寸 + サムネ)が Storage から消える**(DB の件数が 0・相手(B)も本人(A)も署名付き URL を作れない = HTTP 400 `not_found`・取消の前に発行して取りに行っていない URL も画像を返さない。issue #68)→ 成長回数が戻る → やり直しで「ふたり達成」に戻る → **取消のあとに写真を取り直せる**(消した実体と同じパスへアップロード → B が取り戻せる。S20・S23・S25 はこの写真を前提にする)・ソロの取消 |
 | S19 | **PushTokenSync の経路**: 自分の `users.push_token` / `push_env` を読める(登録前は null)→ 書ける → 読み戻せる → `push_env` の不正値は CHECK で 400。相手の行は読めない・書き換えられない。push を送る操作をしても本処理は成功する。最後に偽のトークンを消す |
 | S20 | クライアントから書けないもの: `premium_until`・`checkins` の直接 INSERT / DELETE・`plants`・Storage の写真の削除 |
-| S21 | Management API で SELECT: 初期のお休みチケット 2 枚・close-day が走っていない(`streak_days` 0 行・`plants.grown_days` 0)・`nudges` 3 行・取消で `reactions` が CASCADE で消える・招待は使用済み 1 件と未使用 2 件(S08 の 409 で使われなかったもの)・Storage のオブジェクト数・作ったユーザーはすべて匿名でサインアップの印あり |
+| S21 | Management API で SELECT: 初期のお休みチケット 2 枚・close-day が走っていない(`streak_days` 0 行・`plants.grown_days` 0)・`nudges` 3 行・取消で `reactions` が CASCADE で消える・招待は使用済み 1 件と未使用 2 件(S08 の 409 で使われなかったもの)・Storage のオブジェクト数(S18 で取り直した写真の 2 件)・作ったユーザーはすべて匿名でサインアップの印あり |
 | S22 | ペア外(C)・未ログインから A–B ペアの `promises` / `pairs` / `pair_members` / `plants` / `nudges` / `ticket_ledger` / `streak_days` / `invites` が見えない。表ごとに同じ問い合わせを、メンバー(対照: 読めて行がある)・C(200 で 0 件)・未ログイン(GRANT が無いので 401 など。行が返らない)で流す。ペアの相手 B から A の `invites` も 0 件(`invites_select_own`)。`streak_days` は close-day を呼んでいないので行が無く、対照も 0 件(問い合わせが通ることと GRANT の確認にとどまる)。`reactions` は取消の CASCADE で消えるので S14 で確かめる。`users` / `checkins` / Storage は S19 / S12 |
 | S23 | **pair-dissolve**(ブロック = ペア解消。T23 #23): 未ログイン 401・GET 405 → 解消の前(対照)は B が A の写真の署名付き URL を作れる → A が解消 `{ dissolved: true, snapshot }`(ソロの形・自分の約束と今日の完了は残る)→ A の再送・B からの解消は `dissolved: false`(冪等)→ B の snapshot がソロ → 解消後は B が A の写真の署名付き URL を作れない(HTTP 400)・A の今日の `checkins` 行と約束が B から読めない(0 件)・A は自分の履歴を読める・B の nudge は 409 `no_pair` → DB: ペアは `dissolved`・メンバー 2 人・植物の名前も残る(アーカイブ) |
-| S24 | **組み直し**: 解消のあと A が `invite-create` → B が `invite-accept`(200)。新しいペアの ID は別で、植物の名前なし・ストリーク 0・成長 0 回(解消したペアの記録は復活しない) |
+| S24 | **組み直し**: 解消のあと A が `invite-create` → B が `invite-accept`(200)。新しいペアの ID は別で、植物の名前なし・お休みチケットは初期付与の 2 枚(`ticketBalance`。解消したペアの名前・残数は引き継がない)。close-day は呼んでいないので `streak_days` の行は無く、数えられるのは「今日のふたりのチェックイン」だけ — 今日は 2 人ともチェックイン済み(S15・S18)なので、新しいペアも今日は「ふたり達成」(ストリーク 1・成長 1 回)。チェックインの行はペアに属さない |
 | S25 | **delete-account**(A。現役のペアあり): 未ログイン 401・GET 405 → DB: 削除の前に A の写真が Storage に 2 オブジェクト → 200 `{ deleted: true }` → A の JWT は `snapshot` が 401 `unauthorized`(認証サーバーの確定した拒否は 503 にならない)・もう一度の `delete-account` も 401・**認証サーバーに直接たしかめても 403 `user_not_found`**(アプリの `GoTrueSessionVerifier` が `.rejected` と見る応答)・refresh token も 4xx → B はソロに戻り、自分の `users` 行は無傷 → DB: A の auth・users・約束・チェックイン・所属・Storage の写真が 0、B の auth は 1、2 つのペアは `dissolved` で B だけが所属(植物の行も残る) |
 | S26 | **delete-account**(B = 最後の所属者・C = ソロ): 200 → DB: 3 人の auth・users・約束・チェックイン・招待が 0、誰も残らなくなった 2 つのペアの行・所属・植物・台帳・nudges・Storage が連鎖して 0。**S25・S26 でテストユーザー自身を消す**ので、全部通ると A / B / C は存在しない(`--cleanup` は「記録にあるが、もう DB に無い」として扱う) |
 
@@ -431,7 +432,7 @@ bash products/lien/scripts/e2e/run.sh list              # 残っている通し�
 - 相手の当日の行: `GET /rest/v1/checkins?select=id,user_id,date_local,photo_path&date_local=eq.<今日>&user_id=neq.<自分>&limit=1`(`apikey` + `Authorization: Bearer <JWT>`)→ 200 `[{id, user_id, date_local, photo_path}]`。`photo_path` は原寸のパス。サムネのパスは同じ区画の `photo_thumb.jpg`(行には持たない)
 - 署名付き URL: `POST {base}/storage/v1/object/sign/photos/<photo_path>`(`apikey` + `Authorization`、本文 `{"expiresIn": 3600}`。アプリの `StoragePhotoURLSigner.expiresInSeconds` と通しテストが使う値)→ 200 `{"signedURL": "/object/sign/photos/<path>?token=..."}`。画像の URL は **`{base}/storage/v1` + signedURL**。これをヘッダなしで GET すると 200・`image/jpeg`
 - 署名の**発行**に失敗するとき(ペア外・存在しないオブジェクト・未ログイン)は **HTTP 400** で本文が `{"statusCode":"404","error":"not_found","message":"Object not found",...}` になる(HTTP ステータスは 404 ではない)。クライアントは「200 以外 = 静かに植物だけに戻す」でよい。取消されて行が消えた日は、そもそも行が 0 件になる
-- 署名付き URL の**取得**(GET)が失敗するとき: 寿命切れは **HTTP 400** `{"statusCode":"400","error":"InvalidJWT","message":"\"exp\" claim timestamp check failed"}`、トークンの改ざんも 400。アプリの `.expired`(400 / 401 / 403 → 署名からやり直す)と合う。「署名は有効だがオブジェクトが消えた」ときの GET のステータスは未確認(取消時に写真を消す案 #68 が入ったら確かめる)
+- 署名付き URL の**取得**(GET)が失敗するとき: 寿命切れは **HTTP 400** `{"statusCode":"400","error":"InvalidJWT","message":"\"exp\" claim timestamp check failed"}`、トークンの改ざんも 400。アプリの `.expired`(400 / 401 / 403 → 署名からやり直す)と合う。**署名が有効でもオブジェクトが消えている**(取消のあと)GET も、同じく **HTTP 400** `{"statusCode":"404","error":"not_found",…}`(2026-10-13・#68 で確認)。アプリの `.expired`(400 → 署名からやり直す)に当たり、やり直しの署名の発行も 400 `not_found` なので `.notFound` に落ちる(写真を出さない)。**ただし、取消の前に相手がすでに取得(GET)した URL は、CDN(Smart CDN)のキャッシュから、削除のあとしばらく(実測で最大約 1 分)画像が返ることがある**(DESIGN §5.2「削除のあとの署名付き URL」)
 - 署名付きアップロード(`PUT {base}/storage/v1/object/upload/sign/photos/<path>?token=...`)は、アプリの `uploadPhoto` の現状の形(`Content-Type: image/jpeg` と `x-upsert: true` だけ。`apikey` も `Authorization` も付けない)で通る。同じパスへの差し替えも通る
 
 ### 2026-10-13 の結果(初回)
@@ -439,7 +440,7 @@ bash products/lien/scripts/e2e/run.sh list              # 残っている通し�
 最終回: **244 項目 PASS・FAIL 0**・NOTE 3・SKIP 0。契約フィクスチャとの突き合わせは形(キー・型)34 回・値 4 回で、ずれ 1 件(下の NOTE 1)。Edge Function の応答のフィクスチャ 14 ファイル(`snapshot` 3 状態・`checkin` 3 種・`checkin-cancel`・`promise-set`・`invite-create` / `invite-accept`・`nudge`・`react`・`plant-name` 2 種)は、本番の実応答と形が一致した。エラーは `errors.json` のコード 28 種類(のべ 53 回。HTTP ステータスとの組)を引き出して一致を確認した。未確認なのは、本番では安全に起こせないもの(500 系・`user_not_found`・`invite_expired`・`plant_not_found`・`token_generation_failed`)と、APNs のペイロード(`push.*.json`。実機・APNs が要る)。スタンプは react の 6 種すべてと nudge の 3 種(1 日 3 回の上限のため)を通した。PV の手書きフィクスチャ(`partner-checkin.*.json` / `storage-sign.ok.json`)の形も一致した。
 
 - NOTE 1: 署名付き URL の**発行**(`POST …/object/sign/photos/<path>`)の失敗は、ペア外・存在しないオブジェクト・未ログインのいずれも **HTTP 404 でなく 400**(本文が `{"statusCode":"404","error":"not_found",...}`)。`contracts/README.md` の手書きフィクスチャの説明(404 = 無い・読めない)と、`StoragePhotoURLSigner`(404 だけ `notFound`)は実態とずれる。実際は `.server(400)` になるが、結果(写真を出さない・サムネが無いときは原寸で代わりを作る)は同じ。説明か写像をそろえるのは #59 側
-- NOTE 2: 取消後も写真の実体が Storage に残り、相手は決まったパスから署名付き URL を作って取れる(通常のアプリの画面からは見えない)。DESIGN §5.7-3 の前提が #59 の方式で崩れている → **issue #68**
+- NOTE 2: 取消後も写真の実体が Storage に残り、相手は決まったパスから署名付き URL を作って取れる(通常のアプリの画面からは見えない)。DESIGN §5.7-3 の前提が #59 の方式で崩れている → **issue #68**(2026-10-13 に解消: 取消で実体も消す。§7 の同日の行・DESIGN §5.2 / §5.3)
 - NOTE 3: APNs の secrets(`APNS_AUTH_KEY` / `APNS_KEY_ID` / `APPLE_TEAM_ID` / `APNS_ENV` / `APNS_TOPIC`)が 5 つとも未設定で、push は送られない(G0 待ち)。偽のトークンは残る。G0 のあとに流すと、偽のトークンが 400 BadDeviceToken で掃除される側の観測に変わる(DESIGN §4.1)
 - 最も遅い呼び出しは 1〜3 秒(Edge Function の初回呼び出し・Management API の SQL)
 
@@ -463,6 +464,7 @@ bash products/lien/scripts/e2e/run.sh list              # 残っている通し�
 - 新しい API やエラーコードを足したら、`steps_*.ts` に手順を足す(`rep.run("S23", ...)`。`scenario.ts` の一覧にも書く)。共有の道具は `scenario_lib.ts`。`errors.json` にあるコードの確認は `expectError`
 - 単体テスト(ネットワーク不要。形の突き合わせ・フィクスチャの読み込み・後片付けの安全装置・招待 token の形・引数の解釈): `deno test --allow-read products/lien/scripts/e2e/`。型検査は `deno check products/lien/scripts/e2e/e2e.ts`。どちらも lien-ci の `e2e-tests` ジョブで回る
 - 招待 token の仕様(`0` `O` `1` `l` だけを除く 58 文字)を変えるときは、`invite-create/core.ts` と `scenario_lib.ts` の `INVITE_TOKEN_RE` を一緒に直す(`scenario_lib_test.ts` が食い違いで落ちる)
+- 写真の上限(6 MiB)を変えるときは、migration(新しい番号で `file_size_limit` を更新)・アプリの `PartnerPhotoLimits.original`・`scripts/e2e/images.ts` の `PHOTO_LIMIT_BYTES` を一緒に直す(`images_test.ts` と `scripts/ops/photo_cleanup_static_test.ts` が食い違いで落ちる)
 - close-day / grant-tickets は呼ばない(§10)。両方を通したいときは、§4 の手動の再実行と §2 の監視の手順に従う
 
 ## 13. 運営がユーザーを削除する・停止するとき(通報への対応など。issue #23 のレビュー指摘)
@@ -491,3 +493,27 @@ auth ユーザーを消すと `public.users` と、そこから CASCADE でつ�
 - 停止だけ(消さない)で足りるときは、手順 1(ペアの解消 = 相手との共有を止める)と 2(該当の写真の削除)までにする。アカウントの停止そのもの(サインインを止める)の仕組みは v1.0 には無い
 - 通報への対応の期限・基準(terms 第 6 条の「容認しない」「24 時間以内」の文言)は G4(#42)で人間が決める。決まったら、この節に対応の記録の書き方(通報の ID・対応・日時。**公開リポジトリなので個人情報・内容は書かない**)を足す
 - 手順の模範は `scripts/e2e/cleanup.ts`(通しテストのユーザーを Storage → pairs → auth.users の順で消す。印の無いユーザーは消さない安全装置つき)。実ユーザーに使うときは、あの安全装置は効かない(印が無いため)ので、ID を二重に確かめる
+
+## 14. 写真の実体と行のずれの確認(issue #68)
+
+取消(checkin-cancel)・差し替え(checkin)・アカウント削除(delete-account)が Storage の写真の実体を消す(DESIGN §5.3「写真の実体の削除」)。取消と差し替えは、消すのに失敗しても処理自体は成功にする(ログだけ残す)。**失敗の確認は、Function のログ(`写真の実体の削除に失敗` / `古い写真の実体の削除に失敗`)と、次の SQL(読み取りだけ)で「行から指されていない実体」を見る**:
+
+```sql
+-- 新形式のパス pairs/<pair_id>/<date>/<user_id>/photo.jpg | photo_thumb.jpg の実体のうち、
+-- 同じ (user_id, date) の checkins 行が photo_path を持っていないもの = 行から指されていない実体
+select o.name
+  from storage.objects o
+ where o.bucket_id = 'photos'
+   and split_part(o.name, '/', 5) in ('photo.jpg', 'photo_thumb.jpg')
+   and not exists (
+     select 1 from public.checkins c
+      where c.user_id::text = split_part(o.name, '/', 4)
+        and c.date_local::text = split_part(o.name, '/', 3)
+        and c.photo_path is not null
+   );
+```
+
+- アップロードの途中(署名付き URL を受け取ってから、行に `photo_path` を記録するまでの数十秒)の実体は、正常でも出る。**実ユーザーの運用では 0 件が普通で、増え続けるなら削除の失敗を疑う**(取消の再送で片付く: checkin-cancel は行が無くても、その日の本人の決定的なパスを消す)
+- 旧形式(`pairs/<pair_id>/<date>/photo.jpg`。2026-10-12 の #52 より前)は上の SQL に出ない(5 番目の区画が空)。本番のテストデータにだけ残っている(§8)
+- §8 のテストデータの実体も、この SQL に出てくる。公開前の一括削除のときは、Storage API で remove する(SQL で `storage.objects` の行を消しても実体は消えない — §13)
+- 取消のあと実体が消えているかは通しテスト S18(DB の件数と、相手・本人の署名付き URL)が見る

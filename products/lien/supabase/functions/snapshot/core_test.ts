@@ -43,7 +43,12 @@ interface World {
   users: SnapshotUserRow[];
   promises: Record<string, SnapshotPromiseRow>;
   pair:
-    | { pairId: string; startedOn: string; memberIds: [string, string] }
+    | {
+      pairId: string;
+      startedOn: string;
+      memberIds: [string, string];
+      ticketBalance?: number;
+    }
     | null;
   checkins: Record<string, { photoPath: string | null }>; // `${userId}|${dateLocal}`
   streakDays: StreakDayRecord[];
@@ -64,6 +69,7 @@ function makeRepo(world: World): SnapshotRepo {
       return Promise.resolve({
         pairId: world.pair.pairId,
         startedOn: world.pair.startedOn,
+        ticketBalance: world.pair.ticketBalance,
         partner,
       });
     },
@@ -206,4 +212,50 @@ Deno.test("snapshot: 日付はユーザーTZで判定(JST 翌日 0:05 には今�
   assertEquals(result.status, 200);
   if (result.status !== 200) throw new Error("unreachable");
   assertEquals(result.body.snapshot.todayMeDone, false);
+});
+
+Deno.test("snapshot: お休みチケットの残数 ticketBalance(ペア共有。0 枚は 0・ソロは null — issue #19)", async () => {
+  const base = {
+    users: [userA, userB],
+    promises: {
+      "user-a": { id: "prom-a", title: "筋トレ", emoji: "💪" },
+      "user-b": { id: "prom-b", title: "ランニング", emoji: "🏃" },
+    },
+    checkins: {},
+    streakDays: [],
+    plant: { grownDays: 0, name: null },
+  };
+  const get = async (world: World, userId: string) => {
+    const result = await handleSnapshot(
+      { repo: makeRepo(world), now: () => NOW },
+      { userId },
+    );
+    if (result.status !== 200) throw new Error(`status ${result.status}`);
+    return result.body.snapshot;
+  };
+  const pairOf = (ticketBalance: number): World["pair"] => ({
+    pairId: "pair-1",
+    startedOn: "2026-06-01",
+    memberIds: ["user-a", "user-b"],
+    ticketBalance,
+  });
+
+  // 2 人に同じ値が見える
+  assertEquals(
+    (await get({ ...base, pair: pairOf(2) }, "user-a")).ticketBalance,
+    2,
+  );
+  assertEquals(
+    (await get({ ...base, pair: pairOf(2) }, "user-b")).ticketBalance,
+    2,
+  );
+  // 0 枚は 0(null にしない — 0 枚でもバッジを出す)
+  assertEquals(
+    (await get({ ...base, pair: pairOf(0) }, "user-a")).ticketBalance,
+    0,
+  );
+  // ソロは null(キーは省略しない)
+  const solo = await get({ ...base, pair: null }, "user-a");
+  assertEquals(solo.ticketBalance, null);
+  assertEquals("ticketBalance" in JSON.parse(JSON.stringify(solo)), true);
 });

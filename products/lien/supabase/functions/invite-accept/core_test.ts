@@ -93,6 +93,7 @@ function makeRepo(world: World): InviteAcceptRepo {
       return Promise.resolve({
         pairId: p.pairId,
         startedOn: p.startedOn,
+        ticketBalance: p.ticketBalance, // 成立時の初期付与が pairs.ticket_balance になる(issue #19)
         partner,
       });
     },
@@ -267,6 +268,11 @@ Deno.test("invite-accept: 成立 — pairs+members+plants 作成・初期チケ�
     "発行者視点: 相手(受諾者)は今日チェックイン済み",
   );
   assertEquals(toInviter.lien.snapshot.plantStage, 0, "成立直後は種");
+  assertEquals(
+    toInviter.lien.snapshot.ticketBalance,
+    2,
+    "成立の push の snapshot に初期付与の 2 枚(残数バッジ — issue #19)",
+  );
 
   assertEquals(sent[1].deviceToken, "token-b");
   const toAccepter = sent[1].payload as typeof toInviter;
@@ -284,6 +290,7 @@ Deno.test("invite-accept: 成立 — pairs+members+plants 作成・初期チケ�
     0,
     "ふたりストリークは成立日から(まだ確定なし)",
   );
+  assertEquals(s.ticketBalance, 2, "応答の snapshot も初期付与の 2 枚");
 });
 
 Deno.test("invite-accept: メンバーが premium なら初期チケット5枚(REQUIREMENTS §5 から導出)", async () => {
@@ -301,6 +308,8 @@ Deno.test("invite-accept: メンバーが premium なら初期チケット5枚(R
 
   assertEquals(result.status, 200);
   assertEquals(world.createdPair!.ticketBalance, 5);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.snapshot.ticketBalance, 5, "premium は 5 枚");
   assertEquals(world.ledger, [
     { pairId: "pair-new", delta: 5, reason: "monthly", dateLocal: TODAY },
   ]);

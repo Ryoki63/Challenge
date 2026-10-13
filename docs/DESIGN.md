@@ -200,7 +200,8 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
   "plantNextStageAt": 14,
   "plantMood": "normal | happy | fidget | sad",
   "plantName": "みどり",
-  "hasPartnerPhotoToday": false
+  "hasPartnerPhotoToday": false,
+  "ticketBalance": 2
 }
 ```
 
@@ -212,7 +213,12 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
   - `plantStageFloor`: 今の段階に入る回数(= 閾値配列の `plantStage` 番目)。ソロは 0
   - `plantNextStageAt`: 次の段階に必要な回数。最後の段階(みのり)とソロは `null`(キーは省略せず `null` で出す)。アプリは閾値表を持たずに「あと `plantNextStageAt - plantGrownDays` 回」と区間の進み具合 `(plantGrownDays - plantStageFloor) / (plantNextStageAt - plantStageFloor)` を作れる(あとからサーバー側で閾値を下げても、古いアプリが追従する)
   - `plantMood` の `sad` はアプリでは「すやすや」眠る絵で描く(値は互換性のため `sad` のまま)
-- **互換性**: キーの**追加のみ**(`schemaVersion` は 1 のまま)。古いアプリは未知のキーを無視し、新しいアプリは無いキーを nil として扱いゲージを出さない(表示がちらつかない)。古いアプリは段階 6 以上を 5 として描く(外部配布の前にサーバーと新しいアプリをそろえる — GROWTH §8.6)。この snapshot を組み立てる全関数(§5.3)は**まとめてデプロイする**(一部だけ出すと、通知ごとに古い形と新しい形が混ざる)
+- **お休みチケットの残数(2026-10-13・issue #19 / REQUIREMENTS §3.6)**
+  - `ticketBalance`: ペア共有のお休みチケットの残数(`pairs.ticket_balance`。0 以上の整数)。ホームの残数バッジ用。ペアの2人に同じ値が見える(受信者視点で反転しない)
+  - **0 枚は `0`**(`null` ではない。0 枚でもバッジを出す — 罰なし。REQUIREMENTS §3.5)。**ソロ(ペアがない)は `null`**(キーは省略せず `null` で出す。ペア共有の在庫なので持ち主がいない = バッジを出さない)。`getActivePair` が残数を読んでいない・不正な値のときも `null`(誤った「0枚」を見せない)
+  - 残数が変わる契機と、アプリが追いつく経路: 自動消費(close-day。`ticket_used` の push が消費後の残数の snapshot を運ぶ)・初期付与(invite-accept。成立の push と応答の snapshot)・月次付与(grant-tickets。push は送らないので、アプリは次の前面復帰の GET /snapshot で追いつく)。お休み宣言(rest-declare)は 1.0.1(D3)
+  - 契約フィクスチャ: `products/lien/contracts/snapshot.paired.json`(2)・`snapshot.solo.json` / `snapshot.empty.json`(`null`)ほか snapshot を含むもの
+- **互換性**: キーの**追加のみ**(`schemaVersion` は 1 のまま)。古いアプリは未知のキーを無視し、新しいアプリは無いキーを nil として扱いゲージを出さない・`ticketBalance` が無い(または `null`)ときはバッジを出さない(表示がちらつかない)。古いアプリは段階 6 以上を 5 として描く(外部配布の前にサーバーと新しいアプリをそろえる — GROWTH §8.6)。この snapshot を組み立てる全関数(§5.3)は**まとめてデプロイする**(一部だけ出すと、通知ごとに古い形と新しい形が混ざる)
 - 相手の今日の写真サムネは `photo_thumb.jpg` として同コンテナに保存(NSE がダウンロード、200KB上限)。失敗時は植物表示にフォールバック
 
 ### 3.5 ウィジェット実装方針
@@ -316,13 +322,16 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
     - 読み取り(select): 現役ペアのメンバーのみ。署名付きURLで配布 — **v1.0 はクライアントが利用者の JWT で、RLS の範囲内で作る(新しい関数は増やさない。PV #59。§3.3「相手の今日の写真」)**。`pairs/<pair_id>/` 配下なら新旧どちらの形式でも読める(既存の旧パスの写真は読めるまま)
     - 書き込み(insert / update): 現役ペアのメンバーで、かつ**パスの `<user_id>` 区画が `auth.uid()` と一致**するときだけ(migration 0004 の `is_valid_own_photo_upload`)。他人の区画・旧形式のパスへは書けない。delete はクライアントに許さない
     - checkin Function は署名付きアップロードURLを**本人の区画にだけ**発行し、`photoPath` も本人の原寸写真パス(`.../<user_id>/photo.jpg`)でなければ 400 `invalid_photo_path`。§5.6 の経路・手順は変わらない(§5.6 に書かれたパス `pairs/<pair_id>/<date>/photo.jpg` は本項の規約に読み替える)
+    - **バケットの制限(2026-10-13・migration 0008・issue #68)**: `photos` バケットは `file_size_limit` = **6 MiB(6291456 バイト)**・`allowed_mime_types` = **`image/jpeg` だけ**(それまでは無制限)。署名付きアップロードにも効く(本番で確認): 上限超えと JPEG 以外の Content-Type は、**HTTP 400** で本文が `{"statusCode":"413","error":"Payload too large",…}` / `{"statusCode":"415","error":"invalid_mime_type",…}`(署名の発行の失敗と同じく、HTTP ステータスは 413 / 415 でなく 400 で、理由は本文の `statusCode` に入る)。置き済みのオブジェクトは変わらない。値はアプリの上限と整合: アプリが作る原寸は長辺 2048px・JPEG 品質 0.85、アプリが受け取る上限は原寸 6 MiB・サムネ 512KB(`PartnerPhotoLimits`)、サムネの実際の大きさは 200KB 以下(NSE の予算)。**バケットの上限は 1 つしか持てずファイル名ごとには分けられない**ので、サムネにも 6 MiB がかかる(署名付きアップロードは RLS を通らないので、ポリシーでファイルごとに縛る道もない。サムネの小ささはクライアントの縮小と、受け取り側の打ち切り(512KB)が担う)。既存のオブジェクトには触れない
+    - **実体の削除(2026-10-13・issue #68)**: クライアントには delete を許さない(service role だけ)。実体を消すのは ① チェックインの取消(checkin-cancel)② 写真の差し替えで `photo_path` が変わったとき(checkin)③ アカウントの削除(delete-account)の3つ。詳細は §5.3「写真の実体の削除」。**v1.0 は相手の写真をクライアントが署名付き URL で取る方式(上)なので、取消のあとに実体が残ると、相手は決まったパスから取消後の写真を取れてしまう**(パスは決定的 — pair_id・日付・取り消した人の user_id はすべて相手にも分かる)。そのため取消で実体も消す。**§5.7-3 の「署名URLを発行しない限り見えない」はこの方式では成り立たない**(読み替え: 取消のあとは実体が無いので署名付き URL を作れても取れない。ペア解消のあとに見えないのは、select ポリシーが現役ペアだけを通すため)
+    - **削除のあとの署名付き URL**: 実体が消えたあとの新しい署名の発行は HTTP 400 `{"statusCode":"404","error":"not_found"}`(`storage-sign.not-found.json`)、署名が有効なままの URL の取得も同じ 400。ただし**取消の前に相手がすでに取得(GET)した URL は、CDN(Supabase の Smart CDN。応答の `expires` は1時間後)にキャッシュされており、削除のあと Smart CDN の無効化が伝わるまで(本番の実測: 取得 → 差し替え → 削除のとき約 55 秒。削除の直後に切れたこともある)同じ URL から画像が返ることがある**。返るのは相手がすでに見た画像だけで、取消のあとに新しく作った URL・まだ取得していない URL では返らない(通しテスト S18)。相手の端末にメモリで持っている表示済みの画像は消せない(アプリは保存・共有しない)
 
 ### 5.3 Edge Functions 一覧(すべて deno / TypeScript)
 
 | name | 種別 | 入力 | 主処理 |
 |---|---|---|---|
-| checkin | POST | dateLocal, photoPath? | upsert → 両者状態判定 → 相手へ可視push(snapshot同梱) → 自分用snapshot返却 |
-| checkin-cancel | POST | dateLocal | 当日のみ削除 → 相手へサイレント更新 |
+| checkin | POST | dateLocal, photoPath? | upsert → 両者状態判定 → 相手へ可視push(snapshot同梱) → 自分用snapshot返却。**写真を差し替えて `photo_path` が変わったとき**(同じ日のうちにペアを解消して組み直し、行が前のペアの区画を指していたとき等。ふつうの貼り直しは同じパスへの上書きで変わらない)、どの行からも指されなくなった古い実体(原寸+サムネ)を service role で Storage から消す(2026-10-13・issue #68。下の「写真の実体の削除」。失敗しても checkin は成功) |
+| checkin-cancel | POST | dateLocal | 当日のみ削除 → **写真の実体(原寸+サムネ)を Storage から削除**(2026-10-13・issue #68。下の「写真の実体の削除」)→ 相手へサイレント更新。応答 `{ alreadyCanceled, snapshot }` の形は変えない |
 | invite-create | POST | — | token発行(8文字の英数字・大文字小文字を区別, 72h, 1回限り) |
 | invite-accept | POST | token | ペア作成(双方が未ペアであること検査) → 両者へpush |
 | promise-set | POST | title, emoji, remindAt? | 自分の現役の約束を upsert(編集は同一 promise_id への UPDATE = checkins の FK 継続でストリーク非影響 — REQUIREMENTS §3.3)→ ペアなら相手へサイレント更新(2026-06-11 実装同期・T12。§5.2「書き込みは Function 経由」のギャップを充足) |
@@ -331,10 +340,10 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 | plant-name | POST | name, mode(`first` \| `rename`) | 植物の名前を付ける・変える(2026-10-12 追加・issue #54。下の補足)→ 自分用 snapshot 返却 + 変わったときだけ相手へサイレント更新(`pair_update`・snapshot 同梱) |
 | pair-dissolve | POST | — | 現役のペアを解消する(ブロック = ペア解消 — REQUIREMENTS §3.2・§8。2026-10-13・issue #23)。`pairs.status='dissolved'` と `dissolved_at` を同時に書く(CHECK で整合。行は消さない: 自分の履歴は残り、共有写真・相手の約束とチェックインは RLS が現役ペアだけを読ませるので相互に見えなくなり、植物・ストリークはアーカイブ)→ 相手へサイレント更新(`pair_update`。解消後のソロの snapshot 同梱。通知 UI なし)→ 自分用の(ソロの)snapshot を返す。応答 `{ dissolved, snapshot }`。**冪等**: 現役のペアが無い(解消済み・ずっとソロ・同時に相手が先に解消した)ときは 200 `{ dissolved: false, snapshot }` で、DB も書かず相手にも知らせない。ペアは JWT の userId から引く(pairId を入力に取らない)。`_shared/pair_dissolve.ts`。なお、解消の前に発行済みの署名付き URL(有効 3600 秒)は、有効期限までは使える(解消後は新しく作れなくなるだけ。アプリは URL を保存・共有しない) |
 | delete-account | POST | — | アカウントを**完全に**削除する(App Store ガイドライン 5.1.1(v)・terms 第8条・privacy-policy §6。2026-10-13・issue #23)。順序(各手順は冪等。失敗は 500 のまま、同じ要求をやり直せる — auth ユーザーを最後に消すので、それまで本人の JWT は有効): ① 現役のペアを解消し、相手へサイレント更新(pair-dissolve と同じ)② 本人の写真を Storage(`photos`)から削除: `pairs/<pair_id>/<date>/<user_id>/photo.jpg` と `photo_thumb.jpg` を、所属した全ペアの期間(成立日の前日〜解消日の +2 日。現役は今日の翌日まで。前日からなのは、タイムゾーンの違いで本人の date_local が成立日より 1 日前になりうるため)の全日について決定的に作って `remove`(存在しないキーは無視されるので、取り消した日の写真・行を作る前にアップロードだけ済んだ孤児も回収できる)+ `checkins.photo_path` が指す旧形式のパス(本人の行が指すものだけ)③ 本人しか所属していないペア(相手が先にアカウントを消していた)を**先に**ペアの行ごと削除(`pair_members`・`plants`・`streak_days`・`ticket_ledger`・`nudges` が連鎖。所属を消す前に行うのは、先に所属を消すと失敗後のやり直しで `listMemberships` が空になりペアを辿れず行が残り続けるため)→ 本人の `pair_members` を削除(相手が残るペアは相手のアーカイブとして残す)→ 所属を消したペアのうち誰も居なくなったものを削除(本人と相手の同時削除の取りこぼし) ④ `auth.admin.deleteUser`(`public.users` と `promises`・`checkins`・`reactions`・`nudges`・`invites` が ON DELETE CASCADE で消える。すでに無ければ成功)。応答 `{ deleted: true }`。対象は JWT の userId 本人だけ |
-| snapshot | GET | — | 自分視点の PairSnapshot(起動時の自己修復用)。成長回数は streak_days から数え、昨日の仮判定を含む(§5.4)。認証(`auth.getUser`)の失敗は、認証サーバーの不調(通信の失敗・5xx)なら **503 `auth_unavailable`**、それ以外(期限切れ・ユーザーが居ない等の確定した拒否)なら 401 `unauthorized` に分ける(`_shared/auth_errors.ts`。2026-10-13・issue #23 のレビュー指摘。アプリは 401 が続くと「ログイン状態を確認できません」の確認を出し、「はじめからやり直す」は匿名アカウントに二度と戻れないので、認証サーバーの障害をそこへ誘導しない。pair-dissolve・delete-account も同じ) |
+| snapshot | GET | — | 自分視点の PairSnapshot(起動時の自己修復用)。成長回数は streak_days から数え、昨日の仮判定を含む(§5.4)。お休みチケットの残数 `ticketBalance`(`pairs.ticket_balance`。§3.4)も含む(2026-10-13・issue #19)。認証(`auth.getUser`)の失敗は、認証サーバーの不調(通信の失敗・5xx)なら **503 `auth_unavailable`**、それ以外(期限切れ・ユーザーが居ない等の確定した拒否)なら 401 `unauthorized` に分ける(`_shared/auth_errors.ts`。2026-10-13・issue #23 のレビュー指摘。アプリは 401 が続くと「ログイン状態を確認できません」の確認を出し、「はじめからやり直す」は匿名アカウントに二度と戻れないので、認証サーバーの障害をそこへ誘導しない。pair-dissolve・delete-account も同じ) |
 | close-day | cron 00:10 JST | `dateLocal?`, `notify?` | 前日確定(§5.4)。チケット消費・リセットの通知送信。both の確定では plants.grown_days を both の行数で数え直す(stage は書かない)。cron は本文 `{}`。手動の再実行は `{dateLocal, notify:false}`(リセットの日は行が残らず、再実行で通知を再送するため。下の補足)。今日・未来の日は 400 `date_not_closable`。認証は cron 専用シークレット |
 | grant-tickets | cron 毎月1日 00:05 JST | `dateLocal?` | free: balance=min(2, balance+2) / premium: balance=min(10, balance+5)。**ペア×月の実行記録 `ticket_grant_runs`(migration 0006)で冪等**(上限到達で 0 付与でも記録する)。未来の月は 400 `future_month`。認証は cron 専用シークレット |
-| _shared/ | — | — | streak.ts / tickets.ts(純粋ロジック)、pair_dissolve.ts(ペア解消の本体。pair-dissolve と delete-account が共有)、apns.ts(JWT発行・送信・`TokenAwarePusher`・`sendOptionsFor`)、pusher.ts(`createPusher`・無効トークンの掃除)、user_rows.ts(users 行の読み出し)、cron_http.ts(cron 専用 Function の認証・本文)、snapshot.ts、messages.ts |
+| _shared/ | — | — | streak.ts / tickets.ts(純粋ロジック)、pair_dissolve.ts(ペア解消の本体。pair-dissolve と delete-account が共有)、apns.ts(JWT発行・送信・`TokenAwarePusher`・`sendOptionsFor`)、pusher.ts(`createPusher`・無効トークンの掃除)、user_rows.ts(users 行の読み出し)、pair_rows.ts(現役のペアの読み出し。snapshot の `ticketBalance` を各 Function が読み忘れない — `ACTIVE_PAIR_SELECT` / `toSnapshotPair`)、photo_paths.ts(写真のパス規約・本人の区画の検査 `ownPhotoObjectsOf`)、cron_http.ts(cron 専用 Function の認証・本文)、snapshot.ts、messages.ts |
 
 - **純粋ロジックは I/O から分離**して `_shared/` に置き、`deno test` 可能にする。これが Windows レーンで回せる唯一の自動テストなので、ストリーク・チケットの全エッジケースをここで担保する
 - apns.ts は送信クライアントを注入可能にし、テストではモック
@@ -355,6 +364,13 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
   - 応答 200: `{ "name": "<保存された名前>", "snapshot": <呼び出し本人視点の PairSnapshot(plantName が入る)> }`
   - 相手への知らせ: 変わったときだけ、相手視点の snapshot を同梱した**サイレント push**(`type: pair_update`・`content-available`)。相手のアプリは、次に開いたとき `snapshot.plantName` の変化から「名前が『みどり』にかわったよ」を出す。相手名義の可視通知(「ゆうき: 『みどり』と名づけたよ」)は P1 で、messages.ts の文言を T16 と調整してから(GROWTH §5.3)。サイレントは配送保証がない(§4)。送信失敗でも 200
   - 契約フィクスチャ: `products/lien/contracts/plant-name.ok.json` / `plant-name.already-named.json`
+- **写真の実体の削除(2026-10-13・issue #68。checkin-cancel / checkin / delete-account)**
+  - 背景: v1.0 の相手の写真は、クライアントが RLS の範囲で署名付き URL を作る方式(§5.2)。パスが決定的で、行(`photo_path`)を消しても実体が残ると、改造クライアントは取消のあとも同じパスから写真を取れる(旧 §5.7-3 の前提は成り立たない)。通常のアプリの画面からは、行が消えるので見えない
+  - **checkin-cancel**: 行の削除(取消の確定)のあと、相手へサイレント更新を送る**前**に、service role で `remove` する(知らせを受けた相手が、まだ残っている実体を取りに行く隙を作らない)。消すパスは**本人の区画だけ**: ① 消した行の `photo_path` が指す、本人の区画で**この日(取消の日)**のもの(ペアは問わない)② 現役のペアの、この日の本人の区画(決定的なパス `pairs/<pair_id>/<date>/<user_id>/photo.jpg` と `photo_thumb.jpg`。`photo_path` に記録される前にアップロードだけ済んだ写真や、前回の取消で掃除に失敗した実体も拾う)。旧形式(ペア×日付単位 — 2人の行が同じ実体を指しうるので、片方の取消で相手の分まで消さない)・他人の区画・別の日の区画・規約外のパスを指す行は消さない(ログに「無視した」とだけ残す。値は出さない)。**行が無かった(`alreadyCanceled`)再送でも②を試す**(前回の失敗の片付け。存在しないキーの削除はエラーにならない)。**削除に失敗しても取消は成功**(ログだけ)。応答の形(`{ alreadyCanceled, snapshot }`)は変わらない
+  - **checkin**: 写真を差し替えて `photo_path` が変わったとき、更新前の `photo_path` が**本人の区画で、この行の日付の区画**なら、その原寸とサムネを消す(新しい写真と同じ区画なら消さない。別の日の区画は別の日の行の写真かもしれないので消さない)。失敗しても checkin は成功
+  - **delete-account は変えない**(所属した全ペアの期間の本人の区画を決定的に数え上げて消す。取消で先に消えた実体は「存在しないキー」として無視される)。**pair-dissolve は実体を消さない**: 解消後は select ポリシー(現役ペアだけ)が相互の閲覧を止め、自分の履歴の行は残るため(§5.2)
+  - 実装: `_shared/photo_paths.ts`(パス規約・`ownPhotoObjectsOf`)、`checkin-cancel/core.ts` の `cancelledPhotoPaths`、各 `index.ts` の `removePhotos`(`db.storage.from("photos").remove`)。テスト: `checkin-cancel/core_test.ts`・`checkin/core_test.ts`・`_shared/photo_paths_test.ts`、`scripts/ops/photo_cleanup_static_test.ts`(index.ts が photo_path を返し remove を呼ぶこと・順序)、通しテスト S10(バケットの制限)・S18(実体の削除と取り直し)
+  - 残りの確認の手順(行から指されていない実体の数え方)は `scripts/OPS.md` §14
 - **ワンタップ返事の扱い(2026-06-11 決定・issue #15)**: つつかれた側の定型4種返事(REQUIREMENTS §3.7)は、T15 では記録APIを実装しない。`nudges.replied` 列は migration 0001 で先行確保済みだが未使用のまま残し、実際の記録(通知アクションカテゴリでの受信 → `replied` 更新)は T16(issue #16。通知UI全体の担当)で行う
 
 ### 5.4 ストリーク確定アルゴリズム(これが正本)
