@@ -21,7 +21,7 @@ final class UserNotificationCenterSchedulerTests: XCTestCase {
         id: "lien.local.streak-risk.2099-01-01",
         fireAt: FireTime(year: 2099, month: 1, day: 1, hour: 21, minute: 0, timeZoneIdentifier: "Asia/Tokyo"),
         title: "Lien",
-        body: "あと3時間。ふたりの23日、いっしょにつなごう🌱"
+        body: "あと3時間。ふたりの23日を、いっしょに守ろう🌱"
     )
 
     func testRequestCarriesTheContentAndIsAOneShotCalendarTrigger() throws {

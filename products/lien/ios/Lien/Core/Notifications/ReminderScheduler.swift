@@ -25,7 +25,7 @@
 //   ②が効かなかったとき(NSE が消せない・相手の push が届かない・通知の許可が無いなど)のふるまいは、テストで固定している
 //   (ReminderSchedulerLearningTests / LocalNotificationRulesTests):
 //     - 夜 9 時の通知は、ふたりそろっていても予約が残るので、そのまま届く。文言はそのとき読んでも困らない言い方にしてある
-//       (「いっしょにつなごう」— Strings.LocalNotification。責めない・急かさない)
+//       (「いっしょに守ろう」— Strings.LocalNotification。責めない・脅さない)
 //     - アプリが前面にいる間に届いたものは、出さずに捨てる(AppDelegate.willPresent → shouldSuppress)
 //     - 次にアプリを開いたとき、今日の分を消し(上の①)、配信済みの通知も外す
 //   最悪でも「ふたりそろった日の夜 9 時に、読んで困らない通知が 1 回届く」だけで、記録(ストリーク)には影響しない。
