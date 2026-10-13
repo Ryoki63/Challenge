@@ -5,6 +5,7 @@
 //   - 取り消し条件: 自分のチェックイン / チェックインの取り消し / ふたりそろった / 設定の変更 / 約束の変更 / ペアの解消 / サインアウト
 //   - 通知センターに残っている古い通知(配信済み)を外す
 //   - タイムゾーンが変わったら付け替える / 日付をまたいだ朝の窓の更新
+//   - 端末の記録が「読めない」間(再起動後の最初のアンロックの前など)は何も変えない / 「無い」(サインアウト後)ときは全部消す
 //   (リマインドの時刻をまだ知らないとき・同期の畳み込み・許可・NSE が取り消せなかったときは ReminderSchedulerLearningTests)
 
 import XCTest
@@ -281,6 +282,46 @@ final class ReminderSchedulerTests: XCTestCase {
 
         XCTAssertEqual(rig.center.scheduledCount, 0)
         XCTAssertEqual(rig.center.removedPendingIDs, [])
+    }
+
+    // MARK: - 端末の記録が読めない間
+
+    func testNothingIsTouchedWhileTheDevicesRecordsCannotBeRead() async {
+        // 再起動後の最初のアンロックの前に、サイレント push などでバックグラウンド起動された。コンテナの中身が読めず、
+        // snapshot は「無い」ように見える。ここで「無い」と取り違えて全部消すと、アンロックしたあとアプリを開かない限り、その日の通知が届かない
+        let rig = SchedulerRig(snapshot: freshSnapshot(), now: noon)
+        await rig.sync()
+        rig.center.markDelivered(["lien.local.reminder.2026-10-13"])
+        rig.center.resetLog()
+        let planned = rig.center.ourPending
+
+        rig.isStateReadable = false
+        rig.snapshot = nil // 読めないので nil に見える
+        await rig.sync()
+
+        XCTAssertEqual(rig.center.ourPending, planned, "予約はそのまま")
+        XCTAssertEqual(rig.center.removedPendingIDs, [])
+        XCTAssertEqual(rig.center.removedDeliveredIDs, [], "配信済みの通知にも触れない")
+        XCTAssertEqual(rig.center.pendingReads, 0, "通知センターを読みにも行かない")
+
+        // 読めるようになって、snapshot が戻れば、いつもどおり合わせる
+        rig.isStateReadable = true
+        rig.snapshot = freshSnapshot(meDone: true)
+        await rig.sync()
+        XCTAssertEqual(rig.reminderIDs.count, 13)
+    }
+
+    func testAMissingSnapshotStillClearsEverythingAfterSignOut() async {
+        // 「読めない」ではなく「無い」(サインアウト・削除のあと)ときは、これまでどおり全部消す
+        let rig = SchedulerRig(snapshot: freshSnapshot(), now: noon)
+        await rig.sync()
+        XCTAssertEqual(rig.center.ourPending.count, 15)
+
+        rig.isStateReadable = true
+        rig.snapshot = nil
+        await rig.scheduler.reset()
+
+        XCTAssertEqual(rig.ids, [])
     }
 
     // MARK: - 配信済みの通知

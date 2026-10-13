@@ -5,8 +5,10 @@
 //     タイトルと絵文字は読んだままを送る)ので、サーバーに届いてから端末の予約に反映する。草稿を持ち、「保存する」で確定する
 //     (時刻を回している途中で、通信しない)。サーバーの約束が読めない間は変えられない(元の値が分からないまま保存しない)
 //   - ストリーク危機(夜 9 時)の ON/OFF: 端末ローカル。変えたらすぐ保存して予約を合わせる(通信しない)
-// 相手名義の通知(チェックイン・つつく・リアクション)の ON/OFF は v1.0 では iOS の設定アプリ(サーバー側の通知設定は v1.1 — D3)。
-// OS の通知許可が「拒否」のときは案内を出す。「まだ」のときは、リマインドかストリーク危機を ON にしたときに許可を求める
+// 相手名義の通知(チェックイン・つつく・リアクション)の ON/OFF は v1.0 ではアプリの中では切り替えられない(サーバー側の通知設定は
+// v1.1 — D3)。iOS の設定アプリで通知をオフにすると、Lien の通知がすべて止まる。
+// OS の通知許可が「拒否」のときは案内を出す。「まだ」のときは、リマインドかストリーク危機を ON にしたときに許可を求め、
+// 許可されたら予約を合わせ直す(許可が無い間は、OS が予約を断っているかもしれない)。
 // (オンボーディングで「あとで」を選んだ人が、あとから使い始められるように)。
 
 import Foundation
@@ -150,9 +152,21 @@ final class NotificationSettingsViewModel {
 
     // MARK: ストリーク危機
 
+    /// スイッチの操作。画面の値は**その場で**変え(いったん元に戻って見えない)、保存と予約は続けて行う。
+    /// 戻り値の Task は、保存と予約が終わるまで(テストが待つ)
+    @discardableResult
+    func streakRiskToggled(to enabled: Bool) -> Task<Void, Never> {
+        streakRiskEnabled = enabled
+        return Task { await persistStreakRisk(enabled) }
+    }
+
     /// 端末ローカルの設定。すぐ保存して、予約を合わせる(通信しない)
     func setStreakRiskEnabled(_ enabled: Bool) async {
         streakRiskEnabled = enabled
+        await persistStreakRisk(enabled)
+    }
+
+    private func persistStreakRisk(_ enabled: Bool) async {
         await reminders.setStreakRiskEnabled(enabled)
         if enabled { await requestAuthorizationIfNeeded() }
     }
@@ -160,11 +174,13 @@ final class NotificationSettingsViewModel {
     // MARK: 許可
 
     /// 許可をまだ聞いていないとき(オンボーディングで「あとで」を選んだ)だけ、OS のダイアログを出す。
-    /// 拒否されているときは出せないので、画面の案内(iOS の設定アプリへ)に任せる
+    /// 拒否されているときは出せないので、画面の案内(iOS の設定アプリへ)に任せる。
+    /// 許可されたら、予約を合わせ直す: 許可が出る前の予約は、OS に断られて残っていないかもしれない
     private func requestAuthorizationIfNeeded() async {
         guard await reminders.authorizationStatus() == .notDetermined else { return }
-        await authorizer.requestAuthorization()
+        let granted = await authorizer.requestAuthorization()
         authorization = await reminders.authorizationStatus()
+        if granted { await reminders.sync() }
     }
 
     // MARK: 草稿 ⇔ 約束の remind_at

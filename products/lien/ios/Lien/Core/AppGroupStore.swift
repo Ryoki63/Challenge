@@ -4,7 +4,7 @@
 //   - pair_snapshot.json … 共有契約(スキーマは PairSnapshot.swift が正本)
 //   - pending_ops.json   … 未送信キュー(キュー本体の型定義は T14)
 //   - photo_thumb.jpg    … 相手の今日の写真サムネ(T17 で NSE が DL。200KB 上限)
-//   - notification_prefs.json … 端末のローカル通知の設定(アプリ本体だけが読み書きする。T16 #16。型は NotificationPreferences)
+//   - notification_prefs.json … 端末のローカル通知の設定(アプリ本体が読み書きし、NSE が読む。T16 #16。型は NotificationPreferences)
 //
 // 原則(DESIGN §3.4):
 //   - 書き込むのは**アプリ本体と NSE の2者だけ**。ウィジェットは読み取り専用
@@ -122,6 +122,30 @@ struct AppGroupStore {
     /// 設定を消す。ファイルが無くても成功する
     func removeNotificationPreferences(fileManager: FileManager = .default) {
         try? fileManager.removeItem(at: notificationPrefsFileURL)
+    }
+
+    // MARK: - 「あるのに読めない」の見分け(T16 #16)
+
+    /// snapshot のファイルが、**あるのに読めない**(中身が取り出せない・読めても snapshot として解釈できない)か。
+    /// 「ファイルが無い」(まだ無い・サインアウトで消した)とは別の状態。再起動後の最初のアンロックの前は、データ保護で
+    /// コンテナの中身が読めず(その間にバックグラウンドで起動されることがある)、将来のスキーマの変更や壊れた JSON でも
+    /// 読めない。読めないだけのものを「無い」と取り違えて、予約済みのローカル通知をすべて消さないために使う(ReminderScheduler)
+    func snapshotIsPresentButUnreadable(fileManager: FileManager = .default) -> Bool {
+        isPresentButUnreadable(snapshotFileURL, fileManager: fileManager) { data in
+            (try? PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: data)) != nil
+        }
+    }
+
+    /// ローカル通知の設定のファイルが、**あるのに読めない**(中身が取り出せない)か。壊れた JSON は読めた扱い
+    /// (設定は欠けた値を既定で埋めて読む — NotificationPreferences)
+    func notificationPreferencesAreLocked(fileManager: FileManager = .default) -> Bool {
+        isPresentButUnreadable(notificationPrefsFileURL, fileManager: fileManager) { _ in true }
+    }
+
+    private func isPresentButUnreadable(_ url: URL, fileManager: FileManager, accepts: (Data) -> Bool) -> Bool {
+        guard fileManager.fileExists(atPath: url.path) else { return false }
+        guard let data = try? Data(contentsOf: url) else { return true }
+        return !accepts(data)
     }
 
     // MARK: - 全消去(アカウントの削除・サインアウト・セッション無効のあと — T23 #23)

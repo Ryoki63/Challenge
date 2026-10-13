@@ -10,28 +10,36 @@
 //   毎日くり返す通知(repeats: true)は「今日だけ出さない」ができない(消すと明日以降も止まる)。そこで、日付ごとの 1 回きりの
 //   通知を先の 14 日ぶん予約し、アプリが状態を知るたびに作り直す。作り直す契機(AppModel / HomeViewModel / 設定画面から sync()):
 //   起動・前面復帰・サーバーとの同期・自分のチェックインと取り消し・約束の保存・ペアの成立と解消・サインアウト。
-//   14 日アプリを開かなかった人には、その先は届かない(静かに終わる。通知を出し続けない)。
+//   14 日アプリを開かなかった人には、リマインドはその先は届かない(静かに終わる。通知を出し続けない)。
 //   予約の内容は純粋関数 desiredRequests で決め、OS に残っている予約と比べて、足りないものを足し・要らないものを消す
-//   (同じ内容なら触らない = 何度呼んでも同じ。ペンディングの上限 64 件には、最大でも 14 + 1 件(リマインド 14 + ストリーク危機 1)で収まる)
+//   (NotificationReconciler。同じ内容なら触らない = 何度呼んでも同じ。ペンディングの上限 64 件には、最大でも
+//   14 + 1 件(リマインド 14 + ストリーク危機 1)で収まる)
+//
+// アプリを開かない日のストリーク危機は、**相手の push を受けた NSE が予約を合わせる**(LocalNotificationPushSync)。
+// アプリの同期だけだと、①前の日に先にチェックインして相手のあとにアプリを開かなかった人 ②お休みチケットで守られた翌日の人は、
+// その日の分が無く、「忘れた日」のための通知が届かない。NSE は、アプリの同期と同じ計画(StreakRiskPlan)で、
+// 足りなければ足し、古ければ消す。リマインドの 14 日ぶんは NSE は足さない(今日の分を取り消すだけ)。
 //
 // 「その日はもう出さない」の判断は、アプリの同期(ここ)と NSE で同じ規則を使う(LocalNotificationCancellation)。
 //
-// 取り消せなかったとき(NSE):
-//   ふたりそろったことが分かったら、今日の夜 9 時の通知を取り消す。分かる経路は 2 つ:
-//     ① アプリが同期したとき(前面復帰・自分のチェックイン・push の受信)— sync() の合わせ込みで消し、
-//        配信済みの通知も通知センターから外す
-//     ② 相手のチェックインの push を NSE が受けたとき — NSE が今日の分の予約を removePendingNotificationRequests で消す。
-//        **NSE が本体のアプリの予約を消せるかは、実機でしか確かめられず、まだ確かめていない**(T20。ios/README.md §12)
-//   ②が効かなかったとき(NSE が消せない・相手の push が届かない・通知の許可が無いなど)のふるまいは、テストで固定している
-//   (ReminderSchedulerLearningTests / LocalNotificationRulesTests):
-//     - 夜 9 時の通知は、ふたりそろっていても予約が残るので、そのまま届く。文言はそのとき読んでも困らない言い方にしてある
-//       (「いっしょに守ろう」— Strings.LocalNotification。責めない・脅さない)
+// NSE が予約を扱えなかったとき:
+//   NSE が本体のアプリの予約を読み・消し・足せるかは、実機でしか確かめられず、まだ確かめていない(T20。ios/README.md §12)。
+//   扱えなかったとき(NSE が動かない・相手の push が届かない・通知の許可が無いなど)のふるまいは、テストで固定している
+//   (ReminderSchedulerLearningTests / LocalNotificationRulesTests / LocalNotificationPushSyncTests):
+//     - 足せなかった分は、次にアプリを開いたときの同期で足される(アプリを開かない日の通知は届かない。これまでと同じ)
+//     - 消せなかった夜 9 時の通知は、ふたりそろっていても予約が残るので、そのまま届く。文言はそのとき読んでも困らない言い方に
+//       してある(「いっしょに守ろう」— Strings.LocalNotification。責めない・脅さない)
 //     - アプリが前面にいる間に届いたものは、出さずに捨てる(AppDelegate.willPresent → shouldSuppress)
-//     - 次にアプリを開いたとき、今日の分を消し(上の①)、配信済みの通知も外す
-//   最悪でも「ふたりそろった日の夜 9 時に、読んで困らない通知が 1 回届く」だけで、記録(ストリーク)には影響しない。
+//     - 次にアプリを開いたとき、今日の分を消し、配信済みの通知も外す
+//   最悪でも「ふたりそろった日の夜 9 時に、読んで困らない通知が 1 回届く」/「アプリを開かない日の通知が届かない」だけで、
+//   記録(ストリーク)には影響しない。
 //
 // 約束のリマインド時刻の出どころ(NotificationPreferences.reminder): 約束の remind_at が正。この端末が知らない間は、
 // 予約の前にサーバーの約束から一度読む(loader)。読めなかったら予約せず、次の同期でもう一度ためす(読み直しの間隔は 5 分)。
+//
+// 端末の記録が「読めない」とき(ファイルはあるのに中身が取り出せない)は、何もしない: 再起動後の最初のアンロックの前は、
+// データ保護でコンテナの中身が読めず(その間にバックグラウンドで起動されることがある)、「無い」と取り違えて予約を
+// すべて消すと、アンロックしたあとアプリを開かない限り、その日の通知が届かない(isStateReadable)。
 
 import Foundation
 
@@ -74,6 +82,8 @@ final class ReminderScheduler: ReminderManaging {
     private let reminderLoader: ReminderLoader?
     private let now: @MainActor () -> Date
     private let makeCalendar: @MainActor () -> Calendar
+    /// 端末の記録(snapshot・設定)が読める状態か。false(ファイルはあるのに読めない)のあいだは、同期は何もしない
+    private let isStateReadable: @MainActor () -> Bool
 
     @MainActor private var isSyncing = false
     @MainActor private var resyncRequested = false
@@ -90,7 +100,8 @@ final class ReminderScheduler: ReminderManaging {
         snapshotSource: @escaping @MainActor () -> PairSnapshot?,
         reminderLoader: ReminderLoader? = nil,
         now: @escaping @MainActor () -> Date = Date.init,
-        calendar: @escaping @MainActor () -> Calendar = LocalNotificationCalendar.current
+        calendar: @escaping @MainActor () -> Calendar = LocalNotificationCalendar.current,
+        isStateReadable: @escaping @MainActor () -> Bool = { true }
     ) {
         self.center = center
         self.preferencesStore = preferences
@@ -98,6 +109,7 @@ final class ReminderScheduler: ReminderManaging {
         self.reminderLoader = reminderLoader
         self.now = now
         self.makeCalendar = calendar
+        self.isStateReadable = isStateReadable
     }
 
     @MainActor var preferences: NotificationPreferences {
@@ -159,6 +171,9 @@ final class ReminderScheduler: ReminderManaging {
     }
 
     @MainActor private func syncOnce() async {
+        // 端末の記録が読めない間(再起動後の最初のアンロックの前など)は、何も変えない。「無い」(サインアウト後)とは別
+        guard isStateReadable() else { return }
+
         learnReminderIfNeeded()
 
         // 読み取りから計算までは await を挟まない(途中で状態が変わっても、読んだ値の組で一貫した予約になる)
@@ -169,36 +184,11 @@ final class ReminderScheduler: ReminderManaging {
         let desired = Self.desiredRequests(prefs: prefs, snapshot: snapshot, now: current, calendar: calendar)
 
         // 予約: OS に残っている予約と比べて、要らないもの(計算に無い識別子)を消し、足りないもの・内容が違うものを
-        // 置く(同じ識別子の予約は置き換わる)。内容が同じものは触らない。
-        // 内容が違うだけの予約は、消さずに置き換える: removePendingNotificationRequests は内部で遅れて実行されることがあり、
-        // 同じ識別子を消してすぐ置くと、遅れた削除が新しい予約を消すおそれがある(消すのは、計算に無い識別子だけ)
-        let pending = await center.pendingLocalNotifications()
-        let desiredByID = Dictionary(desired.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let kept = Set(pending.filter { desiredByID[$0.id]?.matches(pending: $0) == true }.map(\.id))
-        let obsolete = Set(pending.map(\.id)).subtracting(desiredByID.keys).sorted()
-        if !obsolete.isEmpty {
-            await center.removePending(ids: obsolete)
-        }
-        for notification in desired where !kept.contains(notification.id) {
-            await center.schedule(notification)
-        }
+        // 置く(同じ識別子の予約は置き換わる)。内容が同じものは触らない(NotificationReconciler。NSE と共通の手順)
+        await NotificationReconciler.reconcile(center: center, desired: desired, scope: LocalNotificationID.isOurs)
 
-        await dismissDeliveredNotifications(snapshot: snapshot, now: current, calendar: calendar)
-    }
-
-    /// 通知センターに残っている、もう古い通知を外す(リマインドを出したあとで完了した / ふたりそろった)。
-    /// snapshot が無い(サインアウト後)ときは、このアプリのローカル通知をすべて外す
-    @MainActor private func dismissDeliveredNotifications(snapshot: PairSnapshot?, now: Date, calendar: Calendar) async {
-        guard let snapshot else {
-            let delivered = await center.deliveredLocalNotificationIDs()
-            if !delivered.isEmpty { await center.removeDelivered(ids: delivered) }
-            return
-        }
-        let stale = LocalNotificationCancellation.staleIDsForToday(snapshot: snapshot, now: now, calendar: calendar)
-        guard !stale.isEmpty else { return }
-        let delivered = Set(await center.deliveredLocalNotificationIDs())
-        let toRemove = stale.filter(delivered.contains)
-        if !toRemove.isEmpty { await center.removeDelivered(ids: toRemove) }
+        // 通知センターに残っている、もう古い通知を外す。snapshot が無い(サインアウト後)ときは、このアプリのものをすべて外す
+        await NotificationReconciler.dismissDelivered(center: center, snapshot: snapshot, now: current, calendar: calendar)
     }
 
     /// リマインドの時刻をこの端末がまだ知らない(`.unknown`)なら、サーバーの約束から読み始める。

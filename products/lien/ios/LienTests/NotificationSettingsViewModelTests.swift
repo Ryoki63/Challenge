@@ -3,8 +3,9 @@
 // 検証対象(NotificationSettingsViewModel.swift):
 //   - リマインド(約束の remind_at): サーバーの約束を読んで草稿にする / 「保存する」で約束を更新して端末の予約に反映 /
 //     失敗してもやり直せる / 約束が読めない間・約束が無い間は変えられない
-//   - ストリーク危機(端末ローカル): すぐ保存して予約を合わせる(通信しない)/ 約束が読めなくても変えられる
-//   - OS の通知許可: 拒否の案内 / まだのときだけ、ON にしたときに許可を求める
+//   - ストリーク危機(端末ローカル): すぐ保存して予約を合わせる(通信しない)/ 約束が読めなくても変えられる /
+//     スイッチの値は操作したその場で変わる(いったん元に戻って見えない)
+//   - OS の通知許可: 拒否の案内 / まだのときだけ、ON にしたときに許可を求める / 許可されたら予約を合わせ直す
 //   - 設定画面の行の右側の要約
 
 import XCTest
@@ -344,6 +345,22 @@ final class NotificationSettingsViewModelTests: XCTestCase {
         XCTAssertEqual(rig.center.ourPending.filter(\.isStreakRisk).count, 1)
     }
 
+    func testTheSwitchShowsTheNewValueAtOnceAndSavesRightAfter() async {
+        // SwiftUI の Toggle の Binding は、set の中で値が変わらないと、いったん元の値に戻って見える。
+        // set からは、画面の値を変える同期の関数を呼び、保存と予約はその Task が続ける
+        let rig = makeRig()
+        await rig.vm.load()
+        await rig.scheduler.sync()
+        XCTAssertTrue(rig.vm.streakRiskEnabled)
+
+        let saving = rig.vm.streakRiskToggled(to: false)
+        XCTAssertFalse(rig.vm.streakRiskEnabled, "呼び出しが返った時点で、もう画面の値が変わっている")
+
+        await saving.value
+        XCTAssertFalse(rig.store.load().streakRiskEnabled)
+        XCTAssertEqual(rig.center.ourPending.filter(\.isStreakRisk).count, 0, "保存と予約は、そのあとに済む")
+    }
+
     func testStreakToggleStartsFromTheSavedSetting() async {
         let rig = makeRig(prefs: NotificationPreferences(reminder: .daily(hour: 20, minute: 30), streakRiskEnabled: false))
         XCTAssertFalse(rig.vm.streakRiskEnabled)
@@ -377,6 +394,32 @@ final class NotificationSettingsViewModelTests: XCTestCase {
         await rig.vm.setStreakRiskEnabled(false)
         await rig.vm.setStreakRiskEnabled(true)
         XCTAssertEqual(rig.authorizer.requestCount, 1, "許可済みなら、もう聞かない")
+    }
+
+    func testGrantingPermissionSyncsTheScheduleAgain() async {
+        // 許可が出る前に合わせた予約は、OS に断られて残っていないかもしれない。許可されたら、もう一度合わせる
+        let rig = makeRig(authorization: .notDetermined)
+        await rig.vm.load()
+        XCTAssertEqual(rig.center.ourPending.count, 0)
+
+        await rig.vm.setStreakRiskEnabled(true)
+
+        XCTAssertEqual(rig.authorizer.requestCount, 1)
+        XCTAssertGreaterThan(rig.center.pendingReads, 1, "許可のあとの同期が走った(設定の保存の同期とは別に、もう一度)")
+        XCTAssertEqual(rig.center.ourPending.filter(\.isStreakRisk).count, 1)
+        XCTAssertEqual(rig.center.ourPending.filter(\.isReminder).count, 14, "リマインドも、許可されたあとに合わせ直される")
+    }
+
+    func testRefusingPermissionDoesNotSyncAgain() async {
+        let rig = makeRig(authorization: .notDetermined)
+        rig.authorizer.grants = false
+        await rig.vm.load()
+
+        await rig.vm.setStreakRiskEnabled(true)
+
+        XCTAssertEqual(rig.authorizer.requestCount, 1)
+        XCTAssertEqual(rig.vm.authorization, .denied, "拒否されたら、画面に案内を出す")
+        XCTAssertEqual(rig.center.pendingReads, 1, "設定の保存の同期だけ(許可のあとの同期は走らない)")
     }
 
     func testSavingAnEnabledReminderAsksForPermissionOnlyWhenNotYetAsked() async {

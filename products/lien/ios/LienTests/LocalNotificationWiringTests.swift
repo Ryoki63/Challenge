@@ -17,6 +17,8 @@ import XCTest
 private final class RecordingReminders: ReminderManaging {
     private(set) var log: [String] = []
     var preferences = NotificationPreferences()
+    /// OS の通知許可の状態(authorizationStatus が返す)
+    var authorization: NotificationAuthorization = .authorized
 
     var syncCount: Int { log.filter { $0 == "sync" }.count }
     var resetCount: Int { log.filter { $0 == "reset" }.count }
@@ -31,12 +33,19 @@ private final class RecordingReminders: ReminderManaging {
 
     func reset() async { log.append("reset") }
 
-    func authorizationStatus() async -> NotificationAuthorization { .authorized }
+    func authorizationStatus() async -> NotificationAuthorization { authorization }
 }
 
+/// 許可を求められた回数を数える(求められたら許可する)
 private final class WiringPushAuthorizer: PushAuthorizing {
+    private(set) var requestCount = 0
+    var grants = true
+
     @discardableResult
-    func requestAuthorization() async -> Bool { true }
+    func requestAuthorization() async -> Bool {
+        requestCount += 1
+        return grants
+    }
 }
 
 /// チェックインと取り消しだけができるサービス(HomeViewModel の能力検出: CheckinCanceling)
@@ -66,6 +75,7 @@ final class LocalNotificationWiringTests: XCTestCase {
         let temp: TempStore
         let auth: StubAuthService
         let client: MockSnapshotClient
+        let authorizer: WiringPushAuthorizer
     }
 
     private func makeHarness(
@@ -80,10 +90,11 @@ final class LocalNotificationWiringTests: XCTestCase {
         if signedIn { try await auth.signInAnonymously() }
         let client = MockSnapshotClient(result: server)
         let reminders = RecordingReminders()
+        let authorizer = WiringPushAuthorizer()
         let services = AppServices(
             isLive: true,
             auth: auth,
-            pushAuthorizer: WiringPushAuthorizer(),
+            pushAuthorizer: authorizer,
             inviteClient: StubInviteClient(),
             promiseClient: StubPromiseAPIClient(),
             snapshotClient: client,
@@ -107,7 +118,8 @@ final class LocalNotificationWiringTests: XCTestCase {
             reminders: reminders,
             temp: temp,
             auth: auth,
-            client: client
+            client: client,
+            authorizer: authorizer
         )
     }
 
@@ -176,6 +188,59 @@ final class LocalNotificationWiringTests: XCTestCase {
         h.model.promiseSaved()
         await waitUntil { h.reminders.syncCount >= 1 }
         XCTAssertFalse(h.reminders.log.contains { $0.hasPrefix("record:") })
+    }
+
+    // MARK: 通知の許可(オンボーディングで「あとで」を選んだ人)
+
+    func testSavingAPromiseWithAReminderAsksForPermissionWhenNotYetAsked() async throws {
+        // 許可が無いまま予約だけが並んで、黙って届かないのを防ぐ(保存の導線から実際に求めに行く)
+        let h = try await makeHarness(local: SnapshotFactory.noPromise())
+        defer { h.temp.cleanup() }
+        h.reminders.authorization = .notDetermined
+
+        h.model.promiseSaved(Promise(id: "p-1", title: "筋トレ", emoji: "💪", remindAt: "20:00"))
+        await waitUntil { h.authorizer.requestCount == 1 }
+
+        XCTAssertEqual(h.authorizer.requestCount, 1)
+    }
+
+    func testGrantedPermissionSyncsTheScheduleAgainButARefusalDoesNot() async throws {
+        let promise = Promise(id: "p-1", title: "筋トレ", emoji: "💪", remindAt: "20:00")
+        for granted in [true, false] {
+            let h = try await makeHarness(local: SnapshotFactory.noPromise())
+            defer { h.temp.cleanup() }
+            h.reminders.authorization = .notDetermined
+            h.authorizer.grants = granted
+
+            let task = try XCTUnwrap(h.model.requestNotificationAuthorizationIfNeeded(for: promise))
+            await task.value
+
+            XCTAssertEqual(h.authorizer.requestCount, 1)
+            XCTAssertEqual(
+                h.reminders.syncCount, granted ? 1 : 0,
+                "許可されたら予約を合わせ直す(許可が出る前の予約は、OS に断られているかもしれない)。断られたら、何もしない"
+            )
+        }
+    }
+
+    func testPermissionIsNotAskedWhenThereIsNoReminderOrItWasAlreadyDecided() async throws {
+        for (label, authorization, remindAt) in [
+            ("リマインドなし", NotificationAuthorization.notDetermined, String?.none),
+            ("許可済み", .authorized, "20:00"),
+            ("拒否済み(アプリからは出せない。設定画面に案内がある)", .denied, "20:00"),
+        ] {
+            let h = try await makeHarness(local: SnapshotFactory.noPromise())
+            defer { h.temp.cleanup() }
+            h.reminders.authorization = authorization
+
+            let task = h.model.requestNotificationAuthorizationIfNeeded(
+                for: Promise(id: "p-1", title: "筋トレ", emoji: "💪", remindAt: remindAt)
+            )
+            await task?.value
+
+            XCTAssertEqual(h.authorizer.requestCount, 0, label)
+            XCTAssertEqual(h.reminders.syncCount, 0, label)
+        }
     }
 
     func testReminderSavedFromTheSettingsScreenRecordsAndSyncs() async throws {

@@ -177,6 +177,7 @@ final class AppModel {
         reloadFromStore() // ローカル通知の予約も、ここで合わせ直される
         services.reloadWidgets() // ウィジェットの空状態(「アプリを開いてはじめよう」)を約束入りの表示へ
         Task { await refresh() }
+        if let promise { _ = requestNotificationAuthorizationIfNeeded(for: promise) }
     }
 
     /// 通知の設定画面でリマインドを保存した(約束の remind_at が変わった。約束のほかの項目は変わらない — issue #16)

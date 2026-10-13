@@ -4,8 +4,11 @@
 //   - 予約は日時を指す 1 回きりのカレンダートリガー(repeats: false)。DateComponents には**暦(グレゴリオ暦)とタイムゾーンを
 //     明示する**: 端末の暦が和暦・仏暦でも、年の数え方が変わって遠い未来の日付と取り違えられないように
 //   - 識別子が LocalNotificationID.prefix で始まるものだけを扱う(ほかの通知には触れない)
-//   - 通知の許可は、ここでは求めない(オンボーディングの許可画面と、通知の設定画面のリマインドを保存したときに、PushAuthorizing が求める)。
-//     許可が無くても予約はできる(許可されたとき、予約済みのものがそのまま届く)
+//   - 通知の許可は、ここでは求めない(オンボーディングの許可画面・リマインド付きの約束の保存・通知の設定画面が、PushAuthorizing で求める)。
+//     許可が無い間に add が通るか(OS が断らないか)は、実機でしか確かめられない(T20)。断られても予約が残らないだけなので、
+//     許可されたら続けて sync() を呼んで予約を合わせ直す(AppModel・NotificationSettingsViewModel)
+//   - NSE(LocalNotificationPushSync)も、このクラスで本体の予約を読み・消し・足す。このファイルは Lien / LienNSE の
+//     2 ターゲットでソース共有される(project.yml)
 
 import Foundation
 import UserNotifications

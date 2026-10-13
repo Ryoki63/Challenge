@@ -4,8 +4,9 @@
 //   - リマインド: 約束の remind_at に先の 14 日ぶん / 今日の分は、時刻を過ぎたら・自分が完了していたら出さない / 取り消しで戻る
 //   - ストリーク危機(夜 9 時): ペアのストリークがあり、その日まだふたりそろっていないときだけ / 文言の出し分け /
 //     ふたりそろった日は明日の分 / 同期できないまま日をまたいだときの扱い
-//   - 日付またぎ(snapshot が今日のものか)・タイムゾーン・夏時間
+//   - 日付またぎ(snapshot が今日のものか / 日付が変わって 1:00 までに作られた snapshot の完了は「不明」)・タイムゾーン・夏時間
 //   - 取り消し条件が NSE と共通の規則(LocalNotificationCancellation)と食い違わないこと
+//   (ストリーク危機の計画そのものは StreakRiskPlan。NSE が同じ答えを出すことは LocalNotificationPushSyncTests)
 
 import XCTest
 @testable import Lien
@@ -306,6 +307,58 @@ final class ReminderPlanTests: XCTestCase {
         XCTAssertEqual(risks(plan(snapshot: future, now: Clock.date(2026, 10, 14, 8, 0))), [], "時計がずれている")
     }
 
+    // MARK: - 日付が変わって間もない snapshot(完了は前の日のことかもしれない)
+
+    func testACompletionInASnapshotBuiltRightAfterMidnightIsNotTrusted() {
+        // 14 日(昨日)の 23:58 に圏外で押された相手のチェックインが、15 日 0:20 に届いた。サーバーはクライアントが送った
+        // 14 日を「今日」として snapshot を作る(自分も 14 日に済ませていたので、ふたりそろった)。updatedAt は 15 日の 0:20。
+        // これを「今日(15 日)の完了」と読むと、15 日のリマインドを取り消し、ストリーク危機を 16 日に回してしまう
+        let snapshot = NotificationSnapshots.paired(
+            updatedAt: Clock.date(2026, 10, 15, 0, 20), meDone: true, partnerDone: true, streak: 24
+        )
+        let planned = plan(snapshot: snapshot, now: Clock.date(2026, 10, 15, 7, 0))
+
+        XCTAssertEqual(reminders(planned).count, 14, "今日のリマインドを取り消さない")
+        XCTAssertEqual(reminders(planned).first?.id, "lien.local.reminder.2026-10-15")
+        XCTAssertEqual(risks(planned).map(\.id), ["lien.local.streak-risk.2026-10-15"], "今日の夜 9 時の分(明日に回さない)")
+        XCTAssertEqual(
+            risks(planned).first?.body, Strings.LocalNotification.streakRiskNeither(days: 24),
+            "完了が分からないので、どちらも未完の言い方"
+        )
+    }
+
+    func testTheSameCompletionBuiltAfterTheSettleHourIsTrusted() {
+        let snapshot = NotificationSnapshots.paired(
+            updatedAt: Clock.date(2026, 10, 15, 1, 0), meDone: true, partnerDone: true, streak: 24
+        )
+        let planned = plan(snapshot: snapshot, now: Clock.date(2026, 10, 15, 7, 0))
+
+        XCTAssertEqual(reminders(planned).first?.id, "lien.local.reminder.2026-10-16", "自分は済み: 今日のリマインドは要らない")
+        XCTAssertEqual(risks(planned).map(\.id), ["lien.local.streak-risk.2026-10-16"], "ふたりそろった: 明日の分")
+    }
+
+    func testAnUnknownCompletionStillPlansTonightsStreakRiskWhenTheRecordContinues() {
+        // 日付が変わって間もない snapshot(誰が済んだかは不明)でも、続いている記録の今夜の分は予約する
+        let early = Clock.date(2026, 10, 15, 0, 10)
+        XCTAssertEqual(
+            risks(plan(snapshot: NotificationSnapshots.paired(updatedAt: early, streak: 23), now: early)).map(\.id),
+            ["lien.local.streak-risk.2026-10-15"]
+        )
+        XCTAssertEqual(
+            risks(plan(snapshot: NotificationSnapshots.paired(updatedAt: early, streak: 0), now: early)), [],
+            "ストリークが 0 なら、続いている記録が無い"
+        )
+    }
+
+    func testAYesterdaysSnapshotBuiltBeforeTheSettleHourDoesNotPlanTonight() {
+        // 14 日の 0:30 に作られた snapshot(ふたりそろって見える)が、同期できないまま 15 日になった。
+        // その完了は 13 日のことかもしれないので、14 日までの記録が続いているとは言えない
+        let snapshot = NotificationSnapshots.paired(
+            updatedAt: Clock.date(2026, 10, 14, 0, 30), meDone: true, partnerDone: true, streak: 24
+        )
+        XCTAssertEqual(risks(plan(snapshot: snapshot, now: Clock.date(2026, 10, 15, 8, 0))), [])
+    }
+
     // MARK: - 日付またぎ
 
     func testTheWindowAndTheDoneFlagRollOverAtMidnight() {
@@ -397,6 +450,7 @@ final class ReminderPlanTests: XCTestCase {
         let updatedAts = [
             Clock.date(2026, 10, 14, 9, 0), Clock.date(2026, 10, 13, 22, 0), Clock.date(2026, 10, 12, 22, 0),
             Clock.date(2026, 10, 15, 9, 0),
+            Clock.date(2026, 10, 14, 0, 30), Clock.date(2026, 10, 15, 0, 30), // 日付が変わって 1:00 までに作られた
         ]
         for now in times {
             for updatedAt in updatedAts {

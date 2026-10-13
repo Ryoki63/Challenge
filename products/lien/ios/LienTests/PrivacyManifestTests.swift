@@ -115,7 +115,14 @@ final class PrivacyManifestTests: XCTestCase {
             sharedFiles: [
                 "Lien/Core/Models/PairSnapshot.swift",
                 "Lien/Core/AppGroupStore.swift",
+                "Lien/Core/Strings.swift",
                 "Lien/Core/Notifications/LocalNotificationID.swift",
+                "Lien/Core/Notifications/NotificationScheduling.swift",
+                "Lien/Core/Notifications/NotificationPreferences.swift",
+                "Lien/Core/Notifications/StreakRiskPlan.swift",
+                "Lien/Core/Notifications/NotificationReconciler.swift",
+                "Lien/Core/Notifications/LocalNotificationPushSync.swift",
+                "Lien/Core/Notifications/UserNotificationCenterScheduler.swift",
             ]
         ),
     ]
@@ -222,6 +229,24 @@ final class PrivacyManifestTests: XCTestCase {
         }
     }
 
+    func testTheScannedSharedFilesMatchTheSourcesInProjectYml() throws {
+        // このテストの bundles は project.yml の sources を手で写したもの。ソース共有するファイルを project.yml に足したのに
+        // ここへ足し忘れると、そのファイルが使う必須理由 API が走査されずに通ってしまう。両者がずれたら落とす
+        let yml = try SourceTree.text("project.yml")
+        for bundle in Self.bundles {
+            let block = try Self.targetBlock(named: bundle.name, in: yml)
+            let listed = Set(block.split(separator: "\n").compactMap { line -> String? in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard trimmed.hasPrefix("- path: "), trimmed.hasSuffix(".swift") else { return nil }
+                return String(trimmed.dropFirst("- path: ".count))
+            })
+            XCTAssertEqual(
+                listed, Set(bundle.sharedFiles),
+                "\(bundle.name): project.yml の sources(個別の Swift ファイル)と、このテストの sharedFiles がずれています"
+            )
+        }
+    }
+
     func testScannerRecognizesEachCategory() {
         let samples: [(String, String)] = [
             (Category.userDefaults, "let d = UserDefaults.standard"),
@@ -293,6 +318,18 @@ final class PrivacyManifestTests: XCTestCase {
             return false
         }
         return regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+    }
+
+    /// project.yml の `targets:` の下の、あるターゲットのブロック(次のターゲットの手前まで)
+    private static func targetBlock(named name: String, in yml: String) throws -> String {
+        guard let start = yml.range(of: "\n  \(name):\n") else {
+            throw NSError(domain: "PrivacyManifestTests", code: 1, userInfo: [NSLocalizedDescriptionKey: "project.yml に \(name) が無い"])
+        }
+        let rest = String(yml[start.upperBound...])
+        let nextTarget = try NSRegularExpression(pattern: #"\n  [A-Za-z][A-Za-z0-9]*:\n"#)
+        let end = nextTarget.firstMatch(in: rest, range: NSRange(rest.startIndex..., in: rest))
+            .flatMap { Range($0.range, in: rest) }?.lowerBound ?? rest.endIndex
+        return String(rest[..<end])
     }
 
     /// 行コメント(// … 行末)とブロックコメント(/* … */)を取り除く

@@ -704,6 +704,16 @@ final class StringsReviewTests: XCTestCase {
         }
     }
 
+    func testPartnerNotificationFooterSaysAllOfLiensNotificationsStopInTheSystemSettings() {
+        // iOS の設定アプリで通知をオフにすると、相手の通知だけでなく、Lien の通知がすべて(リマインドと夜 9 時のお知らせも)止まる。
+        // 「相手の通知だけを切れる」と読める文言にしない(T16 #16 の Opus レビュー)
+        let footer = Strings.NotificationSettings.partnerFooter
+        XCTAssertTrue(footer.contains("すべて止まります"), footer)
+        XCTAssertTrue(footer.contains("リマインド"), footer)
+        XCTAssertTrue(footer.contains("夜9時"), footer)
+        XCTAssertFalse(footer.contains("オン・オフを変えられます"), "相手の通知だけをオン・オフできるようには読ませない: \(footer)")
+    }
+
     // MARK: 3. ソースの全リテラルがカタログに載っている(カタログの陳腐化防止)
 
     func testCatalogCoversEveryStringLiteralInStringsSwift() throws {

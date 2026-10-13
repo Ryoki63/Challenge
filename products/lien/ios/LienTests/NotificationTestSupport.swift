@@ -76,6 +76,8 @@ final class FakeNotificationCenter: NotificationScheduling {
     private(set) var removedPendingBatches: [[String]] = []
     private(set) var removedDeliveredBatches: [[String]] = []
     private(set) var pendingReads = 0
+    /// 予約の一覧の読み出し・予約・取り消しを、呼ばれた順に(NSE が最後に一覧を読み直して、要求の到着を待つことの確認用)
+    private(set) var callLog: [String] = []
 
     var gate: AsyncGate?
 
@@ -94,6 +96,7 @@ final class FakeNotificationCenter: NotificationScheduling {
         removedPendingBatches = []
         removedDeliveredBatches = []
         pendingReads = 0
+        callLog = []
     }
 
     /// このアプリ以外の通知(触られないことを確かめる)
@@ -119,6 +122,7 @@ final class FakeNotificationCenter: NotificationScheduling {
 
     func pendingLocalNotifications() async -> [PlannedNotification] {
         pendingReads += 1
+        callLog.append("read")
         if let gate { await gate.wait() }
         return ourPending
     }
@@ -129,11 +133,13 @@ final class FakeNotificationCenter: NotificationScheduling {
 
     func schedule(_ notification: PlannedNotification) async {
         scheduledIDs.append(notification.id)
+        callLog.append("schedule")
         pending[notification.id] = notification
     }
 
     func removePending(ids: [String]) async {
         removedPendingBatches.append(ids)
+        callLog.append("remove")
         for id in ids { pending[id] = nil }
     }
 
@@ -165,6 +171,8 @@ final class SchedulerRig {
     var loaderResult: ReminderPreference?
     /// 読み込み(loader)の途中で止めるための門
     var loaderGate: AsyncGate?
+    /// 端末の記録が読める状態か(false = ファイルはあるのに読めない。再起動後の最初のアンロックの前など)
+    var isStateReadable = true
 
     init(
         prefs: NotificationPreferences = NotificationPreferences(reminder: .daily(hour: 20, minute: 0)),
@@ -192,7 +200,8 @@ final class SchedulerRig {
             snapshotSource: { [unowned self] in self.snapshot },
             reminderLoader: loader,
             now: { [unowned self] in self.now },
-            calendar: { [unowned self] in NotificationClock.calendar(self.timeZone) }
+            calendar: { [unowned self] in NotificationClock.calendar(self.timeZone) },
+            isStateReadable: { [unowned self] in self.isStateReadable }
         )
     }
 

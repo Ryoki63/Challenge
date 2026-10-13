@@ -144,4 +144,67 @@ final class AppGroupStoreTests: XCTestCase {
         try store.saveSnapshot(makeSnapshot(streak: 9))
         XCTAssertEqual(store.loadSnapshot()?.streakCurrent, 9, "消したあとも、次のアカウントの記録を書ける")
     }
+
+    // MARK: - 「あるのに読めない」の見分け(ローカル通知の予約を、読めないだけで全部消さないため — T16 #16)
+
+    /// ファイルのアクセス権を外して、データ保護(再起動後の最初のアンロックの前)で読めない状態を再現する。
+    /// 外せなかった(root で動いている)ときは false
+    private func makeUnreadable(_ url: URL) -> Bool {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
+        return (try? Data(contentsOf: url)) == nil
+    }
+
+    private func restorePermissions(_ url: URL) {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+    }
+
+    func testAMissingSnapshotIsNotReportedAsUnreadable() {
+        // 「無い」(まだ無い・サインアウトで消した)は、「読めない」ではない
+        XCTAssertNil(store.loadSnapshot())
+        XCTAssertFalse(store.snapshotIsPresentButUnreadable())
+        XCTAssertFalse(store.notificationPreferencesAreLocked())
+    }
+
+    func testAReadableSnapshotIsNotUnreadable() throws {
+        try store.saveSnapshot(makeSnapshot())
+        XCTAssertFalse(store.snapshotIsPresentButUnreadable())
+        store.eraseAll()
+        XCTAssertFalse(store.snapshotIsPresentButUnreadable(), "消したあとは「無い」")
+    }
+
+    func testASnapshotThatExistsButCannotBeReadIsUnreadableNotMissing() throws {
+        try store.saveSnapshot(makeSnapshot())
+        guard makeUnreadable(store.snapshotFileURL) else { return }
+        defer { restorePermissions(store.snapshotFileURL) }
+
+        XCTAssertNil(store.loadSnapshot(), "読めないので、読み取りは nil")
+        XCTAssertTrue(store.snapshotIsPresentButUnreadable(), "でも、ファイルはある: 「無い」と取り違えない")
+    }
+
+    func testACorruptSnapshotIsUnreadable() throws {
+        // 壊れた JSON・将来のスキーマの変更も、「無い」とは別(読めないだけのものを、無いことにして予約を消さない)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        try Data("{ not json".utf8).write(to: store.snapshotFileURL)
+        XCTAssertNil(store.loadSnapshot())
+        XCTAssertTrue(store.snapshotIsPresentButUnreadable())
+
+        try store.saveSnapshot(makeSnapshot())
+        XCTAssertFalse(store.snapshotIsPresentButUnreadable(), "次の同期で正しい snapshot が書かれれば、読める")
+    }
+
+    func testNotificationPreferencesAreLockedOnlyWhenTheFileCannotBeRead() throws {
+        XCTAssertFalse(store.notificationPreferencesAreLocked(), "無い")
+
+        try store.saveNotificationPreferences(NotificationPreferences(reminder: .daily(hour: 20, minute: 0)))
+        XCTAssertFalse(store.notificationPreferencesAreLocked(), "読める")
+
+        // 壊れた JSON は、既定で読める(設定は欠けた値を既定で埋める)ので、「読めない」には数えない
+        try Data("garbage".utf8).write(to: store.notificationPrefsFileURL)
+        XCTAssertFalse(store.notificationPreferencesAreLocked())
+
+        try store.saveNotificationPreferences(NotificationPreferences(reminder: .off))
+        guard makeUnreadable(store.notificationPrefsFileURL) else { return }
+        defer { restorePermissions(store.notificationPrefsFileURL) }
+        XCTAssertTrue(store.notificationPreferencesAreLocked())
+    }
 }

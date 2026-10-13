@@ -6,7 +6,8 @@
 //   - 走行中に来た同期の要求を畳む
 //   - OS の通知許可の状態の受け渡し(許可が無くても予約は合わせる)
 //   - NSE が取り消せなかったときのふるまい(ふたりそろっていても予約が残る → 前面なら捨てる・次の同期で消える)
-//   (予約の合わせ込みの基本は ReminderSchedulerTests)
+//   - NSE が合わせたあとの同期は、何も触らない(アプリと NSE が同じ計画を使う)
+//   (予約の合わせ込みの基本は ReminderSchedulerTests / NSE の合わせ込みは LocalNotificationPushSyncTests)
 
 import XCTest
 @testable import Lien
@@ -225,33 +226,34 @@ final class ReminderSchedulerLearningTests: XCTestCase {
             calendar: Clock.calendar()
         ))
 
-        // 次にアプリを開いたとき(同期)に消える
+        // 次にアプリを開いたとき(同期)に消える(足せなかった明日の分も、ここで入る)
         rig.center.markDelivered(["lien.local.streak-risk.2026-10-14"])
         await rig.sync()
         XCTAssertEqual(rig.riskIDs, ["lien.local.streak-risk.2026-10-15"], "今日の分は消え、明日の分が入る")
         XCTAssertEqual(rig.center.delivered, [], "届いてしまっていた通知も、通知センターから外す")
     }
 
-    func testWhenTheNSECanCancelTheNextSyncHasNothingLeftToRemove() async {
+    func testWhenTheNSEAlignedTheNextSyncHasNothingLeftToDo() async {
         let rig = SchedulerRig(snapshot: freshSnapshot(meDone: true), now: noon)
         await rig.sync()
 
-        // NSE が今日の分を取り消せた(本体の予約を直接消した)
-        let ids = LocalNotificationCancellation.staleIDsForToday(
-            snapshot: freshSnapshot(at: noon.addingTimeInterval(1800), meDone: true, partnerDone: true),
-            now: noon.addingTimeInterval(1800),
-            calendar: Clock.calendar()
+        // 相手のチェックインの push(ふたりそろった)を NSE が受けて、今日の分を消し、明日の分を足した(本体の予約を直接扱えた)
+        let later = noon.addingTimeInterval(1800)
+        let both = freshSnapshot(at: later, meDone: true, partnerDone: true)
+        await LocalNotificationPushSync.align(
+            center: rig.center, prefs: rig.store.load(), snapshot: both, now: later, calendar: Clock.calendar()
         )
-        XCTAssertEqual(Set(ids), ["lien.local.reminder.2026-10-14", "lien.local.streak-risk.2026-10-14"])
-        rig.center.removePendingBehindTheAppsBack(ids: ids)
-        XCTAssertEqual(rig.riskIDs, [])
+        XCTAssertEqual(rig.riskIDs, ["lien.local.streak-risk.2026-10-15"], "NSE が、アプリを開かなくても明日の分まで合わせた")
         rig.center.resetLog()
 
-        rig.snapshot = freshSnapshot(at: noon.addingTimeInterval(1800), meDone: true, partnerDone: true)
+        // 次にアプリを開いて同期しても、何も付け替えない(NSE とアプリは同じ snapshot から同じ答えを出す)
+        rig.snapshot = both
+        rig.now = later
         await rig.sync()
 
         XCTAssertEqual(rig.center.removedPendingIDs, [], "すでに無い予約は消さない")
-        XCTAssertEqual(rig.riskIDs, ["lien.local.streak-risk.2026-10-15"], "明日の分だけ足される")
+        XCTAssertEqual(rig.center.scheduledIDs, [], "NSE が足した明日の分は、そのまま使う")
+        XCTAssertEqual(rig.riskIDs, ["lien.local.streak-risk.2026-10-15"])
     }
 
     func testTheStreakRiskWordingIsHarmlessEvenIfItArrivesAfterBothAreDone() {

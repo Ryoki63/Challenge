@@ -20,11 +20,3 @@ enum AppRouter {
         return snapshot.pairId == nil ? .solo : .paired
     }
 }
-
-extension PairSnapshot {
-    /// 自分の現役の約束があるか(サーバーはタイトル未設定を null で返す。空白だけも未設定扱い)
-    var hasActivePromise: Bool {
-        guard let title = myPromiseTitle else { return false }
-        return !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-}

@@ -99,7 +99,9 @@ extension AppServices {
             center: UserNotificationCenterScheduler(),
             preferences: AppGroupNotificationPreferencesStore(store: store),
             snapshotSource: { store.loadSnapshot() },
-            reminderLoader: reminderLoader
+            reminderLoader: reminderLoader,
+            // ファイルはあるのに読めない間(再起動後の最初のアンロックの前など)は、予約を触らない
+            isStateReadable: { !store.snapshotIsPresentButUnreadable() && !store.notificationPreferencesAreLocked() }
         )
     }
 }

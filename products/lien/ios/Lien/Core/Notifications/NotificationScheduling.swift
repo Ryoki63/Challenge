@@ -1,8 +1,10 @@
 // NotificationScheduling.swift — ローカル通知の予約を扱う抽象と、予約1件の値(T16 #16)
 //
-// ReminderScheduler(予約の計算と合わせ込み)は、OS の通知センター(UNUserNotificationCenter)を直接は触らず、
-// ここの抽象越しに触る。本実装は UserNotificationCenterScheduler、テストは記録するだけの偽物。
+// ReminderScheduler(予約の計算と合わせ込み)と NSE(LocalNotificationPushSync)は、OS の通知センター
+// (UNUserNotificationCenter)を直接は触らず、ここの抽象越しに触る。本実装は UserNotificationCenterScheduler、
+// テストは記録するだけの偽物。
 // 予約1件は値型(PlannedNotification)で、「計算した予約」と「OS に残っている予約」を同じ型で比べられる。
+// このファイルは Lien / LienNSE の 2 ターゲットでソース共有される(project.yml)。Foundation だけに依存させること。
 
 import Foundation
 
@@ -34,6 +36,28 @@ struct FireTime: Equatable, Comparable, Sendable {
     static func < (lhs: FireTime, rhs: FireTime) -> Bool {
         (lhs.year, lhs.month, lhs.day, lhs.hour, lhs.minute)
             < (rhs.year, rhs.month, rhs.day, rhs.hour, rhs.minute)
+    }
+
+    /// calendar の壁時計(分まで)と、そのタイムゾーンで持つ
+    init(_ date: Date, calendar: Calendar) {
+        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        self.init(
+            year: parts.year ?? 0,
+            month: parts.month ?? 0,
+            day: parts.day ?? 0,
+            hour: parts.hour ?? 0,
+            minute: parts.minute ?? 0,
+            timeZoneIdentifier: calendar.timeZone.identifier
+        )
+    }
+
+    init(year: Int, month: Int, day: Int, hour: Int, minute: Int, timeZoneIdentifier: String) {
+        self.year = year
+        self.month = month
+        self.day = day
+        self.hour = hour
+        self.minute = minute
+        self.timeZoneIdentifier = timeZoneIdentifier
     }
 }
 

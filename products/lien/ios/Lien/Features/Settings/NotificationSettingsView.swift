@@ -1,7 +1,8 @@
 // NotificationSettingsView.swift — 通知の設定画面(REQUIREMENTS §3.12・§3.15 / T16 #16)
 //
 // 設定 → 通知から push で開く。リマインド(ON/OFF・時刻 — 約束の remind_at。「保存する」で確定)・ストリーク危機(夜 9 時の
-// ON/OFF — 端末ローカル。すぐ反映)・相手からの通知(v1.0 は iOS の設定アプリで切り替える)。OS の通知が拒否されているときは案内を出す。
+// ON/OFF — 端末ローカル。すぐ反映)・相手からの通知(v1.0 はアプリの中では切り替えられない。iOS の設定アプリで通知をオフにすると、
+// Lien の通知がすべて止まる旨を書く)。OS の通知が拒否されているときは案内を出す。
 // 状態と保存は NotificationSettingsViewModel。文言は Strings.NotificationSettings、色・余白は DesignSystem の定数(DESIGN §3.8)。
 
 import SwiftUI
@@ -127,7 +128,8 @@ struct NotificationSettingsView: View {
                 Strings.NotificationSettings.streakToggle,
                 isOn: Binding(
                     get: { viewModel.streakRiskEnabled },
-                    set: { enabled in Task { await viewModel.setStreakRiskEnabled(enabled) } }
+                    // 値はその場で変える(Task の中で変えると、いったん元に戻って見える)。保存と予約は続けて行う
+                    set: { enabled in viewModel.streakRiskToggled(to: enabled) }
                 )
             )
         } header: {

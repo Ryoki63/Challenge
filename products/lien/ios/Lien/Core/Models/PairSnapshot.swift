@@ -172,6 +172,17 @@ extension PairSnapshot: Codable {
     }
 }
 
+// MARK: - 現役の約束
+
+extension PairSnapshot {
+    /// 自分の現役の約束があるか(サーバーはタイトル未設定を null で返す。空白だけも未設定扱い)。
+    /// AppRouter(画面の系統)・ローカル通知の計画(アプリと NSE の両方)が使うので、共有の型に置く
+    var hasActivePromise: Bool {
+        guard let title = myPromiseTitle else { return false }
+        return !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
 // MARK: - JSON コーダ(updatedAt の ISO8601 を許容的に扱う)
 
 extension PairSnapshot {

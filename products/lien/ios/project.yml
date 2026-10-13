@@ -130,9 +130,18 @@ targets:
       # App Group 共有契約のモデル/ストアをアプリ本体とソース共有(T07)
       - path: Lien/Core/Models/PairSnapshot.swift
       - path: Lien/Core/AppGroupStore.swift
-      # ローカル通知(リマインド・ストリーク危機)の識別子と「今日の分をもう出さなくてよい」の規則(T16 #16)。
-      # アプリの同期(ReminderScheduler)と同じ規則で、相手の push を受けたときに今日の分の取り消しを試みる。Foundation だけに依存する
+      # ローカル通知(リマインド・ストリーク危機)の計画と規則(T16 #16)。アプリの同期(ReminderScheduler)と同じ計画・同じ規則で、
+      # 相手の push を受けたときに、夜 9 時のストリーク危機の予約を合わせ(足りなければ足し、古ければ消す)、今日の分を取り消す
+      # (LocalNotificationPushSync)。アプリを開かない日の夜 9 時の通知は、これが無いと届かない。
+      # 通知センターへの要求(UserNotificationCenterScheduler)だけが UserNotifications を使い、ほかは Foundation だけに依存する
+      - path: Lien/Core/Strings.swift
       - path: Lien/Core/Notifications/LocalNotificationID.swift
+      - path: Lien/Core/Notifications/NotificationScheduling.swift
+      - path: Lien/Core/Notifications/NotificationPreferences.swift
+      - path: Lien/Core/Notifications/StreakRiskPlan.swift
+      - path: Lien/Core/Notifications/NotificationReconciler.swift
+      - path: Lien/Core/Notifications/LocalNotificationPushSync.swift
+      - path: Lien/Core/Notifications/UserNotificationCenterScheduler.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE).nse"
