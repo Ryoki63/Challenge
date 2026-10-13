@@ -39,6 +39,10 @@ export interface Fixtures {
   react: Schema;
   plantName: Schema;
   plantNameAlreadyNamed: Schema;
+  /** POST /pair-dissolve の 200(`{ dissolved, snapshot }`。解消した / すでにペアが無かった、の両方を合成) */
+  pairDissolve: Schema;
+  /** POST /delete-account の 200(`{ deleted: true }`) */
+  deleteAccount: Schema;
   /** PostgREST の相手の当日の行(`[{ id, photo_path }]`。photo / no-photo / none を合成)。フィクスチャが無ければ undefined */
   partnerCheckin?: Schema;
   /** Storage の署名付き URL の発行(`{ signedURL }`)。フィクスチャが無ければ undefined */
@@ -75,6 +79,8 @@ const SNAPSHOT_FILES = [
   "invite-accept.ok.json",
   "nudge.ok.json",
   "plant-name.ok.json",
+  "pair-dissolve.ok.json",
+  "pair-dissolve.already.json",
 ] as const;
 
 /** 必須のフィクスチャ(Edge Function の実ハンドラから作ったもの) */
@@ -93,6 +99,9 @@ export const REQUIRED_FILES = [
   "react.ok.json",
   "plant-name.ok.json",
   "plant-name.already-named.json",
+  "pair-dissolve.ok.json",
+  "pair-dissolve.already.json",
+  "delete-account.ok.json",
   "errors.json",
   "stamps.json",
 ] as const;
@@ -156,6 +165,8 @@ export function buildFixtures(
     react: family("react.ok.json"),
     plantName: family("plant-name.ok.json"),
     plantNameAlreadyNamed: family("plant-name.already-named.json"),
+    pairDissolve: family("pair-dissolve.ok.json", "pair-dissolve.already.json"),
+    deleteAccount: schemaFrom(raw["delete-account.ok.json"]),
     partnerCheckin,
     storageSign,
     storageSignNotFound,

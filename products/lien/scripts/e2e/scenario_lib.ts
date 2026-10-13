@@ -226,6 +226,8 @@ export interface World {
   /** 途中で得る値 */
   d: {
     pairId?: string;
+    /** S24 で組み直した新しいペアの ID */
+    pairId2?: string;
     photoPath?: string;
     thumbPath?: string;
     aCheckinId?: string;

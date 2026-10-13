@@ -135,6 +135,16 @@ export class Api {
     );
   }
 
+  /**
+   * GET /auth/v1/user — 認証サーバーに、このトークンのユーザーを直接たしかめる。アプリの GoTrueSessionVerifier と同じ
+   * (apikey + Authorization)。アカウントを削除したあとの JWT が、確かに「ユーザーが居ない」と拒否されるかの確認用
+   */
+  authUser(jwt: string): Promise<Resp> {
+    return request("GET", `${this.base}/auth/v1/user`, {
+      headers: { apikey: this.anonKey, Authorization: `Bearer ${jwt}` },
+    });
+  }
+
   /** GET /auth/v1/health */
   authHealth(): Promise<Resp> {
     return request("GET", `${this.base}/auth/v1/health`, {

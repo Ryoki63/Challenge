@@ -26,9 +26,9 @@ function clone<T>(v: T): T {
 
 type J = Record<string, unknown>;
 
-Deno.test("loadFixtures: 16 ファイルが読める・語彙とエラー台帳がある", async () => {
+Deno.test("loadFixtures: 19 ファイルが読める・語彙とエラー台帳がある", async () => {
   const fx = await loadFixtures();
-  assertEquals(Object.keys(fx.raw).length, 16);
+  assertEquals(Object.keys(fx.raw).length, 19);
   assertEquals(fx.stamps.nudge.length, 6);
   assertEquals(fx.stamps.reaction.length, 6);
   assertEquals(Array.isArray(fx.errors["checkin"]?.["no_pair"]), true);
@@ -51,6 +51,9 @@ Deno.test("各フィクスチャは、自分の系統の形に収まる", async 
     ["react.ok.json", "react"],
     ["plant-name.ok.json", "plantName"],
     ["plant-name.already-named.json", "plantNameAlreadyNamed"],
+    ["pair-dissolve.ok.json", "pairDissolve"],
+    ["pair-dissolve.already.json", "pairDissolve"],
+    ["delete-account.ok.json", "deleteAccount"],
   ];
   for (const [file, family] of cases) {
     // deno-lint-ignore no-explicit-any
@@ -90,6 +93,30 @@ Deno.test("snapshot の中のキー欠落・型違い・増えたキーは、ど
       "missing:$.snapshot.plantStageFloor",
       "type:$.snapshot.streakCurrent",
     ],
+  );
+});
+
+Deno.test("pair-dissolve / delete-account の形: 解消した・すでに無かった、の両方を通し、キーの欠落・型違いを拾う", async () => {
+  const fx = await loadFixtures();
+  // 解消した応答とすでにペアが無かった応答の snapshot はどちらもソロの形(ペア関連が null)
+  for (const file of ["pair-dissolve.ok.json", "pair-dissolve.already.json"]) {
+    assertEquals(diffShape(fx.raw[file], fx.pairDissolve), [], file);
+  }
+  const broken = clone(fx.raw["pair-dissolve.ok.json"]) as J;
+  broken.dissolved = "yes";
+  delete (broken.snapshot as J).plantName;
+  assertEquals(
+    diffShape(broken, fx.pairDissolve).map((d) => `${d.kind}:${d.path}`).sort(),
+    ["missing:$.snapshot.plantName", "type:$.dissolved"],
+  );
+  assertEquals(diffShape({ deleted: true }, fx.deleteAccount), []);
+  assertEquals(
+    diffShape({ deleted: "true" }, fx.deleteAccount).map((d) => d.kind),
+    ["type"],
+  );
+  assertEquals(
+    diffShape({ deleted: true, extra: 1 }, fx.deleteAccount).map((d) => d.kind),
+    ["extra"],
   );
 });
 

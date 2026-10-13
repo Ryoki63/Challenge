@@ -77,6 +77,9 @@ deno test --allow-read products/lien/contracts/tools/
 - 成長ルール v2(#54)で snapshot に `plantGrownDays` / `plantStageFloor` / `plantNextStageAt` の3キーが足された
   (ソロは 0 / 0 / null。最後の段階も `plantNextStageAt` は null。DESIGN §3.4)。iOS の `PairSnapshot` が
   これらを省略可で受けるようになったら(#56・#57)、`ContractFixtureTests` で値まで検査する。
+- 認証サーバー(Supabase Auth)の不調(通信の失敗・5xx)は、`snapshot` / `pair-dissolve` / `delete-account` が **503 `auth_unavailable`** で返す
+  (確定した拒否 = 期限切れ・ユーザーが居ない、は 401 `unauthorized` のまま。`_shared/auth_errors.ts`)。iOS はこのコードを専用の case にせず、
+  一般のサーバー失敗(`.server`)として扱う — セッションの見張り(`SessionHealthMonitor`)が数えないため、「ログイン状態を確認できません」の誤検知にならない
 - 前方互換: サーバーが snapshot に未知のキーを足しても、古いアプリは無視して動く
   (`ContractFixtureTests.testSnapshotDecodingToleratesNewServerKeys`)。キーの**削除・型変更・改名**は
   互換性を壊すので、DESIGN §9-7 に従い JOURNAL に互換性影響を明記する。

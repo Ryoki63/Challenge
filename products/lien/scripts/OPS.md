@@ -404,6 +404,10 @@ bash products/lien/scripts/e2e/run.sh list              # 残っている通し�
 | S20 | クライアントから書けないもの: `premium_until`・`checkins` の直接 INSERT / DELETE・`plants`・Storage の写真の削除 |
 | S21 | Management API で SELECT: 初期のお休みチケット 2 枚・close-day が走っていない(`streak_days` 0 行・`plants.grown_days` 0)・`nudges` 3 行・取消で `reactions` が CASCADE で消える・招待は使用済み 1 件と未使用 2 件(S08 の 409 で使われなかったもの)・Storage のオブジェクト数・作ったユーザーはすべて匿名でサインアップの印あり |
 | S22 | ペア外(C)・未ログインから A–B ペアの `promises` / `pairs` / `pair_members` / `plants` / `nudges` / `ticket_ledger` / `streak_days` / `invites` が見えない。表ごとに同じ問い合わせを、メンバー(対照: 読めて行がある)・C(200 で 0 件)・未ログイン(GRANT が無いので 401 など。行が返らない)で流す。ペアの相手 B から A の `invites` も 0 件(`invites_select_own`)。`streak_days` は close-day を呼んでいないので行が無く、対照も 0 件(問い合わせが通ることと GRANT の確認にとどまる)。`reactions` は取消の CASCADE で消えるので S14 で確かめる。`users` / `checkins` / Storage は S19 / S12 |
+| S23 | **pair-dissolve**(ブロック = ペア解消。T23 #23): 未ログイン 401・GET 405 → 解消の前(対照)は B が A の写真の署名付き URL を作れる → A が解消 `{ dissolved: true, snapshot }`(ソロの形・自分の約束と今日の完了は残る)→ A の再送・B からの解消は `dissolved: false`(冪等)→ B の snapshot がソロ → 解消後は B が A の写真の署名付き URL を作れない(HTTP 400)・A の今日の `checkins` 行と約束が B から読めない(0 件)・A は自分の履歴を読める・B の nudge は 409 `no_pair` → DB: ペアは `dissolved`・メンバー 2 人・植物の名前も残る(アーカイブ) |
+| S24 | **組み直し**: 解消のあと A が `invite-create` → B が `invite-accept`(200)。新しいペアの ID は別で、植物の名前なし・ストリーク 0・成長 0 回(解消したペアの記録は復活しない) |
+| S25 | **delete-account**(A。現役のペアあり): 未ログイン 401・GET 405 → DB: 削除の前に A の写真が Storage に 2 オブジェクト → 200 `{ deleted: true }` → A の JWT は `snapshot` が 401 `unauthorized`(認証サーバーの確定した拒否は 503 にならない)・もう一度の `delete-account` も 401・**認証サーバーに直接たしかめても 403 `user_not_found`**(アプリの `GoTrueSessionVerifier` が `.rejected` と見る応答)・refresh token も 4xx → B はソロに戻り、自分の `users` 行は無傷 → DB: A の auth・users・約束・チェックイン・所属・Storage の写真が 0、B の auth は 1、2 つのペアは `dissolved` で B だけが所属(植物の行も残る) |
+| S26 | **delete-account**(B = 最後の所属者・C = ソロ): 200 → DB: 3 人の auth・users・約束・チェックイン・招待が 0、誰も残らなくなった 2 つのペアの行・所属・植物・台帳・nudges・Storage が連鎖して 0。**S25・S26 でテストユーザー自身を消す**ので、全部通ると A / B / C は存在しない(`--cleanup` は「記録にあるが、もう DB に無い」として扱う) |
 
 応答は `products/lien/contracts/` のフィクスチャと **形(キー・型)** で突き合わせる(`e2e/shape.ts`)。フィクスチャは 1 つの状態の標本なので、同じ系統のフィクスチャを合成した形で見る(例: `snapshot` の `plantName` は名前の前は null・ソロはペア関連が null)。整数の標本には小数を許さない(Swift の `Int` でデコードできない)。新規ユーザー・ソロ・ペア成立直後のように値が決まっている状態は、**値まで**フィクスチャと比べる。エラーは `errors.json` のコードと HTTP ステータスに一致するかを見る。ずれは FAIL にして、最後に「契約フィクスチャとのずれ」にまとめる。
 
@@ -415,6 +419,7 @@ bash products/lien/scripts/e2e/run.sh list              # 残っている通し�
 
 ### 作るデータと後片付け
 
+- **S25・S26 が `delete-account` でテストユーザー自身を消す**(2026-10-13 に足した。T23 #23)。最後まで通れば A / B / C・2 つのペア・Storage の写真はすべて消えていて、`--cleanup` は「記録にあるが、もう DB に無い」ものとして何もしない。途中で失敗・中断したときに残ったものを、下の `cleanup` が消す
 - 作るもの: 匿名ユーザー 3 人(サインアップの印 `lien_e2e`・`E2E-A` / `E2E-B` / `E2E-C`・絵文字 🧪)・ペア 1 組(+ 植物・お休みチケットの初期付与・招待 3 通 = 使用済み 1・未使用 2)・チェックイン・nudge・Storage の写真 2 枚(`pairs/<ペア>/<今日>/<A>/photo.jpg` と `photo_thumb.jpg`)
 - 消す順序(`cleanup`): ① Storage の実体(Storage API。**secret key をこの削除にだけ**使い、Management API から取って表示しない)② `pairs`(`pair_members` / `plants` / `streak_days` / `ticket_ledger` / `nudges` / `ticket_grant_runs` が CASCADE)③ `auth.users`(`public.users` → `promises` / `checkins` / `reactions` / `invites` が CASCADE)。ペアは users から CASCADE されないので先に消す。最後に SELECT で残りが 0 件であることを確かめる。この順序は T23(アカウント削除)の予行にもなる
 - 安全装置(実ユーザーも同じ匿名ユーザーで、ニックネームは自由に付けられるので、ニックネームだけでは区別しない): 消すのは「この実行が状態ファイルに記録した ID」か `--user` で明示した ID だけ(ニックネームでの一括削除はしない)。対象のユーザーは**次の目印をすべて満たすものだけ**(`e2e/marker.ts`): 匿名ユーザー・**サインアップ時の印 `lien_e2e = true`**(`auth.users.raw_user_meta_data`。`signup` の `data` に入れる。アプリは付けない)・ニックネームが `E2E-A/B/C`(状態ファイルのときに限り空も可)・約束のタイトルがすべて「E2E 」で始まる・`--user` 指定のときはさらに絵文字 🧪。**1 人でも満たさなければ、何も消さずに止まる**(止めるメッセージにはユーザー ID と理由だけを出し、ニックネームなどの中身は出さない)。対象のペアに対象外のメンバーがいる、またはメンバー一覧を配列として読めないときも止まる(確かめられないものは消さない)。ID は UUID の形式を検査してから SQL に入れる。`--dry-run` は SELECT だけ。`list` も同じ判定を使い、`--user` で消せるものと、消せないもの(印の無い `E2E-A`・途中で止まった実行の残りなど)を分けて出す。印を付ける前の版の実行が残した行は印が無いので `cleanup` が止まる(残っているときは、中身を確かめてから、明示した ID だけを SQL で手で消す。2026-10-13 時点で残りは無い)
@@ -459,3 +464,30 @@ bash products/lien/scripts/e2e/run.sh list              # 残っている通し�
 - 単体テスト(ネットワーク不要。形の突き合わせ・フィクスチャの読み込み・後片付けの安全装置・招待 token の形・引数の解釈): `deno test --allow-read products/lien/scripts/e2e/`。型検査は `deno check products/lien/scripts/e2e/e2e.ts`。どちらも lien-ci の `e2e-tests` ジョブで回る
 - 招待 token の仕様(`0` `O` `1` `l` だけを除く 58 文字)を変えるときは、`invite-create/core.ts` と `scenario_lib.ts` の `INVITE_TOKEN_RE` を一緒に直す(`scenario_lib_test.ts` が食い違いで落ちる)
 - close-day / grant-tickets は呼ばない(§10)。両方を通したいときは、§4 の手動の再実行と §2 の監視の手順に従う
+
+## 13. 運営がユーザーを削除する・停止するとき(通報への対応など。issue #23 のレビュー指摘)
+
+利用者本人の削除は `delete-account` Function(アプリの設定 →「アカウントを削除する」)が行う。**運営が他人のアカウントを消す手段はこの Function にはない**(対象は呼び出した本人の JWT の userId だけ)。通報への対応などで運営が消すときは、**ダッシュボードで auth ユーザーを直接消さない**。
+
+### なぜ直接消してはいけないか
+
+auth ユーザーを消すと `public.users` と、そこから CASCADE でつながる行(`pair_members.user_id` を含む。migration 0001)が消える。しかし **`pairs` の行は `status = 'active'` のまま残り、相手の `pair_members` だけが残る**。
+
+- 相手の画面は、`getActivePair` が相手方の所属を見つけられず `null` を返すので、ソロに見える。しかし**ペアの解消(`pair-dissolve`)も同じ `getActivePair` を使うので、`dissolved: false` で何も起きない**(幽霊のペアが DB に残り続ける)
+- 相手が新しい招待を受けると、現役のペアの所属が 2 行になり、`getActivePair`(`maybeSingle`)が壊れて、以後その人の `snapshot` などが 500 になりうる
+- Storage の写真は消えない(行を辿れなくなって、孤児として残る)
+
+### 手順(`delete-account` と同じ順序。失敗したらやり直せる)
+
+`bash products/lien/scripts/ops/db-query.sh "<SQL>"`(`set -a; source .env; set +a` のあと。書き込みも通るので、対象の `<uid>` を必ず確かめてから)。
+
+1. **現役のペアを解消する**(行は消さない。相手の履歴・植物はアーカイブとして残る):
+   `update public.pairs set status = 'dissolved', dissolved_at = now() where status = 'active' and id in (select pair_id from public.pair_members where user_id = '<uid>');`
+   相手のアプリには、次の同期(前面復帰・push 受信)でソロに戻る。**運営の SQL は相手にサイレント更新を送らない**(`pair-dissolve` / `delete-account` だけが送る)
+2. **本人の写真を Storage から消す**: 対象は `pairs/<pair_id>/<date_local>/<uid>/photo.jpg` と `photo_thumb.jpg`(`select name from storage.objects where bucket_id = 'photos' and name like 'pairs/%/<uid>/%'` で一覧を出し、**Storage API で remove**。SQL で `storage.objects` の行を消しても実体は消えない)。通報された写真だけを消すなら、この手順だけでよい
+3. **本人の所属と、本人しか居ないペアを消す**: まず本人しか所属していないペア(相手が先に消えていたもの)を `delete from public.pairs where id = '<pair_id>';`(`pair_members`・`plants`・`streak_days`・`ticket_ledger`・`nudges` が連鎖)、続けて `delete from public.pair_members where user_id = '<uid>';`
+4. **auth ユーザーを消す**: ダッシュボードの Authentication → Users → Delete user(または Auth の admin API)。`public.users` と、`promises`・`checkins`・`reactions`・`nudges`・`invites` が CASCADE で消える
+
+- 停止だけ(消さない)で足りるときは、手順 1(ペアの解消 = 相手との共有を止める)と 2(該当の写真の削除)までにする。アカウントの停止そのもの(サインインを止める)の仕組みは v1.0 には無い
+- 通報への対応の期限・基準(terms 第 6 条の「容認しない」「24 時間以内」の文言)は G4(#42)で人間が決める。決まったら、この節に対応の記録の書き方(通報の ID・対応・日時。**公開リポジトリなので個人情報・内容は書かない**)を足す
+- 手順の模範は `scripts/e2e/cleanup.ts`(通しテストのユーザーを Storage → pairs → auth.users の順で消す。印の無いユーザーは消さない安全装置つき)。実ユーザーに使うときは、あの安全装置は効かない(印が無いため)ので、ID を二重に確かめる

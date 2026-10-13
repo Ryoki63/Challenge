@@ -12,6 +12,9 @@
 //   S16 snapshot の整合  S17 植物の名前  S18 チェックイン取消→やり直し  S19 push 登録の経路(PushTokenSync)
 //   S20 クライアントの書き込み権限の境界  S21 DB の中身(Management API で SELECT)
 //   S22 ペア外(C)・未ログインから A–B ペアの表が見えない(RLS。reactions だけは取消で消える前の S14 で確かめる)
+//   S23 ペアの解消(pair-dissolve。冪等・解消後の閲覧境界)  S24 組み直し(新しいペアは 0 から)
+//   S25 アカウントの削除(delete-account: A。現役のペアあり)  S26 アカウントの削除(B = 最後の所属者・C = ソロ)
+//   ※ S25・S26 でテストユーザー自身を消すので、全部通ると A / B / C は存在しない(後片付けは「もう DB に無い」として扱う)
 //
 // 守ること:
 //   - close-day / grant-tickets は呼ばない(OPS §10)。新しいペアの started_on は今日なので、昨日の確定の対象にも入らない
@@ -20,8 +23,9 @@
 //   - 失敗しても、作ったデータの ID は state に残る(後片付けできる)
 //
 // 構成: 型と道具は scenario_lib.ts、手順は steps_setup.ts(S01〜S08)/ steps_flow.ts(S09〜S16)/
-//   steps_after.ts(S17〜S22)。手順を足すときは該当ファイルに rep.run("S23", ...) の形で足し、ここの一覧にも書く。
+//   steps_after.ts(S17〜S22)/ steps_account.ts(S23〜S26)。手順を足すときは該当ファイルに rep.run("S27", ...) の形で足し、ここの一覧にも書く。
 
+import { stepsAccount } from "./steps_account.ts";
 import { stepsAfter } from "./steps_after.ts";
 import { stepsFlow } from "./steps_flow.ts";
 import { stepsSetup } from "./steps_setup.ts";
@@ -35,4 +39,5 @@ export async function runScenario(c: Ctx): Promise<void> {
   await stepsSetup(c, w);
   await stepsFlow(c, w);
   await stepsAfter(c, w);
+  await stepsAccount(c, w);
 }
