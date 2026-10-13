@@ -497,7 +497,7 @@ enum Strings {
         static let promiseEditRow = "約束を変える"
         static let promiseSavedNote = "約束を保存しました"
 
-        // 通知(通知の設定画面へ — NotificationSettings。相手からの通知のオン・オフは iOS の設定アプリ)
+        // 通知(通知の設定画面へ — NotificationSettings。相手からの通知は v1.0 ではアプリの中で切り替えられない)
         static let notificationSection = "通知"
         static let notificationRow = "リマインドとお知らせ"
         static let notificationFooter = "リマインドの時刻や、ふたりの記録のお知らせを変えられます。"
@@ -529,9 +529,9 @@ enum Strings {
 
     /// 端末のローカル通知の文言(リマインド・ストリーク危機 — REQUIREMENTS §3.12 / T16 #16)。
     /// 通知の名義はアプリ(title は常に「Lien」)。**罰・恥系の表現は使わない**(§3.5。責めない・脅さない・相手を責めない)。
-    /// 文言は予約するときに組み立てて OS に渡す(ReminderScheduler)ので、予約したあとで約束の名前や状態が変わったら、
-    /// 次の同期で付け替わる。ふたりそろったあとに NSE が取り消せなかったとき(ReminderScheduler のコメント)に届いても、
-    /// 読んで困らない言い方にしてある
+    /// 文言は予約するときに組み立てて OS に渡す(ReminderScheduler と、相手の push を受けた NSE — LocalNotificationPushSync)ので、
+    /// 予約したあとで約束の名前や状態が変わったら、次の同期(または次の push)で付け替わる。ふたりそろったあとに NSE が
+    /// 取り消せなかったとき(ReminderScheduler のコメント)に届いても、読んで困らない言い方にしてある
     enum LocalNotification {
         static let title = "Lien"
 

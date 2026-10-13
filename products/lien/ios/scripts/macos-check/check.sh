@@ -53,11 +53,11 @@ exclude_from_module() {
 
 # 走らせないテスト(LienTests/ のファイル名)。理由:
 #   AppServicesTests / ConfigTests : AppServices+Live.swift(supabase-swift)を使う
-#   PlantRenderTests / PlantLayersTests / HomeRenderChecksTests : アセットカタログ・SwiftUI の描画・UIKit の色・XCTAttachment を使う
+#   PlantRenderTests / PlantLayersTests / HomeRenderChecksTests / NotificationSettingsRenderTests : アセットカタログ・SwiftUI の描画・UIKit のウィンドウと色・XCTAttachment を使う
 #   DeviceTokenStoreTests : AppDelegate.swift(UIKit)を使う
 #   QRCodeGeneratorTests : QRCodeGenerator.swift(UIImage)を使う
 #   SmokeTests : アプリ本体のバンドルの前提
-EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
+EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
 
 is_excluded_test() {
   local name="$1" e
