@@ -34,7 +34,7 @@ struct RootView: View {
                         PromiseSetupView(
                             client: model.services.promiseClient,
                             store: model.services.store,
-                            onSaved: { _ in model.promiseSaved() }
+                            onSaved: { saved in model.promiseSaved(saved) }
                         )
                         // 約束を決める前でも、設定(サインアウト・アカウントの削除)には入れる
                         .toolbar { settingsButton }
@@ -55,7 +55,9 @@ struct RootView: View {
                             // 植物の名前付け(plant-name)と、演出の「もう見せたか」の記録(PB #57)
                             plantNaming: model.services.plantNaming,
                             plantMemory: model.services.plantMemory,
-                            reloadWidgets: model.services.reloadWidgets
+                            reloadWidgets: model.services.reloadWidgets,
+                            // チェックイン・取り消しで端末の snapshot が変わったら、ローカル通知の予約を合わせる(issue #16)
+                            localStateChanged: { model.localStateChanged() }
                         ),
                         reloadToken: model.snapshotRevision,
                         onInvite: model.phase == .solo ? { model.presentPairing() } : nil,

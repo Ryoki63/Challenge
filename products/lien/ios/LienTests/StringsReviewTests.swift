@@ -83,6 +83,11 @@ enum StringsCatalog {
     static let representativeAddresses = ["support@example.com"]
     /// ゲージの文に入る段階名の代表(最初・途中・最後 — Strings.Plant.stageNames)
     static let representativeStageNames = ["めばえ", "わかば", "みのり"]
+    /// リマインドの文言に入る約束の名前と絵文字の代表(絵文字なし = 約束に絵文字が無いとき)
+    static let representativePromiseTitles = ["筋トレ", "まいにち散歩"]
+    static let representativeEmojis = ["💪", ""]
+    /// 設定画面の行に出すリマインドの時刻の代表
+    static let representativeTimes = ["20:00", "07:30"]
     /// 通報メールの件名に入る「種別」(Strings.Report.kind*)
     static let representativeKinds = [
         Strings.Report.kindPhoto, Strings.Report.kindNickname, Strings.Report.kindPromise,
@@ -366,6 +371,54 @@ enum StringsCatalog {
         add("Session.restart", Strings.Session.restart)
         add("Session.later", Strings.Session.later)
 
+        // LocalNotification(端末のローカル通知 — T16 #16)
+        add("LocalNotification.title", Strings.LocalNotification.title)
+        for promiseTitle in representativePromiseTitles {
+            for emoji in representativeEmojis {
+                for (index, line) in Strings.LocalNotification.reminderBodies(promiseTitle, emoji: emoji).enumerated() {
+                    add("LocalNotification.reminderBodies(\(promiseTitle), \(emoji))[\(index)]", line)
+                }
+            }
+        }
+        for days in representativeDays {
+            add("LocalNotification.streakRiskNeither(\(days))", Strings.LocalNotification.streakRiskNeither(days: days))
+            for name in representativeNames {
+                add(
+                    "LocalNotification.streakRiskPartnerDone(\(name), \(days))",
+                    Strings.LocalNotification.streakRiskPartnerDone(partnerName: name, days: days)
+                )
+                add(
+                    "LocalNotification.streakRiskMeDone(\(name), \(days))",
+                    Strings.LocalNotification.streakRiskMeDone(partnerName: name, days: days)
+                )
+            }
+        }
+
+        // NotificationSettings(通知の設定画面 — T16 #16)
+        add("NotificationSettings.title", Strings.NotificationSettings.title)
+        add("NotificationSettings.deniedNotice", Strings.NotificationSettings.deniedNotice)
+        add("NotificationSettings.reminderSection", Strings.NotificationSettings.reminderSection)
+        add("NotificationSettings.reminderToggle", Strings.NotificationSettings.reminderToggle)
+        add("NotificationSettings.reminderTime", Strings.NotificationSettings.reminderTime)
+        add("NotificationSettings.reminderFooter", Strings.NotificationSettings.reminderFooter)
+        add("NotificationSettings.reminderNoPromise", Strings.NotificationSettings.reminderNoPromise)
+        add("NotificationSettings.reminderSave", Strings.NotificationSettings.reminderSave)
+        add("NotificationSettings.reminderSaving", Strings.NotificationSettings.reminderSaving)
+        add("NotificationSettings.reminderSaved", Strings.NotificationSettings.reminderSaved)
+        add("NotificationSettings.reminderSaveError", Strings.NotificationSettings.reminderSaveError)
+        add("NotificationSettings.loadFailed", Strings.NotificationSettings.loadFailed)
+        add("NotificationSettings.retry", Strings.NotificationSettings.retry)
+        add("NotificationSettings.streakSection", Strings.NotificationSettings.streakSection)
+        add("NotificationSettings.streakToggle", Strings.NotificationSettings.streakToggle)
+        add("NotificationSettings.streakFooter", Strings.NotificationSettings.streakFooter)
+        add("NotificationSettings.partnerSection", Strings.NotificationSettings.partnerSection)
+        add("NotificationSettings.partnerFooter", Strings.NotificationSettings.partnerFooter)
+        add("NotificationSettings.openSystemSettings", Strings.NotificationSettings.openSystemSettings)
+        add("NotificationSettings.summaryOff", Strings.NotificationSettings.summaryOff)
+        for time in representativeTimes {
+            add("NotificationSettings.summaryDaily(\(time))", Strings.NotificationSettings.summaryDaily(time))
+        }
+
         // Plant(植物 — PB #57)
         addPalette("Plant.stageNames", Strings.Plant.stageNames)
         for stage in -1...11 {
@@ -625,6 +678,29 @@ final class StringsReviewTests: XCTestCase {
         }
         for kind in StringsCatalog.representativeKinds {
             XCTAssertTrue(Strings.Report.subject(kind).contains(kind))
+        }
+        // ローカル通知(T16 #16): 約束の名前・絵文字・相手の名前・続いている日数が文言に入る
+        for promiseTitle in StringsCatalog.representativePromiseTitles {
+            for emoji in StringsCatalog.representativeEmojis {
+                let bodies = Strings.LocalNotification.reminderBodies(promiseTitle, emoji: emoji)
+                XCTAssertEqual(bodies.count, 3)
+                for body in bodies {
+                    XCTAssertTrue(body.contains("『\(promiseTitle)』"), body)
+                    XCTAssertTrue(body.hasSuffix(emoji), body)
+                }
+            }
+        }
+        for days in StringsCatalog.representativeDays {
+            XCTAssertTrue(Strings.LocalNotification.streakRiskNeither(days: days).contains("\(days)日"))
+            for name in StringsCatalog.representativeNames {
+                XCTAssertTrue(Strings.LocalNotification.streakRiskPartnerDone(partnerName: name, days: days).contains(name))
+                XCTAssertTrue(Strings.LocalNotification.streakRiskPartnerDone(partnerName: name, days: days).contains("\(days)日"))
+                XCTAssertTrue(Strings.LocalNotification.streakRiskMeDone(partnerName: name, days: days).contains(name))
+                XCTAssertTrue(Strings.LocalNotification.streakRiskMeDone(partnerName: name, days: days).contains("\(days)日"))
+            }
+        }
+        for time in StringsCatalog.representativeTimes {
+            XCTAssertTrue(Strings.NotificationSettings.summaryDaily(time).contains(time))
         }
     }
 

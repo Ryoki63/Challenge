@@ -47,6 +47,10 @@ struct AppServices {
     /// nil のとき(これを渡さない既存の組み立て・テスト)は、ホームがメモリ内の記録で動く(保存しない)。
     /// アカウントの削除・サインアウトの後始末で消す(AppModel.endSession)
     var plantMemory: PlantMemoryStoring?
+    /// 端末のローカル通知(リマインド・ストリーク危機)の予約と設定(T16 #16)。nil のとき(これを渡さない既存の組み立て・テスト)は、
+    /// ローカル通知を扱わない。Live / Stub のどちらの構成でも AppServices が入れる。アカウントの削除・サインアウトの後始末で
+    /// 設定と予約を消す(AppModel.endSession)
+    var reminders: ReminderManaging?
 }
 
 extension AppServices {
@@ -78,7 +82,24 @@ extension AppServices {
             reloadWidgets: reloadWidgets,
             accountClient: StubAccountClient(store: store),
             plantNaming: StubPlantNaming(store: store),
-            plantMemory: UserDefaultsPlantMemoryStore()
+            plantMemory: UserDefaultsPlantMemoryStore(),
+            // サーバーの約束を持たない構成: リマインドの時刻は、約束を保存したとき(promiseSaved)に端末が覚える
+            reminders: makeReminders(store: store, reminderLoader: nil)
+        )
+    }
+
+    /// ローカル通知の予約(Live / Stub 共通)。本物の通知センターを使うが、組み立てだけでは OS に触れない。
+    /// reminderLoader は、リマインドの時刻をまだ知らないときに、サーバーの約束から読む口(Live だけ)
+    static func makeReminders(
+        store: AppGroupStore?,
+        reminderLoader: ReminderScheduler.ReminderLoader?
+    ) -> ReminderManaging? {
+        guard let store else { return nil }
+        return ReminderScheduler(
+            center: UserNotificationCenterScheduler(),
+            preferences: AppGroupNotificationPreferencesStore(store: store),
+            snapshotSource: { store.loadSnapshot() },
+            reminderLoader: reminderLoader
         )
     }
 }

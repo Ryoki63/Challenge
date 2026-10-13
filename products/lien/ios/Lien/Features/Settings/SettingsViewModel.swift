@@ -2,7 +2,7 @@
 //
 // 設定画面(ホームの歯車から開くシート)が出すもの:
 //   - プロフィール(ニックネームとアイコンの表示と編集 — 編集は ProfileEditViewModel)・約束(編集は約束設定の画面を開く)・
-//     通知(OS の設定アプリへ)
+//     通知(リマインド・ストリーク危機。画面は NotificationSettingsView)
 //   - ペア(相手の名前と「ペアを解消する」= ブロック)
 //   - サポート(お問い合わせ・通報・利用規約・プライバシーポリシー)
 //   - アカウント(サインアウト・アカウントの削除)
@@ -150,6 +150,11 @@ final class SettingsViewModel {
         promise = saved
         showsPromiseSavedNote = true
         snapshot = store?.loadSnapshot()
+    }
+
+    /// 通知の設定画面でリマインドを保存できた(約束のほかの項目は変わらない)。約束の行の「保存しました」は出さない
+    func reminderSaved(_ saved: Promise) {
+        promise = saved
     }
 
     /// サーバーに現役の約束が無いのに snapshot には約束が残っている(スタブ構成・古い snapshot)ときの代わり。

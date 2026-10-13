@@ -138,7 +138,17 @@ extension AppServices {
                 tokenProvider: tokenProvider,
                 session: session
             ),
-            plantMemory: UserDefaultsPlantMemoryStore()
+            plantMemory: UserDefaultsPlantMemoryStore(),
+            // ローカル通知(T16 #16)。リマインドの時刻をまだ知らないとき(この版へ更新した直後・再インストール直後)は、
+            // サーバーの約束の remind_at から一度読む。読めなければ nil(予約せず、あとで読み直す)
+            reminders: makeReminders(store: store, reminderLoader: {
+                do {
+                    let promise = try await supabase.fetchMyPromise()
+                    return ReminderPreference(remindAt: promise?.remindAt)
+                } catch {
+                    return nil
+                }
+            })
         )
     }
 }

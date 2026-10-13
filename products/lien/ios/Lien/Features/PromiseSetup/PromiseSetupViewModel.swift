@@ -1,7 +1,8 @@
 // PromiseSetupViewModel.swift — 約束設定画面の状態管理(T12 / REQUIREMENTS §3.3)
 //
 // - 入力: タイトル(20字・コードポイント数え=DB の char_length と一致)+絵文字(固定候補)
-//   +リマインド toggle(時刻のデフォルト 20:00。ローカル通知のスケジューリングは T16 の責務)
+//   +リマインド toggle(時刻のデフォルト 20:00。この remind_at が毎日のローカル通知の時刻になる — ReminderScheduler。
+//   保存したら onSaved の呼び出し元(AppModel.promiseSaved)が、端末の予約に反映する — T16 #16)
 // - save(): PromiseAPIClient.setPromise → 成功で App Group snapshot の
 //   myPromiseTitle / myPromiseEmoji を更新(ウィジェットへの楽観反映。正はサーバーで、
 //   次の GET /snapshot・push 同梱 snapshot で収束する — DESIGN §4)→ onSaved

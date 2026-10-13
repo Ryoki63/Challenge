@@ -23,7 +23,8 @@ struct Promise: Equatable, Sendable, Codable {
     let id: String
     let title: String
     let emoji: String
-    /// リマインド時刻 "HH:MM"(なしは nil)。ローカル通知のスケジューリングは T16 の責務
+    /// リマインド時刻 "HH:MM"(なしは nil)。毎日のローカル通知の時刻で、予約は ReminderScheduler(T16 #16)。
+    /// 約束設定の画面と通知の設定画面のどちらから変えても、この値(サーバーの約束)を書く
     let remindAt: String?
 }
 

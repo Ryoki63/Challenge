@@ -10,7 +10,10 @@
 //   5. 招待ディープリンク(lien://invite/<token>)を保持し、ソロのホームで招待画面を開く
 //   6. オンボーディングのまま起動したあとでセッションが読めるようになったら、phase を導き直す
 //      (再起動後の最初のアンロック前にバックグラウンド起動されると Keychain を読めない — issue #62)
-//   7. アカウント・ペアの操作(AccountOperating — issue #23): ペアの解消(= ブロック)・アカウントの削除・
+//   7. 端末のローカル通知(リマインド・ストリーク危機 — issue #16)の予約を、状態が変わるたびに合わせる(ReminderScheduler):
+//      snapshot を読み直すとき(同期・約束の保存・ペアの成立と解消)・ホームの操作で端末の snapshot が変わったとき・
+//      通知の設定画面でリマインドを変えたとき・サインアウトのあと(予約と設定を消す)
+//   8. アカウント・ペアの操作(AccountOperating — issue #23): ペアの解消(= ブロック)・アカウントの削除・
 //      サインアウトのあとの端末の後始末(記録を消し、ウィジェットを更新し、オンボーディングへ戻る)と、
 //      セッションが使えなくなったとき(snapshot の取得が 401 / user_not_found で続き、認証サーバーに直接たしかめても
 //      確かに拒否される)の確認。認証 SDK がセッションを破棄したとき(アカウントがサーバーで消えたあと、トークンの更新が
@@ -109,6 +112,9 @@ final class AppModel {
     /// セッションがあればサーバーと同期する
     func start() async {
         Task { await services.pushTokenSync.sessionDidChange() }
+        // 端末にある snapshot で、ローカル通知の予約を先に合わせる(サーバーとの同期を待たない。サインアウトの途中で
+        // 終了して予約が残っていたときも、ここで片づく)
+        scheduleReminderSync()
         if phase == .onboarding {
             // 保険: init の時点ではセッションを読めずオンボーディングで立ち上がったが、この .task が走るまでの間に読めるように
             // なっていた(再起動後の最初のアンロック前にバックグラウンド起動され、その後アンロックされた — issue #62)場合に、
@@ -164,11 +170,25 @@ final class AppModel {
         await syncFirstTimeIfNeeded()
     }
 
-    /// 約束の保存が成功した(snapshot の myPromise* は PromiseSetupViewModel が書き込み済み)
-    func promiseSaved() {
-        reloadFromStore()
+    /// 約束の保存が成功した(snapshot の myPromise* は PromiseSetupViewModel が書き込み済み)。
+    /// 保存した約束の remind_at が、端末のローカル通知のリマインドの時刻になる(issue #16)
+    func promiseSaved(_ promise: Promise? = nil) {
+        if let promise { services.reminders?.recordReminder(from: promise) }
+        reloadFromStore() // ローカル通知の予約も、ここで合わせ直される
         services.reloadWidgets() // ウィジェットの空状態(「アプリを開いてはじめよう」)を約束入りの表示へ
         Task { await refresh() }
+    }
+
+    /// 通知の設定画面でリマインドを保存した(約束の remind_at が変わった。約束のほかの項目は変わらない — issue #16)
+    func reminderSaved(_ promise: Promise) {
+        services.reminders?.recordReminder(from: promise)
+        scheduleReminderSync()
+    }
+
+    /// ホームの操作(チェックイン・取り消し・写真・再送)で、端末の snapshot が変わった。ローカル通知の予約を合わせる
+    /// (自分が完了したら今日のリマインドを取り消し、取り消したら戻す — issue #16)
+    func localStateChanged() {
+        scheduleReminderSync()
     }
 
     /// 招待の受諾が成功した(受諾者視点の snapshot は PairingViewModel が書き込み済み)
@@ -281,9 +301,17 @@ final class AppModel {
         )
         snapshotRevision += 1
         applyPendingInvite()
+        scheduleReminderSync()
         if hadSession, phase == .onboarding, !isEndingSession {
             scheduleSessionVanishedCheck()
         }
+    }
+
+    /// 端末のローカル通知の予約を、いまの snapshot と設定に合わせる(同時に走るのは 1 本。ReminderScheduler が畳む)。
+    /// snapshot が無い(サインアウト後)・約束が無いときは、予約はすべて取り消される
+    private func scheduleReminderSync() {
+        guard let reminders = services.reminders else { return }
+        Task { await reminders.sync() }
     }
 
     /// セッションが消えたように見えたときの確認を、重複させずに始める
@@ -441,6 +469,8 @@ extension AppModel: AccountOperating {
         services.store?.eraseAll()
         // 植物の体験の記録(段階アップの演出を見せた段階・最後のチェックイン日など)も、前のアカウントのものを持ち越さない(PB #57)
         services.plantMemory?.reset()
+        // ローカル通知の設定を消し、予約も配信済みも残さない(前のアカウントの約束のリマインドが、サインアウト後に鳴らないように — issue #16)
+        await services.reminders?.reset()
 
         sessionMonitor.reset()
         sessionLost = false

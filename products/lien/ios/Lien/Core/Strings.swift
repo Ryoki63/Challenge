@@ -147,7 +147,7 @@ enum Strings {
         // 絵文字選択
         static let emojiSectionTitle = "絵文字をえらんでね"
 
-        // リマインド(任意。ローカル通知のスケジューリングは T16)
+        // リマインド(任意。約束の remind_at が毎日のローカル通知の時刻になる — ReminderScheduler / T16 #16)
         static let remindSectionTitle = "リマインド"
         static let remindToggleLabel = "毎日そっとお知らせ"
         static let remindTimeLabel = "時刻"
@@ -497,10 +497,10 @@ enum Strings {
         static let promiseEditRow = "約束を変える"
         static let promiseSavedNote = "約束を保存しました"
 
-        // 通知(OS の設定アプリを開く)
+        // 通知(通知の設定画面へ — NotificationSettings。相手からの通知のオン・オフは iOS の設定アプリ)
         static let notificationSection = "通知"
-        static let notificationRow = "通知の設定を開く"
-        static let notificationFooter = "通知のオン・オフは、iOS の設定アプリで変えられます。リマインドの時刻は「約束」から変えられます。"
+        static let notificationRow = "リマインドとお知らせ"
+        static let notificationFooter = "リマインドの時刻や、ふたりの記録のお知らせを変えられます。"
 
         // ペア
         static let pairSection = "ペア"
@@ -525,6 +525,77 @@ enum Strings {
         static let accountFooter = "登録なしで始めたので、機種変更やアプリの入れ直しで記録を引き継げない場合があります。"
 
         static let versionLabel = "バージョン"
+    }
+
+    /// 端末のローカル通知の文言(リマインド・ストリーク危機 — REQUIREMENTS §3.12 / T16 #16)。
+    /// 通知の名義はアプリ(title は常に「Lien」)。**罰・恥系の表現は使わない**(§3.5。急かさない・責めない・相手を責めない)。
+    /// 文言は予約するときに組み立てて OS に渡す(ReminderScheduler)ので、予約したあとで約束の名前や状態が変わったら、
+    /// 次の同期で付け替わる。ふたりそろったあとに NSE が取り消せなかったとき(ReminderScheduler のコメント)に届いても、
+    /// 読んで困らない言い方にしてある
+    enum LocalNotification {
+        static let title = "Lien"
+
+        /// リマインド(約束の remind_at)。日付で 1 つ選ぶ(同じ日は同じ言葉)。emoji は約束の絵文字(無ければ空)を末尾に付ける。
+        /// 1 つ目は REQUIREMENTS §3.12 の例
+        static func reminderBodies(_ promiseTitle: String, emoji: String) -> [String] {
+            [
+                "今日の『\(promiseTitle)』、まだ間に合うよ\(emoji)",
+                "『\(promiseTitle)』の時間だよ。ゆっくりでだいじょうぶ\(emoji)",
+                "今日もひとつだけ。『\(promiseTitle)』、できそう?\(emoji)",
+            ]
+        }
+
+        // ストリーク危機(夜 9 時 = ReminderScheduler.streakRiskHour。「あと3時間」は 21:00 から日付が変わるまで)。
+        // ふたりの記録が続いていて、その日まだふたりそろっていないとき。days は続いている日数(ふたりの記録)
+
+        /// どちらも、またはわからない
+        static func streakRiskNeither(days: Int) -> String {
+            "あと3時間。ふたりの\(days)日、いっしょにつなごう🌱"
+        }
+        /// 相手は済んでいて、自分がまだ(ウィジェットの「(相手)が待ってるよ」と同じ言い方 — REQUIREMENTS §3.10)
+        static func streakRiskPartnerDone(partnerName: String, days: Int) -> String {
+            "\(partnerName)が待ってるよ。あと3時間、ふたりの\(days)日をつなごう🌱"
+        }
+        /// 自分は済んでいて、相手がまだ(アプリの「つつく」を案内する)
+        static func streakRiskMeDone(partnerName: String, days: Int) -> String {
+            "あと3時間。\(partnerName)に「つつく」を送ってみる? ふたりの\(days)日がつながるよ"
+        }
+    }
+
+    /// 通知の設定画面(設定 → 通知。REQUIREMENTS §3.12・§3.15 / T16 #16)。罰・恥系の表現は使わない(§3.5)
+    enum NotificationSettings {
+        static let title = "通知"
+        /// OS の通知が許可されていないとき(iOS の設定アプリでしか変えられない)
+        static let deniedNotice = "通知が許可されていません。iOS の設定アプリで許可すると、お知らせが届きます。"
+
+        // リマインド(約束の remind_at。約束設定の画面と同じ値 — 保存すると約束も更新される)
+        static let reminderSection = "リマインド"
+        static let reminderToggle = PromiseSetup.remindToggleLabel
+        static let reminderTime = PromiseSetup.remindTimeLabel
+        static let reminderFooter = "決めた時刻に、約束をそっとお知らせします。その日の分ができていたら、お知らせしません。"
+        static let reminderNoPromise = "約束を決めると、リマインドを設定できます。"
+        static let reminderSave = "保存する"
+        static let reminderSaving = "保存しています…"
+        static let reminderSaved = "リマインドを保存しました"
+        static let reminderSaveError = "保存できませんでした。通信状態を確認して、もう一度お試しください"
+        static let loadFailed = Settings.loadFailed
+        static let retry = Settings.retry
+
+        // ふたりの記録(ストリーク危機。端末ローカルの設定)
+        static let streakSection = "ふたりの記録"
+        static let streakToggle = "夜9時のお知らせ"
+        static let streakFooter = "ふたりの記録が続いていて、その日まだふたりそろっていないときだけ、夜9時に一度お知らせします。ふたりそろったら、お知らせしません。"
+
+        // 相手からの通知(v1.0 は iOS の設定アプリで切り替える。種別ごとのオン・オフは v1.1)
+        static let partnerSection = "相手からの通知"
+        static let partnerFooter = "相手のチェックイン・つつく・リアクションの通知は、iOS の設定アプリでオン・オフを変えられます。"
+        static let openSystemSettings = "iOS の通知設定を開く"
+
+        // 設定画面の行の右側(いまの状態)
+        static func summaryDaily(_ time: String) -> String {
+            "毎日 \(time)"
+        }
+        static let summaryOff = "オフ"
     }
 
     /// サインアウトの確認(1段階。端末の記録は消え、登録なしで始めたアカウントには戻れない)

@@ -115,6 +115,7 @@ final class PrivacyManifestTests: XCTestCase {
             sharedFiles: [
                 "Lien/Core/Models/PairSnapshot.swift",
                 "Lien/Core/AppGroupStore.swift",
+                "Lien/Core/Notifications/LocalNotificationID.swift",
             ]
         ),
     ]

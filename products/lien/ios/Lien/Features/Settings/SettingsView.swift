@@ -1,7 +1,7 @@
 // SettingsView.swift — 設定画面(REQUIREMENTS §3.15 / T23 #23)
 //
 // ホームの歯車から開くシートの中身(NavigationStack は SettingsSheetView)。
-//   プロフィール(ニックネームとアイコン。編集は ProfileEditView)/ 約束(編集は約束設定の画面)/ 通知(iOS の設定アプリへ)/
+//   プロフィール(ニックネームとアイコン。編集は ProfileEditView)/ 約束(編集は約束設定の画面)/ 通知(リマインド・ストリーク危機。NotificationSettingsView)/
 //   ペア(相手の名前・ペアを解消する)/ サポート(お問い合わせ・通報・利用規約・プライバシーポリシー)/
 //   アカウント(サインアウト・アカウントを削除する)
 // 取り消せない操作(ペアの解消・アカウントの削除)は、説明の画面(push)→ 最後のアラートの2段階
@@ -12,10 +12,16 @@ import SwiftUI
 @MainActor
 struct SettingsView: View {
     @State private var viewModel: SettingsViewModel
+    private let auth: AuthServicing
     private let promiseClient: PromiseAPIClient
     private let store: AppGroupStore?
+    /// ローカル通知の管理(通知の設定画面とその行の要約)。nil のとき(通知を扱わない構成)は、iOS の設定アプリへの行だけ
+    private let reminders: ReminderManaging?
+    private let pushAuthorizer: PushAuthorizing
     /// 約束を保存できた(AppModel が snapshot を読み直し、ウィジェットを更新し、サーバーとも突き合わせる)
-    private let onPromiseSaved: () -> Void
+    private let onPromiseSaved: (Promise) -> Void
+    /// 通知の設定画面でリマインドを保存できた(AppModel が端末の予約を合わせる)
+    private let onReminderSaved: (Promise) -> Void
 
     @Environment(\.openURL) private var openURL
     /// メールを開けなかったときのアラート
@@ -26,12 +32,19 @@ struct SettingsView: View {
         store: AppGroupStore?,
         account: AccountOperating,
         promiseClient: PromiseAPIClient,
-        onPromiseSaved: @escaping () -> Void
+        reminders: ReminderManaging?,
+        pushAuthorizer: PushAuthorizing,
+        onPromiseSaved: @escaping (Promise) -> Void,
+        onReminderSaved: @escaping (Promise) -> Void
     ) {
         _viewModel = State(initialValue: SettingsViewModel(auth: auth, store: store, account: account))
+        self.auth = auth
         self.promiseClient = promiseClient
         self.store = store
+        self.reminders = reminders
+        self.pushAuthorizer = pushAuthorizer
         self.onPromiseSaved = onPromiseSaved
+        self.onReminderSaved = onReminderSaved
     }
 
     var body: some View {
@@ -118,7 +131,7 @@ struct SettingsView: View {
                         promise: promise,
                         onSaved: { saved in
                             viewModel.promiseSaved(saved)
-                            onPromiseSaved()
+                            onPromiseSaved(saved)
                         }
                     )
                 } label: {
@@ -145,17 +158,17 @@ struct SettingsView: View {
     }
 
     private var notificationSection: some View {
-        Section {
-            Button {
-                openURL(SupportLinks.appSettingsURL)
-            } label: {
-                Text(Strings.Settings.notificationRow)
+        NotificationSettingsSection(
+            auth: auth,
+            promiseClient: promiseClient,
+            reminders: reminders,
+            pushAuthorizer: pushAuthorizer,
+            savedPromise: viewModel.promise,
+            onReminderSaved: { saved in
+                viewModel.reminderSaved(saved)
+                onReminderSaved(saved)
             }
-        } header: {
-            Text(Strings.Settings.notificationSection)
-        } footer: {
-            Text(Strings.Settings.notificationFooter)
-        }
+        )
     }
 
     @ViewBuilder

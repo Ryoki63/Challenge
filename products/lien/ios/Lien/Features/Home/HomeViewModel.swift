@@ -89,6 +89,8 @@ final class HomeViewModel {
     private let store: AppGroupStore?
     private let checkinService: CheckinPerforming
     private let reloadWidgets: () -> Void
+    /// 端末の snapshot を新しい状態に書き換えたときに呼ぶ(ローカル通知の予約を合わせる — AppModel.localStateChanged。issue #16)
+    private let localStateChanged: () -> Void
 
     /// 追加能力(T14)。checkinService が適合する場合のみ非 nil(能力検出)
     private let cancelService: CheckinCanceling?
@@ -118,12 +120,14 @@ final class HomeViewModel {
         plantMemory: PlantMemoryStoring? = nil,
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .current,
-        reloadWidgets: @escaping () -> Void = { WidgetCenter.shared.reloadAllTimelines() }
+        reloadWidgets: @escaping () -> Void = { WidgetCenter.shared.reloadAllTimelines() },
+        localStateChanged: @escaping () -> Void = {}
     ) {
         self.store = store
         self.checkinService = checkinService
         self.partnerPhoto = partnerPhoto
         self.reloadWidgets = reloadWidgets
+        self.localStateChanged = localStateChanged
         self.cancelService = checkinService as? CheckinCanceling
         self.photoService = checkinService as? PhotoAttaching
         self.opsFlusher = checkinService as? PendingOpsFlushing
@@ -360,6 +364,7 @@ final class HomeViewModel {
         snapshot = updated
         try? store?.saveSnapshot(updated)
         reloadWidgets()
+        localStateChanged()
         partnerPhoto?.snapshotDidChange(updated)
         plantExperience.snapshotDidChange(updated)
     }

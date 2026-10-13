@@ -103,14 +103,24 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     // MARK: UNUserNotificationCenterDelegate
 
     /// フォアグラウンド中に届いた可視 push: バナーを出しつつ snapshot を同期する
-    /// (NSE が App Group に書いた snapshot に、アプリ本体の表示を追従させる)
+    /// (NSE が App Group に書いた snapshot に、アプリ本体の表示を追従させる)。
+    /// 届いたのがローカル通知(リマインド・ストリーク危機)で、端末の snapshot が「今日の分はもう要らない」(自分が完了した /
+    /// ふたりそろった)を示すときは、出さずに捨てる(NSE が取り消せなかったときの最後の網 — issue #16。前面にいないときは出てしまう)
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         Task { @MainActor in await RemoteNotificationRelay.shared.notify() }
-        completionHandler([.banner, .list, .sound])
+        let store = AppGroupStore.standard() ?? AppGroupStore.localFallback()
+        let isStale = LocalNotificationCancellation.shouldSuppress(
+            identifier: notification.request.identifier,
+            snapshot: store.loadSnapshot(),
+            now: Date(),
+            calendar: LocalNotificationCalendar.current()
+        )
+        let options: UNNotificationPresentationOptions = isStale ? [] : [.banner, .list, .sound]
+        completionHandler(options)
     }
 
     /// 通知のタップ(アプリが前面へ来る。前面復帰の同期とは別に、確実に取り直す)

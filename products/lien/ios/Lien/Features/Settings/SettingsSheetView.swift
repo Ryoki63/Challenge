@@ -16,7 +16,10 @@ struct SettingsSheetView: View {
                 store: model.services.store,
                 account: model,
                 promiseClient: model.services.promiseClient,
-                onPromiseSaved: { model.promiseSaved() }
+                reminders: model.services.reminders,
+                pushAuthorizer: model.services.pushAuthorizer,
+                onPromiseSaved: { saved in model.promiseSaved(saved) },
+                onReminderSaved: { saved in model.reminderSaved(saved) }
             )
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

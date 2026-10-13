@@ -4,6 +4,7 @@
 //   - pair_snapshot.json … 共有契約(スキーマは PairSnapshot.swift が正本)
 //   - pending_ops.json   … 未送信キュー(キュー本体の型定義は T14)
 //   - photo_thumb.jpg    … 相手の今日の写真サムネ(T17 で NSE が DL。200KB 上限)
+//   - notification_prefs.json … 端末のローカル通知の設定(アプリ本体だけが読み書きする。T16 #16。型は NotificationPreferences)
 //
 // 原則(DESIGN §3.4):
 //   - 書き込むのは**アプリ本体と NSE の2者だけ**。ウィジェットは読み取り専用
@@ -23,6 +24,7 @@ struct AppGroupStore {
     static let snapshotFileName = "pair_snapshot.json"
     static let pendingOpsFileName = "pending_ops.json"
     static let photoThumbFileName = "photo_thumb.jpg"
+    static let notificationPrefsFileName = "notification_prefs.json"
 
     /// App Group ID を Info.plist から引くキー。
     /// 実体は Config/Base.xcconfig の LIEN_APP_GROUP_ID(project.yml が全ターゲットの Info.plist に埋め込む)
@@ -57,6 +59,7 @@ struct AppGroupStore {
     var snapshotFileURL: URL { containerURL.appendingPathComponent(Self.snapshotFileName) }
     var pendingOpsFileURL: URL { containerURL.appendingPathComponent(Self.pendingOpsFileName) }
     var photoThumbFileURL: URL { containerURL.appendingPathComponent(Self.photoThumbFileName) }
+    var notificationPrefsFileURL: URL { containerURL.appendingPathComponent(Self.notificationPrefsFileName) }
 
     // MARK: - pair_snapshot.json
 
@@ -102,12 +105,31 @@ struct AppGroupStore {
         try fileManager.removeItem(at: pendingOpsFileURL)
     }
 
+    // MARK: - notification_prefs.json(端末のローカル通知の設定 — T16 #16。型定義は NotificationPreferences)
+
+    /// 設定を読む。ファイル無し・壊れた JSON は nil
+    func loadNotificationPreferences<T: Decodable>(_ type: T.Type) -> T? {
+        guard let data = try? Data(contentsOf: notificationPrefsFileURL) else { return nil }
+        return try? PairSnapshot.makeJSONDecoder().decode(type, from: data)
+    }
+
+    /// 設定をアトミックに書き込む
+    func saveNotificationPreferences<T: Encodable>(_ preferences: T) throws {
+        let data = try PairSnapshot.makeJSONEncoder().encode(preferences)
+        try writeAtomically(data, to: notificationPrefsFileURL)
+    }
+
+    /// 設定を消す。ファイルが無くても成功する
+    func removeNotificationPreferences(fileManager: FileManager = .default) {
+        try? fileManager.removeItem(at: notificationPrefsFileURL)
+    }
+
     // MARK: - 全消去(アカウントの削除・サインアウト・セッション無効のあと — T23 #23)
 
-    /// 端末に置いた記録をすべて消す(snapshot・未送信キュー・相手の写真のサムネ)。
+    /// 端末に置いた記録をすべて消す(snapshot・未送信キュー・相手の写真のサムネ・ローカル通知の設定)。
     /// ウィジェットは次の reload で空の表示になる(呼び出し側が reload する)。ファイルが無くても成功する
     func eraseAll(fileManager: FileManager = .default) {
-        for url in [snapshotFileURL, pendingOpsFileURL, photoThumbFileURL] {
+        for url in [snapshotFileURL, pendingOpsFileURL, photoThumbFileURL, notificationPrefsFileURL] {
             try? fileManager.removeItem(at: url) // 無いファイルの削除エラーは無視する
         }
     }
