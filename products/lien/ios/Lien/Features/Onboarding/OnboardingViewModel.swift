@@ -4,7 +4,8 @@
 // - 認証は AuthServicing 経由(実体は SupabaseService / Config 未設定時 StubAuthService /
 //   テストはモック)。通知許可は PushAuthorizing 経由
 // - ニックネーム検証は DB の check 制約 char_length(Unicode コードポイント数)に合わせて
-//   unicodeScalars.count で数える(絵文字込みでも DB とズレない — issue #10)
+//   unicodeScalars.count で数える(絵文字込みでも DB とズレない — issue #10)。規則は NicknameRules
+//   (設定のプロフィール編集と共通 — issue #23)
 // - 利用規約・プライバシーポリシーへの明示の同意(チェック)が入るまで、プロフィールを送信できない。
 //   送信が匿名サインイン(= アカウントの作成)を兼ねるので、同意のないままアカウントを作らない
 //   (写真を共有するアプリの審査要件 — App Store ガイドライン 1.2 / issue #23)
@@ -21,14 +22,6 @@ final class OnboardingViewModel {
         case nickname
         case notification
     }
-
-    /// ニックネーム検証エラー(REQUIREMENTS §3.1: 8字まで)
-    enum NicknameError {
-        case empty
-        case tooLong
-    }
-
-    static let nicknameMaxLength = 8
 
     // MARK: - 入力状態(View からバインド)
 
@@ -72,15 +65,13 @@ final class OnboardingViewModel {
 
     /// 前後の空白・改行を除いた送信用ニックネーム
     var trimmedNickname: String {
-        nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        NicknameRules.trimmed(nickname)
     }
 
-    /// nil なら送信可。DB の check(char_length <= 8)と同じ数え方で検証する
+    /// nil なら送信可。DB の check(char_length <= 8)と同じ数え方で検証する。
+    /// 設定のプロフィール編集と同じ規則(NicknameRules)
     var nicknameError: NicknameError? {
-        let trimmed = trimmedNickname
-        if trimmed.isEmpty { return .empty }
-        if trimmed.unicodeScalars.count > Self.nicknameMaxLength { return .tooLong }
-        return nil
+        NicknameRules.validate(nickname)
     }
 
     var canSubmitProfile: Bool {

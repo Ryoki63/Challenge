@@ -6,6 +6,7 @@
 //   - ペアの解消・アカウントの削除は、確認の2段階を経てからだけ AccountOperating を呼ぶ
 //   - サインアウトの確認(1段階)
 //   - 通報・お問い合わせのメール(ペア ID を入れる)
+//   - プロフィールの編集(ニックネーム8字+アイコン。検証はオンボと共通 / 保存は timezone を書かない更新口 / 失敗してもやり直せる)
 
 import XCTest
 @testable import Lien
@@ -17,12 +18,23 @@ private final class SettingsMockAuth: AuthServicing {
     var promiseResult: Result<Promise?, Error> = .success(nil)
     private(set) var profileFetches = 0
     private(set) var promiseFetches = 0
+    /// ニックネームとアイコンだけの更新(設定のプロフィール編集)に入れる失敗
+    var nicknameUpdateError: Error?
+    private(set) var nicknameUpdates: [(nickname: String, avatarEmoji: String)] = []
+    /// timezone まで書く更新(オンボ用の updateProfile)が呼ばれた回数。プロフィール編集では 0 のまま
+    private(set) var fullProfileUpdates = 0
 
     var currentUserID: UUID? { UUID() }
 
     @discardableResult
     func signInAnonymously() async throws -> UUID { UUID() }
-    func updateProfile(nickname: String, avatarEmoji: String, timezone: String) async throws {}
+    func updateProfile(nickname: String, avatarEmoji: String, timezone: String) async throws {
+        fullProfileUpdates += 1
+    }
+    func updateNicknameAndAvatar(nickname: String, avatarEmoji: String) async throws {
+        if let nicknameUpdateError { throw nicknameUpdateError }
+        nicknameUpdates.append((nickname, avatarEmoji))
+    }
     func accessToken() async throws -> String { "token" }
     func fetchProfile() async throws -> UserProfile {
         profileFetches += 1
@@ -186,6 +198,171 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(rig.vm.promise?.title, "ランニング")
         XCTAssertEqual(rig.vm.promiseSummary, "🏃 ランニング")
         XCTAssertTrue(rig.vm.showsPromiseSavedNote)
+    }
+
+    // MARK: プロフィールの編集
+
+    private func loadedRig() async throws -> Rig {
+        let rig = try makeRig()
+        rig.auth.promiseResult = .success(savedPromise)
+        await rig.vm.load()
+        return rig
+    }
+
+    func testProfileEditorIsUnavailableUntilTheProfileIsLoaded() async throws {
+        let rig = try makeRig()
+        defer { rig.temp.cleanup() }
+        XCTAssertNil(rig.vm.makeProfileEditor(), "読めていない間は、いまの値が分からない(空で上書きしかねない)")
+
+        rig.auth.profileResult = .failure(Offline())
+        await rig.vm.load()
+        XCTAssertNil(rig.vm.makeProfileEditor(), "読み込みに失敗したときも開けない")
+
+        rig.auth.profileResult = .success(UserProfile(nickname: "あきら", avatarEmoji: "🌱"))
+        await rig.vm.load()
+        XCTAssertNotNil(rig.vm.makeProfileEditor())
+    }
+
+    func testProfileEditorStartsFromTheServerValuesWithNothingToSave() async throws {
+        let rig = try await loadedRig()
+        defer { rig.temp.cleanup() }
+
+        let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
+
+        XCTAssertEqual(editor.nickname, "あきら")
+        XCTAssertEqual(editor.avatarEmoji, "🌱")
+        XCTAssertNil(editor.nicknameError)
+        XCTAssertFalse(editor.hasChanges)
+        XCTAssertFalse(editor.canSave, "変更が無ければ保存ボタンは押せない")
+    }
+
+    func testProfileEditorWithoutAnAvatarStartsWithThePaletteHead() async throws {
+        let rig = try makeRig()
+        defer { rig.temp.cleanup() }
+        rig.auth.profileResult = .success(UserProfile(nickname: "あきら", avatarEmoji: ""))
+        await rig.vm.load()
+
+        let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
+
+        XCTAssertEqual(editor.avatarEmoji, Strings.Onboarding.avatarPalette.first)
+        XCTAssertTrue(editor.hasChanges, "アイコン未設定だった人は、初期のアイコンを選んだまま保存できる")
+    }
+
+    func testProfileEditorValidatesLikeOnboarding() async throws {
+        let rig = try await loadedRig()
+        defer { rig.temp.cleanup() }
+        let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
+
+        editor.nickname = ""
+        XCTAssertEqual(editor.nicknameError, .empty)
+        XCTAssertFalse(editor.canSave)
+        editor.nickname = "   \n "
+        XCTAssertEqual(editor.nicknameError, .empty, "空白だけは不可")
+        XCTAssertFalse(editor.canSave)
+
+        editor.nickname = "あいうえおかきく" // 8字
+        XCTAssertNil(editor.nicknameError)
+        XCTAssertTrue(editor.canSave)
+        editor.nickname = "  あいうえおかきく  " // 前後の空白は数えない
+        XCTAssertNil(editor.nicknameError)
+        editor.nickname = "あいうえおかきくけ" // 9字
+        XCTAssertEqual(editor.nicknameError, .tooLong)
+        XCTAssertFalse(editor.canSave)
+
+        // DB の check は Unicode コードポイントの数。肌色修飾つきの絵文字は 1 文字に見えて 2 スカラー
+        editor.nickname = String(repeating: "👍🏻", count: 4)
+        XCTAssertNil(editor.nicknameError)
+        editor.nickname = String(repeating: "👍🏻", count: 5)
+        XCTAssertEqual(editor.nicknameError, .tooLong)
+    }
+
+    func testProfileEditorCanSaveOnlyWhenSomethingChanged() async throws {
+        let rig = try await loadedRig()
+        defer { rig.temp.cleanup() }
+        let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
+
+        editor.nickname = "はる"
+        XCTAssertTrue(editor.canSave)
+        editor.nickname = "あきら"
+        XCTAssertFalse(editor.canSave, "元に戻したら、変更なし")
+
+        editor.avatarEmoji = "🐶"
+        XCTAssertTrue(editor.canSave, "アイコンだけの変更も保存できる")
+        editor.avatarEmoji = "🌱"
+        XCTAssertFalse(editor.canSave)
+
+        editor.nickname = "あきら  " // 空白を足しただけ(トリム後は同じ)
+        XCTAssertFalse(editor.canSave)
+    }
+
+    func testSaveWritesTheTrimmedNicknameAndAvatarWithoutTouchingTheTimezone() async throws {
+        let rig = try await loadedRig()
+        defer { rig.temp.cleanup() }
+        let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
+        editor.nickname = "  はる  "
+        editor.avatarEmoji = "🐶"
+
+        let saved = await editor.save()
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(rig.auth.nicknameUpdates.count, 1)
+        XCTAssertEqual(rig.auth.nicknameUpdates.first?.nickname, "はる")
+        XCTAssertEqual(rig.auth.nicknameUpdates.first?.avatarEmoji, "🐶")
+        XCTAssertEqual(rig.auth.fullProfileUpdates, 0, "timezone を端末の値で上書きする更新口は使わない")
+        XCTAssertNil(editor.errorMessage)
+        XCTAssertEqual(editor.nickname, "はる", "画面の値も保存した値(空白なし)に揃う")
+        XCTAssertFalse(editor.hasChanges)
+        XCTAssertFalse(editor.canSave, "保存済みなので、もう一度は押せない")
+        // 設定画面の表示も新しい値になり、保存の一言が出る
+        XCTAssertEqual(rig.vm.profile, UserProfile(nickname: "はる", avatarEmoji: "🐶"))
+        XCTAssertTrue(rig.vm.showsProfileSavedNote)
+    }
+
+    func testSaveFailureKeepsTheDraftAndTheProfileAndAllowsRetry() async throws {
+        let rig = try await loadedRig()
+        defer { rig.temp.cleanup() }
+        let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
+        editor.nickname = "はる"
+        editor.avatarEmoji = "🐶"
+        rig.auth.nicknameUpdateError = Offline()
+
+        let saved = await editor.save()
+
+        XCTAssertFalse(saved)
+        XCTAssertEqual(editor.errorMessage, Strings.Settings.profileSaveError)
+        XCTAssertEqual(editor.nickname, "はる", "入力はそのまま残る")
+        XCTAssertEqual(editor.avatarEmoji, "🐶")
+        XCTAssertEqual(rig.vm.profile, UserProfile(nickname: "あきら", avatarEmoji: "🌱"), "失敗したら、設定画面の表示は変えない")
+        XCTAssertFalse(rig.vm.showsProfileSavedNote)
+        XCTAssertTrue(editor.canSave, "もう一度できる")
+
+        rig.auth.nicknameUpdateError = nil
+        let retried = await editor.save()
+
+        XCTAssertTrue(retried)
+        XCTAssertNil(editor.errorMessage, "成功したらエラーの一言は消える")
+        XCTAssertEqual(rig.vm.profile, UserProfile(nickname: "はる", avatarEmoji: "🐶"))
+        XCTAssertTrue(rig.vm.showsProfileSavedNote)
+    }
+
+    func testSaveIsRefusedWhenTheNicknameIsInvalidOrNothingChanged() async throws {
+        let rig = try await loadedRig()
+        defer { rig.temp.cleanup() }
+        let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
+
+        let unchanged = await editor.save()
+        XCTAssertFalse(unchanged)
+
+        editor.nickname = "あいうえおかきくけ" // 9字
+        let tooLong = await editor.save()
+        XCTAssertFalse(tooLong)
+
+        editor.nickname = "  "
+        let empty = await editor.save()
+        XCTAssertFalse(empty)
+
+        XCTAssertEqual(rig.auth.nicknameUpdates.count, 0, "検証に通らない・変更が無いときは、サーバーに送らない")
+        XCTAssertNil(editor.errorMessage)
     }
 
     // MARK: ペアの表示

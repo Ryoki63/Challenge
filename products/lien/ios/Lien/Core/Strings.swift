@@ -279,11 +279,18 @@ enum Strings {
         /// ホームの歯車ボタンの VoiceOver 名
         static let openButtonLabel = "設定"
 
-        // プロフィール(ニックネームの表示)
+        // プロフィール(ニックネームとアイコンの表示と編集 — REQUIREMENTS §3.15)
         static let profileSection = "プロフィール"
         static let nicknameLabel = "ニックネーム"
         static let loadFailed = "読み込めませんでした"
         static let retry = "もう一度ためす"
+        /// プロフィールの編集画面のタイトル
+        static let profileEditTitle = "プロフィールを編集"
+        static let profileEditFooter = "ニックネームとアイコンは、ペアの相手にも表示されます。"
+        static let profileSave = "保存する"
+        static let profileSaving = "保存しています…"
+        static let profileSavedNote = "プロフィールを保存しました"
+        static let profileSaveError = "保存できませんでした。通信状態を確認して、もう一度お試しください"
 
         // 約束(編集は約束設定の画面を開く)
         static let promiseSection = "約束"

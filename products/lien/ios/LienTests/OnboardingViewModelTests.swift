@@ -43,6 +43,11 @@ private final class MockAuthService: AuthServicing {
         lastTimezone = timezone
     }
 
+    func updateNicknameAndAvatar(nickname: String, avatarEmoji: String) async throws {
+        lastNickname = nickname
+        lastAvatarEmoji = avatarEmoji
+    }
+
     func accessToken() async throws -> String {
         guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
         return "test-access-token"

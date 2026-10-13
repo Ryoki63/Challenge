@@ -24,6 +24,12 @@ protocol AuthServicing: AnyObject {
     /// push_token / push_env — 0001_init.sql, 0005)に限られる
     func updateProfile(nickname: String, avatarEmoji: String, timezone: String) async throws
 
+    /// 自分の users 行の nickname / avatar_emoji **だけ**を更新する(設定のプロフィール編集 — REQUIREMENTS §3.15)。
+    /// `updateProfile` と違って timezone を書かない: timezone は日付の判定(チェックインの date_local の許容範囲・
+    /// close-day の確定)に効くので、名前を直すたびに端末の値で上書きしない(旅行先で名前だけ直しても判定がずれない)。
+    /// 未サインインなら AuthServiceError.notSignedIn
+    func updateNicknameAndAvatar(nickname: String, avatarEmoji: String) async throws
+
     /// 現在のユーザー JWT(Edge Functions の `Authorization: Bearer` に載せる)。
     /// 期限切れの場合は提供側(supabase-swift のセッション)が自動更新してから返す。
     /// 未サインインなら AuthServiceError.notSignedIn
@@ -77,6 +83,12 @@ final class StubAuthService: AuthServicing, PushRegistrationUpdating {
     }
 
     func updateProfile(nickname: String, avatarEmoji: String, timezone: String) async throws {
+        guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
+        // メモリ内スタブ: 何も送信しない(読み戻し用に覚えるだけ)
+        storedProfile = UserProfile(nickname: nickname, avatarEmoji: avatarEmoji)
+    }
+
+    func updateNicknameAndAvatar(nickname: String, avatarEmoji: String) async throws {
         guard signedInUserID != nil else { throw AuthServiceError.notSignedIn }
         // メモリ内スタブ: 何も送信しない(読み戻し用に覚えるだけ)
         storedProfile = UserProfile(nickname: nickname, avatarEmoji: avatarEmoji)

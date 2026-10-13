@@ -8,6 +8,7 @@ final class SupabaseService: AuthServicing, PushRegistrationUpdating {
     var currentUserID: UUID? { nil }
     func signInAnonymously() async throws -> UUID { UUID() }
     func updateProfile(nickname: String, avatarEmoji: String, timezone: String) async throws {}
+    func updateNicknameAndAvatar(nickname: String, avatarEmoji: String) async throws {}
     func accessToken() async throws -> String { "" }
     func updatePushRegistration(token: String, environment: PushEnvironment) async throws {}
     func fetchPushRegistration() async throws -> ServerPushRegistration {

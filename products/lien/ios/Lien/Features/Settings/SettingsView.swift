@@ -1,7 +1,7 @@
 // SettingsView.swift — 設定画面(REQUIREMENTS §3.15 / T23 #23)
 //
 // ホームの歯車から開くシートの中身(NavigationStack は SettingsSheetView)。
-//   プロフィール(ニックネームの表示)/ 約束(編集は約束設定の画面)/ 通知(iOS の設定アプリへ)/
+//   プロフィール(ニックネームとアイコン。編集は ProfileEditView)/ 約束(編集は約束設定の画面)/ 通知(iOS の設定アプリへ)/
 //   ペア(相手の名前・ペアを解消する)/ サポート(お問い合わせ・通報・利用規約・プライバシーポリシー)/
 //   アカウント(サインアウト・アカウントを削除する)
 // 取り消せない操作(ペアの解消・アカウントの削除)は、説明の画面(push)→ 最後のアラートの2段階
@@ -86,11 +86,23 @@ struct SettingsView: View {
             case .failed:
                 loadFailedRow
             case .loaded:
-                LabeledContent(Strings.Settings.nicknameLabel) {
-                    Text([viewModel.profile?.avatarEmoji, viewModel.profile?.nickname]
-                        .compactMap { $0 }
-                        .filter { !$0.isEmpty }
-                        .joined(separator: " "))
+                // ニックネームとアイコンの編集画面へ(REQUIREMENTS §3.15)。編集画面の状態は開くたびに作る
+                NavigationLink {
+                    if let editor = viewModel.makeProfileEditor() {
+                        ProfileEditView(editor: editor)
+                    }
+                } label: {
+                    LabeledContent(Strings.Settings.nicknameLabel) {
+                        Text([viewModel.profile?.avatarEmoji, viewModel.profile?.nickname]
+                            .compactMap { $0 }
+                            .filter { !$0.isEmpty }
+                            .joined(separator: " "))
+                    }
+                }
+                if viewModel.showsProfileSavedNote {
+                    Text(Strings.Settings.profileSavedNote)
+                        .font(.footnote)
+                        .foregroundStyle(LienColors.done)
                 }
             }
         }

@@ -23,6 +23,17 @@ final class SupabaseService: AuthServicing, PushRegistrationUpdating {
         }
     }
 
+    /// ニックネームとアイコンだけの更新ペイロード(設定のプロフィール編集。timezone は書かない)
+    private struct NicknameAvatarUpdate: Encodable {
+        let nickname: String
+        let avatarEmoji: String
+
+        enum CodingKeys: String, CodingKey {
+            case nickname
+            case avatarEmoji = "avatar_emoji"
+        }
+    }
+
     /// APNs 登録の更新ペイロード(push_token / push_env は本人が更新できる列 — 0001 + 0005)
     private struct PushRegistrationUpdate: Encodable {
         let pushToken: String
@@ -112,6 +123,17 @@ final class SupabaseService: AuthServicing, PushRegistrationUpdating {
         _ = try await client
             .from("users")
             .update(ProfileUpdate(nickname: nickname, avatarEmoji: avatarEmoji, timezone: timezone))
+            .eq("id", value: userID)
+            .execute()
+    }
+
+    func updateNicknameAndAvatar(nickname: String, avatarEmoji: String) async throws {
+        guard let userID = currentUserID else { throw AuthServiceError.notSignedIn }
+        // RLS(users_update_self)と列レベル GRANT により、更新できるのは自分の行のこの列だけ。
+        // timezone は書かない(日付の判定に効くので、プロフィールの編集では触らない)
+        _ = try await client
+            .from("users")
+            .update(NicknameAvatarUpdate(nickname: nickname, avatarEmoji: avatarEmoji))
             .eq("id", value: userID)
             .execute()
     }

@@ -1,7 +1,8 @@
 // SettingsViewModel.swift — 設定画面の状態管理(REQUIREMENTS §3.15 / T23 #23)
 //
 // 設定画面(ホームの歯車から開くシート)が出すもの:
-//   - プロフィール(ニックネームの表示)・約束(編集は約束設定の画面を開く)・通知(OS の設定アプリへ)
+//   - プロフィール(ニックネームとアイコンの表示と編集 — 編集は ProfileEditViewModel)・約束(編集は約束設定の画面を開く)・
+//     通知(OS の設定アプリへ)
 //   - ペア(相手の名前と「ペアを解消する」= ブロック)
 //   - サポート(お問い合わせ・通報・利用規約・プライバシーポリシー)
 //   - アカウント(サインアウト・アカウントの削除)
@@ -33,6 +34,8 @@ final class SettingsViewModel {
     private(set) var snapshot: PairSnapshot?
     /// 約束を保存した直後の一言を出すか
     private(set) var showsPromiseSavedNote = false
+    /// プロフィールを保存した直後の一言を出すか
+    private(set) var showsProfileSavedNote = false
     /// サインアウトの確認(1段階のアラート)を出すか
     var showsSignOutConfirmation = false
 
@@ -123,6 +126,23 @@ final class SettingsViewModel {
     /// ペアの解消のあとなど、端末の snapshot が変わったとき
     func refreshSnapshot() {
         snapshot = store?.loadSnapshot()
+    }
+
+    // MARK: プロフィールの編集
+
+    /// 編集画面の状態を作る(編集画面を開くたびに 1 つ)。サーバーから読めていない間は nil
+    /// (いまの値が分からないまま保存すると、読めていないニックネームを空で上書きしかねない)
+    func makeProfileEditor() -> ProfileEditViewModel? {
+        guard loadState == .loaded, let profile else { return nil }
+        return ProfileEditViewModel(profile: profile, auth: auth, onSaved: { [weak self] saved in
+            self?.profileSaved(saved)
+        })
+    }
+
+    /// プロフィールを保存できた(編集画面から)。設定画面の表示を新しい値にする
+    func profileSaved(_ saved: UserProfile) {
+        profile = saved
+        showsProfileSavedNote = true
     }
 
     /// 約束設定の画面で保存できた
