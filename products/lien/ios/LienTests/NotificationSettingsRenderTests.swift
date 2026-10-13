@@ -170,8 +170,9 @@ final class NotificationSettingsRenderTests: XCTestCase {
         for (label, size, dark, height) in [
             ("standard_light", DynamicTypeSize.large, false, CGFloat(1000)),
             ("standard_dark", .large, true, 1000),
-            ("accessibility5_light", .accessibility5, false, 3200),
-            ("accessibility5_dark", .accessibility5, true, 3200),
+            // 高さが画面の 2 倍をだいぶ超えると、drawHierarchy が空白を返した(3200pt で確認)。2000pt(= 4000 画素)に収める
+            ("accessibility5_light", .accessibility5, false, 2000),
+            ("accessibility5_dark", .accessibility5, true, 2000),
         ] {
             let (screen, viewModel) = await settingsScreen(makeParts())
             XCTAssertEqual(viewModel.loadState, .loaded)
