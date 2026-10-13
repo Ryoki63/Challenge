@@ -34,7 +34,7 @@ scripts/macos-check/check.sh views                 # SwiftUI の View と AppSer
 ## 検査しないもの(`check.sh` の `exclude_from_module` / `EXCLUDE_TESTS`)
 
 - `AppDelegate` / `LienApp` / `RootView` / `SupabaseService` / `PushManager` / `QRCodeGenerator` / Debug の View: UIKit・UserNotifications・supabase-swift・`@main`・iOS 専用 API
-- テスト `AppServicesTests` / `ConfigTests`(`AppServices+Live` を使う)・`PlantRenderTests` / `PlantLayersTests`(アセットカタログ・描画・`XCTAttachment`)・`DeviceTokenStoreTests` / `QRCodeGeneratorTests` / `SmokeTests`
+- テスト `AppServicesTests` / `ConfigTests`(`AppServices+Live` を使う)・`PlantRenderTests` / `PlantLayersTests` / `HomeRenderChecksTests`(アセットカタログ・描画・UIKit の色・`XCTAttachment`)・`DeviceTokenStoreTests` / `QRCodeGeneratorTests` / `SmokeTests`
 - 描画の見た目・実機の挙動・シミュレータ上の UI・ウィジェットと NSE のターゲット: CI と実機(T20)で見る
 
 新しいファイルが UIKit などに依存するようになって `build` が落ちたら、`check.sh` の除外に足す(理由をコメントに)。

@@ -55,6 +55,8 @@ struct HomeView: View {
                     EmptyHomeContent()
                 }
             }
+            // 内容の周りの余白。上の余白(24pt)は、植物の上に出る吹き出しの余白の計算が前提にしている
+            // (WhisperBubbleMetrics.parentTopPadding。変えるときは、そちらも合わせる)
             .padding(LienSpacing.l)
 
             #if DEBUG
@@ -79,12 +81,8 @@ struct HomeView: View {
             viewModel.load()
             viewModel.plantExperience.homeDidAppear()
         }
-        // 今日のひとこと(吹き出し)は数秒で消える。出し直す(タップ)たびにタイマーを作り直す
-        .task(id: viewModel.plantExperience.whisperToken) {
-            guard viewModel.plantExperience.whisper != nil else { return }
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            if !Task.isCancelled { viewModel.plantExperience.hideWhisper() }
-        }
+        // 今日のひとこと(吹き出し)は数秒で消える。出し直す(タップ)たびにタイマーを作り直し、VoiceOver へ読み上げる
+        .plantWhisperLifetime(viewModel.plantExperience)
         .task { await viewModel.flushPendingOps() }
         // 前面に出したまま日付が変わったら、相手の写真を消す(PV #59。View が消えるとキャンセルされる)
         .task { await viewModel.partnerPhoto?.watchDayChanges() }
@@ -101,6 +99,8 @@ struct HomeView: View {
                 viewModel.load()
                 // 前面に出したまま日付が変わった次の朝も「その日はじめて」(今日のひとこと)
                 viewModel.plantExperience.homeDidAppear()
+                // バックグラウンドで観測して出しておいた段階アップの演出を、前面に戻って実際に見せた(ここで「見せた」と記録する)
+                viewModel.plantExperience.presentationDidAppear()
                 Task { await viewModel.flushPendingOps() }
             }
         }
@@ -123,13 +123,19 @@ struct HomeView: View {
                 presentation: presentation,
                 snapshot: viewModel.snapshot,
                 naming: viewModel.plantNaming,
-                canSendHeart: viewModel.canReact,
+                // 今日すでにリアクションを送っていたら出さない(付け替えは相手に届かない — HomeViewModel.canSendHeart)
+                canSendHeart: viewModel.canSendHeart,
                 // T15 のリアクション ❤️ を使い回す(相手の今日のチェックインへ)。失敗の文言は演出の中に出す
                 onSendHeart: { await viewModel.sendReaction(stamp: .heart) },
                 onClose: { viewModel.plantExperience.dismissPresentation() }
             )
             .id(presentation.id)
             .transition(.opacity)
+            // 前面のシーンで実際に表示した: ここで初めて「見せた」と記録する(バックグラウンドで観測しただけでは記録しない)。
+            // active になる前に表示された分は、scenePhase の変化(上の onChange)で記録する
+            .onAppear {
+                if scenePhase == .active { viewModel.plantExperience.presentationDidAppear() }
+            }
         }
     }
 }
@@ -169,6 +175,7 @@ private struct SnapshotContent: View {
                 canName: viewModel.canNamePlant,
                 gaugeText: viewModel.growthGaugeText,
                 whisper: viewModel.plantExperience.whisper,
+                canWhisper: viewModel.canWhisper,
                 nameNotice: viewModel.plantExperience.nameNotice,
                 moderation: moderation,
                 onTapPlant: { viewModel.plantExperience.plantTapped() },

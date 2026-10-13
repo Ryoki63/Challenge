@@ -173,51 +173,7 @@ final class HomeViewModel {
         plantState.sways
     }
 
-    // MARK: 植物まわり(PB #57。snapshot からの純粋な導出)
-
-    /// ゲージの文(「ふたりそろって あと2回で めばえ」— GROWTH §5.1)。ソロ・新しいキーが無い snapshot では nil(出さない)
-    var growthGaugeText: String? {
-        snapshot.flatMap(GrowthGauge.text(for:))
-    }
-
-    /// 植物の VoiceOver の読み上げ文(GROWTH §5.4)。snapshot が無い空状態は nil(装飾画像として隠す)
-    var plantAccessibilityText: String? {
-        snapshot.map(PlantVoiceOver.label(for:))
-    }
-
-    /// 葉の下に小さく置く約束の絵文字(左 = 自分 / 右 = 相手 — GROWTH §4.5)。ソロは葉が無いので置かない
-    var leafEmojis: (me: String?, partner: String?) {
-        guard let snapshot, snapshot.pairId != nil else { return (nil, nil) }
-        return (snapshot.myPromiseEmoji, snapshot.partnerPromiseEmoji)
-    }
-
-    /// ホームに出す植物の名前(ペアの鉢の名前だけ。ソロには名前を出さない)
-    var plantName: String? {
-        guard let snapshot, snapshot.pairId != nil, let name = snapshot.plantName, !name.isEmpty else { return nil }
-        return name
-    }
-
-    /// 「名前をつける」を出すか: ペアで、最初の「ふたば」(段階1)以降で、まだ名前が無いとき。
-    /// 演出を閉じても、名前が付くまでここに残る(GROWTH §5.3)。名前付けの口が無い構成では出さない
-    var canNamePlant: Bool {
-        guard plantNaming != nil, let snapshot, snapshot.pairId != nil, plantName == nil else { return false }
-        return PlantLayers.clampedStage(snapshot.plantStage) >= 1
-    }
-
-    /// 名前を変えられるか(名前があるペア)。名前の行がボタンになる
-    var canRenamePlant: Bool {
-        plantNaming != nil && plantName != nil
-    }
-
-    /// 名前のシートを開く(まだ名前が無ければ付ける・あれば変える)
-    func presentPlantNameSheet() {
-        guard let plantNaming else { return }
-        if canRenamePlant {
-            plantNaming.presentSheet(mode: .rename, currentName: plantName)
-        } else if canNamePlant {
-            plantNaming.presentSheet(mode: .first, currentName: nil)
-        }
-    }
+    // MARK: 植物まわり(PB #57)— snapshot からの導出は HomeViewModel+Plant.swift
 
     /// 名前を付けた・変えた結果を、端末の snapshot へ反映する(名前だけ。サーバーの snapshot 全体で上書きしない:
     /// 未送信のチェックインが残っているとき、サーバーの「今日は未完」で楽観の状態を巻き戻さないため。ほかは次の同期で揃う)
@@ -374,6 +330,8 @@ final class HomeViewModel {
         do {
             try await reactionService.sendReaction(stamp: stamp)
             reactionSentNote = Strings.Reaction.sentNote
+            // 今日は送った(どのスタンプでも)。段階アップの「ハートを送る」を、その日は出さない(付け替えは相手に届かない)
+            plantExperience.noteReactionSent()
             return true
         } catch {
             reactionErrorMessage = Strings.Reaction.errorMessage

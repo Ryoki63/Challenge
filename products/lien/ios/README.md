@@ -182,13 +182,25 @@ gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false -f in
 |---|---|
 | 進み具合(区間の中の位置)・のぞきを出す判定(区間7回以上の後半 = 11・18・26・38・56・83回から) | `Core/PlantProgress.swift`(ウィジェットとソース共有) |
 | ゲージの文・VoiceOver の読み上げ文(GROWTH §5.1・§5.4) | `Core/GrowthGauge.swift`(文言は `Strings.Plant`) |
-| 段階アップの演出を「1回だけ」出す記録(pairId ごと。新バージョン初回は静かに初期化・取り消しのあとの再到達では出さない)・相手の名前の知らせ・おかえり・ひとことの「もう見せたか」 | `Core/PlantMemory.swift`(端末の UserDefaults。サインアウト・削除で `reset()`) |
+| 段階アップの演出を「1回だけ」出す記録(pairId ごと。新バージョン初回は静かに初期化・取り消しのあとの再到達では出さない。**「見せた」と記録するのは前面で表示したとき** — `markCelebrated`)・相手の名前の知らせ・おかえり・ひとこと・リアクションを送った日の「もう見せたか」。旧ペアの記録(相手が付けた名前)は掃除する | `Core/PlantMemory.swift`(端末の UserDefaults。サインアウト・削除で `reset()`) |
 | 名前の入力の検査(NFC・Unicode コードポイントで 1〜8字・ZWJ だけ許す書式文字)と、plant-name の Live / スタブ(first の 409 は**自分が送った名前と同じなら成功・違えば相手の名前を採用**) | `Core/PlantNaming.swift`・`Core/Api/PlantNameAPIClient.swift` |
 | 今日のひとこと(吹き出し)の選び方(状況 + 段階の候補から日付で1つ) | `Core/PlantWhisper.swift` |
 | 体験の状態(全画面の演出・名前の知らせ・ひとこと)/ 名前フォームの状態 | `Features/Plant/PlantExperienceModel.swift`・`PlantNamingModel.swift` |
-| 画面: ホームの植物まわり / 全画面の演出(ホームの上のオーバーレイ。シートにしない = ほかの表示と重なっても待てる)/ 名前のフォームとシート | `Features/Plant/PlantHeroView.swift`・`PlantCelebrationView.swift`・`PlantNameFormView.swift`・`PlantNameSheet.swift` |
+| 画面: ホームの植物まわり・吹き出し / 全画面の演出(ホームの上のオーバーレイ。シートにしない = ほかの表示と重なっても待てる。植物の行・ハートのボタンは別ファイル)/ 名前のフォームとシート | `Features/Plant/PlantHeroView.swift`・`WhisperBubbleView.swift`・`PlantCelebrationView.swift`・`PlantCelebrationPlantsView.swift`・`PlantCelebrationHeartView.swift`・`PlantNameFormView.swift`・`PlantNameSheet.swift` |
 
 - 葉の下の約束の絵文字(左 = 自分・右 = 相手)と、小さな揺れ(プレートは揺らさない)は `PlantCharacterView` の中。揺れるかは描いている状態から決める(`PlantCharacterState.sways`)
-- テスト: `GrowthGaugeTests`(ゲージ・のぞき・VoiceOver・揺れ)/ `StageCelebrationTests`(演出の記録・名前の知らせ・おかえり・ひとこと)/ `PlantNamingTests`(入力の検査・Live・スタブ・フォーム)/ `PlantHomeTests`(HomeViewModel とのつなぎ)/ `PlantWhisperTests` / `ContractFixtureTests`(新キーの値と plant-name の応答)/ `PairSnapshotTests`(新キー無し・往復)
-- 実描画: `PlantRenderTests` が `plant_08`〜`plant_11`(ホームの植物まわり・全画面の演出。ライト/ダーク)も `plant-render-sheets` に書く
+- テスト: `GrowthGaugeTests`(ゲージ・のぞき・VoiceOver・揺れ)/ `StageCelebrationTests`(演出の記録・名前の知らせ・おかえり・ひとこと)/ `PlantNamingTests`(入力の検査・Live・スタブ・フォーム)/ `PlantHomeTests`(HomeViewModel とのつなぎ)/ `PlantWhisperTests` / `ContractFixtureTests`(新キーの値と plant-name の応答)/ `PairSnapshotTests`(新キー無し・往復)/ `PlantExperiencePolishTests`(仕上げ: 下の箇条書き)
+- 実描画: `PlantRenderTests` が `plant_08`〜`plant_11`(ホームの植物まわり・全画面の演出。ライト/ダーク)も `plant-render-sheets` に書く。
+  ホームの植物まわりには、文字を大きくした行(xxxLarge・accessibility3)もある
+- **仕上げ(PB #57 の Opus レビューの改善提案。2026-10-13)**
+  - 段階アップの「見せた」の記録は、snapshot を観測した時点でなく、前面で実際に表示した時点(`PlantExperienceModel.presentationDidAppear` ← `HomeView` が scenePhase が active のとき呼ぶ)。
+    サイレント push で起こされたプロセスがバックグラウンドで観測して終了しても、演出を一度も見せずに失わない。閉じたときも記録する
+  - 演出を出している間にペアが解消された・別のペアになったら、その演出(と、ひとこと)は下げる
+  - 「(相手)にハートを送る」は、その日すでにリアクションを送っていたら出さない(サーバーの react は2回目以降を付け替えにして通知を送り直さないため。`HomeViewModel.canSendHeart`)
+  - 相手が初めて名前を付けたときの知らせは「名前が『みどり』になったよ」(変えたときは「かわったよ」)。旧ペアの名前は、ペアが変わった・ソロに戻ったときに端末から消す
+  - 今日のひとこと: VoiceOver のアクション「タネの子のひとこと」(ペア成立中)と、出すたびの読み上げ(`plantWhisperLifetime`)。吹き出しの上の余白は、文字の大きさに連れて広げる(`WhisperBubbleMetrics`。2行の吹き出しがホームの ScrollView の上端に食い込まない)。
+    実機の VoiceOver・大きい文字での見え方は T20 で確認する
+- 相手の今日の写真(PV #59)の仕上げ: 全画面で原寸が取れなかったらスピナーを止める(`PartnerPhotoModel.Viewer.Original`)/ 15 分たって取り直すとき、オフラインでも出している写真は消さない
+  (行の読み取り・トークンの更新の通信失敗を `PartnerPhotoError.network` にそろえる)/ 読めなかった日は 3 分間取り直さない(通信の失敗は覚えない)/ 縦長の写真でも、枠と角丸とタップ範囲が写真そのもの(`PartnerPhotoCardLayout`)。
+  画素での確認は `HomeRenderChecksTests`(CI のみ。見た目は artifact の `photo_01_partner_photo_cards.png`・`bubble_*.png`)
 - 手元の下見(`scripts/macos-check/check.sh test <ファイル名...>`)で絞って走らせるとき、`PunishmentFreeLint`(`StringsReviewTests`)・`MockSnapshotClient`(`SnapshotSynchronizerTests`)などほかのテストファイルの部品を使うテストは、それらのファイル名も並べる

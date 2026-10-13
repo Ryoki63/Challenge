@@ -238,6 +238,8 @@ private struct HeroSheet: View {
         var gauge: String?
         var whisper: String?
         var notice: String?
+        /// 文字の大きさ(nil なら標準)。大きくすると、2行の吹き出しが高くなる — 上の余白が足りているかを見る
+        var typeSize: DynamicTypeSize?
     }
 
     private let items: [Item] = [
@@ -278,10 +280,24 @@ private struct HeroSheet: View {
             gauge: "よりそいになってから 2回そろったよ",
             whisper: "すやすや…ふたりのペースで いいよ"
         ),
+        Item(
+            label: "文字: 大きい(xxxLarge)\n2行のひとこと — 上端に食い込まない",
+            state: PlantCharacterState(stage: 9, meOpen: true, partnerOpen: true, expression: .happy),
+            gauge: "ふたりで 128回 そろったよ",
+            whisper: "あなたの葉が ひらくのも、たのしみにしてるよ",
+            typeSize: .xxxLarge
+        ),
+        Item(
+            label: "文字: 最大級(accessibility3)\n2行のひとこと — 上端に食い込まない",
+            state: PlantCharacterState(stage: 3, meOpen: true, expression: .lookLeft, peek: true),
+            gauge: "ふたりそろって あと3回で よりそい",
+            whisper: "ひらいたよ。ゆうきの葉は ねんね中",
+            typeSize: .accessibility3
+        ),
     ]
 
     var body: some View {
-        Sheet(title: "ホームの植物まわり(葉の下の約束の絵文字・のぞき・ゲージ・名前・ひとこと)— \(dark ? "ダーク" : "ライト")", dark: dark) {
+        Sheet(title: "ホームの植物まわり(葉の下の約束の絵文字・のぞき・ゲージ・名前・ひとこと。上の余白はホームの ScrollView と同じ 24pt)— \(dark ? "ダーク" : "ライト")", dark: dark) {
             VStack(alignment: .leading, spacing: 18) {
                 ForEach(0..<(items.count + 2) / 3, id: \.self) { row in
                     HStack(alignment: .top, spacing: 14) {
@@ -300,8 +316,11 @@ private struct HeroSheet: View {
                                     whisper: item.whisper,
                                     nameNotice: item.notice
                                 )
+                                .environment(\.dynamicTypeSize, item.typeSize ?? .large)
                                 .frame(width: 260)
-                                .padding(.top, 40) // 吹き出しが枠の上へはみ出す分(画像から切れないように)
+                                // ホームの ScrollView の内容の上の余白(LienSpacing.l)だけ。吹き出しが上へはみ出して切れたら、画像でも切れる
+                                // (以前は 40pt を足して、切れないように撮っていた — PB の Opus レビュー)
+                                .padding(.top, LienSpacing.l)
                                 Text(item.label)
                                     .font(.system(size: 9))
                                     .foregroundStyle(.secondary)

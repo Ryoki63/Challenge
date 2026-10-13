@@ -1,6 +1,7 @@
 // PlantHeroView.swift — ホームの植物まわり(植物・名前・ゲージの文・今日のひとこと・名前の知らせ / issue #57)
 //
-//   [吹き出し: 今日のひとこと]         ← 植物の上(レイアウトを動かさない。数秒で消える。植物のタップでもう一度)
+//   [吹き出し: 今日のひとこと]         ← 植物の上(レイアウトを動かさない。数秒で消える。植物のタップでもう一度。
+//                                        VoiceOver には、アクション「タネの子のひとこと」と、出すたびの読み上げ)
 //   [植物(ふたりの葉の下に約束の絵文字)]  ← 片方だけ完了のときは小さく揺れる(プレートは揺らさない)
 //   名前(タップで変える)/「名前をつける」
 //   名前の知らせ(「名前が『みどり』にかわったよ」)
@@ -31,6 +32,8 @@ struct PlantHeroView: View {
     var gaugeText: String?
     /// 今日のひとこと(吹き出し。nil なら出さない)
     var whisper: String?
+    /// 植物をタップしてひとことを出せるか(ペア成立中)。出せるときだけ、VoiceOver のアクション「タネの子のひとこと」を付ける
+    var canWhisper = false
     /// 相手が名前を付けた・変えた知らせ(nil なら出さない)
     var nameNotice: String?
     var moderation: ModerationViewModel?
@@ -39,6 +42,8 @@ struct PlantHeroView: View {
     var onDismissNameNotice: () -> Void = {}
 
     @State private var swayAngle: Double = 0
+    /// `.footnote` の行の高さ。文字を大きくする設定に連れて広がる(吹き出しの余白を、2行ぶんの高さに合わせるため)
+    @ScaledMetric(relativeTo: .footnote) private var footnoteLineHeight = WhisperBubbleMetrics.baseLineHeight
 
     /// 植物の枠の大きさ(3:4。キャンバス 240×320 と同じ比率)
     private static let plantWidth: CGFloat = 180
@@ -53,9 +58,17 @@ struct PlantHeroView: View {
                 swayDegrees: swayAngle,
                 accessibilityText: accessibilityText
             )
+            // VoiceOver からも、タップと同じ「ひとこと」を出せる(吹き出しは数秒で消えるので、出し直せる口が要る)
+            .accessibilityActions {
+                if canWhisper {
+                    Button(Strings.Plant.whisperAction) { onTapPlant() }
+                }
+            }
             .frame(width: Self.plantWidth, height: Self.plantHeight)
             .overlay(alignment: .top) { whisperBubble }
-            .padding(.top, LienSpacing.xl) // 吹き出しが植物の上に出る分の余白(出ていないときも同じ。レイアウトを動かさない)
+            // 吹き出しが植物の上に出る分の余白(出ていないときも同じ。レイアウトを動かさない)。
+            // 最大2行の吹き出しが、文字を大きくしても ScrollView の上端に食い込まないよう、行の高さに連れて広げる
+            .padding(.top, WhisperBubbleMetrics.roomAbovePlant(lineHeight: footnoteLineHeight))
             .contentShape(Rectangle())
             .onTapGesture { onTapPlant() }
             .onAppear { updateSway() }
@@ -125,16 +138,16 @@ struct PlantHeroView: View {
 
     // MARK: 吹き出し(今日のひとこと)
 
-    /// 植物の枠の上に、枠の外へはみ出して出す(下端が枠の上端の 2pt 上)。レイアウトは動かさない。タップは植物に通す。
+    /// 植物の枠の上に、枠の外へはみ出して出す(下端が枠の上端の `gap` 上)。レイアウトは動かさない。タップは植物に通す。
     /// 位置は、枠と同じ高さの入れ物の下端に吹き出しを置き、その分だけ上へずらして決める
     /// (alignmentGuide は、実描画のテスト(ImageRenderer)で効かなかったので使わない — 吹き出しが植物の絵に重なっていた)
     @ViewBuilder
     private var whisperBubble: some View {
         if let whisper {
-            WhisperBubble(text: whisper)
-                .frame(width: 260)
+            WhisperBubbleView(text: whisper)
+                .frame(width: WhisperBubbleMetrics.width)
                 .frame(height: Self.plantHeight, alignment: .bottom)
-                .offset(y: -(Self.plantHeight + 2))
+                .offset(y: -(Self.plantHeight + WhisperBubbleMetrics.gap))
                 .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .bottom)))
                 .allowsHitTesting(false)
         }
@@ -155,43 +168,5 @@ struct PlantHeroView: View {
                 swayAngle = 0
             }
         }
-    }
-}
-
-// MARK: - 吹き出し
-
-/// 短い吹き出し(角丸+下向きのしっぽ)。文言は呼び出し側から(絵は使わない)
-private struct WhisperBubble: View {
-    let text: String
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Text(text)
-                .font(.footnote)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(LienColors.chipBackground)
-                )
-            BubbleTail()
-                .fill(LienColors.chipBackground)
-                .frame(width: 14, height: 7)
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// 吹き出しのしっぽ(下向きの三角)
-private struct BubbleTail: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.closeSubpath()
-        return path
     }
 }

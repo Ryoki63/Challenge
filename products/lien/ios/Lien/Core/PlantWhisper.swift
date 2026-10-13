@@ -75,3 +75,43 @@ enum PlantDay {
         calendar.ordinality(of: .day, in: .era, for: date) ?? 0
     }
 }
+
+/// 吹き出しの大きさ(点)と、植物の枠の上に空けておく余白の計算(純粋)。
+/// 吹き出しは植物の枠の上にはみ出して出す(下端が枠の上端の `gap` 上)。レイアウトは動かさないので、出ていないときも
+/// 余白を空けておく。文字を大きくする設定(Dynamic Type)では行が高くなり、最大2行の吹き出しも高くなる。余白が足りないと、
+/// ホームの ScrollView の上端・ナビゲーションバーの下に吹き出しが食い込んで切れる(PB の Opus レビュー)。
+/// 2行ぶんの高さに合わせて余白を広げる(行の高さは `.footnote` を基準に ScaledMetric で文字の大きさに連れて広げる)
+enum WhisperBubbleMetrics {
+    /// 吹き出しの文字の行数の上限
+    static let maxLines = 2
+    /// 吹き出しの文字の上下の余白(片側)
+    static let verticalPadding: CGFloat = 6
+    /// 吹き出しの文字の左右の余白(片側)
+    static let horizontalPadding: CGFloat = 12
+    /// しっぽ(下向きの三角)の大きさ
+    static let tailWidth: CGFloat = 14
+    static let tailHeight: CGFloat = 7
+    /// 吹き出しの下端と、植物の枠の上端のすき間
+    static let gap: CGFloat = 2
+    /// 吹き出しの幅
+    static let width: CGFloat = 260
+    /// 標準の文字の大きさ(Large)での `.footnote` の行の高さ。ScaledMetric の基準にする(Apple の HIG: 13pt の行送りは 18pt)
+    static let baseLineHeight: CGFloat = 18
+    /// 親(ホームの ScrollView)が内容の上に空けている余白。吹き出しは、この余白にもはみ出してよい(LienSpacing.l と同じ 24pt)
+    static let parentTopPadding: CGFloat = 24
+    /// 植物の枠の上に最低限空ける余白(吹き出しが出ていないときの、植物の上の空き。LienSpacing.xl と同じ 32pt)
+    static let minimumRoom: CGFloat = 32
+    /// 上の端から空けておく余裕。日本語の行は、かなと漢字のフォントの違いで、基準の行の高さより少し高くなることがある
+    static let safetyMargin: CGFloat = 4
+
+    /// 最大の行数の吹き出しが、植物の枠の上にはみ出す高さ(文字 + 上下の余白 + しっぽ + すき間)
+    static func extent(lineHeight: CGFloat) -> CGFloat {
+        CGFloat(maxLines) * lineHeight + 2 * verticalPadding + tailHeight + gap
+    }
+
+    /// 植物の枠の上に空けておく余白。吹き出しの高さのうち、親の余白に収まらない分(と余裕)を足す。
+    /// 標準の文字の大きさでは、従来の 32pt に近い(37pt)
+    static func roomAbovePlant(lineHeight: CGFloat) -> CGFloat {
+        max(minimumRoom, extent(lineHeight: lineHeight) - parentTopPadding + safetyMargin)
+    }
+}

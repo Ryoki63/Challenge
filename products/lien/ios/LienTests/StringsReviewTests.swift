@@ -397,6 +397,7 @@ enum StringsCatalog {
             add("Plant.celebrationHeart(\(name))", Strings.Plant.celebrationHeart(name))
             add("Plant.nameSavedNote(\(name))", Strings.Plant.nameSavedNote(name))
             add("Plant.nameAdoptedNote(\(name))", Strings.Plant.nameAdoptedNote(name))
+            add("Plant.nameFirstNotice(\(name))", Strings.Plant.nameFirstNotice(name))
             add("Plant.nameChangedNotice(\(name))", Strings.Plant.nameChangedNotice(name))
             for (index, line) in Strings.Plant.Whisper.bothDone(name).enumerated() {
                 add("Plant.Whisper.bothDone(\(name))[\(index)]", line)

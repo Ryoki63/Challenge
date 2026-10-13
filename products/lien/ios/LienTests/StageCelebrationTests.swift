@@ -64,6 +64,16 @@ private enum Fixture {
     }
 }
 
+/// 観測して、出す演出があれば「見せた」と記録するまで進める(前面で表示したあとの記録の状態)。
+/// 記録を観測と分けた挙動そのもの(観測だけでは記録しない)は PlantExperiencePolishTests で確かめる
+extension PlantMemory {
+    fileprivate mutating func observeAndRecord(_ snapshot: PairSnapshot) -> PlantObservation {
+        let observation = observe(snapshot)
+        if let celebration = observation.celebration { markCelebrated(celebration) }
+        return observation
+    }
+}
+
 // MARK: - 記録の判定(純粋)
 
 final class StageCelebrationTests: XCTestCase {
@@ -74,7 +84,7 @@ final class StageCelebrationTests: XCTestCase {
         var memory = PlantMemory()
         XCTAssertFalse(memory.initialized)
 
-        let observation = memory.observe(Fixture.paired(stage: 4, plantName: "みどり"))
+        let observation = memory.observeAndRecord(Fixture.paired(stage: 4, plantName: "みどり"))
 
         XCTAssertNil(observation.celebration)
         XCTAssertNil(observation.changedName, "最初の観測では、名前の知らせも出さない(ずっと前からある名前)")
@@ -85,18 +95,18 @@ final class StageCelebrationTests: XCTestCase {
 
     func testFirstObservationOfAZeroStagePairIsAlsoSilent() {
         var memory = PlantMemory()
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 0)).celebration)
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 0)).celebration)
         XCTAssertEqual(memory.celebratedStage["pair-A"], 0)
     }
 
     func testSoloFirstObservationMarksInitializedSoTheFirstPairIsCelebrated() {
         // 新規ユーザー: 最初に見る snapshot はソロ(約束を決めたあとのホーム)。そのあとできたペアは、新しいペアとして祝う
         var memory = PlantMemory()
-        XCTAssertNil(memory.observe(Fixture.solo()).celebration)
+        XCTAssertNil(memory.observeAndRecord(Fixture.solo()).celebration)
         XCTAssertTrue(memory.initialized)
         XCTAssertTrue(memory.celebratedStage.isEmpty, "ソロでは、ペアごとの記録に触れない")
 
-        let observation = memory.observe(Fixture.paired(stage: 0))
+        let observation = memory.observeAndRecord(Fixture.paired(stage: 0))
         let celebration = observation.celebration
         XCTAssertEqual(celebration?.stage, 0)
         XCTAssertEqual(celebration?.isFirstMeeting, true, "段階0 = ペア成立の「はじめまして」")
@@ -109,7 +119,7 @@ final class StageCelebrationTests: XCTestCase {
     func testEachStageIsCelebratedOnlyOnce() {
         var memory = Fixture.initializedMemory(celebrated: ["pair-A": 4])
 
-        let up = memory.observe(Fixture.paired(stage: 5, grownDays: 21)).celebration
+        let up = memory.observeAndRecord(Fixture.paired(stage: 5, grownDays: 21)).celebration
         XCTAssertEqual(up?.stage, 5)
         XCTAssertEqual(up?.previousStage, 4)
         XCTAssertEqual(up?.beforeStage, 4)
@@ -120,10 +130,10 @@ final class StageCelebrationTests: XCTestCase {
 
         // 同じ snapshot を何度見ても、もう出さない(ホームを開き直す・前面復帰・同期のたびに見る)
         for _ in 0..<3 {
-            XCTAssertNil(memory.observe(Fixture.paired(stage: 5, grownDays: 21)).celebration)
+            XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 5, grownDays: 21)).celebration)
         }
         // 次の段階では、また1回出る
-        XCTAssertEqual(memory.observe(Fixture.paired(stage: 6, grownDays: 30)).celebration?.stage, 6)
+        XCTAssertEqual(memory.observeAndRecord(Fixture.paired(stage: 6, grownDays: 30)).celebration?.stage, 6)
     }
 
     func testTheWholeJourneyCelebratesEveryStageExactlyOnce() {
@@ -134,7 +144,7 @@ final class StageCelebrationTests: XCTestCase {
             let stage = thresholds.lastIndex { $0 <= grown } ?? 0
             // 同じ回数を2回見る(2回目は出ない)
             for _ in 0..<2 {
-                if let celebration = memory.observe(Fixture.paired(stage: stage, grownDays: grown)).celebration {
+                if let celebration = memory.observeAndRecord(Fixture.paired(stage: stage, grownDays: grown)).celebration {
                     celebrated.append(celebration.stage)
                 }
             }
@@ -144,13 +154,13 @@ final class StageCelebrationTests: XCTestCase {
 
     func testFirstFutabaOffersNamingAndOtherStagesDoNot() {
         var memory = Fixture.initializedMemory(celebrated: ["pair-A": 0])
-        let futaba = memory.observe(Fixture.paired(stage: 1)).celebration
+        let futaba = memory.observeAndRecord(Fixture.paired(stage: 1)).celebration
         XCTAssertEqual(futaba?.offersNaming, true, "最初の「ふたば」の演出の中で名前を付ける(GROWTH §5.3)")
 
         let meeting = Fixture.initializedMemory()
         var fresh = meeting
-        XCTAssertEqual(fresh.observe(Fixture.paired(stage: 0)).celebration?.offersNaming, false, "ペア成立の直後ではない")
-        XCTAssertEqual(memory.observe(Fixture.paired(stage: 2)).celebration?.offersNaming, false)
+        XCTAssertEqual(fresh.observeAndRecord(Fixture.paired(stage: 0)).celebration?.offersNaming, false, "ペア成立の直後ではない")
+        XCTAssertEqual(memory.observeAndRecord(Fixture.paired(stage: 2)).celebration?.offersNaming, false)
     }
 
     // MARK: 取り消し・段階を飛ぶ・知らない段階
@@ -158,28 +168,28 @@ final class StageCelebrationTests: XCTestCase {
     func testCancelingAndReachingTheSameStageAgainDoesNotCelebrateAgain() {
         // 当日のチェックインを取り消すと、先取りしていた1回分が戻って、段階が下がることがある
         var memory = Fixture.initializedMemory(celebrated: ["pair-A": 2])
-        XCTAssertEqual(memory.observe(Fixture.paired(stage: 3, grownDays: 7)).celebration?.stage, 3, "わかばに上がった")
+        XCTAssertEqual(memory.observeAndRecord(Fixture.paired(stage: 3, grownDays: 7)).celebration?.stage, 3, "わかばに上がった")
 
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 2, grownDays: 6)).celebration, "取り消しで戻った")
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 2, grownDays: 6)).celebration, "取り消しで戻った")
         XCTAssertEqual(memory.celebratedStage["pair-A"], 3, "記録は戻さない")
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 3, grownDays: 7)).celebration, "同じ段階にまた上がっても、もう一度は出さない")
-        XCTAssertEqual(memory.observe(Fixture.paired(stage: 4, grownDays: 14)).celebration?.stage, 4, "次の段階は祝う")
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 3, grownDays: 7)).celebration, "同じ段階にまた上がっても、もう一度は出さない")
+        XCTAssertEqual(memory.observeAndRecord(Fixture.paired(stage: 4, grownDays: 14)).celebration?.stage, 4, "次の段階は祝う")
     }
 
     func testSkippingSeveralStagesCelebratesOnlyTheCurrentOne() {
         // アプリを長く開かなかった(複数の段階が進んだ)
         var memory = Fixture.initializedMemory(celebrated: ["pair-A": 1])
-        let celebration = memory.observe(Fixture.paired(stage: 4, grownDays: 14)).celebration
+        let celebration = memory.observeAndRecord(Fixture.paired(stage: 4, grownDays: 14)).celebration
         XCTAssertEqual(celebration?.stage, 4)
         XCTAssertEqual(celebration?.previousStage, 1)
         XCTAssertEqual(celebration?.beforeStage, 1, "変わる前 = 最後に見た段階")
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 4, grownDays: 14)).celebration)
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 4, grownDays: 14)).celebration)
     }
 
     func testPairBornWhileTheAppWasClosedCelebratesTheCurrentStageWithoutMeeting() {
         // 相手がペア成立のあとチェックインを重ね、自分は初めてアプリを開いたらもう「ふたば」だった
         var memory = Fixture.initializedMemory()
-        let celebration = memory.observe(Fixture.paired(stage: 1)).celebration
+        let celebration = memory.observeAndRecord(Fixture.paired(stage: 1)).celebration
         XCTAssertEqual(celebration?.stage, 1)
         XCTAssertNil(celebration?.previousStage)
         XCTAssertEqual(celebration?.beforeStage, 0, "前の記録が無いときは、1つ前の段階")
@@ -189,12 +199,12 @@ final class StageCelebrationTests: XCTestCase {
     func testUnknownLargeStageIsClampedSoTheLastStageIsNotCelebratedRepeatedly() {
         // 1.0.1 の花壇の段階 10 以降をサーバーが返した古いアプリは、みのり(9)として描く
         var memory = Fixture.initializedMemory(celebrated: ["pair-A": 9])
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 10, grownDays: 125)).celebration)
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 12, grownDays: 175)).celebration)
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 10, grownDays: 125)).celebration)
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 12, grownDays: 175)).celebration)
         XCTAssertEqual(memory.celebratedStage["pair-A"], 9)
 
         var behind = Fixture.initializedMemory(celebrated: ["pair-A": 8])
-        let celebration = behind.observe(Fixture.paired(stage: 11, grownDays: 150)).celebration
+        let celebration = behind.observeAndRecord(Fixture.paired(stage: 11, grownDays: 150)).celebration
         XCTAssertEqual(celebration?.stage, 9, "みのりとして、1回だけ祝う")
     }
 
@@ -203,16 +213,15 @@ final class StageCelebrationTests: XCTestCase {
     func testPairsAreTrackedSeparately() {
         var memory = Fixture.initializedMemory(celebrated: ["pair-A": 5])
         // 別のペア(組み直し)は、新しいペアとして段階0から祝う
-        let rebuilt = memory.observe(Fixture.paired(pairId: "pair-B", stage: 0)).celebration
+        let rebuilt = memory.observeAndRecord(Fixture.paired(pairId: "pair-B", stage: 0)).celebration
         XCTAssertEqual(rebuilt?.stage, 0)
         XCTAssertEqual(rebuilt?.pairId, "pair-B")
-        XCTAssertEqual(memory.celebratedStage["pair-A"], 5, "前のペアの記録は触らない")
-        XCTAssertEqual(memory.celebratedStage["pair-B"], 0)
+        XCTAssertEqual(memory.celebratedStage, ["pair-B": 0], "前のペアの記録は掃除する(今のペアのぶんだけ残す)")
     }
 
     func testSoloSnapshotDoesNotCelebrate() {
         var memory = Fixture.initializedMemory(celebrated: ["pair-A": 5])
-        XCTAssertNil(memory.observe(Fixture.solo(meDone: true)).celebration)
+        XCTAssertNil(memory.observeAndRecord(Fixture.solo(meDone: true)).celebration)
         XCTAssertEqual(memory.celebratedStage, ["pair-A": 5])
     }
 
@@ -221,35 +230,39 @@ final class StageCelebrationTests: XCTestCase {
     func testPartnerNamingOrRenamingShowsNoticeOnceAfterTheFirstObservation() {
         var memory = Fixture.initializedMemory(celebrated: ["pair-A": 2])
         // 名前が無い → 相手が付けた
-        XCTAssertEqual(memory.observe(Fixture.paired(stage: 2, plantName: "みどり")).changedName, "みどり")
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 2, plantName: "みどり")).changedName, "同じ名前は、もう知らせない")
+        XCTAssertEqual(memory.observeAndRecord(Fixture.paired(stage: 2, plantName: "みどり")).changedName, "みどり")
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 2, plantName: "みどり")).changedName, "同じ名前は、もう知らせない")
         // 相手が変えた
-        XCTAssertEqual(memory.observe(Fixture.paired(stage: 2, plantName: "あおば")).changedName, "あおば")
+        XCTAssertEqual(memory.observeAndRecord(Fixture.paired(stage: 2, plantName: "あおば")).changedName, "あおば")
         // 名前が(まだ)無い snapshot は知らせない
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 2, plantName: nil)).changedName)
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 2, plantName: "")).changedName)
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 2, plantName: nil)).changedName)
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 2, plantName: "")).changedName)
     }
 
     func testOwnNameIsNotAnnouncedToMyself() {
         var memory = Fixture.initializedMemory(celebrated: ["pair-A": 2])
         memory.recordOwnName(pairId: "pair-A", name: "みどり")
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 2, plantName: "みどり")).changedName)
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 2, plantName: "みどり")).changedName)
     }
 
     func testNameChangeTogetherWithACelebrationIsRememberedButNotAnnounced() {
         // 演出の中で名前を見せる。演出と同時に「かわったよ」を出さない
         var memory = Fixture.initializedMemory(celebrated: ["pair-A": 0])
-        let observation = memory.observe(Fixture.paired(stage: 1, plantName: "みどり"))
+        let observation = memory.observeAndRecord(Fixture.paired(stage: 1, plantName: "みどり"))
         XCTAssertEqual(observation.celebration?.stage, 1)
         XCTAssertNil(observation.changedName)
         XCTAssertEqual(memory.seenName["pair-A"], "みどり")
-        XCTAssertNil(memory.observe(Fixture.paired(stage: 1, plantName: "みどり")).changedName, "あとで知らせ直さない")
+        XCTAssertNil(memory.observeAndRecord(Fixture.paired(stage: 1, plantName: "みどり")).changedName, "あとで知らせ直さない")
     }
 
     func testNamesAreTrackedPerPair() {
-        var memory = Fixture.initializedMemory(celebrated: ["pair-A": 2, "pair-B": 2])
-        _ = memory.observe(Fixture.paired(pairId: "pair-A", stage: 2, plantName: "みどり"))
-        XCTAssertEqual(memory.observe(Fixture.paired(pairId: "pair-B", stage: 2, plantName: "みどり")).changedName, "みどり")
+        // 別のペア(組み直し)は、同じ名前でも新しい名前として知らせる(前のペアの記録は掃除してある)
+        var memory = Fixture.initializedMemory(celebrated: ["pair-A": 2])
+        _ = memory.observeAndRecord(Fixture.paired(pairId: "pair-A", stage: 2, plantName: "みどり"))
+        XCTAssertEqual(memory.seenName, ["pair-A": "みどり"])
+
+        _ = memory.observeAndRecord(Fixture.paired(pairId: "pair-B", stage: 2, plantName: "みどり"))
+        XCTAssertEqual(memory.seenName, ["pair-B": "みどり"], "旧ペアの名前(相手が付けた UGC)を端末に残さない")
     }
 
     // MARK: おかえり(GROWTH §4.4)
@@ -336,7 +349,7 @@ final class StageCelebrationTests: XCTestCase {
         var memory = store.load()
         XCTAssertEqual(memory, PlantMemory(initialized: true))
         // 次のアカウントで最初にできたペアは、新しいペアとして「はじめまして」を祝う(静かに初期化してしまわない)
-        XCTAssertEqual(memory.observe(Fixture.paired(pairId: "pair-X", stage: 0)).celebration?.stage, 0)
+        XCTAssertEqual(memory.observeAndRecord(Fixture.paired(pairId: "pair-X", stage: 0)).celebration?.stage, 0)
         // 前のアカウントの最後のチェックイン日から、おかえりを出さない
         XCTAssertFalse(memory.noteMyCheckin(day: 9999))
     }
@@ -419,14 +432,22 @@ final class PlantExperienceModelTests: XCTestCase {
 
     func testPartnerRenameShowsANoticeAndOwnNameDoesNot() {
         let (model, _, _) = makeModel(memory: Fixture.initializedMemory(celebrated: ["pair-A": 2]))
+        // 名前が無い → 相手が初めて付けた: 「なったよ」(変えたときの「かわったよ」とは分ける)
         model.snapshotDidChange(Fixture.paired(stage: 2, plantName: "みどり"))
-        XCTAssertEqual(model.nameNotice, Strings.Plant.nameChangedNotice("みどり"))
+        XCTAssertEqual(model.nameNotice, Strings.Plant.nameFirstNotice("みどり"))
+        XCTAssertEqual(model.nameNotice, "名前が『みどり』になったよ")
         model.dismissNameNotice()
         XCTAssertNil(model.nameNotice)
 
-        // 自分が変えた: 知らせない
-        model.recordOwnName(pairId: "pair-A", name: "あおば")
+        // 相手が変えた: 「かわったよ」
         model.snapshotDidChange(Fixture.paired(stage: 2, plantName: "あおば"))
+        XCTAssertEqual(model.nameNotice, Strings.Plant.nameChangedNotice("あおば"))
+        XCTAssertEqual(model.nameNotice, "名前が『あおば』にかわったよ")
+        model.dismissNameNotice()
+
+        // 自分が変えた: 知らせない
+        model.recordOwnName(pairId: "pair-A", name: "きいろ")
+        model.snapshotDidChange(Fixture.paired(stage: 2, plantName: "きいろ"))
         XCTAssertNil(model.nameNotice)
 
         // 相手が付けていた名前に決まった(409): 文言を出す

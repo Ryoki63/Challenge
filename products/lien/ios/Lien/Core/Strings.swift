@@ -281,7 +281,11 @@ enum Strings {
         static func nameAdoptedNote(_ name: String) -> String {
             "名前は『\(name)』になったよ"
         }
-        /// 相手が付けた・変えた(次に開いたとき): 「名前が『みどり』にかわったよ」
+        /// 相手が初めて付けた(次に開いたとき): 「名前が『みどり』になったよ」。変えたときの「かわったよ」とは分ける
+        static func nameFirstNotice(_ name: String) -> String {
+            "名前が『\(name)』になったよ"
+        }
+        /// 相手が変えた(次に開いたとき): 「名前が『みどり』にかわったよ」
         static func nameChangedNotice(_ name: String) -> String {
             "名前が『\(name)』にかわったよ"
         }
