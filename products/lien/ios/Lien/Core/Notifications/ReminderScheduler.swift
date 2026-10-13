@@ -169,7 +169,9 @@ final class ReminderScheduler: ReminderManaging {
         let desired = Self.desiredRequests(prefs: prefs, snapshot: snapshot, now: current, calendar: calendar)
 
         // 予約: OS に残っている予約と比べて、要らないもの(計算に無い識別子)を消し、足りないもの・内容が違うものを
-        // 置く(同じ識別子の予約は置き換わる)。内容が同じものは触らない
+        // 置く(同じ識別子の予約は置き換わる)。内容が同じものは触らない。
+        // 内容が違うだけの予約は、消さずに置き換える: removePendingNotificationRequests は内部で遅れて実行されることがあり、
+        // 同じ識別子を消してすぐ置くと、遅れた削除が新しい予約を消すおそれがある(消すのは、計算に無い識別子だけ)
         let pending = await center.pendingLocalNotifications()
         let desiredByID = Dictionary(desired.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let kept = Set(pending.filter { desiredByID[$0.id]?.matches(pending: $0) == true }.map(\.id))

@@ -237,7 +237,7 @@ v1.0 の端末のローカル通知は 2 つだけ(REQUIREMENTS §3.12)。配送
 
 ふたりそろったことが分かったら、今日の夜 9 時の通知を取り消す。分かる経路は 2 つ: ① アプリが同期したとき(`sync()`)/ ② 相手のチェックインの push を NSE が受けたとき(`NotificationService` が `LocalNotificationCancellation` の規則で、今日の分の予約を `removePendingNotificationRequests`、届いたものを `removeDeliveredNotifications` で取り消す。取り消しがシステムに届いてから通知を出す)。
 
-**②(NSE が本体のアプリの予約を消せるか)は、実機でしか確かめられず、まだ確かめていない。** 消せなかったときのふるまいは決めてあり、テストで固定している(`ReminderSchedulerLearningTests.testWhenTheNSECannotCancel…` / `LocalNotificationRulesTests`):
+**②(NSE が本体のアプリの予約を消せるか)は、実機でしか確かめられず、まだ確かめていない。** Apple の文書には、拡張から本体の予約を消せるとも消せないとも書かれていない(2026-10-13 に調べた)。手がかりは、開発者フォーラムの報告([thread 684226](https://developer.apple.com/forums/thread/684226))で、NSE の `getPendingNotificationRequests` が本体の予約を返す前提で解決していること(Apple の回答は無い)。なので「たぶん消せる」と見て作り、消せなかったときのふるまいは決めてあり、テストで固定している(`ReminderSchedulerLearningTests.testWhenTheNSECannotCancel…` / `LocalNotificationRulesTests`):
 
 1. 夜 9 時の通知は、ふたりそろっていても予約が残るので、そのまま届く。文言は、そのとき読んでも困らない言い方(「いっしょに守ろう」。記録を失う・脅す言い方はしない)
 2. アプリが前面にいる間に届いたものは、出さずに捨てる(`AppDelegate.willPresent` → `shouldSuppress`)
