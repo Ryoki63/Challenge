@@ -70,7 +70,7 @@ products/lien/
 ### 3.3 アプリ内アーキテクチャ
 
 - SwiftUI + Observation(`@Observable`)。ViewModel は画面単位
-- データ層はプロトコル境界(`AuthServicing` / `InviteClient` / `PromiseAPIClient` / `SnapshotClient` / `CheckinAPIClient` など)で隔離し、ViewModel へ注入する(テストはモック)。View から Supabase を直接呼ばない。Edge Functions のクライアントは URLSession ベース(`Core/Api/`・`Core/Repositories/`)で、JWT は `AuthServicing.accessToken()`(supabase-swift のセッション。期限切れは自動更新)から渡す。共通の下回り `EdgeFunctionTransport`(URL の組み立て・Bearer・送信・失敗応答の `error` の読み取り)を**使うのは、W1(#55)で足した invite(`EdgeFunctionInviteClient`)・snapshot(`EdgeFunctionSnapshotClient`)・nudge / react(`EdgeFunctionNudgeReactClient`)の3つ**。promise-set(`EdgeFunctionPromiseClient`)と checkin / checkin-cancel(`EdgeFunctionCheckinClient`)は W1 より前に書いた自前の実装のまま(形は同じ — baseURL・tokenProvider・URLSession を注入 — だが下回りは共有していない。完了条件にないリファクタをしない)。相手の当日の checkins 行の読み取り(`PostgRESTPartnerCheckinResolver`)は PostgREST(`/rest/v1/`)を直接読み、`apikey` ヘッダも要るので、これも別の実装。**supabase-swift を import するのは `SupabaseService.swift` だけ**(匿名サインイン・users 行の更新と読み取り — プロフィールと APNs 登録・accessToken)
+- データ層はプロトコル境界(`AuthServicing` / `InviteClient` / `PromiseAPIClient` / `SnapshotClient` / `CheckinAPIClient` など)で隔離し、ViewModel へ注入する(テストはモック)。View から Supabase を直接呼ばない。Edge Functions のクライアントは URLSession ベース(`Core/Api/`・`Core/Repositories/`)で、JWT は `AuthServicing.accessToken()`(supabase-swift のセッション。期限切れは自動更新)から渡す。共通の下回り `EdgeFunctionTransport`(URL の組み立て・Bearer・送信・失敗応答の `error` の読み取り)を**使うのは、invite(`EdgeFunctionInviteClient`)・snapshot(`EdgeFunctionSnapshotClient`)・nudge / react(`EdgeFunctionNudgeReactClient`)— ここまでは W1(#55)— と、T23(#23)で足した pair-dissolve / delete-account(`EdgeFunctionAccountClient`)、PB(#57)で足した plant-name(`EdgeFunctionPlantNaming`)の5つ**。promise-set(`EdgeFunctionPromiseClient`)と checkin / checkin-cancel(`EdgeFunctionCheckinClient`)は W1 より前に書いた自前の実装のまま(形は同じ — baseURL・tokenProvider・URLSession を注入 — だが下回りは共有していない。完了条件にないリファクタをしない)。相手の当日の checkins 行の読み取り(`PostgRESTPartnerCheckinResolver`。PV #59 で `id` に加えて `photo_path` も読む)は PostgREST(`/rest/v1/`)を直接読み、`apikey` ヘッダも要るので、これも別の実装。写真の署名付き URL の発行(`StoragePhotoURLSigner`。Storage の `/storage/v1/object/sign/`)も、`apikey` が要るので同じ理由で別の実装(下の「相手の今日の写真」)。**supabase-swift を import するのは `SupabaseService.swift` だけ**(匿名サインイン・users 行の更新と読み取り — プロフィールと APNs 登録・accessToken)
 - **状態の正はサーバー**。アプリが永続するのは「最後に取得した PairSnapshot」+「未送信キュー」のみ(ローカルDBは持たない。SwiftData不使用)。画面系統を決める「オンボ済み」のような独自の永続フラグも持たない
 - ルートは `AppPhase` enum の **4状態**で画面系統を切り替える。値は純粋関数 `AppRouter.phase(hasSession:snapshot:)` が、「セッションの有無」と「App Group の最後の snapshot」だけから導く(2026-10-13・issue #61。W1 #55 の実装に合わせて改訂した。旧記述は `onboarding` / `solo` / `paired` の3状態で、約束設定の独立画面と下の構成図が無かった)
 
@@ -94,8 +94,8 @@ ios/Lien/
 │   ├── AppServices+Live.swift     # make(): Config があれば Live。無いときは Debug = Stub / Release = 起動時に止める(致命)ファクトリ+Live の組み立て
 │   ├── AppPhase.swift             # onboarding / promiseSetup / solo / paired
 │   ├── AppRouter.swift            # phase の導出(純粋関数)
-│   ├── AppModel.swift             # ルート状態の保持+サーバー同期の司令塔(@Observable)
-│   ├── RootView.swift             # phase で画面系統を切替+招待シート+onOpenURL
+│   ├── AppModel.swift             # ルート状態の保持+サーバー同期の司令塔(@Observable)。AccountOperating(ペア解消・アカウント削除・サインアウトと端末の後始末 — T23)も実装する
+│   ├── RootView.swift             # phase で画面系統を切替+招待シート+設定シート(歯車)+onOpenURL
 │   ├── AppDelegate.swift          # APNs トークン・リモート通知の受け口(→ PushTokenSync / AppModel)
 │   └── DeepLinkHandler.swift      # lien://invite/<token> のパース(純粋関数。§3.6)
 ├── Core/
@@ -109,15 +109,28 @@ ios/Lien/
 │   ├── AppGroupStore.swift        # pair_snapshot.json / pending_ops.json の読み書き
 │   ├── CheckinService.swift / PendingOps.swift / PhotoProcessor.swift   # チェックイン+未送信キュー+写真縮小
 │   ├── NudgeReactService.swift / LiveNudgeReactService.swift            # つつく・リアクション
-│   ├── Api/                       # Edge Functions(と PostgREST)の Live クライアント。共通の下回り EdgeFunctionTransport は snapshot・nudge / react が使う(promise-set・checkin は自前。上の本文)
+│   │
+│   │   # 相手の今日の写真(PV #59)— 値型・取得の流れ・ダウンロード(メモリのみ。下の「相手の今日の写真」)
+│   ├── PartnerPhoto.swift / PartnerPhotoService.swift / PartnerPhotoLoader.swift   # パス規約の検証(PartnerPhotoPath)・写真の指し先(PartnerPhotoReference)・長押しの取り付け口(PartnerPhotoAction)/ 行を読む→署名→取得の流れ(LivePartnerPhotoService)/ 受信バイト数の上限つきの取得と縮小(URLSessionPartnerPhotoLoader)
+│   │
+│   │   # 設定・通報・ブロック・アカウント(T23 #23 — 下の「設定・通報・ブロック・アカウント」)
+│   ├── ReportComposer.swift / SupportLinks.swift / NicknameRules.swift     # 通報・お問い合わせの mailto の組み立て / 規約・プライバシーポリシーの URL と運営の連絡先(G4 で確定)/ ニックネームの検証(オンボと設定で共通)
+│   ├── SessionHealth.swift        # 「サーバーがこのセッションを受け付けない」状態が続いたかの判定(401 / user_not_found の連続)
+│   │
+│   │   # 植物の体験の純粋な部品(PB #57 — 下の「植物の体験」。Foundation だけに依存し、テストが直接呼ぶ)
+│   ├── GrowthGauge.swift / PlantProgress.swift / PlantMemory.swift / PlantNaming.swift / PlantWhisper.swift   # ゲージの文と VoiceOver の文 / 区間の中での位置(のぞきの境目も)/ 「もう見せたか」の記録(段階アップの演出 StageCelebration ほか)/ 名前の検査・抽象・スタブ / 今日のひとこと
+│   │
+│   ├── Api/                       # Edge Functions(と PostgREST・Storage)の Live クライアント。共通の下回り EdgeFunctionTransport は snapshot・nudge / react・account(pair-dissolve / delete-account)・plant-name が使う(promise-set・checkin・署名付き URL・相手の checkins 行は自前。上の本文)。SessionVerifier = 認証サーバーへの直接のたしかめ
 │   ├── Repositories/              # InviteClient とその Live 実装(EdgeFunctionInviteClient も EdgeFunctionTransport を使う)
 │   ├── Models/                    # PairSnapshot, Promise, Invite
-│   ├── DesignSystem/              # Colors.swift, Spacing.swift, 植物の描画(§3.5)
+│   ├── DesignSystem/              # Colors.swift, Spacing.swift, 植物の描画(PlantCharacterView・PlantLayers — §3.5)
 │   └── Strings.swift              # ユーザー向け文言を全て集約(全リテラルが罰なし文言の lint の検査対象 — §3.8)
 └── Features/                      # 1画面1ディレクトリ(View + ViewModel)
-    ├── Onboarding/  ├── PromiseSetup/  ├── Pairing/(招待シート)
-    ├── Home/        ├── Checkin/       ├── Nudge/
-    └── Debug/(DEBUG ビルドのみ)     ※ History/(T18)・Settings/(T23)は未実装、Album/ は v1.1
+    ├── Onboarding/(規約への明示の同意つき)  ├── PromiseSetup/  ├── Pairing/(招待シート)
+    ├── Home/(相手の写真 PartnerPhotoModel / PartnerPhotoView を含む)  ├── Checkin/  ├── Nudge/
+    ├── Plant/(PlantHeroView = ホームの植物まわり / PlantCelebrationView = 段階アップ・おかえりの全画面 / PlantNameSheet・PlantNameFormView・PlantNamingModel = 名前付け / PlantExperienceModel = 体験の状態)
+    ├── Settings/(設定・プロフィール編集・ペア解消とアカウント削除の2段階確認)  ├── Safety/(ホームの長押しの通報・ブロック)
+    └── Debug/(DEBUG ビルドのみ)     ※ History/(T18)は未実装、Album/ は v1.1
 ```
 
 主要部品の役割(W1・issue #55):
@@ -134,7 +147,36 @@ ios/Lien/
   同期は同時に1本だけ走り、走行中に来た要求は、終わった直後に1回だけ取り直す
 - `SnapshotSynchronizer`: GET /snapshot の結果で `pair_snapshot.json` を上書きし、**見た目が変わるときだけ**ウィジェットを reload する(`updatedAt` だけの差では reload しない — §3.5・§10 の reload 予算)。**端末の方が新しい可能性があるときは上書きしない**: ① 未送信キューが残っている(オフラインで記録したチェックインがサーバーへ届く前に上書きすると、画面が一瞬戻る。キューが空になった次回の同期で反映する)② 取得中に端末の snapshot が変わった(ホームのチェックイン完了や NSE の書き込みの方が新しい。取得結果は捨てて1回だけ取り直す)。取得に失敗したときは端末の snapshot を残す(オフラインでも表示は壊れない)
 - `PushTokenSync`(actor): `users.push_token` / `push_env` の自動保存(§4.1)。**トークンの取得とセッションの確立の両方がそろうまで保留**する(どちらが先でもよい)。最後に送信成功した (userID, token, env) を覚えて**変化時だけ**送り、ユーザーが変わった(再インストールで匿名ユーザーが作り直された)ときは同じトークンでも再送する。失敗は保留にして、次のトリガー(前面復帰・トークンの更新・セッションの確立)で再送する。**サーバー側のずれの確認**(issue #62): サーバーは APNs が `410` / `400 BadDeviceToken` を返したトークンの `users.push_token` を null にする(§4.1)が、端末の記録は「送信済み」のままなので、変化時だけ送る仕組みだけでは二度と戻らない。そこで、記録の上では送信済みのときに限り、**プロセスの最初の1回(トークンとセッションがそろった最初の機会)と、前回の確認から1時間(`minVerifyInterval`)以上あけた前面復帰のたび**に、自分の `users.push_token` / `push_env` を読んで(`fetchPushRegistration`。RLS により読めるのは自分の行だけ)、送ったはずの内容とずれていれば(null にされた・別の値・`push_env` が未設定)記録を捨てて送り直す。読めなかった(オフライン等)ときは何もせず、次のトリガーで改めて確かめる。確認した時刻はプロセスの中だけで持つので、起動のたびに最初の1回が走る。この「最後に送信成功した登録」は、画面の状態ではなく送信の重複防止の記録なので、上の「のみ」の例外として端末ローカルの UserDefaults に置く(App Group には置かない — NSE・ウィジェットは読まない。再インストールで消えるのは正しい挙動で、新しい匿名ユーザー・新しいトークンとして再送される)
-- 読み取りは RLS の範囲で PostgREST を直接使ってよい(現状: react の対象にする相手の当日の `checkins` 行 — `PartnerCheckinResolving`。PV #59 が `photo_path` と署名付き URL に広げる)。書き込みは、本人の users 行(プロフィール・push 登録 — §4.1)を除いて Edge Functions 経由(§5.2)
+- 読み取りは RLS の範囲で PostgREST・Storage を直接使ってよい(現状: 相手の当日の `checkins` 行 — `PartnerCheckinResolving`。react の対象の `id` と、PV #59 で広げた `photo_path`。それと photos バケットの署名付き URL の発行。次の「相手の今日の写真」)。書き込みは、本人の users 行(プロフィール・push 登録 — §4.1)を除いて Edge Functions 経由(§5.2)
+
+相手の今日の写真(PV・issue #59。REQUIREMENTS §3.11):
+
+- ホームの `PartnerPhotoModel`(`@MainActor @Observable`)が、snapshot の `hasPartnerPhotoToday` が true で、その snapshot が今日のものであるときだけ、`PartnerPhotoProviding`(本実装 `LivePartnerPhotoService`)に取りに行く。流れ: ① `PartnerCheckinResolving`(PostgREST)で相手の当日の `checkins` 行(`id`・`photo_path`)を読む ② `PartnerPhotoPath` が `photo_path` を §5.2 のパス規約に照らして検証する(相手の行から読んだ文字列をそのまま URL にしない。`..`・空の区画・別のペア・別の日のパスは捨てる)③ `PhotoURLSigning`(`StoragePhotoURLSigner`)が**利用者の JWT で** Storage の `POST /storage/v1/object/sign/photos/<パス>`(有効 3600 秒)を呼んで署名付き URL を作る ④ `PartnerPhotoImageLoading`(`URLSessionPartnerPhotoLoader`)が取得して縮小する(URL キャッシュもディスクも使わない専用セッション・受信バイト数の上限・JPEG のみ・ImageIO で縮小)。サムネ(`photo_thumb.jpg`)を先に出し(無い・読めないときは原寸から代わりを作る)、タップしたときだけ原寸を全画面で取る
+- **署名付き URL はクライアントが作る — 新しい Edge Function も migration も増やさない**(2026-10-13・TASKPLAN §9.4 PV)。読み取りの可否は DB の RLS が決める: `checkins_select_pair`(現役ペアの相手の行だけ)と `photos_select_pair_member`(パスの第2セグメントが自分の現役 pair_id のオブジェクトだけ。パスの深さを問わないので `<user_id>/` 区画の新形式も旧形式も読める)。migration 0001 の想定「配布の主経路は Function が発行する署名付き URL」は v1.0 では採らない(§5.2)。snapshot にパスや URL を足す案も採らない(署名付き URL は短寿命で、snapshot は push と App Group に載るため)
+- **端末に残さない**: 署名付き URL も画像も、持つのは `PartnerPhotoModel` のメモリだけ(App Group・UserDefaults・ディスクに書かない。ウィジェットへも渡さない — M ウィジェットの写真は v1.0.1)。同じ日・同じペアの写真は 15 分(`revalidateInterval`)は取り直さず、過ぎたら次の機会に取り直す(同じパスへの貼り直しを拾うため)
+- **出さないとき**は何も出さず、文言も出さない(罰なし — REQUIREMENTS §3.5): 写真の無い日・ソロ・ペア解消後・日付が変わった・取得の失敗(RLS・署名の失効・通信)。ペア解消後は RLS が行も署名も弾く(§5.7 の3)。長押しメニュー(通報・ブロック)の取り付け口は `PartnerPhotoAction`(カードにも全画面にも付く。次の T23)
+
+設定・通報・ブロック・アカウント(T23・issue #23。REQUIREMENTS §3.15・§8):
+
+- 入口はホームの歯車(`RootView`。約束を決める前の画面にも付く — サインアウトとアカウント削除に入れるように。オンボでは開かない)。`SettingsSheetView`(シートの中の NavigationStack)→ `SettingsView` / `SettingsViewModel`。項目: プロフィール(ニックネーム+アイコン。`ProfileEditView` / `ProfileEditViewModel` — 検証はオンボと共通の `NicknameRules`、保存は `nickname` / `avatar_emoji` だけで `timezone` は書かない)・約束(約束設定の画面を再利用して編集。ストリークは続く — REQUIREMENTS §3.3)・通知(iOS の設定アプリへ。サーバー側の通知設定は v1.1)・ペア(相手の名前・ペアを解消する)・サポート(お問い合わせ・不適切な内容を通報する・利用規約・プライバシーポリシー)・アカウント(サインアウト・アカウントを削除する)・バージョン。ニックネームと約束は開くたびにサーバーの自分の行から読み、読めない間は約束の編集を開けない(リマインド時刻が分からないまま保存すると消してしまうため)
+- **取り消せない操作は確認2段階**: `DestructiveFlow`(idle → reviewing → finalPrompt → working の状態機械)。説明の画面(`DestructiveConfirmView`。何が消える・止まる・残るか)→ 最後のアラート(「本当に〜しますか?」)を経ないと operation を呼ばない(`confirm()` は finalPrompt からしか進まない)。失敗しても何も失われず、説明の画面に戻ってやり直せる
+- 実体は `AccountOperating`(`AppModel` が実装。テストはモック):
+  - `dissolvePair()`: pair-dissolve を呼び、返ったソロの形の snapshot で端末とウィジェットを即座に更新する(未送信のチェックインがあれば、楽観の「今日は完了」を巻き戻さない)
+  - `deleteAccount()`: delete-account が成功してから、端末の記録を消してサインアウトし、オンボへ戻る。失敗したときは端末を変えない(やり直せる)。応答だけ取りこぼしてサーバーでは削除済みのとき、やり直しは 401 になって先へ進めないので、`SessionVerifying`(`SessionVerifier`)が認証サーバー(`GET /auth/v1/user`)に直接たしかめ、「ユーザーが居ない」と確かに答えたときだけ削除済みとして片づける(401 だけでは決めない — 認証サーバーの不調でも出るため。§5.3 snapshot の行)
+  - `signOut()`: push の登録を外し、端末の記録だけを消す。サーバー側のアカウントは残る(登録なしで始めたので同じ記録には戻れない。確認の文言にも書いてある)
+  - 端末の後始末(`endSession`)の順序: 走っている同期の完了を待つ(同期の書き込みは止める)→ push の登録を外す(または記録だけ捨てる)→ サインアウト → App Group(snapshot・未送信キュー・サムネ)を消す → 植物の「もう見せたか」の記録を消す → ウィジェットを更新 → オンボへ
+- **セッションが無効になったとき**: snapshot の取得が 401 / `user_not_found` で連続(`SessionHealthMonitor`。回数 3)したら、認証サーバーに**直接たしかめ**、確かに拒否されているときだけ「ログイン状態を確認できません」の確認を出す。「はじめからやり直す」を選んだときだけ端末を消す(一時的な不調で、登録なしで始めたアカウントを勝手に手放さない)。認証 SDK 自身がセッションを破棄したときは、選べることが無いので確認なしで同じ後始末を通す
+- **通報(App Store ガイドライン 1.2)**: `Features/Safety/`。相手の写真(カードと全画面)・ニックネームと約束の文・植物の名前の長押し(VoiceOver にも同じ操作をアクションとして出す)と、設定の「不適切な内容を通報する」から。確認1回(「この内容を通報しますか?」)のあと、**運営宛のメールの下書き(mailto)を開く**: `ReportComposer`(純粋関数)が、件名「【Lien】通報: <種別>」と、ペア ID・日付・対象(写真のパス、またはニックネームなどの内容)・アプリの版を本文に入れる。**自動では送らない**(利用者が確かめて送る)。メールを開けない端末には、運営の連絡先を添えたアラートを出す。宛先は `SupportLinks.contactEmail`(**G4 で確定するまで空** — 空のあいだは宛先なしの下書き。lien-release の外向きの入力の検査が、`dry_run=false` で空なら止める)
+- **ブロック = ペア解消**: 長押しメニューの「ブロック(ペアを解消)」は、設定の「ペアを解消する」と同じ操作・同じ2段階の流れ(`ModerationViewModel.block`)。解消後の遮断は DB の RLS が保証する(§5.2・REQUIREMENTS §3.2)
+- **規約への明示の同意**: オンボのニックネーム画面のチェック「利用規約とプライバシーポリシーに同意します」が入るまで、ボタン「同意してはじめる」は押せない(`OnboardingViewModel.agreedToTerms`)。規約・プライバシーポリシーの URL は `SupportLinks`(Pages への公開は TASKPLAN §9.2 の「Pages 公開」)
+
+植物の体験(PB・issue #57。GROWTH.md §4.4・§5):
+
+- `PlantExperienceModel`(`HomeViewModel` が1つ持つ)が、snapshot が変わるたび(`snapshotDidChange`)に、全画面の演出・名前の知らせ・ひとことを決める: ① 段階アップの全画面演出(`StageCelebration`。**各段階で1回だけ**。ペア成立の「はじめまして」= 段階0も含む。相手名義の通知には混ぜず、ウィジェットも動かさない)② 相手が付けた・変えた名前の知らせ(次に開いたとき)③ おかえり(2日以上あいたあと、自分がチェックインした瞬間だけ。空いた日数は出さない。段階アップの演出と重なるときは段階アップだけ)④ 今日のひとこと(`PlantWhisper`。その日はじめてホームを開いたとき。状況ごとの候補から**日付で1つ選ぶ**ので、同じ日の同じ状況なら同じ言葉)
+- **「もう見せたか」の記録(`PlantMemory`)は、画面の状態ではなく見せた記録**なので、App Group ではなくアプリ本体の `UserDefaults` に置く(サーバーにも無く、ウィジェット・NSE は読まない。`PushTokenSync` の ledger と同じ扱い。サインアウト・アカウント削除で消す)。新しい版を初めて起動したときは、今の段階で静かに初期化し(過去の段階をさかのぼって祝わない)、取り消しで段階が戻ったあとに同じ段階へ上がっても、もう一度は見せない
+- ゲージの文(`GrowthGauge`)・区間の進み具合(`PlantProgress`)・VoiceOver の文(`PlantVoiceOver`)は、snapshot の新キー(`plantGrownDays` / `plantStageFloor` / `plantNextStageAt` — §3.4)だけから作る純粋関数で、**アプリは閾値表を持たない**(あとからサーバー側で閾値を下げても追従する)。新しいキーが無い snapshot・ソロではゲージを出さない。`PlantProgress`(のぞきを出す判定にも使う)は、描画の `PlantLayers` / `PlantCharacterView` と一緒に Lien / LienWidget でソース共有する(Foundation と PairSnapshot にだけ依存させる。T17a のウィジェットの「細い進み具合のバー」でも使う)
+- 名前付け(`PlantNamingModel` + `EdgeFunctionPlantNaming`): 最初の「ふたば」の演出の中か、ホームの「名前をつける」(名前が付くまで残る)から。409 `already_named` はエラーにせず、本文の `name` が**自分が送った名前と同じなら成功**、違えば**相手が先に付けた名前を採用**する(§5.3 plant-name の「クライアントの注意」)。端末の snapshot は名前だけを直す(サーバーの snapshot 全体では上書きしない — 未送信のチェックインの楽観状態を巻き戻さないため)。名前は相手が付けることもある(UGC)ので、長押しで通報・ブロックできる
+- 描画: `PlantHeroView`(植物・葉の下の約束の絵文字・名前・ゲージの文・ひとこと)・`PlantCelebrationView`(段階アップ・おかえりの全画面。ホームの上にオーバーレイで重ねる — シートにしないのは、設定・招待・通報の確認など他の表示と重なっても、先の表示が閉じるまで裏で待てるため)・`PlantNameSheet` / `PlantNameFormView`。REQUIREMENTS §3.9 の P1 のうち、のぞき・おかえり・今日のひとこと・ハートを送る(リアクションの ❤️ を使い回す)は実装済み。名前の相手名義の通知(サーバー側の push)は未実装
 
 ### 3.4 App Group 共有契約(ウィジェットとの境界。変更時は要レビュー)
 
@@ -271,7 +313,7 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
   - pairs, plants, streak_days, ticket_ledger: メンバーのみ select。書き込みは Function のみ
   - checkins, nudges, reactions: メンバーのみ select。書き込みは Function のみ
   - 写真(Storage): パスは **`pairs/<pair_id>/<date_local>/<user_id>/photo.jpg`**(サムネは同じ区画の `photo_thumb.jpg`)。**本人単位**(2026-10-12 決定・issue #52。旧 `pairs/<pair_id>/<date_local>/photo.jpg` はペア×日付単位で、同じ日に2人目が付けると上書きできた)
-    - 読み取り(select): 現役ペアのメンバーのみ。署名付きURLで配布。`pairs/<pair_id>/` 配下なら新旧どちらの形式でも読める(既存の旧パスの写真は読めるまま)
+    - 読み取り(select): 現役ペアのメンバーのみ。署名付きURLで配布 — **v1.0 はクライアントが利用者の JWT で、RLS の範囲内で作る(新しい関数は増やさない。PV #59。§3.3「相手の今日の写真」)**。`pairs/<pair_id>/` 配下なら新旧どちらの形式でも読める(既存の旧パスの写真は読めるまま)
     - 書き込み(insert / update): 現役ペアのメンバーで、かつ**パスの `<user_id>` 区画が `auth.uid()` と一致**するときだけ(migration 0004 の `is_valid_own_photo_upload`)。他人の区画・旧形式のパスへは書けない。delete はクライアントに許さない
     - checkin Function は署名付きアップロードURLを**本人の区画にだけ**発行し、`photoPath` も本人の原寸写真パス(`.../<user_id>/photo.jpg`)でなければ 400 `invalid_photo_path`。§5.6 の経路・手順は変わらない(§5.6 に書かれたパス `pairs/<pair_id>/<date>/photo.jpg` は本項の規約に読み替える)
 
