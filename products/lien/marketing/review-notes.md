@@ -2,7 +2,7 @@
 
 - Status: **DRAFT** (T30準備 / issue #30 — prepared ahead of full backend deploy; see "状態" per section)
 - Last updated: 2026-10-13
-- Related issues: #30 (this task) / #8 (Supabase deploy, G0 待ち) / #23 (settings/report/delete UI, 未着手) / #28 (release build, 未着手) / #55 (W1: ソロモード・招待シート。完了) / #61 (§1.1・§1.2 を W1 の実装に合わせた) / #65 (§1.1 の約束の編集の記述・ソロの植物の記述、§1.2 手順5の前提を実装に合わせた)
+- Related issues: #30 (this task) / #8 (Supabase deploy, G0 待ち) / #23 (T23: 設定・通報・ブロック・アカウント削除。**実装済み** 2026-10-13) / #28 (T28準備は済み。内部 TestFlight は G0 の後) / #55 (W1: ソロモード・招待シート。完了) / #59 (PV: 相手の今日の写真。**実装済み**) / #61 (§1.1・§1.2 を W1 の実装に合わせた) / #65 (§1.1 の約束の編集の記述・ソロの植物の記述、§1.2 手順5の前提を実装に合わせた) / #69 (§1.1・§1.2・§1.4・§1.5 と §2.6 を PV・T23 の実装に合わせた)
 - 正本の優先順位: `docs/REQUIREMENTS.md` → `docs/DESIGN.md` → `docs/CONCEPT.md`(矛盾時はこの順で優先)
 
 > このファイルは2段構えです。**今回のコミット(T30準備)は「草案」**であり、TBDプレースホルダを含みます。T23(設定画面)・T08(G0後の本番デプロイ)・T28(TestFlightビルド)が完了した後、別コミットでTBDを実値に差し替えて完成させます(issue #30 の進め方コメントに記載された2段構え)。
@@ -15,15 +15,16 @@
 
 Lien is a 2-person habit-tracking app, but **the app is fully usable before a pair is formed.** A new user can finish onboarding, set their own daily promise and check in without ever inviting anyone. One device is enough for everything in this section.
 
-- New-install flow: onboarding (3 screens: concept → nickname + emoji icon → notification permission) → **promise setup (a screen of its own, shown right after onboarding)** → **Home in the "solo" state**. There is no sign-in screen (see §1.2).
+- New-install flow: onboarding (3 screens: concept → nickname + emoji icon → notification permission) → **promise setup (a screen of its own, shown right after onboarding)** → **Home in the "solo" state**. There is no sign-in screen (see §1.2). The nickname screen also asks the user to tick an explicit agreement to the Terms of Use and the Privacy Policy before the start button is enabled (§1.4).
 - **Promise setup**: type a promise title (up to 20 characters), pick an emoji, optionally set a daily reminder time, then tap "この約束にする" (Set this promise).
 - **Home in the solo state** shows the user's own promise, the check-in button "できた!" (Done!), a pot in which the small seed character ("タネの子") sleeps in the soil, with a short caption ("ペアになると、タネの子が目をさますよ", i.e. "When you pair up, the seed character wakes up"), and an invite button ("相手を招待する", i.e. "Invite your partner").
 - **Checking in works in solo.** Tapping "できた!" records today's check-in; the button is replaced by the label "今日のぶんは完了" (Today's done) and an "取り消す" (Undo) button appears for same-day mis-taps. No pairing prompt blocks any of this.
-- Deliberately **not available in solo** (these appear only once a pair exists): the shared streak, the partner's status, nudges, reactions and **photo attachment**. A photo is shared only with the paired partner, so in solo there is nothing to share it with and the "写真を添える" (Attach a photo) button is not shown. The seed character keeps sleeping in the soil in solo (the soil glows softly after the user checks in); it wakes up and grows from the days on which both partners complete their promise.
+- Deliberately **not available in solo** (these appear only once a pair exists): the shared streak, the partner's status, nudges, reactions and **photo attachment**. A photo is shared only with the paired partner, so in solo there is nothing to share it with and the "写真を添える" (Attach a photo) button is not shown. Once paired, the partner's photo of the day (if there is one) appears on Home as a thumbnail that opens full screen; it is read with a short-lived signed URL, kept in memory only, and v1.0 has no photo history or album (§1.2, step 6). The seed character keeps sleeping in the soil in solo (the soil glows softly after the user checks in); it wakes up and grows from the days on which both partners complete their promise.
 - The "ふたりストリーク" (shared streak) starts counting from the day a pair is formed; it does not block any core action beforehand.
 - Inviting is optional. The invite button on Home opens a sheet (title "ふたりをつなぐ") that can be closed at any time with "あとで" (Later).
+- The promise can be edited later: Settings (the gear icon on Home) → 約束 (Promise) → 約束を変える (Change promise). Editing it does not reset the shared streak. Settings is also available in solo (profile, promise, a link to the iOS notification settings, contact / report, Terms of Use, Privacy Policy, sign out, delete account — see §1.4 and §1.5).
 - Reviewer verification steps:
-  1. Launch the app and tap "はじめる". Enter any nickname (up to 8 characters), pick an icon and tap "これではじめる". On the notification screen, tap "通知を許可する" (Allow) or "あとで" (Later); either one continues.
+  1. Launch the app and tap "はじめる" (Start). Enter any nickname (up to 8 characters), pick an icon, tick the agreement check box "利用規約とプライバシーポリシーに同意します" (I agree to the Terms of Use and the Privacy Policy) and tap "同意してはじめる" (Agree and start; disabled until the box is ticked). On the notification screen, tap "通知を許可する" (Allow) or "あとで" (Later); either one continues.
   2. On the promise screen, type any title (e.g. "Walk"), pick an emoji and tap "この約束にする".
   3. You are now on Home in the solo state. Tap "できた!". Confirm that the check-in completes (the button is replaced by "今日のぶんは完了") and that nothing asks you to pair.
   4. (Optional) Tap the invite button, then "招待をつくる" (Create invite). A QR code, an 8-character invite code and a share-link button appear. Close the sheet with "あとで"; pairing is never required to keep using the app.
@@ -36,13 +37,13 @@ Lien is a 2-person habit-tracking app, but **the app is fully usable before a pa
 | ① | Home で約束を設定する | オンボの後に**約束設定の独立画面**があり、保存すると Home に進む |
 | ② | 写真を任意で添えられる(ペアなしでも) | **ソロでは写真を添えられない**(「写真を添える」は出ない。端末側で止めており、サーバーも photoPath 付きのソロの checkin を 400 `no_pair` で拒否する) |
 | ③ | 植物が反応する | **ソロの鉢は、土の中で眠るタネの子**(`solo_seed`+zzz。PA #56 で描画)。自分がチェックインした日は土がほのかに光る(`fx_soil_glow`)が、葉や表情の変化(ふたりの葉・にっこり)はペア後。一言は「ペアになると、タネの子が目をさますよ」(`Strings.Widget.soloCaption` をホームと共有) |
-| ④ | Settings を開いて招待を発行する | **招待は Home のボタン**から開くシート(設定画面は T23 で、まだ無い) |
+| ④ | Settings を開いて招待を発行する | **招待は Home のボタン**から開くシート(設定画面は T23 #23 で入ったが、招待の入口は設定の中ではなく Home のボタンのまま) |
 
 実ビルドでの最終確認は T28a の内部 TestFlight 以降(T30)。そのとき合わせるもの:
-- PA(#56)は入った。ソロの鉢は「土の中で眠るタネの子」で、一言の現行の文言は「ペアになると、タネの子が目をさますよ」(旧文言「ペアになると種がまかれるよ」は#56 で置き換わった)。英文はこれに合わせて書き直した(#65)。実ビルドで、眠る絵・zzz・チェックイン後の土の光り方と一言が英文の記述どおりかを確かめる。PB(#57)が入った後も同じ記述でよいか見直す
+- PA(#56)は入った。ソロの鉢は「土の中で眠るタネの子」で、一言の現行の文言は「ペアになると、タネの子が目をさますよ」(旧文言「ペアになると種がまかれるよ」は#56 で置き換わった)。英文はこれに合わせて書き直した(#65)。実ビルドで、眠る絵・zzz・チェックイン後の土の光り方と一言が英文の記述どおりかを確かめる。PB(#57)が入った後も同じ記述でよいことを、コードで確かめた(2026-10-13・#69): ソロでは、ゲージの文・植物の名前・今日のひとこと・段階アップの演出・おかえりは出ない(どれもペアのときだけ。`GrowthGauge` はソロで nil、段階アップは `PlantMemory.observeStage` がソロを除く、ひとことは `homeDidAppear` がペアを条件にする)。ソロの鉢の見え方は PB の前と同じ
 - 招待ボタンのラベルは、#62 で「パートナーを招待する」から「相手を招待する」に変わった(実装済み。CONCEPT §5-2: カップル限定にしない)。英文のボタン名は変更後のラベルで書いてある。実ビルドで合っているか確かめる
-- **約束の編集の入口**: 2026-10-13 時点で、約束設定の画面は「現役の約束が無いとき」の独立画面としてしか開かず、保存したあとに約束を編集する入口がアプリに無い(設定画面は T23)。入口の無い機能を審査員に説明しないよう、英文から「The promise can be edited later.」を外した(#65)。編集の入口(設定画面など)が入ったら、実ビルドで確かめてから英文に戻すか決める。なお約束設定画面の副題(`Strings.PromiseSetup.subtitle`)は「あとからいつでも変えられます」と書いているので、入口が入らないまま出荷する場合は T27 で文言を直す
-- PV(#59)が機能凍結(11/8)に間に合わず、写真を v1.0.1 に移す場合は、写真に触れる記述(本節の「写真を添える」・§1.4 の UGC)をそろえて外す(TASKPLAN §9.4)
+- **約束の編集の入口**: #65 の時点では、保存したあとに約束を編集する入口がアプリに無かった(設定画面は T23)ので、英文から「The promise can be edited later.」を外していた。**T23(#23)で入口が入った**(設定 → 約束 → 約束を変える。約束設定の画面を再利用し、リマインド時刻もここから変える。変えてもストリークは続く)ので、2026-10-13(#69)に英文へ戻した(入口の場所つき)。実ビルドで、入口の場所と文言が英文どおりかを確かめる(T30)。約束設定画面の副題(`Strings.PromiseSetup.subtitle`)の「あとからいつでも変えられます」も、入口ができたので事実と合った
+- PV(#59)は 2026-10-13 に入った(相手の今日の写真をホームに出す。写真は v1.0 に残る)。写真に触れる記述は、本節の「写真を添える」・§1.2 の手順6・§1.4 の UGC。PV の機能が凍結(11/8)で外れることになった場合は、これらをそろえて外す(TASKPLAN §9.4)
 
 ### 1.2 No demo account is required — authentication is anonymous
 
@@ -58,6 +59,7 @@ Lien v1.0 uses **anonymous authentication only** (Supabase anonymous sign-in). T
   3. Both devices now show the paired Home screen. Device A's invite sheet closes by itself (while the sheet is open, Device A re-checks with the server at intervals that grow from 4 to 30 seconds; the app also refreshes at launch and whenever it returns to the foreground).
   4. Confirm that each device shows the other's nickname and promise (emoji + title) on Home, together with the shared streak and the plant. The icon emoji picked during onboarding is not shown to the partner in v1.0.
   5. Check in on Device A ("できた!"). Device B receives a push notification and its Home screen (and widget, if installed) update. The target is within about a minute. **This assumes that Device B is a physical iPhone and that its user allowed notifications** (tapped "通知を許可する" on the onboarding notification screen and accepted the iOS permission dialog): a device that has not allowed notifications is never registered for push, so neither the notification nor the push-driven widget update arrives. Without the permission, Device B's Home still updates when the app is opened or returns to the foreground.
+  6. **Photos (optional, paired users only).** On Device A, after checking in, tap "写真を添える" (Attach a photo) and pick one photo from the photo library (taking a photo with the camera is not part of v1.0). On Device B, open Home: if A attached a photo today, a card "<A's nickname>の今日の写真" (A's photo of today) appears with a thumbnail; tap it to see the photo full screen. Only today's photo is shown. It is loaded with a short-lived signed URL and kept in memory only (nothing is saved on Device B), and v1.0 has no album of past photos. If the photo cannot be loaded (for example, the pair was dissolved), nothing is shown. Long-press the photo (or use the "…" menu at the top left of the full-screen view) to report it or to block the user — see §1.4. Access is enforced by the database's row-level security: only the current, active partner can read the file.
 
 **状態: 2026-10-13 に W1(#55)の実装に合わせて書き直した(#61)。** 草案からの変更点:
 - 招待コードは「8桁」ではなく**8文字英数**(大文字小文字を区別。紛らわしい 0/O/1/l は使わない — DESIGN §5.1)
@@ -68,10 +70,10 @@ Lien v1.0 uses **anonymous authentication only** (Supabase anonymous sign-in). T
 
 実ビルドでの最終確認は T28a の内部 TestFlight 以降(T30)。確認点:
 - 招待ページ(`web/invite`)を Pages で公開した後に、「アプリで開く」の経路を実機で通す(G3 の前までに公開する)
-- オンボの注意書き(`Strings.Onboarding.anonymousStartNote`)は「あとから Apple ID 連携(設定画面)が必要」と読める。SIWA が v1.0.1 に移った(D3)ので、「機種変更で記録を引き継げない場合がある」に直す(PB #57 の持ち越しに入れた — T27 から前倒し。#57 のコメント 2026-10-13)。直ったら、英文の該当の一文も合わせる
+- オンボの注意書き(`Strings.Onboarding.anonymousStartNote`)は、PB(#57)で「登録なしですぐ始められます。機種変更やアプリの入れ直しでは、記録を引き継げない場合があります。」に直った(旧文言は「あとから Apple ID 連携(設定画面)が必要」と読めた)。英文の該当の一文("progress may not carry over when changing devices or reinstalling the app")と一致している。設定の補足(`Strings.Settings.accountFooter`)も同じ趣旨。実ビルドで確かめる(T30)
 - 手順5は、受け取る側の端末が**通知を許可していることが前提**(許可しないと APNs 登録が始まらず、push もウィジェットの更新も届かない)。英文に明記した(#65)。審査員がオンボで「あとで」を選んだ場合に push が来ないのは仕様で、アプリを開く・前面に戻すと Home は追いつく。§1.1 の手順1は「許可」「あとで」のどちらでも進める書き方のままなので、2台のペアの確認をお願いするときは、先に許可してもらう案内を §1.3 に足すか(T30)
 - 端末1台の審査員向けに、開発者が操作する相手役の招待コード(期限を延ばしたもの)を §1.3 に用意する(T30)。用意できたら本節の末尾に1行足す
-- 相手の写真の表示は PV(#59)の担当。PV の後に、ペア後の写真の手順(添付 → 相手のホームに表示)を足す
+- ペア後の写真の手順(添付 → 相手のホームに表示)は、PV(#59)の完了に合わせて手順6として足した(2026-10-13・#69)。実機 2 台で、添付 → 相手のホームの表示 → 全画面 → 長押しの通報までを確かめる(T20 の ⑧、T30)
 
 ### 1.3 Test pair accounts (2 pairs, as requested by App Review guidance)
 
@@ -94,11 +96,12 @@ Because authentication is anonymous, "test accounts" are provided as **two pre-p
 
 ### 1.4 Report flow and blocking (UGC — Guideline 1.2)
 
-Lien has one piece of user-generated content: an **optional photo attached to a check-in, visible only to the paired partner** (never public, never shown to third parties).
+Lien has no public content, no feed, no search, no user directory and no chat. What one user can show another is limited to the **paired partner** (two people who exchanged an invite code): an **optional photo attached to a check-in**, the **nickname**, the **promise text** (title + emoji) and the **name given to the shared plant**. Nudges are fixed stamps (no free text).
 
-- **Report**: Settings → 通報 (Report). Implemented as a `mailto:` link that pre-fills subject/body with the pair ID and date, sent directly to the operator's contact email. (実装はT23の担当範囲 — 本タスク時点では **未実装**。下記「状態」参照)
-- **Block**: In this app's closed 2-person design, "block" is implemented as **pair dissolution** (Settings → ペア管理 → ペアを解消する). Dissolving the pair immediately and permanently stops all sharing between the two users: no more shared photos, check-in visibility, nudges, or notifications pass between them. There is no partial-block state — dissolution is a full stop of sharing, which is the functional equivalent of a block in a 2-person-only sharing model.
-- **Operator takedown rights**: The operator can remove violating content without prior notice (regardless of whether it was reported), per `products/lien/marketing/terms.md` 第6条3項.
+- **Agreement to the terms**: the nickname screen of the onboarding asks the user to tick "利用規約とプライバシーポリシーに同意します" (I agree to the Terms of Use and the Privacy Policy). The start button "同意してはじめる" (Agree and start) stays disabled until it is ticked. The same screen links to both documents and says that inappropriate photos, words and nuisance behavior are prohibited and can be reported, or the pair dissolved.
+- **Report** (available for every kind of content the partner can show): long-press the partner's photo on Home (the full-screen photo view has the same actions in a "…" menu at its top left), the partner's nickname / promise chip, or the plant's name, and choose 写真を通報する / ニックネームを通報する / 約束の文を通報する / 植物の名前を通報する (Report photo / nickname / promise text / plant name). VoiceOver users get the same actions as accessibility actions. A general report is also available at Settings → サポート → 不適切な内容を通報する (Report inappropriate content). After one confirmation ("この内容を通報しますか?" → "メールを開く" Open mail), the app opens an **e-mail draft addressed to the operator** — subject "【Lien】通報: <kind>", body with the pair ID, the date, the reported item (the photo's storage path, or the nickname / text) and the app version. The user reviews and sends it from the Mail app; **the app never sends anything by itself**. If the device has no mail account, an alert shows the operator's address so the report can be sent from another app. The address is the same one that is published in the Terms of Use and the Privacy Policy and behind Settings → サポート → お問い合わせ (Contact).
+- **Block** = **pair dissolution**: the same long-press menu has "ブロック(ペアを解消)" (Block (dissolve the pair)), and Settings → ペア → "ペアを解消する" (Dissolve the pair) does the same. It is confirmed in two steps: an explanation screen (photos, promises and check-ins stop being visible to each other; nudges, reactions and notifications stop; the plant and streak records are archived and do not come back even if the same two people pair again; the user's own check-in history stays) and a final alert ("本当にペアを解消しますか?" → "解消する"). It takes effect at once on the server: the database's row-level security stops showing either user's photos, promises and check-ins to the other. The former partner gets no notification message; when they next open the app, it shows that the pair has ended (their Home returns to the solo state). The blocked user has no other way to reach the blocker: there is no messaging, search or directory in the app, and a new pair is formed only when the invited person accepts an invite themselves (they enter the code or open the link, then tap "ペアになる" (Pair up)).
+- **Operator takedown rights**: the operator can remove violating content without prior notice (whether or not it was reported) and restrict, suspend or delete accounts, per `products/lien/marketing/terms.md` 第6条. A report carries the pair ID and the exact photo path or text, so the operator can find and remove the item (and, if needed, dissolve the pair or delete the account).
 - **Terms of Service references** (audited against REQUIREMENTS §8③④, confirmed consistent):
   - 第6条(通報および運営者によるコンテンツの削除等) — `products/lien/marketing/terms.md:46-51`: 利用者からの通報導線、運営者による確認・削除、事前通知なしの削除権、違反利用者への利用制限/停止/削除の措置を規定。
   - 第7条(ブロックとペアの解消) — `products/lien/marketing/terms.md:53-56`: ペア解消=ブロック相当であることと、解消後の共有停止範囲を規定。
@@ -107,19 +110,39 @@ Lien has one piece of user-generated content: an **optional photo attached to a 
 
 **審査リスクの特記(issue #30の敵対検証より)**: 「ブロック=ペア解消」という解釈はApple審査で「相手を完全に遮断する手段がない(新規ペアを組まれ直す可能性?)」と誤解されるリスクがある。本アプリは1ユーザー1ペア(v1.0)で、ペア解消後は相手が自分に対して新たな共有関係を強制的に再構築する手段がないため、実質的に完全なブロックと同等である旨をレビューノート本文で明示する(上記説明文がその明示に該当)。
 
-**状態: ③(通報導線)④(ブロック=ペア解消導線)はいずれも **T23(#23)未着手** のため実装はまだ存在しない。規約(terms.md)の記載は済み。実装後、CI(lien-ios.yml)でSettingsビューの存在確認+証跡をもって§8③④にチェックする。**
+**状態: 2026-10-13 に T23(#23)の実装に合わせて書き直した(#69)。** 通報・ブロック(=ペア解消)・オンボの規約への明示の同意は、いずれも実装済み。サーバー側の pair-dissolve は本番にデプロイ済みで、本番の通しテスト S23〜S24(OPS §12。冪等・解消後の閲覧境界・組み直し)で確かめた。草案(T30準備)から変わった点:
+- 通報の対象は写真だけではない。UGC として相手に見える文字(ニックネーム・約束の文・植物の名前)も、長押しで通報できる(英文の冒頭を「UGC は写真が1つだけ」から書き直した)。特定の対象を持たない「不適切な内容を通報する」(設定 → サポート)もある
+- ブロックは設定だけでなく、長押しのメニューからもできる(どちらも同じ2段階の確認)
+- 規約への明示の同意(旧 §2.6 の「未確認事項」)を実装した
+- 通報の入口は「Settings → 通報」ではなく、Settings の「サポート」の中(「不適切な内容を通報する」)
+- 運営が通報に対応する手順(該当の写真だけを消す / ペアを解消する / アカウントを消す)は OPS §13。ダッシュボードで auth ユーザーを直接消さない(幽霊のペアが残る)。通報の対応の期限・基準は G4(#42)で人間が決める
+
+実ビルドでの最終確認(T30。T20 の ⑭⑮)で確かめること:
+- 写真(カードと全画面の「…」)・ニックネームと約束の文・植物の名前の長押しと、設定の「不適切な内容を通報する」から、メールの下書きが開き、件名・本文(ペア ID・日付・対象・版)が英文どおりか。実機の VoiceOver でアクションが出るか
+- 運営の連絡先 `SupportLinks.contactEmail` が **G4(#42)で確定して埋まっている**こと。空のままだと下書きに宛先が無い(外部テスト・審査に出す lien-release は、空だと止まる。内部 TestFlight 専用の `internal_only` を除く)。Terms・Privacy Policy の連絡先欄(`【要記入: G4: …】`)と同じアドレスにする
+- 規約・プライバシーポリシーのリンク先が公開されている(Pages — TASKPLAN §9.2。HTTP 200 でないと lien-release が止まる)
+- 解消すると、2 台目の画面が次の同期でソロに戻る(相手に通知が出ないこと)
+- 設定のプロフィール編集の補足(`Strings.Settings.profileEditFooter`)は「ニックネームとアイコンは、ペアの相手にも表示されます」と書くが、v1.0 では**アイコン(絵文字)は相手の画面に出ない**(snapshot に含まれず、アプリも描かない — §1.2 手順4)。英文は事実のとおり(アイコンは相手に出ない)に書いてあるので、文言の側を直す(T27 または iOS の仕上げ)
 
 ### 1.5 Account deletion
 
-Settings → アカウントを削除する(確認2段階)。Deletes the user's row (cascades to pair memberships, promises, check-ins per `auth.users` cascade — `products/lien/supabase/migrations/0001_init.sql`) and triggers pair dissolution for the partner if the user was in an active pair. Terms 第8条 / Privacy Policy §6 (保持期間とアカウントの削除) describe this to the end user.
+Settings (the gear icon on Home) → アカウント → **"アカウントを削除する"** (Delete account). The deletion is confirmed in two steps: an explanation screen (what is deleted — the nickname, promise and check-in records, the photos the user attached, and the sharing with the partner, because the current pair is dissolved; "削除したあとは、元に戻せません。" It cannot be undone) and a final alert ("本当に削除しますか?" → "削除する").
 
-**状態: T23(#23)未着手につき実装前。backend Function(`delete-account`)も未作成。**
+What happens: the app calls the server function `delete-account`, which acts only on the account of the signed-in user. It (1) dissolves the user's active pair (the partner's app silently returns to the solo state), (2) deletes the user's photos from storage, (3) removes the pair data first if the user is the last remaining member (the partner had already deleted their account), then the user's pair membership, and finally (4) deletes the authentication user, which cascades to the profile, promise, check-ins, reactions, nudges and invites. The authentication user is removed last, so a failure in the middle (for example, no network) leaves the account usable: the app shows a message ("削除できませんでした。…もう一度押せば、続きから進みます") and the same button can be pressed again. On success the app erases its local data (the last snapshot and the pending queue), signs out, refreshes the widget and returns to the first onboarding screen.
+
+The partner keeps their own records (their check-ins and the archived plant and streak of the dissolved pair); the deleted user's data is gone. Terms 第8条 / Privacy Policy §6 (保持期間とアカウントの削除) describe this to the end user.
+
+"サインアウト" (Sign out) in the same section is a different action: it only wipes the device and keeps the server data (an anonymous account cannot be signed back into), and its confirmation says so and points to "アカウントを削除する" for users who also want the server records removed.
+
+Reviewer verification: with any test account, open Settings → アカウント → アカウントを削除する, follow both confirmation steps, and confirm that the app returns to the welcome screen. Starting again creates a new anonymous account.
+
+**状態: 2026-10-13 に T23(#23)の実装に合わせて書き直した(#69)。** delete-account は本番にデプロイ済みで、本番の通しテスト S25・S26(OPS §12。現役のペアあり / 最後の所属者 / ソロの 3 通りを実際に消して、DB と Storage に残らないこと・相手が無傷なことを確認)で確かめた。草案の「`auth.users` の cascade で消える」だけの記述を、実装の順序(ペアの解消 → 写真 → 本人しか居ないペア → 所属 → auth ユーザー)と、失敗してもやり直せる性質に書き直した。実ビルドでの再現は T30(T20 の ⑭)。運営が他人のアカウントを消すときは、ダッシュボードで auth ユーザーを直接消さずに OPS §13 の順序で行う(幽霊のペアが残るため)。
 
 ---
 
 ## 2. 提出前チェック(App Store Connect 提出時に必要な回答・設定の台帳)
 
-REQUIREMENTS §8(5項目)に加えて、App Store Connect 提出フローで実際に入力・判断が必要な項目をここに台帳化する。**Apple側の仕様詳細について確信が持てない記述は「要確認」と明記し、断定しない。**
+REQUIREMENTS §8(6項目。2026-10-13 に、オンボの規約への明示の同意を独立した項目として足した)に加えて、App Store Connect 提出フローで実際に入力・判断が必要な項目をここに台帳化する。**Apple側の仕様詳細について確信が持てない記述は「要確認」と明記し、断定しない。**
 
 ### 2.1 App Store Connect「アプリのプライバシー」(データ収集の申告)草案
 
@@ -187,10 +210,10 @@ REQUIREMENTS §8(5項目)に加えて、App Store Connect 提出フローで実�
 
 | 要件 | 対応 | 状態 |
 |---|---|---|
-| 通報の仕組み | Settings→通報(mailto、pairId・日付プリフィル) | **未実装(T23待ち)**。規約(terms.md第6条)記載済み |
-| 不適切ユーザーの排除(block) | ペア解消で共有完全停止 | **未実装(T23待ち)**。規約(terms.md第7条)記載済み |
-| 利用規約への同意 | **未確認事項**: オンボーディング(T10実装済み、`OnboardingView.swift`)に規約同意UI(チェックボックス等)は現状存在しない。利用規約・プライバシーポリシーへのリンクはREQUIREMENTS §3.15により設定画面に配置予定(T23範囲)だが、オンボ時点の明示同意有無は未確認 | **T10/T27へ申し送り事項として提起**(issue #30の敵対検証コメントと同じ懸念) |
-| コンテンツの連絡先情報公開 | 運営者連絡先(メール)は`terms.md`/`privacy-policy.md`に記載欄あり、現在プレースホルダ | **G4(#42)待ち** |
+| 通報の仕組み | 長押し(写真・ニックネーム・約束の文・植物の名前)と Settings → サポート → 不適切な内容を通報する(mailto。ペア ID・日付・対象・版を入れる。自動では送らない) | **実装済み(T23 #23)**。規約(terms.md第6条)記載済み。宛先は G4 待ち |
+| 不適切ユーザーの排除(block) | 長押しの「ブロック(ペアを解消)」と Settings → ペアを解消する(確認2段階)で共有を完全停止 | **実装済み(T23 #23)**。規約(terms.md第7条)記載済み |
+| 利用規約への同意 | オンボのニックネーム画面で、規約・プライバシーポリシーへの同意のチェックが入るまで「同意してはじめる」を押せない(リンクと禁止事項の注意書きつき)。規約・ポリシーへのリンクは設定にもある | **実装済み(T23 #23)**。旧「未確認事項」(issue #30 の敵対検証の懸念)は解消。実ビルドでの確認は T30 |
+| コンテンツの連絡先情報公開 | 運営者連絡先(メール)は`terms.md`/`privacy-policy.md`に記載欄あり、現在プレースホルダ。アプリ側も `SupportLinks.contactEmail` が空(通報・お問い合わせのメールの宛先になる)。G4 で同じアドレスに揃える | **G4(#42)待ち** |
 
 ---
 
@@ -202,7 +225,7 @@ REQUIREMENTS §8(5項目)に加えて、App Store Connect 提出フローで実�
 - 第7条(ブロックとペアの解消): `products/lien/marketing/terms.md:53-56`
 - 第8条(アカウントの削除): `products/lien/marketing/terms.md:58-61`
 
-いずれも条文としては記載済み。未実装なのはアプリ側のUI/APIのみ(T23)。
+いずれも条文としては記載済み。アプリ側の UI/API(T23)も 2026-10-13 に実装済み(§1.4・§1.5・§2.6)。
 
 ---
 
@@ -212,4 +235,4 @@ REQUIREMENTS §8(5項目)に加えて、App Store Connect 提出フローで実�
 - **事業者名・連絡先メールアドレス・制定日・管轄裁判所が未確定**: `terms.md` / `privacy-policy.md` の `【要記入: G4: ...】` 箇所。G4(#42)で決定。
 - **利用状況計測手段(自前テーブル or TelemetryDeck)が未確定**: REQUIREMENTS §7。App Privacy回答(本ファイル§2.1)の最終確定に影響する。CHECKLIST-G4.md項目と同一。
 - **年齢レーティング質問票・Export Compliance質問票の正確な回答**: Apple側の最新の質問文言はApp Store Connect上で実際に確認する必要があり、本ドラフトは想定(4+、免除想定)に留めている(要確認)。
-- **オンボーディングでの利用規約同意UIの要否**: 現状未実装。UGCアプリとしてApple審査が明示同意UIを求める可能性があるため、T10/T27担当エージェントへの確認・追加実装の要否判断が必要。
+- ~~**オンボーディングでの利用規約同意UIの要否**~~ → 2026-10-13 に T23(#23)で実装した(§1.4・§2.6)。残るのは、実ビルドでの確認(T30)と、リンク先の公開(Pages・G4 — 上の「Support URL / Privacy Policy URL の公開先」)。
