@@ -1,7 +1,9 @@
 // HomeView.swift — ホーム画面(T13+T14 / REQUIREMENTS §3.4, §3.5, §3.9, §3.10 / §6)
 //
-// 構成: 植物(SVG レイヤーの重ね合わせ+名前)/ ストリーク / ふたりの今日(自分・相手チップ+相手の今日の写真)/
-//       チェックインフロー(CheckinFlowView — 1タップ完了+写真添付+当日取消)。
+// 構成: 植物(SVG レイヤーの重ね合わせ+葉の下の約束の絵文字+名前+ゲージの文+今日のひとこと — PlantHeroView)/ ストリーク /
+//       ふたりの今日(自分・相手チップ+相手の今日の写真)/ チェックインフロー(CheckinFlowView — 1タップ完了+写真添付+当日取消)。
+// 植物の全画面の演出(段階アップ・おかえり — PlantCelebrationView)は、ホームの上に重ねるオーバーレイ(PB #57)。
+// 名前を付ける・変えるシート(PlantNameSheet)はホームから開く。
 // 相手の今日の写真(PV #59)は、相手が写真を添えた日だけ出る(PartnerPhotoView.swift)。写真が無い日・
 // 取得に失敗したときは何も出さない。タップで原寸を全画面で見る。
 // 文言は Strings.Home / Strings.Checkin、色・余白は DesignSystem の定数に集約(DESIGN §3.8)。
@@ -61,9 +63,28 @@ struct HomeView: View {
                 .padding(.horizontal, LienSpacing.l)
             #endif
         }
+        // 植物の全画面の演出(段階アップ・おかえり — PB #57)。ホームの上に重ねる。ナビゲーションバーも隠して全画面に見せる
+        .overlay { celebrationOverlay }
+        .hidesNavigationBar(viewModel.plantExperience.presentation != nil)
+        .animation(.easeInOut(duration: 0.25), value: viewModel.plantExperience.presentation)
+        // 名前を付ける・変えるシート(PB #57)
+        .sheet(isPresented: nameSheetBinding) {
+            if let naming = viewModel.plantNaming {
+                PlantNameSheet(model: naming)
+            }
+        }
         // 通報の確認・メールを開けなかったときのアラート・ブロック(ペア解消)の説明シート(T23 #23)
         .moderationPresentation(moderation)
-        .onAppear { viewModel.load() }
+        .onAppear {
+            viewModel.load()
+            viewModel.plantExperience.homeDidAppear()
+        }
+        // 今日のひとこと(吹き出し)は数秒で消える。出し直す(タップ)たびにタイマーを作り直す
+        .task(id: viewModel.plantExperience.whisperToken) {
+            guard viewModel.plantExperience.whisper != nil else { return }
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            if !Task.isCancelled { viewModel.plantExperience.hideWhisper() }
+        }
         .task { await viewModel.flushPendingOps() }
         // 前面に出したまま日付が変わったら、相手の写真を消す(PV #59。View が消えるとキャンセルされる)
         .task { await viewModel.partnerPhoto?.watchDayChanges() }
@@ -78,9 +99,52 @@ struct HomeView: View {
             // フォアグラウンド復帰時の再送(DESIGN §3.7。snapshot 表示も読み直す)
             if scenePhase == .active {
                 viewModel.load()
+                // 前面に出したまま日付が変わった次の朝も「その日はじめて」(今日のひとこと)
+                viewModel.plantExperience.homeDidAppear()
                 Task { await viewModel.flushPendingOps() }
             }
         }
+    }
+
+    /// 名前のシートを出しているか。観測する状態は body の中で読む(Binding の getter の中では読まない — T23 #23)
+    private var nameSheetBinding: Binding<Bool> {
+        let isShown = viewModel.plantNaming?.isSheetPresented ?? false
+        return Binding(
+            get: { isShown },
+            set: { viewModel.plantNaming?.isSheetPresented = $0 }
+        )
+    }
+
+    /// 植物の全画面の演出(段階アップ・おかえり)。無いときは何も出さない
+    @ViewBuilder
+    private var celebrationOverlay: some View {
+        if let presentation = viewModel.plantExperience.presentation {
+            PlantCelebrationView(
+                presentation: presentation,
+                snapshot: viewModel.snapshot,
+                naming: viewModel.plantNaming,
+                canSendHeart: viewModel.canReact,
+                // T15 のリアクション ❤️ を使い回す(相手の今日のチェックインへ)。失敗の文言は演出の中に出す
+                onSendHeart: { await viewModel.sendReaction(stamp: .heart) },
+                onClose: { viewModel.plantExperience.dismissPresentation() }
+            )
+            .id(presentation.id)
+            .transition(.opacity)
+        }
+    }
+}
+
+// MARK: - 全画面の演出の間だけナビゲーションバーを隠す
+
+private extension View {
+    /// 全画面の演出の間は、ナビゲーションバー(歯車)も隠す。macOS の型検査(Xcode 無しの下見)では何もしない
+    @ViewBuilder
+    func hidesNavigationBar(_ hidden: Bool) -> some View {
+        #if os(iOS)
+        toolbar(hidden ? .hidden : .automatic, for: .navigationBar)
+        #else
+        self
+        #endif
     }
 }
 
@@ -94,11 +158,22 @@ private struct SnapshotContent: View {
 
     var body: some View {
         VStack(spacing: LienSpacing.m) {
-            PlantArea(
+            PlantHeroView(
                 state: viewModel.plantState,
                 sways: viewModel.plantSways,
-                plantName: snapshot.pairId != nil ? snapshot.plantName : nil,
-                moderation: moderation
+                accessibilityText: viewModel.plantAccessibilityText,
+                meEmoji: viewModel.leafEmojis.me,
+                partnerEmoji: viewModel.leafEmojis.partner,
+                plantName: viewModel.plantName,
+                canRename: viewModel.canRenamePlant,
+                canName: viewModel.canNamePlant,
+                gaugeText: viewModel.growthGaugeText,
+                whisper: viewModel.plantExperience.whisper,
+                nameNotice: viewModel.plantExperience.nameNotice,
+                moderation: moderation,
+                onTapPlant: { viewModel.plantExperience.plantTapped() },
+                onNameAction: { viewModel.presentPlantNameSheet() },
+                onDismissNameNotice: { viewModel.plantExperience.dismissNameNotice() }
             )
 
             if viewModel.isSolo {
@@ -134,50 +209,6 @@ private struct SnapshotContent: View {
             // Live 構成は LiveNudgeReactService(実 Edge Functions)、Stub 構成は LocalEchoCheckinService の
             // モック適合で能力検出される(AppServices — issue #55。ソロでは viewModel.canNudge が false)
             NudgeArea(viewModel: viewModel)
-        }
-    }
-}
-
-// MARK: - 植物(§3.9。SVG レイヤーの重ね合わせ — PlantCharacterView / assets/plant/mapping.md)
-
-private struct PlantArea: View {
-    let state: PlantCharacterState
-    /// fidget(片方だけ完了のそわそわ)の揺れアニメ
-    let sways: Bool
-    let plantName: String?
-    let moderation: ModerationViewModel?
-
-    @State private var swayAngle: Double = 0
-
-    var body: some View {
-        VStack(spacing: LienSpacing.s) {
-            PlantCharacterView(state: state)
-                .frame(width: 180, height: 240) // 3:4(キャンバス 240×320 と同じ比率)
-                .rotationEffect(.degrees(swayAngle), anchor: .bottom)
-                .onAppear { updateSway() }
-                .onChange(of: sways) { updateSway() }
-                .padding(.top, LienSpacing.m)
-
-            if let plantName, !plantName.isEmpty {
-                Text(plantName)
-                    .font(.headline)
-                    // 名前はどちらのペアも付けられる。気になるときは長押しで通報・ブロックできる(T23 #23)
-                    .plantNameMenu(moderation, plantName: plantName)
-            }
-        }
-    }
-
-    /// 揺れのみ(REQUIREMENTS §3.9。アニメ専用の絵は持たない。葉の開閉は PlantCharacterView が差し替えで見せる)
-    private func updateSway() {
-        if sways {
-            swayAngle = -2
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-                swayAngle = 2
-            }
-        } else {
-            withAnimation(.default) {
-                swayAngle = 0
-            }
         }
     }
 }
@@ -436,6 +467,9 @@ extension PairSnapshot {
         todayMeDone: Bool = false,
         todayPartnerDone: Bool = true,
         plantStage: Int = 3,
+        plantGrownDays: Int? = 11,
+        plantStageFloor: Int? = 7,
+        plantNextStageAt: Int? = 14,
         plantMood: PlantMood = .fidget
     ) -> PairSnapshot {
         PairSnapshot(
@@ -452,6 +486,9 @@ extension PairSnapshot {
             partnerPromiseTitle: "ランニング",
             partnerPromiseEmoji: "🏃",
             plantStage: plantStage,
+            plantGrownDays: plantGrownDays,
+            plantStageFloor: plantStageFloor,
+            plantNextStageAt: plantNextStageAt,
             plantMood: plantMood,
             plantName: "みどり",
             hasPartnerPhotoToday: false

@@ -40,6 +40,13 @@ struct AppServices {
     /// アカウントの削除の応答だけ取りこぼしたときに使う。Live 構成だけ。nil のとき(Stub 構成)は、たしかめずに自分たちの
     /// サーバーの答えをそのまま信じる
     var sessionVerifier: SessionVerifying?
+    /// 植物の名前を付ける・変える(plant-name — PB #57)。Live / Stub のどちらの構成でも AppServices が入れる。
+    /// nil のとき(これを渡さない既存の組み立て・プレビュー)は、ホームは名前付けの導線を出さない
+    var plantNaming: PlantNaming?
+    /// 植物の体験の「もう見せたか」の記録(段階アップの演出・名前の知らせ・おかえり・ひとこと — PB #57。端末の UserDefaults)。
+    /// nil のとき(これを渡さない既存の組み立て・テスト)は、ホームがメモリ内の記録で動く(保存しない)。
+    /// アカウントの削除・サインアウトの後始末で消す(AppModel.endSession)
+    var plantMemory: PlantMemoryStoring?
 }
 
 extension AppServices {
@@ -69,7 +76,9 @@ extension AppServices {
                 ledger: InMemoryPushRegistrationLedger()
             ),
             reloadWidgets: reloadWidgets,
-            accountClient: StubAccountClient(store: store)
+            accountClient: StubAccountClient(store: store),
+            plantNaming: StubPlantNaming(store: store),
+            plantMemory: UserDefaultsPlantMemoryStore()
         )
     }
 }

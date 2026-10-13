@@ -52,6 +52,9 @@ struct RootView: View {
                             partnerPhoto: model.services.partnerPhotos.map {
                                 PartnerPhotoModel(provider: $0, actions: model.moderation.photoActions)
                             },
+                            // 植物の名前付け(plant-name)と、演出の「もう見せたか」の記録(PB #57)
+                            plantNaming: model.services.plantNaming,
+                            plantMemory: model.services.plantMemory,
                             reloadWidgets: model.services.reloadWidgets
                         ),
                         reloadToken: model.snapshotRevision,

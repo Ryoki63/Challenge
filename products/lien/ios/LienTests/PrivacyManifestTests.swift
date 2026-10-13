@@ -105,6 +105,7 @@ final class PrivacyManifestTests: XCTestCase {
                 "Lien/Core/Strings.swift",
                 "Lien/Core/DesignSystem/PlantLayers.swift",
                 "Lien/Core/DesignSystem/PlantCharacterView.swift",
+                "Lien/Core/PlantProgress.swift",
             ]
         ),
         BundleSpec(

@@ -7,7 +7,8 @@
 	       分析 SDK は入れない(REQUIREMENTS §7 / D6)ので、用途はアプリの機能のみ。トラッキングなし。
 	       App Store Connect「アプリのプライバシー」の回答と突き合わせて T30 で確定する
 	     - 必須理由 API:
-	       * UserDefaults(PushTokenSync の送信記録 = アプリ自身だけが読む情報。理由 CA92.1)。自前のコード
+	       * UserDefaults(PushTokenSync の送信記録・植物の体験の「もう見せたか」の記録(PlantMemory = 段階アップの演出を見せた段階など)
+	         = どちらもアプリ自身だけが読む情報。理由 CA92.1)。自前のコード
 	       * FileTimestamp(理由 C617.1 = アプリのコンテナ内のファイルのメタデータ)。**依存パッケージ分**:
 	         supabase-swift 2.55.3 のバイナリが FileManager.attributesOfItem を参照する(lien-release の棚卸しで検出)。
 	         アプリ自身はファイルのタイムスタンプを読まない。supabase-swift が自前のマニフェストを持つ版になったら見直す

@@ -132,7 +132,13 @@ extension AppServices {
                 apiKey: config.supabaseAnonKey,
                 tokenProvider: tokenProvider,
                 session: session
-            )
+            ),
+            plantNaming: EdgeFunctionPlantNaming(
+                baseURL: baseURL,
+                tokenProvider: tokenProvider,
+                session: session
+            ),
+            plantMemory: UserDefaultsPlantMemoryStore()
         )
     }
 }

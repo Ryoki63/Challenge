@@ -63,8 +63,9 @@ enum Strings {
         static let consentCheckedValue = "同意済み"
         static let consentUncheckedValue = "未同意"
 
-        /// 匿名開始の注意(DESIGN §10: Apple ID 未連携のまま再インストールすると
-        /// データを引き継げないことをオンボで明示する義務がある)
+        /// 匿名開始の注意。v1.0 は Sign in with Apple(Apple ID への連携)を入れない(D3・REVIEW-2026-10-12 §1。1.0.1 で対応)ので、
+        /// 機種変更やアプリの入れ直しで記録を引き継げない場合があることを、オンボ(ここ)と設定(Settings.accountFooter)に明示する
+        /// (DESIGN §10: 再インストール時、匿名のままのユーザーは救済できない — オンボで明示する)
         static let anonymousStartNote =
             "登録なしですぐ始められます。機種変更やアプリの入れ直しでは、記録を引き継げない場合があります。"
 
@@ -164,6 +165,198 @@ enum Strings {
             "💧", "🌿", "🍎", "🥗", "🛏️", "🦷", "🧹", "☀️",
             "💊", "🤸", "🚴", "🏊", "🎨", "📷", "💌", "🌙",
         ]
+    }
+
+    /// 植物(タネの子)— 段階名・ゲージ・段階アップの演出・名前付け・読み上げ・ひとこと(GROWTH §3.3・§4.5・§5 / PB #57)。
+    /// 罰・恥系の表現は使わない(§3.5。休んだ日・減ることには触れない)。主語は名前にする(左右は使わない — GROWTH §4.5)
+    enum Plant {
+        // MARK: 段階名(GROWTH §3.3。仮の名前)
+
+        /// 添字 = 段階 0〜9。アプリが知らない大きい段階は stageName が最大(みのり)に丸める
+        static let stageNames = [
+            "たね", "ふたば", "めばえ", "わかば", "よりそい", "つぼみ", "いろづき", "ほころび", "ふたりざき", "みのり",
+        ]
+
+        /// 段階の名前。範囲外は 0〜9 に丸める(知らない段階はみのりとして描く — PlantLayers.clampedStage)
+        static func stageName(_ stage: Int) -> String {
+            stageNames[min(max(stage, 0), stageNames.count - 1)]
+        }
+
+        // MARK: ゲージの文(GROWTH §5.1。ホームの植物の下に1行。単位は「回」)
+
+        /// 次の段階まで(区間が短いとき・長い区間の後半): 「ふたりそろって あと2回で めばえ」
+        static func gaugeRemaining(_ remaining: Int, nextStageName: String) -> String {
+            "ふたりそろって あと\(remaining)回で \(nextStageName)"
+        }
+        /// 長い区間の前半: 「わかばになってから 3回そろったよ」
+        static func gaugeSinceStage(_ stageName: String, count: Int) -> String {
+            "\(stageName)になってから \(count)回そろったよ"
+        }
+        /// 次の段階が無いとき(みのり以降): 「ふたりで 128回 そろったよ」
+        static func gaugeLast(_ grownDays: Int) -> String {
+            "ふたりで \(grownDays)回 そろったよ"
+        }
+        /// アプリが知らない段階をサーバーが返したとき(1.0.1 の花壇など): 「あと25回で つぎの おたのしみ」
+        static func gaugeUnknownNext(_ remaining: Int) -> String {
+            "あと\(remaining)回で つぎの おたのしみ"
+        }
+
+        // MARK: VoiceOver(GROWTH §5.4: 「みどり、わかば。あなた: 完了、ゆうき: まだ。ふたりそろって あと3回で よりそい」)
+
+        /// 名前があれば「名前、段階名」、無ければ段階名だけ
+        static func voiceHeader(name: String?, stageName: String) -> String {
+            guard let name, !name.isEmpty else { return stageName }
+            return "\(name)、\(stageName)"
+        }
+        /// 「あなた: 完了、ゆうき: まだ」
+        static func voiceStatus(meDone: Bool, partnerName: String, partnerDone: Bool) -> String {
+            "あなた: \(meDone ? voiceDone : voicePending)、\(partnerName): \(partnerDone ? voiceDone : voicePending)"
+        }
+        static let voiceDone = "完了"
+        static let voicePending = "まだ"
+        /// ソロ(ペア未成立): 植物は土の中で眠っている
+        static let voiceSolo = "土の中で眠るタネの子"
+        /// 名前を変えるボタンのヒント
+        static let renameHint = "ダブルタップで、名前を変えます"
+        /// 植物をタップするとひとことをもう一度出す(VoiceOver のアクション名)
+        static let whisperAction = "タネの子のひとこと"
+
+        // MARK: 段階アップの演出(GROWTH §5.2。各段階1回だけ全画面で)
+
+        /// 段階0(ペア成立): はじめまして
+        static let meetingHeadline = "はじめまして!"
+        static let meetingBody = "タネの子が、目をさましたよ"
+        /// 段階1以降: 「わかばになった!」/「ふたりで 7回 そろったよ」
+        static func stageUpHeadline(_ stageName: String) -> String {
+            "\(stageName)になった!"
+        }
+        static func stageUpBody(_ grownDays: Int) -> String {
+            "ふたりで \(grownDays)回 そろったよ"
+        }
+        static let celebrationClose = "とじる"
+        /// 変わる前 / 後の植物(VoiceOver)
+        static func celebrationBefore(_ stageName: String) -> String {
+            "さっきまで: \(stageName)"
+        }
+        static func celebrationAfter(_ stageName: String) -> String {
+            "いま: \(stageName)"
+        }
+        /// ボタン「(相手)にハートを送る」(リアクションのスタンプ ❤️ を使い回す — T15)
+        static func celebrationHeart(_ partnerName: String) -> String {
+            "\(partnerName)にハートを送る"
+        }
+        static let celebrationHeartSending = "送っています…"
+        static let celebrationHeartSent = "ハートを送ったよ"
+        static let celebrationHeartError = "送れませんでした。あとでもう一度お試しください"
+
+        // MARK: おかえり(GROWTH §4.4。2日以上あいたあと、自分がチェックインした瞬間だけ。空いた日数は出さない)
+
+        static let welcomeBackHeadline = "おかえり"
+        static let welcomeBackBody = "また いっしょに"
+
+        // MARK: 名前付け(GROWTH §5.3。最初の「ふたば」の演出の中で付ける。先に付けた人の名前に決まる)
+
+        static let nameTitle = "名前をつけてあげよう"
+        static let renameTitle = "名前をかえる"
+        static let namePlaceholder = "なまえ(8文字まで)"
+        static let nameNote = "どちらかが先につけると、その名前に決まります。あとからいつでも変えられます。"
+        static let nameSubmit = "名前をつける"
+        static let renameSubmit = "この名前にする"
+        static let nameSaving = "保存しています…"
+        static let nameLater = "あとで"
+        static let nameCancel = "やめる"
+        /// ホームで、まだ名前が無いときのボタン(演出を閉じたあとも残る)
+        static let nameButton = "名前をつける"
+        static let nameEmptyError = "名前を入力してね"
+        static let nameTooLongError = "名前は8文字までです"
+        /// 改行・見えない文字・向きを変える制御文字など(サーバーの invalid_name と同じ規則)
+        static let nameInvalidError = "使えない文字が入っています"
+        static let nameSaveError = "保存できませんでした。通信状態を確認して、もう一度お試しください"
+        static let nameNoPairError = "いまはペアがいないので、名前をつけられません"
+        /// 自分が付けた: 「『みどり』と名づけたよ」
+        static func nameSavedNote(_ name: String) -> String {
+            "『\(name)』と名づけたよ"
+        }
+        /// 相手が先に付けていた(409): 「名前は『みどり』になったよ」
+        static func nameAdoptedNote(_ name: String) -> String {
+            "名前は『\(name)』になったよ"
+        }
+        /// 相手が付けた・変えた(次に開いたとき): 「名前が『みどり』にかわったよ」
+        static func nameChangedNotice(_ name: String) -> String {
+            "名前が『\(name)』にかわったよ"
+        }
+        static let nameNoticeClose = "閉じる"
+
+        // MARK: 今日のひとこと(GROWTH §5.5。その日はじめてホームを開いたとき、吹き出しで短く。同じ日は同じ言葉)
+        // 主語は名前にする。絵は使わない。罰なし文言の lint の対象(Strings.swift の全リテラル)
+
+        enum Whisper {
+            /// ふたりそろった日
+            static func bothDone(_ partnerName: String) -> [String] {
+                [
+                    "ふたりの葉、そろってひらいたね",
+                    "きょうも ふたりで できたね",
+                    "ぽかぽか。いい日だなあ",
+                    "\(partnerName)と いっしょで うれしいな",
+                ]
+            }
+            /// 相手だけ完了
+            static func partnerDone(_ partnerName: String) -> [String] {
+                [
+                    "\(partnerName)の葉、ひらいたよ",
+                    "\(partnerName)が ひらいてくれた。うれしいね",
+                    "\(partnerName)の葉が きらきらしてる",
+                    "あなたの葉が ひらくのも、たのしみにしてるよ",
+                ]
+            }
+            /// 自分だけ完了
+            static func meDone(_ partnerName: String) -> [String] {
+                [
+                    "ひらいたよ。\(partnerName)の葉は ねんね中",
+                    "\(partnerName)の葉も、そのうち ひらくよ",
+                    "ひとりぶん できたね。ゆっくり待とうね",
+                ]
+            }
+            /// すやすや(ふたり達成もお休みチケットもない日が続いたあと)
+            static let sleepy = [
+                "すやすや…ふたりのペースで いいよ",
+                "ぐっすり ねてたよ。おはよう",
+                "のんびり いこうね",
+            ]
+            /// まだ誰もチェックインしていない日(時間帯ごと)
+            static let morning = [
+                "おはよう。きょうも ふたりのペースでね",
+                "いい朝だね。きょうは なにする?",
+                "ふわぁ…おはよう",
+                "あさの ひかりが きもちいいね",
+            ]
+            static let daytime = [
+                "おひるだね。ひとやすみも いいね",
+                "きょうも ふたりの葉っぱが そよそよ",
+                "ゆっくり いこうね",
+            ]
+            static let evening = [
+                "夕方だね。きょうも おつかれさま",
+                "ゆっくりで だいじょうぶ",
+                "ひがくれてきたね",
+            ]
+            static let night = [
+                "もう夜だね。おやすみの じゅんび?",
+                "ふぁ…ねむくなってきた",
+                "あしたも ふたりのペースでね",
+            ]
+            /// 段階ごとの一言(ふたば・わかば・つぼみ・ふたりざき・みのり)。ほかの段階は無い
+            static func stage(_ stage: Int) -> [String] {
+                switch stage {
+                case 1: return ["ふたば、にあう?", "ふたばって かわいいでしょ"]
+                case 3: return ["わかばに なれたよ。ぐんぐん のびるよ", "ふたりの わかば、いいかんじ"]
+                case 5: return ["つぼみが ふくらんできたよ", "なにが さくんだろう?"]
+                case 8: return ["ふたりで さいたね", "いっしょに さくと うれしいね"]
+                case 9: return ["みのりの おいわい。ありがとう", "ふたりの タネが ひかってるよ"]
+                default: return []
+                }
+            }
+        }
     }
 
     /// ホーム画面(REQUIREMENTS §3.4, §3.5, §3.9, §3.10 / T13)。

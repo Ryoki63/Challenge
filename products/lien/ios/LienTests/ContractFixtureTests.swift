@@ -11,6 +11,7 @@
 //   - スタンプの語彙と順序(NudgeStamp / ReactionStamp ⇔ messages.ts)
 //   - エラー文字列(各クライアントのエラーマップ ⇔ 各 function の core.ts / index.ts)
 //   - 前方互換(サーバーが snapshot に未知のキーを足しても壊れない)
+//   - 成長ルール v2 の新キー3つ(plantGrownDays / plantStageFloor / plantNextStageAt)の値まで(PB #57)と、plant-name の応答
 
 import XCTest
 @testable import Lien
@@ -37,6 +38,11 @@ final class ContractFixtureTests: XCTestCase {
         XCTAssertEqual(snapshot.partnerName, "ゆうき")
         XCTAssertEqual(snapshot.partnerPromiseTitle, "ランニング")
         XCTAssertEqual(snapshot.plantStage, 2)
+        // 成長ルール v2 の新キー(サーバーの閾値 [0,1,3,7,…] で、段階2 = 下限3・次の段階7)
+        XCTAssertEqual(snapshot.plantGrownDays, 6)
+        XCTAssertEqual(snapshot.plantStageFloor, 3)
+        XCTAssertEqual(snapshot.plantNextStageAt, 7)
+        XCTAssertEqual(GrowthGauge.text(for: snapshot), "ふたりそろって あと1回で わかば", "実ハンドラの出力から、ゲージの文が作れる")
         XCTAssertEqual(snapshot.plantMood, .fidget)
         XCTAssertEqual(snapshot.plantName, "みどり")
         XCTAssertTrue(snapshot.hasPartnerPhotoToday)
@@ -47,6 +53,12 @@ final class ContractFixtureTests: XCTestCase {
         let snapshot = try ContractFixtures.decode(SnapshotResponse.self, from: "snapshot.solo").snapshot
         XCTAssertNil(snapshot.pairId, "ソロ状態は pairId = null")
         XCTAssertEqual(snapshot.plantStage, 0)
+        // ソロの植物の成長は 0 / 0 / null(キーは省略されない — DESIGN §3.4)。ソロにゲージは出さない
+        XCTAssertEqual(snapshot.plantGrownDays, 0)
+        XCTAssertEqual(snapshot.plantStageFloor, 0)
+        XCTAssertNil(snapshot.plantNextStageAt)
+        XCTAssertNil(PlantProgress(snapshot: snapshot))
+        XCTAssertNil(GrowthGauge.text(for: snapshot))
         XCTAssertNil(snapshot.partnerName)
         XCTAssertEqual(snapshot.myPromiseTitle, "筋トレ")
         XCTAssertEqual(AppRouter.phase(hasSession: true, snapshot: snapshot), .solo)
@@ -61,13 +73,11 @@ final class ContractFixtureTests: XCTestCase {
         XCTAssertEqual(snapshot, PairSnapshot.emptySolo(updatedAt: fixedDate), "スタブ構成の空 snapshot と同じ形")
     }
 
-    func testSnapshotDecodingToleratesNewServerKeys() throws {
-        // 成長ルール v2(#54 / #57)でサーバーが snapshot に足す予定のキー。古いアプリは無視して動く
+    func testSnapshotDecodingToleratesUnknownServerKeys() throws {
+        // サーバーが将来 snapshot に足すキー(1.0.1 の花壇・おきゃくさんなど)。今のアプリは無視して動く
         var object = try ContractFixtures.object("snapshot.paired")
         var inner = try XCTUnwrap(object["snapshot"] as? [String: Any])
-        inner["plantGrownDays"] = 12
-        inner["plantStageFloor"] = 3
-        inner["plantNextStageAt"] = 14
+        inner["plantVisitorId"] = "ladybug"
         inner["someFutureKey"] = ["a": 1]
         object["snapshot"] = inner
         let data = try JSONSerialization.data(withJSONObject: object)
@@ -75,6 +85,66 @@ final class ContractFixtureTests: XCTestCase {
         let decoded = try PairSnapshot.makeJSONDecoder().decode(SnapshotResponse.self, from: data)
         XCTAssertEqual(decoded.snapshot.pairId, pairID)
         XCTAssertEqual(decoded.snapshot.plantStage, 2)
+        XCTAssertEqual(decoded.snapshot.plantGrownDays, 6, "既知のキーはそのまま読める")
+    }
+
+    func testEverySnapshotFixtureCarriesTheGrowthKeysTheAppReads() throws {
+        // サーバーの実ハンドラの出力は、どの応答の snapshot にも新キー3つを載せる(省略しない)。アプリはその値まで読める
+        let fixtures: [(name: String, grown: Int, floor: Int, next: Int?)] = [
+            ("snapshot.paired", 6, 3, 7),
+            ("snapshot.solo", 0, 0, nil),
+            ("snapshot.empty", 0, 0, nil),
+        ]
+        for fixture in fixtures {
+            let snapshot = try ContractFixtures.decode(SnapshotResponse.self, from: fixture.name).snapshot
+            XCTAssertEqual(snapshot.plantGrownDays, fixture.grown, fixture.name)
+            XCTAssertEqual(snapshot.plantStageFloor, fixture.floor, fixture.name)
+            XCTAssertEqual(snapshot.plantNextStageAt, fixture.next, fixture.name)
+        }
+        // ペア成立の直後(invite-accept)は 段階0・成長 0 回・次の段階は 1 回
+        let accepted = try ContractFixtures.decode(InviteAcceptResponse.self, from: "invite-accept.ok").snapshot
+        XCTAssertEqual(accepted.plantGrownDays, 0)
+        XCTAssertEqual(accepted.plantStageFloor, 0)
+        XCTAssertEqual(accepted.plantNextStageAt, 1)
+        XCTAssertEqual(GrowthGauge.text(for: accepted), "ふたりそろって あと1回で ふたば")
+        // ふたり達成(checkin): 7回で「わかば」に入った
+        let both = try ContractFixtures.decode(CheckinResponse.self, from: "checkin.paired").snapshot
+        XCTAssertEqual(both.plantStage, 3)
+        XCTAssertEqual(both.plantGrownDays, 7)
+        XCTAssertEqual(both.plantStageFloor, 7)
+        XCTAssertEqual(both.plantNextStageAt, 14)
+        XCTAssertEqual(GrowthGauge.text(for: both), "ふたりそろって あと7回で よりそい", "段階に入った直後(0回)は『0回そろったよ』と言わない")
+    }
+
+    // MARK: POST /plant-name
+
+    func testPlantNameFixturesDecode() throws {
+        let ok = try ContractFixtures.decode(PlantNameResponse.self, from: "plant-name.ok")
+        XCTAssertEqual(ok.name, "みどり")
+        XCTAssertEqual(ok.snapshot.pairId, pairID)
+        XCTAssertEqual(ok.snapshot.plantName, "みどり", "呼び出し本人視点の snapshot に名前が入る")
+
+        let conflict = try ContractFixtures.decode(PlantNameConflictResponse.self, from: "plant-name.already-named")
+        XCTAssertEqual(conflict.error, "already_named")
+        XCTAssertEqual(conflict.name, "みどり")
+    }
+
+    func testPlantNameFixturesAreReadByTheClientTheWayThePlanSays() throws {
+        // 200 → 保存された名前 / 409 → 自分が送った名前と同じなら成功・違えば相手の名前を採用
+        let ok = try ContractFixtures.data("plant-name.ok")
+        XCTAssertEqual(
+            try EdgeFunctionPlantNaming.interpret(status: 200, data: ok, sent: "みどり", mode: .first),
+            .saved(name: "みどり")
+        )
+        let conflict = try ContractFixtures.data("plant-name.already-named")
+        XCTAssertEqual(
+            try EdgeFunctionPlantNaming.interpret(status: 409, data: conflict, sent: "みどり", mode: .first),
+            .saved(name: "みどり")
+        )
+        XCTAssertEqual(
+            try EdgeFunctionPlantNaming.interpret(status: 409, data: conflict, sent: "あおば", mode: .first),
+            .adopted(name: "みどり")
+        )
     }
 
     // MARK: POST /checkin, /checkin-cancel
@@ -314,6 +384,18 @@ final class ContractFixtureTests: XCTestCase {
             ],
             generic: ["internal_error", "method_not_allowed", "invalid_json", "invalid_request"],
             isMapped: { NudgeReactClientError(serverCode: $0) != .server(code: $0) }
+        )
+    }
+
+    func testPlantNameErrorCodesMatchTheServer() throws {
+        // already_named(409)は、エラーでなく結果として読む(本文の name を使う)ので、専用 case にはしない(generic)。
+        // 本文の name つきの読み方は PlantNameFixtures と EdgeFunctionPlantNamingTests が検査する
+        try assertErrorMap(
+            label: "plant-name",
+            functions: ["plant-name"],
+            mapped: ["invalid_name", "no_pair", "plant_not_found", "user_not_found", "unauthorized"],
+            generic: ["already_named", "invalid_mode", "invalid_json", "internal_error", "method_not_allowed"],
+            isMapped: { PlantNameClientError(serverCode: $0) != .server(code: $0) }
         )
     }
 

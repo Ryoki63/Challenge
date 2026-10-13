@@ -8,6 +8,10 @@
 //   plant_03_sizes_light / plant_04_sizes_dark     毎朝の既定を 40 / 60 / 80pt(高さ)で。ソロ+段階0〜9+段階9(ひらいた葉)
 //   plant_05_expressions_light / _06_..._dark      表情6種・ソロ・ソロでチェックイン・段階0・のぞき・知らない段階
 //   plant_07_flower_colors                         花の色(左=自分・右=相手で別の色に着色できること)
+//   plant_08_hero_light / plant_09_hero_dark       ホームの植物まわり(PB #57): 葉の下の約束の絵文字・のぞき・ゲージの文・名前・
+//                                                    「名前をつける」・今日のひとこと(吹き出し)・名前の知らせ
+//   plant_10_celebration_light / _11_..._dark      全画面の演出(PB #57): はじめまして・ふたば・わかば(ハートを送る)・みのり・おかえり
+//                                                    (名前のフォームは UIKit の TextField を含み ImageRenderer で描けないので、ここでは名前付けなしで描く)
 //   plant_00_check_morning_strip                   「空のシートを保存できただけで通さない」確認用の1枚(朝の既定 × 段階0〜9)
 //
 // 保存先は2つ(どちらかが失敗しても残るように):
@@ -222,6 +226,145 @@ private struct FlowerColorsSheet: View {
     }
 }
 
+/// ホームの植物まわり(PlantHeroView)。値だけで描ける(HomeViewModel に依存しない)
+private struct HeroSheet: View {
+    let dark: Bool
+
+    private struct Item {
+        let label: String
+        let state: PlantCharacterState
+        var plantName: String? = "みどり"
+        var canName = false
+        var gauge: String?
+        var whisper: String?
+        var notice: String?
+    }
+
+    private let items: [Item] = [
+        Item(
+            label: "わかば・のぞき・自分だけ完了\n(葉の下の絵文字・ゲージ・ひとこと)",
+            state: PlantCharacterState(stage: 3, meOpen: true, expression: .lookLeft, peek: true),
+            gauge: "ふたりそろって あと3回で よりそい",
+            whisper: "ひらいたよ。ゆうきの葉は ねんね中"
+        ),
+        Item(
+            label: "みのり・ふたりそろった\n(2行のひとこと)",
+            state: PlantCharacterState(stage: 9, meOpen: true, partnerOpen: true, expression: .happy),
+            gauge: "ふたりで 128回 そろったよ",
+            whisper: "あなたの葉が ひらくのも、たのしみにしてるよ"
+        ),
+        Item(
+            label: "ふたば・名前なし\n(「名前をつける」が残る)",
+            state: PlantCharacterState(stage: 1),
+            plantName: nil,
+            canName: true,
+            gauge: "ふたりそろって あと2回で めばえ"
+        ),
+        Item(
+            label: "つぼみ・名前の知らせ\n(長い区間の前半)",
+            state: PlantCharacterState(stage: 5, expression: .normal),
+            gauge: "つぼみになってから 3回そろったよ",
+            notice: "名前が『あおば』にかわったよ"
+        ),
+        Item(
+            label: "たね(ペア成立の直後)",
+            state: PlantCharacterState(stage: 0),
+            plantName: nil,
+            gauge: "ふたりそろって あと1回で ふたば"
+        ),
+        Item(
+            label: "よりそい・すやすや",
+            state: PlantCharacterState(stage: 4, expression: .sleep),
+            gauge: "よりそいになってから 2回そろったよ",
+            whisper: "すやすや…ふたりのペースで いいよ"
+        ),
+    ]
+
+    var body: some View {
+        Sheet(title: "ホームの植物まわり(葉の下の約束の絵文字・のぞき・ゲージ・名前・ひとこと)— \(dark ? "ダーク" : "ライト")", dark: dark) {
+            VStack(alignment: .leading, spacing: 18) {
+                ForEach(0..<(items.count + 2) / 3, id: \.self) { row in
+                    HStack(alignment: .top, spacing: 14) {
+                        ForEach(row * 3..<min(row * 3 + 3, items.count), id: \.self) { index in
+                            let item = items[index]
+                            VStack(spacing: 4) {
+                                PlantHeroView(
+                                    state: item.state,
+                                    sways: false,
+                                    meEmoji: "💪",
+                                    partnerEmoji: "🏃",
+                                    plantName: item.plantName,
+                                    canRename: item.plantName != nil,
+                                    canName: item.canName,
+                                    gaugeText: item.gauge,
+                                    whisper: item.whisper,
+                                    nameNotice: item.notice
+                                )
+                                .frame(width: 260)
+                                .padding(.top, 40) // 吹き出しが枠の上へはみ出す分(画像から切れないように)
+                                Text(item.label)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 全画面の演出(PlantCelebrationContent)。名前のフォームは出さない(UIKit の TextField は ImageRenderer で描けない)
+private struct CelebrationSheet: View {
+    let dark: Bool
+
+    private func celebration(stage: Int, previous: Int?, grown: Int?) -> PlantExperienceModel.Presentation {
+        .stageUp(StageCelebration(pairId: "pair-A", stage: stage, previousStage: previous, grownDays: grown))
+    }
+
+    private func snapshot(stage: Int, partnerDone: Bool) -> PairSnapshot {
+        PairSnapshot(
+            schemaVersion: 1, pairId: "pair-A", updatedAt: Date(), streakCurrent: 7, streakBest: 7,
+            todayMeDone: true, todayPartnerDone: partnerDone, myPromiseTitle: "筋トレ", myPromiseEmoji: "💪",
+            partnerName: "ゆうき", partnerPromiseTitle: "ランニング", partnerPromiseEmoji: "🏃",
+            plantStage: stage, plantMood: .happy, plantName: "みどり", hasPartnerPhotoToday: false
+        )
+    }
+
+    var body: some View {
+        let cases: [(String, PlantExperienceModel.Presentation, PairSnapshot, Bool)] = [
+            ("はじめまして(段階0)", celebration(stage: 0, previous: nil, grown: 0), snapshot(stage: 0, partnerDone: true), false),
+            ("ふたば(段階1)", celebration(stage: 1, previous: 0, grown: 1), snapshot(stage: 1, partnerDone: true), false),
+            ("わかば(段階3)+ハートを送る", celebration(stage: 3, previous: 2, grown: 7), snapshot(stage: 3, partnerDone: true), true),
+            ("みのり(段階9)", celebration(stage: 9, previous: 8, grown: 100), snapshot(stage: 9, partnerDone: true), true),
+            ("おかえり", .welcomeBack, snapshot(stage: 4, partnerDone: false), false),
+        ]
+        Sheet(title: "全画面の演出(幅 390pt)— \(dark ? "ダーク" : "ライト")", dark: dark) {
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(cases.indices, id: \.self) { index in
+                    VStack(spacing: 4) {
+                        PlantCelebrationContent(
+                            presentation: cases[index].1,
+                            snapshot: cases[index].2,
+                            naming: nil,
+                            canSendHeart: cases[index].3,
+                            onSendHeart: { true },
+                            onClose: {},
+                            initiallyRevealed: true
+                        )
+                        .frame(width: 390)
+                        .background(LienColors.celebrationBackground)
+                        Text(cases[index].0)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - テスト
 
 @MainActor
@@ -274,6 +417,11 @@ final class PlantRenderTests: XCTestCase {
         try save("plant_05_expressions_light", ExpressionsSheet(dark: false))
         try save("plant_06_expressions_dark", ExpressionsSheet(dark: true))
         try save("plant_07_flower_colors", FlowerColorsSheet())
+        // 植物の体験(PB #57): ホームの植物まわり・全画面の演出
+        try save("plant_08_hero_light", HeroSheet(dark: false))
+        try save("plant_09_hero_dark", HeroSheet(dark: true))
+        try save("plant_10_celebration_light", CelebrationSheet(dark: false))
+        try save("plant_11_celebration_dark", CelebrationSheet(dark: true))
     }
 
     func testRenderedSheetsAreNotBlank() throws {

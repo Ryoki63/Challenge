@@ -1,4 +1,6 @@
 // PairSnapshotTests.swift — App Group 共有契約(DESIGN §3.4)のデコード/エンコード検証(T07)
+// 成長ルール v2 の新キー3つ(plantGrownDays / plantStageFloor / plantNextStageAt)は省略可: 無いとき nil(ゲージを出さない)、
+// あるときは値を読み、書き出して読み戻しても一致する(PB #57)
 
 import XCTest
 @testable import Lien
@@ -121,6 +123,9 @@ final class PairSnapshotTests: XCTestCase {
         XCTAssertFalse(snapshot.todayMeDone)
         XCTAssertFalse(snapshot.todayPartnerDone)
         XCTAssertEqual(snapshot.plantStage, 0)
+        XCTAssertNil(snapshot.plantGrownDays, "新キーは 0 で埋めない(ゲージが「0回」と出てちらつく)")
+        XCTAssertNil(snapshot.plantStageFloor)
+        XCTAssertNil(snapshot.plantNextStageAt)
         XCTAssertEqual(snapshot.plantMood, .normal)
         XCTAssertFalse(snapshot.hasPartnerPhotoToday)
     }
@@ -131,6 +136,112 @@ final class PairSnapshotTests: XCTestCase {
 
     func testDecodeFailsWithoutSchemaVersion() {
         XCTAssertThrowsError(try decode("{ \"updatedAt\": \"2026-06-11T00:00:00Z\" }"))
+    }
+
+    // MARK: - 成長ルール v2 の新キー(省略可 — PB #57)
+
+    /// 新キーつきの JSON(DESIGN §3.4 の例: 段階3・成長9回・下限7・次の段階14)
+    private var withGrowthKeysJSON: String {
+        designExampleJSON.replacingOccurrences(
+            of: "\"plantStage\": 3,",
+            with: "\"plantStage\": 3, \"plantGrownDays\": 9, \"plantStageFloor\": 7, \"plantNextStageAt\": 14,"
+        )
+    }
+
+    func testDecodeWithoutGrowthKeysLeavesThemNil() throws {
+        // 古いサーバー・古いキャッシュ(§3.4 の元の例には、新キーが無い): ゲージを出さない
+        let snapshot = try decode(designExampleJSON)
+        XCTAssertNil(snapshot.plantGrownDays)
+        XCTAssertNil(snapshot.plantStageFloor)
+        XCTAssertNil(snapshot.plantNextStageAt)
+        XCTAssertNil(PlantProgress(snapshot: snapshot), "新キーが無ければ、進み具合も無い")
+        XCTAssertNil(GrowthGauge.text(for: snapshot))
+        XCTAssertEqual(snapshot.plantStage, 3, "段階そのものは読める")
+    }
+
+    func testDecodeGrowthKeys() throws {
+        let snapshot = try decode(withGrowthKeysJSON)
+        XCTAssertEqual(snapshot.plantGrownDays, 9)
+        XCTAssertEqual(snapshot.plantStageFloor, 7)
+        XCTAssertEqual(snapshot.plantNextStageAt, 14)
+        XCTAssertEqual(GrowthGauge.text(for: snapshot), "わかばになってから 2回そろったよ")
+    }
+
+    func testNextStageAtNullMeansTheLastStageNotAMissingKey() throws {
+        // サーバーは、最後の段階(みのり)とソロで plantNextStageAt を省略せず null で返す(DESIGN §3.4)
+        let json = designExampleJSON.replacingOccurrences(
+            of: "\"plantStage\": 3,",
+            with: "\"plantStage\": 9, \"plantGrownDays\": 128, \"plantStageFloor\": 100, \"plantNextStageAt\": null,"
+        )
+        let snapshot = try decode(json)
+        XCTAssertEqual(snapshot.plantGrownDays, 128)
+        XCTAssertEqual(snapshot.plantStageFloor, 100)
+        XCTAssertNil(snapshot.plantNextStageAt)
+        XCTAssertEqual(GrowthGauge.text(for: snapshot), "ふたりで 128回 そろったよ", "回数と下限があって次が null = 次の段階が無い")
+    }
+
+    func testWrongTypedGrowthKeysAreIgnoredWithoutBreakingTheSnapshot() throws {
+        // 表示だけの新キー: 型が違っても、snapshot 全体(チェックイン状態など)を壊さない
+        let json = designExampleJSON.replacingOccurrences(
+            of: "\"plantStage\": 3,",
+            with: "\"plantStage\": 3, \"plantGrownDays\": \"many\", \"plantStageFloor\": [], \"plantNextStageAt\": {},"
+        )
+        let snapshot = try decode(json)
+        XCTAssertNil(snapshot.plantGrownDays)
+        XCTAssertNil(snapshot.plantStageFloor)
+        XCTAssertNil(snapshot.plantNextStageAt)
+        XCTAssertEqual(snapshot.streakCurrent, 23)
+        XCTAssertTrue(snapshot.todayMeDone)
+    }
+
+    func testEncodeDecodeRoundTripWithGrowthKeys() throws {
+        let original = try decode(withGrowthKeysJSON)
+        let data = try PairSnapshot.makeJSONEncoder().encode(original)
+        let decoded = try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: data)
+        XCTAssertEqual(decoded, original)
+        XCTAssertEqual(decoded.plantGrownDays, 9)
+        XCTAssertEqual(decoded.plantStageFloor, 7)
+        XCTAssertEqual(decoded.plantNextStageAt, 14)
+    }
+
+    func testEncodeWithoutGrowthKeysDoesNotInventThem() throws {
+        // キーが無い snapshot を書き出して「0回」などに変えない(往復しても、キーは無いまま)
+        let original = try decode(designExampleJSON)
+        let text = try XCTUnwrap(String(data: try PairSnapshot.makeJSONEncoder().encode(original), encoding: .utf8))
+        XCTAssertFalse(text.contains("plantGrownDays"))
+        XCTAssertFalse(text.contains("plantStageFloor"))
+        XCTAssertFalse(text.contains("plantNextStageAt"))
+        let decoded = try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: Data(text.utf8))
+        XCTAssertEqual(decoded, original)
+        XCTAssertNil(decoded.plantGrownDays)
+    }
+
+    func testEncodeWritesAnExplicitNullNextStageForTheLastStage() throws {
+        // サーバーの形(DESIGN §3.4「キーは省略せず null で出す」)と同じに書く。往復しても同じ
+        var snapshot = try decode(designExampleJSON)
+        snapshot.plantStage = 9
+        snapshot.plantGrownDays = 128
+        snapshot.plantStageFloor = 100
+        snapshot.plantNextStageAt = nil
+        let data = try PairSnapshot.makeJSONEncoder().encode(snapshot)
+        let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+        XCTAssertTrue(text.contains("\"plantNextStageAt\":null"), text)
+        XCTAssertTrue(text.contains("\"plantGrownDays\":128"))
+        let decoded = try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: data)
+        XCTAssertEqual(decoded, snapshot)
+    }
+
+    func testMemberwiseInitWithoutGrowthArgumentsKeepsExistingCallSitesWorking() {
+        // 新キーは引数の既定値が nil(これまでの組み立て方がそのまま通る)
+        let snapshot = PairSnapshot(
+            schemaVersion: 1, pairId: nil, updatedAt: Date(), streakCurrent: 0, streakBest: 0,
+            todayMeDone: false, todayPartnerDone: false, myPromiseTitle: nil, myPromiseEmoji: nil,
+            partnerName: nil, partnerPromiseTitle: nil, partnerPromiseEmoji: nil, plantStage: 0,
+            plantMood: .normal, plantName: nil, hasPartnerPhotoToday: false
+        )
+        XCTAssertNil(snapshot.plantGrownDays)
+        XCTAssertNil(snapshot.plantStageFloor)
+        XCTAssertNil(snapshot.plantNextStageAt)
     }
 
     // MARK: - エンコード(往復)
@@ -171,5 +282,14 @@ final class PairSnapshotTests: XCTestCase {
         XCTAssertEqual(reset.pairId, snapshot.pairId)
         XCTAssertEqual(reset.plantStage, snapshot.plantStage)
         XCTAssertEqual(reset.partnerName, snapshot.partnerName)
+    }
+
+    func testResettingForNewDayKeepsTheGrowthKeys() throws {
+        // 翌日 0:00 のウィジェットのエントリ: 段階と同じく、成長回数なども持ち越す(植物は縮まない)
+        let snapshot = try decode(withGrowthKeysJSON)
+        let reset = snapshot.resettingForNewDay()
+        XCTAssertEqual(reset.plantGrownDays, 9)
+        XCTAssertEqual(reset.plantStageFloor, 7)
+        XCTAssertEqual(reset.plantNextStageAt, 14)
     }
 }

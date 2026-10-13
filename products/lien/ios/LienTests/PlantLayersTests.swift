@@ -494,6 +494,8 @@ final class PlantLayersTests: XCTestCase {
         let allowed: [String: Set<String>] = [
             "Lien/Core/DesignSystem/PlantLayers.swift": ["Foundation"],
             "Lien/Core/DesignSystem/PlantCharacterView.swift": ["SwiftUI"],
+            // のぞきの判定(PlantCharacterState(snapshot:) が使う)。ウィジェットの進み具合のバー(T17a)でも使う(PB #57)
+            "Lien/Core/PlantProgress.swift": ["Foundation"],
         ]
         for (path, imports) in allowed {
             let source = try SourceTree.text(path)
@@ -514,6 +516,7 @@ final class PlantLayersTests: XCTestCase {
         for path in [
             "Lien/Core/DesignSystem/PlantLayers.swift",
             "Lien/Core/DesignSystem/PlantCharacterView.swift",
+            "Lien/Core/PlantProgress.swift",
             "../assets/plant/PlantAssets.xcassets",
         ] {
             XCTAssertTrue(widget.contains(path), "LienWidget の sources に \(path) が無い(ウィジェットでも描く — GROWTH §8.2)")

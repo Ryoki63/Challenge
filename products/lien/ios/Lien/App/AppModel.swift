@@ -109,7 +109,12 @@ final class AppModel {
     /// セッションがあればサーバーと同期する
     func start() async {
         Task { await services.pushTokenSync.sessionDidChange() }
-        guard phase != .onboarding else { return }
+        if phase == .onboarding {
+            // 保険: init の時点ではセッションを読めずオンボーディングで立ち上がったが、この .task が走るまでの間に読めるように
+            // なっていた(再起動後の最初のアンロック前にバックグラウンド起動され、その後アンロックされた — issue #62)場合に、
+            // 既存ユーザーがオンボーディングに取り残されないよう、phase を導き直す。読めなければ、このまま(前面復帰・push 受信で再確認する)
+            guard restoreSessionIfAvailable() else { return }
+        }
         await syncFirstTimeIfNeeded()
     }
 
@@ -434,6 +439,8 @@ extension AppModel: AccountOperating {
         await services.auth.signOut()
         services.pendingOps?.invalidate() // 送信の最中だった再送が、消したあとにキューを書き戻さない
         services.store?.eraseAll()
+        // 植物の体験の記録(段階アップの演出を見せた段階・最後のチェックイン日など)も、前のアカウントのものを持ち越さない(PB #57)
+        services.plantMemory?.reset()
 
         sessionMonitor.reset()
         sessionLost = false

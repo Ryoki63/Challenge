@@ -85,6 +85,8 @@ final class AppModelAccountTests: XCTestCase {
         let reloads: ReloadCounter
         let queue: PendingOpsQueue
         let verifier: MockSessionVerifier?
+        /// 植物の体験の「もう見せたか」の記録(PB #57)。段階アップの演出を見せた段階・最後のチェックイン日が入っている
+        let plantMemory: InMemoryPlantMemoryStore
 
         var store: AppGroupStore { temp.store }
     }
@@ -108,6 +110,13 @@ final class AppModelAccountTests: XCTestCase {
         let queue = PendingOpsQueue(store: temp.store)
         queue.enqueue(.checkin(dateLocal: "2026-06-11", photoPath: nil))
         let verifier = verdict.map { MockSessionVerifier($0) }
+        let plantMemory = InMemoryPlantMemoryStore(PlantMemory(
+            initialized: true,
+            celebratedStage: ["1f0c5a4e-9d3b-4c1a-8f2e-7b6d5a4c3b2a": 5],
+            seenName: ["1f0c5a4e-9d3b-4c1a-8f2e-7b6d5a4c3b2a": "みどり"],
+            lastCheckinDay: 700,
+            lastWhisperDay: 701
+        ))
 
         let services = AppServices(
             isLive: true,
@@ -129,7 +138,8 @@ final class AppModelAccountTests: XCTestCase {
             ),
             reloadWidgets: { reloads.value += 1 },
             accountClient: withAccountClient ? account : nil,
-            sessionVerifier: verifier
+            sessionVerifier: verifier,
+            plantMemory: plantMemory
         )
         // 相手の写真のサムネ(NSE が置く)も端末に残っている状況
         try Data("jpeg".utf8).write(to: temp.store.photoThumbFileURL)
@@ -143,13 +153,17 @@ final class AppModelAccountTests: XCTestCase {
             temp: temp,
             reloads: reloads,
             queue: queue,
-            verifier: verifier
+            verifier: verifier,
+            plantMemory: plantMemory
         )
     }
 
     private func assertLocalDataIsErased(_ h: Harness, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertNil(h.store.loadSnapshot(), "snapshot が消えている", file: file, line: line)
         XCTAssertTrue(h.queue.isEmpty, "未送信のチェックインのキューが消えている", file: file, line: line)
+        // 植物の体験の記録も、前のアカウントのものを持ち越さない(次のアカウントの最初のペアは「はじめまして」を祝い、
+        // おかえりも前のアカウントの最後のチェックイン日から数えない)。「版の最初の観測を済ませた」だけは残る
+        XCTAssertEqual(h.plantMemory.load(), PlantMemory(initialized: true), "植物の体験の記録が消えている", file: file, line: line)
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: h.store.photoThumbFileURL.path),
             "相手の写真のサムネが消えている",

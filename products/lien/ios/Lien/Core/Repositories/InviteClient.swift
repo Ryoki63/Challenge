@@ -100,6 +100,12 @@ final class StubInviteClient: InviteClient {
         let pairId = UUID().uuidString.lowercased()
         var snapshot = store?.loadSnapshot() ?? PairSnapshot.emptySolo(updatedAt: Date())
         snapshot.pairId = pairId
+        // ペア成立の直後は段階0(たね)・成長 0 回・次の段階は 1 回(サーバーの invite-accept と同じ形。
+        // ソロの 0 / 0 / null のままだと、ゲージが「ふたりで 0回 そろったよ」と出てしまう)
+        snapshot.plantStage = 0
+        snapshot.plantGrownDays = 0
+        snapshot.plantStageFloor = 0
+        snapshot.plantNextStageAt = 1
         snapshot.updatedAt = Date()
         return InviteAcceptResponse(pairId: pairId, snapshot: snapshot)
     }

@@ -20,4 +20,6 @@ enum LienColors {
     static let photoBackdrop = Color.black
     /// 全画面の写真に重ねる操作(閉じるボタン・読み込み中の表示)の色
     static let photoControl = Color.white
+    /// 植物の全画面の演出(段階アップ・おかえり — PB #57)の背景。ライト / ダークの標準の背景(プレートが暗い背景でも輪郭を見せる)
+    static let celebrationBackground = Color(uiColor: .systemBackground)
 }

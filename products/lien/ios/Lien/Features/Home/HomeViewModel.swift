@@ -10,6 +10,9 @@
 //   reload のトリガーはアプリ本体と NSE のみ — DESIGN §3.5)
 // - 相手の今日の写真(PV #59)は PartnerPhotoModel が持つ。snapshot を表示用に読み直す/反映するたびに
 //   snapshotDidChange で知らせる(取りに行くか・消すかはそちらが決める)。nil のとき(Stub 構成)は写真を扱わない
+// - 植物まわりの体験(PB #57): ゲージの文・VoiceOver の読み上げ文・葉の下の約束の絵文字は snapshot からの純粋な導出。
+//   段階アップの全画面演出・おかえり・今日のひとこと・相手の名前の知らせは PlantExperienceModel(同じく snapshot の変化を渡す)。
+//   名前を付ける・変えるフォームの状態は PlantNamingModel(結果は applyPlantName で端末の snapshot に反映する)
 
 import Foundation
 import Observation
@@ -100,12 +103,21 @@ final class HomeViewModel {
     /// 相手の今日の写真(PV #59。ホームのカードと、タップで開く全画面)。nil のときは写真を扱わない
     let partnerPhoto: PartnerPhotoModel?
 
+    /// 植物まわりの体験の状態(段階アップの全画面演出・おかえり・今日のひとこと・相手の名前の知らせ — PB #57)
+    let plantExperience: PlantExperienceModel
+    /// 植物の名前を付ける・変えるフォームの状態。nil のとき(名前付けの口が無い構成・プレビュー)は名前付けの導線を出さない
+    let plantNaming: PlantNamingModel?
+
     init(
         store: AppGroupStore?,
         checkinService: CheckinPerforming,
         nudgeService: NudgeSending? = nil,
         reactionService: Reacting? = nil,
         partnerPhoto: PartnerPhotoModel? = nil,
+        plantNaming: PlantNaming? = nil,
+        plantMemory: PlantMemoryStoring? = nil,
+        now: @escaping () -> Date = Date.init,
+        calendar: Calendar = .current,
         reloadWidgets: @escaping () -> Void = { WidgetCenter.shared.reloadAllTimelines() }
     ) {
         self.store = store
@@ -117,6 +129,15 @@ final class HomeViewModel {
         self.opsFlusher = checkinService as? PendingOpsFlushing
         self.nudgeService = nudgeService ?? (checkinService as? NudgeSending)
         self.reactionService = reactionService ?? (checkinService as? Reacting)
+        self.plantExperience = PlantExperienceModel(
+            memoryStore: plantMemory ?? InMemoryPlantMemoryStore(),
+            now: now,
+            calendar: calendar
+        )
+        self.plantNaming = plantNaming.map { PlantNamingModel(naming: $0) }
+        self.plantNaming?.onApply = { [weak self] application in
+            self?.applyPlantName(application)
+        }
     }
 
     // MARK: 読み込み
@@ -127,6 +148,7 @@ final class HomeViewModel {
     func load() {
         snapshot = store?.loadSnapshot()
         partnerPhoto?.snapshotDidChange(snapshot)
+        plantExperience.snapshotDidChange(snapshot)
     }
 
     // MARK: 表示分岐(REQUIREMENTS §3.9 / §3.10)
@@ -144,10 +166,75 @@ final class HomeViewModel {
         return PlantCharacterState(snapshot: snapshot)
     }
 
-    /// fidget(片方だけ完了のそわそわ)は View 側の小さな揺れで表す(REQUIREMENTS §3.9)。
-    /// 葉の開閉と視線は plantState が表すので、揺れは付け足し
+    /// 片方だけ完了のそわそわは、View 側の小さな揺れで表す(REQUIREMENTS §3.9)。
+    /// 描いている状態そのもの(plantState。完了のフラグ + ペアの有無)から決める: plantMood から決めると、楽観更新で
+    /// mood が古いまま todayMeDone が立った瞬間に、葉は両方ひらいているのに揺れ続ける(PA の手直し — #57)
     var plantSways: Bool {
-        snapshot?.plantMood == .fidget
+        plantState.sways
+    }
+
+    // MARK: 植物まわり(PB #57。snapshot からの純粋な導出)
+
+    /// ゲージの文(「ふたりそろって あと2回で めばえ」— GROWTH §5.1)。ソロ・新しいキーが無い snapshot では nil(出さない)
+    var growthGaugeText: String? {
+        snapshot.flatMap(GrowthGauge.text(for:))
+    }
+
+    /// 植物の VoiceOver の読み上げ文(GROWTH §5.4)。snapshot が無い空状態は nil(装飾画像として隠す)
+    var plantAccessibilityText: String? {
+        snapshot.map(PlantVoiceOver.label(for:))
+    }
+
+    /// 葉の下に小さく置く約束の絵文字(左 = 自分 / 右 = 相手 — GROWTH §4.5)。ソロは葉が無いので置かない
+    var leafEmojis: (me: String?, partner: String?) {
+        guard let snapshot, snapshot.pairId != nil else { return (nil, nil) }
+        return (snapshot.myPromiseEmoji, snapshot.partnerPromiseEmoji)
+    }
+
+    /// ホームに出す植物の名前(ペアの鉢の名前だけ。ソロには名前を出さない)
+    var plantName: String? {
+        guard let snapshot, snapshot.pairId != nil, let name = snapshot.plantName, !name.isEmpty else { return nil }
+        return name
+    }
+
+    /// 「名前をつける」を出すか: ペアで、最初の「ふたば」(段階1)以降で、まだ名前が無いとき。
+    /// 演出を閉じても、名前が付くまでここに残る(GROWTH §5.3)。名前付けの口が無い構成では出さない
+    var canNamePlant: Bool {
+        guard plantNaming != nil, let snapshot, snapshot.pairId != nil, plantName == nil else { return false }
+        return PlantLayers.clampedStage(snapshot.plantStage) >= 1
+    }
+
+    /// 名前を変えられるか(名前があるペア)。名前の行がボタンになる
+    var canRenamePlant: Bool {
+        plantNaming != nil && plantName != nil
+    }
+
+    /// 名前のシートを開く(まだ名前が無ければ付ける・あれば変える)
+    func presentPlantNameSheet() {
+        guard let plantNaming else { return }
+        if canRenamePlant {
+            plantNaming.presentSheet(mode: .rename, currentName: plantName)
+        } else if canNamePlant {
+            plantNaming.presentSheet(mode: .first, currentName: nil)
+        }
+    }
+
+    /// 名前を付けた・変えた結果を、端末の snapshot へ反映する(名前だけ。サーバーの snapshot 全体で上書きしない:
+    /// 未送信のチェックインが残っているとき、サーバーの「今日は未完」で楽観の状態を巻き戻さないため。ほかは次の同期で揃う)
+    func applyPlantName(_ application: PlantNameApplication) {
+        guard let current = snapshot, let pairId = current.pairId else { return }
+        let name: String
+        switch application {
+        case .saved(let saved): name = saved
+        case .adopted(let adopted): name = adopted
+        }
+        // 自分が付けた名前は、自分には「かわったよ」を出さない(snapshot を反映する前に覚える)
+        plantExperience.recordOwnName(pairId: pairId, name: name)
+        apply(current.withPlantName(name))
+        if case .adopted = application {
+            // 相手が先に付けていた: 自分の入力は使われなかったので、決まった名前を知らせる
+            plantExperience.showNameNotice(Strings.Plant.nameAdoptedNote(name))
+        }
     }
 
     /// ストリーク行はペア成立中のみ(ふたりストリークはペアのもの — §3.5)
@@ -220,6 +307,8 @@ final class HomeViewModel {
         do {
             let updated = try await checkinService.performCheckin(current: current)
             apply(updated)
+            // おかえり(2日以上あいたあとの自分のチェックイン — GROWTH §4.4)。段階アップの演出が出ていれば、そちらだけ
+            plantExperience.myCheckinCompleted(snapshot: updated)
         } catch {
             checkinErrorMessage = Strings.Home.checkinErrorMessage
         }
@@ -275,16 +364,20 @@ final class HomeViewModel {
 
     // MARK: リアクション(REQUIREMENTS §3.8 / T15)
 
-    func sendReaction(stamp: ReactionStamp) async {
-        guard canReact, let reactionService else { return }
+    /// 戻り値は、送れたか(段階アップの演出の「ハートを送る」が、結果で表示を切り替える — PB #57)
+    @discardableResult
+    func sendReaction(stamp: ReactionStamp) async -> Bool {
+        guard canReact, let reactionService else { return false }
         isSendingReaction = true
         clearMessages()
         defer { isSendingReaction = false }
         do {
             try await reactionService.sendReaction(stamp: stamp)
             reactionSentNote = Strings.Reaction.sentNote
+            return true
         } catch {
             reactionErrorMessage = Strings.Reaction.errorMessage
+            return false
         }
     }
 
@@ -310,6 +403,7 @@ final class HomeViewModel {
         try? store?.saveSnapshot(updated)
         reloadWidgets()
         partnerPhoto?.snapshotDidChange(updated)
+        plantExperience.snapshotDidChange(updated)
     }
 
     private func clearMessages() {

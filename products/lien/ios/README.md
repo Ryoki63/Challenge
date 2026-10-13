@@ -173,3 +173,22 @@ gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false -f in
   同じ画像を xcresult の添付からも取り出して `plant-render-sheets-xcresult` に、xcresult 自体を `xcresult` に残す(テストが失敗しても残る)
   - 取り出し: `gh run download <run-id> --repo Ryoki63/Challenge -n plant-render-sheets`
   - 承認ゲート(GROWTH.md §9.5)は、この画像と下書きのプレビュー(`../assets/plant/v4_drafts/preview_*.png`)を見比べて行う
+
+## 11. 植物の体験: ゲージ・段階アップの演出・名前付けほか(issue #57)
+
+成長ルール v2(docs/GROWTH.md §4〜§5)の、アプリ側の体験。サーバーの snapshot の新キー3つ(`plantGrownDays` / `plantStageFloor` / `plantNextStageAt`。**省略可** — 無いとゲージを出さない)から、アプリは閾値表を持たずに進み具合を作る。
+
+| 何 | どこ |
+|---|---|
+| 進み具合(区間の中の位置)・のぞきを出す判定(区間7回以上の後半 = 11・18・26・38・56・83回から) | `Core/PlantProgress.swift`(ウィジェットとソース共有) |
+| ゲージの文・VoiceOver の読み上げ文(GROWTH §5.1・§5.4) | `Core/GrowthGauge.swift`(文言は `Strings.Plant`) |
+| 段階アップの演出を「1回だけ」出す記録(pairId ごと。新バージョン初回は静かに初期化・取り消しのあとの再到達では出さない)・相手の名前の知らせ・おかえり・ひとことの「もう見せたか」 | `Core/PlantMemory.swift`(端末の UserDefaults。サインアウト・削除で `reset()`) |
+| 名前の入力の検査(NFC・Unicode コードポイントで 1〜8字・ZWJ だけ許す書式文字)と、plant-name の Live / スタブ(first の 409 は**自分が送った名前と同じなら成功・違えば相手の名前を採用**) | `Core/PlantNaming.swift`・`Core/Api/PlantNameAPIClient.swift` |
+| 今日のひとこと(吹き出し)の選び方(状況 + 段階の候補から日付で1つ) | `Core/PlantWhisper.swift` |
+| 体験の状態(全画面の演出・名前の知らせ・ひとこと)/ 名前フォームの状態 | `Features/Plant/PlantExperienceModel.swift`・`PlantNamingModel.swift` |
+| 画面: ホームの植物まわり / 全画面の演出(ホームの上のオーバーレイ。シートにしない = ほかの表示と重なっても待てる)/ 名前のフォームとシート | `Features/Plant/PlantHeroView.swift`・`PlantCelebrationView.swift`・`PlantNameFormView.swift`・`PlantNameSheet.swift` |
+
+- 葉の下の約束の絵文字(左 = 自分・右 = 相手)と、小さな揺れ(プレートは揺らさない)は `PlantCharacterView` の中。揺れるかは描いている状態から決める(`PlantCharacterState.sways`)
+- テスト: `GrowthGaugeTests`(ゲージ・のぞき・VoiceOver・揺れ)/ `StageCelebrationTests`(演出の記録・名前の知らせ・おかえり・ひとこと)/ `PlantNamingTests`(入力の検査・Live・スタブ・フォーム)/ `PlantHomeTests`(HomeViewModel とのつなぎ)/ `PlantWhisperTests` / `ContractFixtureTests`(新キーの値と plant-name の応答)/ `PairSnapshotTests`(新キー無し・往復)
+- 実描画: `PlantRenderTests` が `plant_08`〜`plant_11`(ホームの植物まわり・全画面の演出。ライト/ダーク)も `plant-render-sheets` に書く
+- 手元の下見(`scripts/macos-check/check.sh test <ファイル名...>`)で絞って走らせるとき、`PunishmentFreeLint`(`StringsReviewTests`)・`MockSnapshotClient`(`SnapshotSynchronizerTests`)などほかのテストファイルの部品を使うテストは、それらのファイル名も並べる

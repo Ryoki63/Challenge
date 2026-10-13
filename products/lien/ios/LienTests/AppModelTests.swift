@@ -128,6 +128,37 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(h.model.phase, .onboarding)
     }
 
+    func testStartRestoresSessionThatBecameReadableBetweenInitAndStart() async throws {
+        // 保険(issue #62 の続き): init の時点ではセッションを読めずオンボーディングで立ち上がったが、RootView の .task が
+        // start() を呼ぶまでの間に(最初のアンロックのあとで)読めるようになっていた。前面復帰・push を待たずに、既存ユーザーとして復帰する
+        let h = try await makeHarness(
+            signedIn: false,
+            local: SnapshotFactory.solo(),
+            server: .success(SnapshotFactory.paired())
+        )
+        defer { h.temp.cleanup() }
+        XCTAssertEqual(h.model.phase, .onboarding)
+
+        try await h.auth.signInAnonymously() // init のあと・start のまえに、Keychain が読めるようになった
+        await h.model.start()
+
+        XCTAssertEqual(h.model.phase, .paired, "オンボーディングに取り残さない")
+        XCTAssertEqual(h.client.callCount, 1, "復帰して、すぐ同期する")
+    }
+
+    func testStartDuringOnboardingDoesNotMistakeTheNewSessionForARestoredOne() async throws {
+        // ニックネーム送信で匿名サインインしたあと(オンボ操作中)に start() が来ても、通知の許可画面などを飛ばさない
+        let h = try await makeHarness(signedIn: false, server: .success(SnapshotFactory.noPromise()))
+        defer { h.temp.cleanup() }
+        h.model.onboardingProfileSubmitStarted()
+        try await h.auth.signInAnonymously()
+
+        await h.model.start()
+
+        XCTAssertEqual(h.model.phase, .onboarding)
+        XCTAssertEqual(h.client.callCount, 0)
+    }
+
     func testStartResolvesExistingAccountThroughSyncAfterReinstall() async throws {
         // 再インストール: Keychain のセッションは残るが App Group は空。サーバーには約束とペアがある
         let h = try await makeHarness(local: nil, server: .success(SnapshotFactory.paired()))

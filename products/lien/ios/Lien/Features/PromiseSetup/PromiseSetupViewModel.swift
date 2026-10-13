@@ -135,24 +135,11 @@ final class PromiseSetupViewModel {
             snapshot.myPromiseEmoji = promise.emoji
             try? store.saveSnapshot(snapshot)
         } else {
-            try? store.saveSnapshot(PairSnapshot(
-                schemaVersion: PairSnapshot.currentSchemaVersion,
-                pairId: nil,
-                updatedAt: Date(),
-                streakCurrent: 0,
-                streakBest: 0,
-                todayMeDone: false,
-                todayPartnerDone: false,
-                myPromiseTitle: promise.title,
-                myPromiseEmoji: promise.emoji,
-                partnerName: nil,
-                partnerPromiseTitle: nil,
-                partnerPromiseEmoji: nil,
-                plantStage: 0,
-                plantMood: .normal,
-                plantName: nil,
-                hasPartnerPhotoToday: false
-            ))
+            // サーバーがソロに返す形(植物の成長は 0 / 0 / null)に、約束だけを足す
+            var snapshot = PairSnapshot.emptySolo(updatedAt: Date())
+            snapshot.myPromiseTitle = promise.title
+            snapshot.myPromiseEmoji = promise.emoji
+            try? store.saveSnapshot(snapshot)
         }
     }
 

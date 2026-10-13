@@ -108,7 +108,7 @@ final class StubSnapshotClient: SnapshotClient {
 
 extension PairSnapshot {
     /// サーバーが「約束もペアもない新規ユーザー」に返す snapshot と同じ形
-    /// (snapshot.ts buildSoloSnapshot の約束なし版)
+    /// (snapshot.ts buildSoloSnapshot の約束なし版。ソロの植物の成長は 0 / 0 / null — DESIGN §3.4)
     static func emptySolo(updatedAt: Date) -> PairSnapshot {
         PairSnapshot(
             schemaVersion: currentSchemaVersion,
@@ -124,6 +124,9 @@ extension PairSnapshot {
             partnerPromiseTitle: nil,
             partnerPromiseEmoji: nil,
             plantStage: 0,
+            plantGrownDays: 0,
+            plantStageFloor: 0,
+            plantNextStageAt: nil,
             plantMood: .normal,
             plantName: nil,
             hasPartnerPhotoToday: false

@@ -68,6 +68,8 @@ final class AppServicesTests: XCTestCase {
         XCTAssertNil(services.pendingOps, "スタブ構成にオフラインキューは無い")
         XCTAssertNil(services.partnerPhotos, "スタブ構成に相手の写真は無い(ホームは写真を扱わない — PV #59)")
         XCTAssertTrue(services.accountClient is StubAccountClient, "ペア解消・アカウント削除の口はスタブにもある(T23 #23)")
+        XCTAssertTrue(services.plantNaming is StubPlantNaming, "植物の名前付けの口はスタブにもある(PB #57)")
+        XCTAssertTrue(services.plantMemory is UserDefaultsPlantMemoryStore, "段階アップの演出の記録は、スタブでも端末に残す(PB #57)")
     }
 
     func testLocalFallbackStoreLivesInApplicationSupport() {
@@ -107,6 +109,8 @@ final class AppServicesTests: XCTestCase {
         XCTAssertTrue(services.reactionService is LiveNudgeReactService)
         XCTAssertTrue(services.partnerPhotos is LivePartnerPhotoService, "相手の今日の写真(PV #59)")
         XCTAssertTrue(services.accountClient is EdgeFunctionAccountClient, "ペア解消・アカウント削除(T23 #23)")
+        XCTAssertTrue(services.plantNaming is EdgeFunctionPlantNaming, "植物の名前を付ける・変える(plant-name — PB #57)")
+        XCTAssertTrue(services.plantMemory is UserDefaultsPlantMemoryStore, "段階アップの演出の記録(PB #57)")
         XCTAssertNotNil(services.pendingOps)
         XCTAssertEqual(services.store?.containerURL, temp.store.containerURL)
         XCTAssertTrue(
@@ -129,6 +133,7 @@ final class AppServicesTests: XCTestCase {
         }
         await assertFails("snapshot の取得") { _ = try await services.snapshotClient.fetchSnapshot() }
         await assertFails("つつく") { try await services.nudgeService?.sendNudge(stamp: .wave) }
+        await assertFails("植物の名前付け") { _ = try await services.plantNaming?.setName("みどり", mode: .first) }
         await assertFails("相手の写真") {
             _ = try await services.partnerPhotos?.loadThumbnail(pairID: PartnerPhotoFixtures.pairID, dateLocal: PartnerPhotoFixtures.today)
         }

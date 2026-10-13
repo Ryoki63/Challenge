@@ -14,6 +14,9 @@
 //     "partnerName": "ゆうき",
 //     "partnerPromiseTitle": "ランニング", "partnerPromiseEmoji": "🏃",
 //     "plantStage": 3,
+//     "plantGrownDays": 9,
+//     "plantStageFloor": 7,
+//     "plantNextStageAt": 14,
 //     "plantMood": "normal | happy | fidget | sad",
 //     "plantName": "みどり",
 //     "hasPartnerPhotoToday": false
@@ -25,6 +28,9 @@
 //   * pairId は null を許容(ソロ状態)
 //   * 未知の plantMood は .normal にフォールバック
 //   * schemaVersion / updatedAt 以外は欠落時にデフォルト値で埋める
+//   * 成長ルール v2 の新キー3つ(plantGrownDays / plantStageFloor / plantNextStageAt。DESIGN §3.4)は**省略可**:
+//     無いとき(古いサーバー・古いキャッシュ)は nil のまま持ち、画面はゲージを出さない(0 で埋めると、
+//     表示が「0回」と出てちらつく — GROWTH §8.6)。型が違っても snapshot 全体を壊さず nil として扱う
 // - このファイルは Lien / LienWidget / LienNSE の3ターゲットでソース共有される(project.yml 参照)。
 //   Foundation 以外に依存させないこと。
 
@@ -70,8 +76,17 @@ struct PairSnapshot: Equatable, Sendable {
     var partnerName: String?
     var partnerPromiseTitle: String?
     var partnerPromiseEmoji: String?
-    /// 0 = 土(ソロ)〜 5 = 開花(REQUIREMENTS §3.9)
+    /// 成長段階 0〜9(0 = たね 〜 9 = みのり。GROWTH §3.3 / DESIGN §3.4)。ソロは 0。
+    /// アプリが知らない大きい段階が来たら、描くときは知っている最大の段階として扱う(PlantLayers)
     var plantStage: Int
+    /// 成長回数(ふたり達成日の累計。GROWTH §3.2)。ソロは 0。nil = このキーが無い(→ ゲージを出さない)
+    var plantGrownDays: Int? = nil
+    /// 今の段階に入る回数(サーバーの閾値配列の `plantStage` 番目)。ソロは 0。nil = このキーが無い
+    var plantStageFloor: Int? = nil
+    /// 次の段階に必要な回数。サーバーは、最後の段階(みのり)とソロでは `null` を明示して返す(キーは省略しない)。
+    /// アプリでは、`plantGrownDays` / `plantStageFloor` があって、これが nil なら「次の段階が無い」と読む
+    /// (3つとも nil = キーが無い古いサーバー → ゲージを出さない。判定は PlantProgress)
+    var plantNextStageAt: Int? = nil
     var plantMood: PlantMood
     var plantName: String?
     var hasPartnerPhotoToday: Bool
@@ -94,6 +109,9 @@ extension PairSnapshot: Codable {
         case partnerPromiseTitle
         case partnerPromiseEmoji
         case plantStage
+        case plantGrownDays
+        case plantStageFloor
+        case plantNextStageAt
         case plantMood
         case plantName
         case hasPartnerPhotoToday
@@ -115,6 +133,10 @@ extension PairSnapshot: Codable {
         partnerPromiseTitle = try c.decodeIfPresent(String.self, forKey: .partnerPromiseTitle)
         partnerPromiseEmoji = try c.decodeIfPresent(String.self, forKey: .partnerPromiseEmoji)
         plantStage = try c.decodeIfPresent(Int.self, forKey: .plantStage) ?? 0
+        // 成長ルール v2 の新キー: 省略可。無い・null・型違いは nil(try? は decodeIfPresent の Optional をそのまま返す)
+        plantGrownDays = try? c.decodeIfPresent(Int.self, forKey: .plantGrownDays)
+        plantStageFloor = try? c.decodeIfPresent(Int.self, forKey: .plantStageFloor)
+        plantNextStageAt = try? c.decodeIfPresent(Int.self, forKey: .plantNextStageAt)
         plantMood = try c.decodeIfPresent(PlantMood.self, forKey: .plantMood) ?? .normal
         plantName = try c.decodeIfPresent(String.self, forKey: .plantName)
         hasPartnerPhotoToday = try c.decodeIfPresent(Bool.self, forKey: .hasPartnerPhotoToday) ?? false
@@ -135,6 +157,15 @@ extension PairSnapshot: Codable {
         try c.encode(partnerPromiseTitle, forKey: .partnerPromiseTitle)
         try c.encode(partnerPromiseEmoji, forKey: .partnerPromiseEmoji)
         try c.encode(plantStage, forKey: .plantStage)
+        // 新キーは、持っているときだけ書く(キーが無い snapshot を、書き出しで「0回」などに変えない)。
+        // 成長回数と段階の下限があるときは、次の段階も明示する(最後の段階は null — サーバーの形と同じ。DESIGN §3.4)
+        try c.encodeIfPresent(plantGrownDays, forKey: .plantGrownDays)
+        try c.encodeIfPresent(plantStageFloor, forKey: .plantStageFloor)
+        if plantGrownDays != nil || plantStageFloor != nil {
+            try c.encode(plantNextStageAt, forKey: .plantNextStageAt)
+        } else {
+            try c.encodeIfPresent(plantNextStageAt, forKey: .plantNextStageAt)
+        }
         try c.encode(plantMood, forKey: .plantMood)
         try c.encode(plantName, forKey: .plantName)
         try c.encode(hasPartnerPhotoToday, forKey: .hasPartnerPhotoToday)

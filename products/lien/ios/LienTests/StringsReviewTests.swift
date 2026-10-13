@@ -10,6 +10,9 @@
 //   2. StringsCatalog(静的な文言+関数型文言の代表的な出力)を、実行時の値で検査する(組み立て後の文言)
 //   3. 1 で拾った全リテラルが 2 のカタログに載っていることを確かめる(カタログの陳腐化防止)
 //      → Strings.swift に文言を足したら、StringsCatalog にも1行足す(忘れるとここが落ちて教えてくれる)
+//      載っている = **完全一致**(補間のないリテラルは、カタログの文言のどれかと一字一句同じ。補間のあるリテラルは、
+//      固定部分の並びに、文言の全体が一致する — LiteralMatcher)。部分一致にすると、「日」「あり」のような短い断片が
+//      どの文言にも含まれてしまい、足し忘れを見逃す(#57 の持ち越し)
 //
 // 機械チェックは補助にすぎない(責めるニュアンスは語では捕まらない)。
 // 全文言の目視レビュー(レビュー表)は T27 本体(#27)で行い、StringsCatalog がその一覧の元になる。
@@ -78,6 +81,8 @@ enum StringsCatalog {
     static let representativeDates = ["2026年10月20日 21:00", "Oct 20, 2026 at 9:00 PM"]
     /// 運営の連絡先として文言に入るメールアドレスの代表(メールを開けなかったときの案内)
     static let representativeAddresses = ["support@example.com"]
+    /// ゲージの文に入る段階名の代表(最初・途中・最後 — Strings.Plant.stageNames)
+    static let representativeStageNames = ["めばえ", "わかば", "みのり"]
     /// 通報メールの件名に入る「種別」(Strings.Report.kind*)
     static let representativeKinds = [
         Strings.Report.kindPhoto, Strings.Report.kindNickname, Strings.Report.kindPromise,
@@ -361,7 +366,131 @@ enum StringsCatalog {
         add("Session.restart", Strings.Session.restart)
         add("Session.later", Strings.Session.later)
 
+        // Plant(植物 — PB #57)
+        addPalette("Plant.stageNames", Strings.Plant.stageNames)
+        for stage in -1...11 {
+            add("Plant.stageName(\(stage))", Strings.Plant.stageName(stage))
+        }
+        for days in representativeDays {
+            for stageName in representativeStageNames {
+                add("Plant.gaugeRemaining(\(days), \(stageName))", Strings.Plant.gaugeRemaining(days, nextStageName: stageName))
+                add("Plant.gaugeSinceStage(\(stageName), \(days))", Strings.Plant.gaugeSinceStage(stageName, count: days))
+            }
+            add("Plant.gaugeLast(\(days))", Strings.Plant.gaugeLast(days))
+            add("Plant.gaugeUnknownNext(\(days))", Strings.Plant.gaugeUnknownNext(days))
+            add("Plant.stageUpBody(\(days))", Strings.Plant.stageUpBody(days))
+        }
+        for stageName in Strings.Plant.stageNames {
+            add("Plant.stageUpHeadline(\(stageName))", Strings.Plant.stageUpHeadline(stageName))
+            add("Plant.celebrationBefore(\(stageName))", Strings.Plant.celebrationBefore(stageName))
+            add("Plant.celebrationAfter(\(stageName))", Strings.Plant.celebrationAfter(stageName))
+            add("Plant.voiceHeader(みどり, \(stageName))", Strings.Plant.voiceHeader(name: "みどり", stageName: stageName))
+            add("Plant.voiceHeader(nil, \(stageName))", Strings.Plant.voiceHeader(name: nil, stageName: stageName))
+        }
+        for name in representativeNames {
+            for (meDone, partnerDone) in [(false, false), (true, false), (false, true), (true, true)] {
+                add(
+                    "Plant.voiceStatus(\(meDone), \(name), \(partnerDone))",
+                    Strings.Plant.voiceStatus(meDone: meDone, partnerName: name, partnerDone: partnerDone)
+                )
+            }
+            add("Plant.celebrationHeart(\(name))", Strings.Plant.celebrationHeart(name))
+            add("Plant.nameSavedNote(\(name))", Strings.Plant.nameSavedNote(name))
+            add("Plant.nameAdoptedNote(\(name))", Strings.Plant.nameAdoptedNote(name))
+            add("Plant.nameChangedNotice(\(name))", Strings.Plant.nameChangedNotice(name))
+            for (index, line) in Strings.Plant.Whisper.bothDone(name).enumerated() {
+                add("Plant.Whisper.bothDone(\(name))[\(index)]", line)
+            }
+            for (index, line) in Strings.Plant.Whisper.partnerDone(name).enumerated() {
+                add("Plant.Whisper.partnerDone(\(name))[\(index)]", line)
+            }
+            for (index, line) in Strings.Plant.Whisper.meDone(name).enumerated() {
+                add("Plant.Whisper.meDone(\(name))[\(index)]", line)
+            }
+        }
+        add("Plant.voiceDone", Strings.Plant.voiceDone)
+        add("Plant.voicePending", Strings.Plant.voicePending)
+        add("Plant.voiceSolo", Strings.Plant.voiceSolo)
+        add("Plant.renameHint", Strings.Plant.renameHint)
+        add("Plant.whisperAction", Strings.Plant.whisperAction)
+        add("Plant.meetingHeadline", Strings.Plant.meetingHeadline)
+        add("Plant.meetingBody", Strings.Plant.meetingBody)
+        add("Plant.celebrationClose", Strings.Plant.celebrationClose)
+        add("Plant.celebrationHeartSending", Strings.Plant.celebrationHeartSending)
+        add("Plant.celebrationHeartSent", Strings.Plant.celebrationHeartSent)
+        add("Plant.celebrationHeartError", Strings.Plant.celebrationHeartError)
+        add("Plant.welcomeBackHeadline", Strings.Plant.welcomeBackHeadline)
+        add("Plant.welcomeBackBody", Strings.Plant.welcomeBackBody)
+        add("Plant.nameTitle", Strings.Plant.nameTitle)
+        add("Plant.renameTitle", Strings.Plant.renameTitle)
+        add("Plant.namePlaceholder", Strings.Plant.namePlaceholder)
+        add("Plant.nameNote", Strings.Plant.nameNote)
+        add("Plant.nameSubmit", Strings.Plant.nameSubmit)
+        add("Plant.renameSubmit", Strings.Plant.renameSubmit)
+        add("Plant.nameSaving", Strings.Plant.nameSaving)
+        add("Plant.nameLater", Strings.Plant.nameLater)
+        add("Plant.nameCancel", Strings.Plant.nameCancel)
+        add("Plant.nameButton", Strings.Plant.nameButton)
+        add("Plant.nameEmptyError", Strings.Plant.nameEmptyError)
+        add("Plant.nameTooLongError", Strings.Plant.nameTooLongError)
+        add("Plant.nameInvalidError", Strings.Plant.nameInvalidError)
+        add("Plant.nameSaveError", Strings.Plant.nameSaveError)
+        add("Plant.nameNoPairError", Strings.Plant.nameNoPairError)
+        add("Plant.nameNoticeClose", Strings.Plant.nameNoticeClose)
+        for (index, line) in Strings.Plant.Whisper.sleepy.enumerated() { add("Plant.Whisper.sleepy[\(index)]", line) }
+        for (index, line) in Strings.Plant.Whisper.morning.enumerated() { add("Plant.Whisper.morning[\(index)]", line) }
+        for (index, line) in Strings.Plant.Whisper.daytime.enumerated() { add("Plant.Whisper.daytime[\(index)]", line) }
+        for (index, line) in Strings.Plant.Whisper.evening.enumerated() { add("Plant.Whisper.evening[\(index)]", line) }
+        for (index, line) in Strings.Plant.Whisper.night.enumerated() { add("Plant.Whisper.night[\(index)]", line) }
+        for stage in 0...9 {
+            for (index, line) in Strings.Plant.Whisper.stage(stage).enumerated() {
+                add("Plant.Whisper.stage(\(stage))[\(index)]", line)
+            }
+        }
+
         return items
+    }
+}
+
+// MARK: - リテラルとカタログの照合(完全一致)
+
+enum LiteralMatcher {
+    /// Strings.swift のリテラル(補間で区切られた固定部分 `fragments`)が、`text`(カタログの文言)と一致するか。
+    ///   - 断片が1つ(補間なし): `text` と完全に同じ
+    ///   - 断片が2つ以上(補間あり): `text` が最初の断片で始まり、最後の断片で終わり、間の断片がこの順に(重ならずに)現れる。
+    ///     補間の位置には任意の文字列が入る
+    /// 比べるのは UTF-8 のバイト列(正規化・書記素の扱いに左右されない。「見た目が同じ別の表記」は別の文字列)
+    static func matches(fragments: [String], text: String) -> Bool {
+        let bytes = Array(text.utf8)
+        let parts = fragments.map { Array($0.utf8) }
+        guard let first = parts.first, let last = parts.last else { return false }
+        if parts.count == 1 {
+            return !first.isEmpty && bytes == first
+        }
+        guard
+            bytes.count >= first.count + last.count,
+            bytes.starts(with: first),
+            bytes.suffix(last.count).elementsEqual(last)
+        else { return false }
+        var cursor = first.count
+        let end = bytes.count - last.count
+        for middle in parts.dropFirst().dropLast() {
+            guard let found = firstIndex(of: middle, in: bytes, from: cursor, to: end) else { return false }
+            cursor = found + middle.count
+        }
+        return true
+    }
+
+    /// bytes[from..<to] の中で、pattern が最初に現れる位置(無ければ nil。空のパターンは from)
+    private static func firstIndex(of pattern: [UInt8], in bytes: [UInt8], from: Int, to: Int) -> Int? {
+        if pattern.isEmpty { return from }
+        guard to - from >= pattern.count else { return nil }
+        var start = from
+        while start + pattern.count <= to {
+            if bytes[start..<(start + pattern.count)].elementsEqual(pattern) { return start }
+            start += 1
+        }
+        return nil
     }
 }
 
@@ -504,14 +633,38 @@ final class StringsReviewTests: XCTestCase {
         let catalogTexts = StringsCatalog.all.map(\.text)
 
         for literal in try stringsSwiftLiterals() {
-            // 補間で分けた固定部分が、どれもカタログのどれかの文言に含まれていること
-            for fragment in literal.fragments where !fragment.isEmpty {
-                XCTAssertTrue(
-                    catalogTexts.contains { $0.contains(fragment) },
-                    "Strings.swift:\(literal.line) の文言がカタログに無い: \(literal.display) — StringsReviewTests の StringsCatalog.all に足してください"
-                )
-            }
+            // 完全一致: 補間のないリテラルは、カタログの文言のどれかと一字一句同じ。補間のあるリテラルは、
+            // 固定部分の並びに、カタログの文言のどれかの全体が一致する(部分一致にしない — LiteralMatcher)
+            XCTAssertTrue(
+                catalogTexts.contains { LiteralMatcher.matches(fragments: literal.fragments, text: $0) },
+                "Strings.swift:\(literal.line) の文言がカタログに無い: \(literal.display) — StringsReviewTests の StringsCatalog.all に足してください"
+            )
         }
+    }
+
+    func testLiteralMatcherRequiresTheWholeText() {
+        // 補間のないリテラル(断片が1つ): 完全一致だけ。部分一致では通さない
+        XCTAssertTrue(LiteralMatcher.matches(fragments: ["ふたり達成!"], text: "ふたり達成!"))
+        XCTAssertFalse(LiteralMatcher.matches(fragments: ["ふたり達成"], text: "ふたり達成!"), "前方一致だけでは通らない")
+        XCTAssertFalse(LiteralMatcher.matches(fragments: ["達成!"], text: "ふたり達成!"), "後方一致だけでは通らない")
+        XCTAssertFalse(LiteralMatcher.matches(fragments: ["日"], text: "最高記録 40日"), "短い断片が、どの文言にも含まれて通ってしまわない")
+        XCTAssertFalse(LiteralMatcher.matches(fragments: [""], text: "なにか"), "空のリテラルは、文言と一致しない")
+
+        // 補間のあるリテラル: 固定部分の並びに、文言の全体が一致する(補間の位置には任意の文字列が入る)
+        XCTAssertTrue(LiteralMatcher.matches(fragments: ["", "が待ってるよ"], text: "ゆうきが待ってるよ"))
+        XCTAssertTrue(LiteralMatcher.matches(fragments: ["最高記録 ", "日"], text: "最高記録 40日"))
+        XCTAssertFalse(LiteralMatcher.matches(fragments: ["最高記録 ", "日"], text: "最高記録 40日です"), "末尾が違う")
+        XCTAssertFalse(LiteralMatcher.matches(fragments: ["最高記録 ", "日"], text: "いまの最高記録 40日"), "先頭が違う")
+        XCTAssertTrue(LiteralMatcher.matches(fragments: ["あなた: ", "、", ": ", ""], text: "あなた: 完了、ゆうき: まだ"))
+        XCTAssertFalse(
+            LiteralMatcher.matches(fragments: ["あなた: ", "、", ": ", ""], text: "あなた: 完了。ゆうき: まだ"),
+            "途中の固定部分が、この順に並んでいない"
+        )
+        // 断片が重ならない: 「ab」+ 補間 + 「bc」は「abc」には一致しない(b が2回要る)
+        XCTAssertFalse(LiteralMatcher.matches(fragments: ["ab", "bc"], text: "abc"))
+        XCTAssertTrue(LiteralMatcher.matches(fragments: ["ab", "bc"], text: "abbc"))
+        // 文字の同一性はバイト列で比べる(見た目が同じ別の表記を同じとは見ない)
+        XCTAssertFalse(LiteralMatcher.matches(fragments: ["が"], text: "か\u{3099}"), "濁点の分解形は別の文字列")
     }
 
     // MARK: 禁止ワード自体の確認

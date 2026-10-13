@@ -13,7 +13,7 @@
 // 知らない段階(サーバーが新しい段階を返したとき)は、知っている最大の段階として描く(GROWTH §8.2)。
 //
 // このファイルは Lien / LienWidget の2ターゲットでソース共有される(project.yml 参照。T17a のウィジェットと
-// T22 のシェア画像でも使う)。Foundation と PairSnapshot(これもソース共有)以外に依存させないこと。
+// T22 のシェア画像でも使う)。Foundation と PairSnapshot・PlantProgress(これらもソース共有)以外に依存させないこと。
 
 import Foundation
 
@@ -75,7 +75,8 @@ struct PlantCharacterState: Equatable, Sendable {
     var isSolo: Bool
     /// ソロで自分が今日チェックインした(土がほのかに光る)
     var soilGlow: Bool
-    /// のぞき(区間の途中の光る小さな芽)を出す。位置がある段階(3〜8)だけに出る。いつ出すかは PB(GROWTH §3.4)が決める
+    /// のぞき(区間の途中の光る小さな芽)を出す。位置がある段階(3〜8)だけに出る。
+    /// snapshot からは、長い区間(7回以上)の後半だけ true(PlantProgress.showsPeek — GROWTH §3.4)
     var peek: Bool
 
     init(
@@ -140,7 +141,17 @@ extension PlantCharacterState {
         case (false, false):
             expression = snapshot.plantMood == .sad ? .sleep : .normal
         }
-        self.init(stage: snapshot.plantStage, meOpen: me, partnerOpen: partner, expression: expression)
+        // のぞき: 長い区間(7回以上)の後半だけ(GROWTH §3.4)。新キーが無い snapshot では出さない
+        let peek = PlantProgress(snapshot: snapshot)?.showsPeek ?? false
+        self.init(stage: snapshot.plantStage, meOpen: me, partnerOpen: partner, expression: expression, peek: peek)
+    }
+
+    /// 片方だけ完了のそわそわ(小さな揺れ。REQUIREMENTS §3.9・GROWTH §4.1)。
+    /// 描いている状態そのもの(自分 / 相手の葉を見る顔)から決めるので、葉・視線・揺れが食い違わない
+    /// (plantMood は楽観更新で古いまま todayMeDone だけが立つことがあり、そこから決めると、ふたりそろったのに揺れ続ける)。
+    /// ソロは土の中で眠っているので揺れない
+    var sways: Bool {
+        !isSolo && (expression == .lookLeft || expression == .lookRight)
     }
 }
 
@@ -193,6 +204,12 @@ enum PlantLayers {
 
     /// v1.0 の既定の花色 #FFB3C7(petal_sN の SVG の色と同じ。PlantLayersTests が突き合わせる)
     static let defaultPetalRGB: UInt32 = 0xFFB3C7
+
+    /// ふたりの葉の下に小さく置く約束の絵文字の位置と大きさ(キャンバス座標 240×320。GROWTH §4.5)。
+    /// 左 = 自分(x)・右 = 相手(240 − x)。頭の丸みの上の肩のあたりで、顔(目は y≒170 より下)と葉(y≒130 より上)に掛からない
+    static let leafBadgeCenterX: Double = 84
+    static let leafBadgeCenterY: Double = 150
+    static let leafBadgeSize: Double = 22
 
     /// のぞき(fx_peek)の平行移動量(キャンバス座標)。assets/plant/peek_offsets.json と一致する
     struct PeekOffset: Equatable, Sendable {

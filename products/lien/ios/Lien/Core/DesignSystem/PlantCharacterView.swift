@@ -11,6 +11,10 @@
 //   - ダークモードのときだけ、最背面に bg_plate を敷く(こげ茶の輪郭が暗い背景に沈まないように)
 //   - **状態が変わっても、アニメーションは掛けない**。葉のひらく / たたむを自動でクロスフェードすると、
 //     形の違う2枚が二重に見えるため(assets/plant/mapping.md §5)。変えたいときは回転・拡大縮小か、単純な差し替えにする
+//   - 葉の下の約束の絵文字(GROWTH §4.5。PB #57): 左 = 自分・右 = 相手。誰の葉かが、文章に頼らず分かる。
+//     ソロには葉が無いので出さない。位置と大きさは PlantLayers.leafBadge*(キャンバス座標)
+//   - 小さな揺れ(片方だけ完了のそわそわ): 鉢の底を支点に、**プレート以外**の絵と絵文字を回す。
+//     ダークモードのプレートまで回ると、背景の四角が一緒に傾いてしまう(PA の手直し — #57)
 //
 // このファイルは Lien / LienWidget の2ターゲットでソース共有される(project.yml 参照)。
 // SwiftUI と Foundation 以外に依存させないこと(WidgetKit の API はウィジェット側で付ける)。
@@ -24,6 +28,12 @@ struct PlantCharacterView: View {
     var meFlowerColor: Color = PlantCharacterView.defaultFlowerColor
     /// 相手の花(右)の色。v1.0 は既定色
     var partnerFlowerColor: Color = PlantCharacterView.defaultFlowerColor
+    /// ふたりの葉の下に小さく置く、自分(左)の約束の絵文字。nil なら置かない
+    var meEmoji: String?
+    /// 同じく、相手(右)の約束の絵文字
+    var partnerEmoji: String?
+    /// 小さな揺れの角度(度)。鉢の底を支点に、プレート以外を回す。0 なら揺れない
+    var swayDegrees: Double = 0
     /// VoiceOver で読み上げる文。nil なら装飾画像として隠す
     var accessibilityText: String?
 
@@ -36,13 +46,22 @@ struct PlantCharacterView: View {
         GeometryReader { proxy in
             // キャンバス座標(240 幅)→ 画面の長さ
             let unit = proxy.size.width / CGFloat(PlantLayers.canvasWidth)
+            let layers = PlantLayers.stack(for: state, dark: colorScheme == .dark)
             ZStack {
-                ForEach(PlantLayers.stack(for: state, dark: colorScheme == .dark)) { layer in
-                    layerImage(layer)
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .scaleEffect(x: layer.mirrored ? -1 : 1, y: 1)
-                        .offset(x: CGFloat(layer.dx) * unit, y: CGFloat(layer.dy) * unit)
+                // 背面のプレートは揺らさない
+                ForEach(layers.filter { $0.slot == .backPlate }) { layer in
+                    layerView(layer, size: proxy.size, unit: unit)
                 }
+                ZStack {
+                    ForEach(layers.filter { $0.slot != .backPlate }) { layer in
+                        layerView(layer, size: proxy.size, unit: unit)
+                    }
+                    if !state.isSolo {
+                        leafBadges(unit: unit)
+                    }
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .rotationEffect(.degrees(swayDegrees), anchor: .bottom)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
@@ -53,7 +72,15 @@ struct PlantCharacterView: View {
         .accessibilityHidden(accessibilityText == nil)
     }
 
-    /// レイヤー1枚。花の塗りだけ template にして着色し、ほかは元の色のまま(template にしない)
+    /// レイヤー1枚(同じ大きさの枠に重ね、右は反転し、のぞきはずらす)
+    private func layerView(_ layer: PlantLayer, size: CGSize, unit: CGFloat) -> some View {
+        layerImage(layer)
+            .frame(width: size.width, height: size.height)
+            .scaleEffect(x: layer.mirrored ? -1 : 1, y: 1)
+            .offset(x: CGFloat(layer.dx) * unit, y: CGFloat(layer.dy) * unit)
+    }
+
+    /// 花の塗りだけ template にして着色し、ほかは元の色のまま(template にしない)
     @ViewBuilder
     private func layerImage(_ layer: PlantLayer) -> some View {
         if let tint = layer.tint {
@@ -67,6 +94,28 @@ struct PlantCharacterView: View {
                 .renderingMode(.original)
                 .resizable()
                 .scaledToFit()
+        }
+    }
+
+    /// 葉の下の約束の絵文字(左 = 自分 / 右 = 相手。GROWTH §4.5)
+    @ViewBuilder
+    private func leafBadges(unit: CGFloat) -> some View {
+        let size = CGFloat(PlantLayers.leafBadgeSize) * unit
+        if let meEmoji, !meEmoji.isEmpty {
+            Text(meEmoji)
+                .font(.system(size: size))
+                .position(
+                    x: CGFloat(PlantLayers.leafBadgeCenterX) * unit,
+                    y: CGFloat(PlantLayers.leafBadgeCenterY) * unit
+                )
+        }
+        if let partnerEmoji, !partnerEmoji.isEmpty {
+            Text(partnerEmoji)
+                .font(.system(size: size))
+                .position(
+                    x: CGFloat(PlantLayers.canvasWidth - PlantLayers.leafBadgeCenterX) * unit,
+                    y: CGFloat(PlantLayers.leafBadgeCenterY) * unit
+                )
         }
     }
 }
