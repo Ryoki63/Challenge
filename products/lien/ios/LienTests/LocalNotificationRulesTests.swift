@@ -121,6 +121,42 @@ final class LocalNotificationRulesTests: XCTestCase {
         XCTAssertEqual(LocalNotificationCancellation.staleIDsForToday(snapshot: yesterday, now: now, calendar: calendar), [])
     }
 
+    // MARK: アプリと NSE が同じ規則を使っている(ソースの確認)
+
+    func testTheAppAndTheNotificationServiceExtensionShareOneCancellationRule() throws {
+        // 取り消し条件はアプリの同期(ReminderScheduler)と NSE で同じ関数(LocalNotificationCancellation)を使う。
+        // 片方だけが別の規則に変わる(予約しないものと、取り消すものが食い違う)のを、ソースの上で止める
+        let nse = try SourceTree.text("LienNSE/NotificationService.swift")
+        XCTAssertTrue(nse.contains("LocalNotificationCancellation.staleIDsForToday"), "NSE が共通の規則を使っていない")
+        XCTAssertTrue(nse.contains("removePendingNotificationRequests"), "NSE が今日の分の予約を取り消していない")
+        XCTAssertTrue(nse.contains("removeDeliveredNotifications"), "NSE が届いてしまった分を外していない")
+
+        let scheduler = try SourceTree.text("Lien/Core/Notifications/ReminderScheduler.swift")
+        XCTAssertTrue(scheduler.contains("LocalNotificationCancellation.staleIDsForToday"), "アプリの同期が共通の規則を使っていない")
+
+        let delegate = try SourceTree.text("Lien/App/AppDelegate.swift")
+        XCTAssertTrue(delegate.contains("LocalNotificationCancellation.shouldSuppress"), "前面で届いたときの網が無い")
+    }
+
+    func testTheNotificationServiceExtensionTargetCompilesTheSharedRuleFile() throws {
+        let yml = try SourceTree.text("project.yml")
+        let nseBlock = try XCTUnwrap(
+            yml.components(separatedBy: "\n  LienNSE:").last?.components(separatedBy: "\n  LienTests:").first,
+            "project.yml に LienNSE が無い"
+        )
+        XCTAssertTrue(
+            nseBlock.contains("Lien/Core/Notifications/LocalNotificationID.swift"),
+            "LienNSE の sources に LocalNotificationID.swift が無い(NSE が共通の規則を使えない)"
+        )
+        // 共有するファイルは Foundation だけに依存する(NSE は UIKit も必須理由 API も使わない — PrivacyManifestTests)
+        let source = try SourceTree.text("Lien/Core/Notifications/LocalNotificationID.swift")
+        let imports = Set(source.split(separator: "\n").compactMap { line -> String? in
+            let parts = line.split(separator: " ")
+            return parts.count == 2 && parts[0] == "import" ? String(parts[1]) : nil
+        })
+        XCTAssertEqual(imports, ["Foundation"])
+    }
+
     // MARK: 前面で届いたときに捨ててよいか(NSE が取り消せなかったときの最後の網)
 
     func testShouldSuppressOnlyTheStaleLocalNotificationOfToday() {

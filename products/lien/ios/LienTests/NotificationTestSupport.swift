@@ -160,6 +160,8 @@ final class SchedulerRig {
     var now: Date
     var timeZone: String
     var loaderCalls = 0
+    /// loader が結果を返した(門を抜けた)回数
+    var loaderReturns = 0
     var loaderResult: ReminderPreference?
     /// 読み込み(loader)の途中で止めるための門
     var loaderGate: AsyncGate?
@@ -180,6 +182,7 @@ final class SchedulerRig {
             loader = { [unowned self] in
                 self.loaderCalls += 1
                 if let gate = self.loaderGate { await gate.wait() }
+                self.loaderReturns += 1
                 return self.loaderResult
             }
         }

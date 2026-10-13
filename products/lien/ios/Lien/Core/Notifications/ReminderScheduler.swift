@@ -23,7 +23,7 @@
 //     ② 相手のチェックインの push を NSE が受けたとき — NSE が今日の分の予約を removePendingNotificationRequests で消す。
 //        **NSE が本体のアプリの予約を消せるかは、実機でしか確かめられず、まだ確かめていない**(T20。ios/README.md §12)
 //   ②が効かなかったとき(NSE が消せない・相手の push が届かない・通知の許可が無いなど)のふるまいは、テストで固定している
-//   (ReminderSchedulerTests / LocalNotificationRulesTests):
+//   (ReminderSchedulerLearningTests / LocalNotificationRulesTests):
 //     - 夜 9 時の通知は、ふたりそろっていても予約が残るので、そのまま届く。文言はそのとき読んでも困らない言い方にしてある
 //       (「いっしょにつなごう」— Strings.LocalNotification。責めない・急かさない)
 //     - アプリが前面にいる間に届いたものは、出さずに捨てる(AppDelegate.willPresent → shouldSuppress)

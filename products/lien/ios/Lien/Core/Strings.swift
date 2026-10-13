@@ -556,9 +556,10 @@ enum Strings {
         static func streakRiskPartnerDone(partnerName: String, days: Int) -> String {
             "\(partnerName)が待ってるよ。あと3時間、ふたりの\(days)日をつなごう🌱"
         }
-        /// 自分は済んでいて、相手がまだ(アプリの「つつく」を案内する)
+        /// 自分は済んでいて、相手がまだ(アプリの「つつく」を案内する)。「まだなら」と条件で言う: 予約したあとで相手が済ませて、
+        /// NSE が取り消せなかったとき(ReminderScheduler のコメント)に届いても、事実と食い違わない
         static func streakRiskMeDone(partnerName: String, days: Int) -> String {
-            "あと3時間。\(partnerName)に「つつく」を送ってみる? ふたりの\(days)日がつながるよ"
+            "あと3時間。\(partnerName)がまだなら、「つつく」で声をかけてみよう。ふたりの\(days)日がつながるよ"
         }
     }
 

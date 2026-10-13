@@ -141,9 +141,10 @@ final class ReminderSchedulerLearningTests: XCTestCase {
         XCTAssertFalse(rig.scheduler.isLearningReminder)
 
         gate.open()
-        await Task.yield()
-        await Task.yield()
+        await waitUntil { rig.loaderReturns == 1 } // 古い読み込みが結果を返した(捨てられる側の経路を通った)
+        for _ in 0..<5 { await Task.yield() }
 
+        XCTAssertEqual(rig.loaderReturns, 1)
         XCTAssertEqual(rig.store.load().reminder, .unknown, "前のアカウントの約束の時刻が、あとから設定に入らない")
         XCTAssertEqual(rig.ids, [])
     }

@@ -237,12 +237,17 @@ v1.0 の端末のローカル通知は 2 つだけ(REQUIREMENTS §3.12)。配送
 
 ふたりそろったことが分かったら、今日の夜 9 時の通知を取り消す。分かる経路は 2 つ: ① アプリが同期したとき(`sync()`)/ ② 相手のチェックインの push を NSE が受けたとき(`NotificationService` が `LocalNotificationCancellation` の規則で、今日の分の予約を `removePendingNotificationRequests`、届いたものを `removeDeliveredNotifications` で取り消す。取り消しがシステムに届いてから通知を出す)。
 
-**②(NSE が本体のアプリの予約を消せるか)は、実機でしか確かめられず、まだ確かめていない。** 消せなかったときのふるまいは決めてあり、テストで固定している(`ReminderSchedulerTests.testWhenTheNSECannotCancel…` / `LocalNotificationRulesTests`):
+**②(NSE が本体のアプリの予約を消せるか)は、実機でしか確かめられず、まだ確かめていない。** 消せなかったときのふるまいは決めてあり、テストで固定している(`ReminderSchedulerLearningTests.testWhenTheNSECannotCancel…` / `LocalNotificationRulesTests`):
 
 1. 夜 9 時の通知は、ふたりそろっていても予約が残るので、そのまま届く。文言は、そのとき読んでも困らない言い方(「いっしょにつなごう」。記録を失う・急かす言い方はしない)
 2. アプリが前面にいる間に届いたものは、出さずに捨てる(`AppDelegate.willPresent` → `shouldSuppress`)
 3. 次にアプリを開いたとき(同期)、今日の分を消し、通知センターに届いてしまった分も外す
 4. 最悪でも「ふたりそろった日の夜 9 時に、読んで困らない通知が 1 回届く」だけで、記録(ストリーク)には影響しない
+
+### 確認できていること・できていないこと
+
+- **CI(シミュレータ・macOS)で確認済み**: 予約の中身の計算(`ReminderPlanTests`。日付またぎ・タイムゾーン・夏時間・取り消し条件・NSE との規則の一致)/ 予約の合わせ込み(偽の通知センター)/ 設定の保存 / 設定画面の状態 / 各所からの呼び出し(`LocalNotificationWiringTests`)/ カレンダートリガーが、指定した暦・タイムゾーンどおりの瞬間を指すこと(`UserNotificationCenterSchedulerTests` が `nextTriggerDate()` で確認。iOS のシミュレータでも通る)
+- **実機でしか確認できない(T20)**: 通知が実際に時刻どおり届くこと(ロック画面・バナー・音)/ OS の許可のダイアログ / **NSE が本体の予約を消せるか** / 端末のタイムゾーンを変えたときの挙動 / 機内モードでの挙動
 
 ### T20 の確認項目(実機・TestFlight)
 

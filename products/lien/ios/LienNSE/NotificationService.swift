@@ -6,7 +6,7 @@
 //   (T16 #16)その snapshot が「今日の分のローカル通知はもう要らない」ことを示すとき(ふたりそろった = 夜 9 時のストリーク危機)は、
 //   本体のアプリが予約しているローカル通知の取り消しを試みる(LocalNotificationCancellation — アプリの同期と共通の規則)。
 //   **NSE が本体のアプリの予約を消せるかは実機でしか確かめられず、まだ確かめていない**(T20。ios/README.md §12)。
-//   消せなかったときのふるまいは ReminderScheduler.swift の冒頭と ReminderSchedulerTests に書いてある
+//   消せなかったときのふるまいは ReminderScheduler.swift の冒頭と ReminderSchedulerLearningTests に書いてある
 //   (予約が残るので夜 9 時に届くが、文言はそのとき読んで困らない / 前面なら捨てる / 次に開いたときの同期で消す)。
 //
 // 制約(DESIGN §10): NSE は実行30秒・メモリ約24MB。
