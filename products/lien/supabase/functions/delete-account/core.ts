@@ -12,7 +12,7 @@
 //      (_shared/pair_dissolve.ts)。相手のペアの記録(植物・ストリーク)はアーカイブとして残る
 //   2. 本人の写真を Storage(photos バケット)から消す。パスは決定的に作る:
 //        pairs/<pair_id>/<date_local>/<user_id>/photo.jpg と photo_thumb.jpg(DESIGN §5.2・本人単位の区画)
-//      を、所属したことのある全ペアの期間(成立日〜解消日)の全日について。checkins.photo_path が指す
+//      を、所属したことのある全ペアの期間(成立日の前日〜解消日の +2 日)の全日について。checkins.photo_path が指す
 //      旧形式(#52 より前の pairs/<pair_id>/<date>/photo.jpg)も、本人の行が指すものに限って消す。
 //      存在しないキーの削除は何も起きない(Storage の remove はエラーにしない)ので、取り消した日の写真・
 //      行を作る前にアップロードだけ済んだ写真などの取りこぼし(DB から辿れない孤児)も回収できる
@@ -153,7 +153,7 @@ function minDate(a: string, b: string): string {
 
 /**
  * 消す写真のパスを作る(決定的。重複なし・順序は安定)。
- *   - 所属した各ペアの期間(成立日 〜 解消日の翌々日。現役なら今日の翌日)の全日の
+ *   - 所属した各ペアの期間(成立日の前日 〜 解消日の翌々日。現役なら今日の翌日)の全日の
  *     pairs/<pair_id>/<date>/<user_id>/photo.jpg と photo_thumb.jpg。
  *     解消日の +2 日は、UTC 表記の解消時刻とユーザーのタイムゾーンのずれ、解消の直前に発行された署名付き
  *     アップロード URL(2 時間有効)で日付をまたいだアップロードを見込む余裕
@@ -174,7 +174,9 @@ export function photoPathsToRemove(params: {
     const upper = m.status === "dissolved" && m.dissolvedAt
       ? minDate(addDaysLocal(m.dissolvedAt.slice(0, 10), 2), tomorrow)
       : tomorrow;
-    let from = m.startedOn;
+    // 成立日の前日から: タイムゾーンが違うと、本人の date_local が started_on より 1 日前になりうる
+    // (checkin は本人の「今日」の ±1 日を許す)。DB から辿れない孤児(行を作る前にアップロードだけ済んだ写真)も拾う
+    let from = addDaysLocal(m.startedOn, -1);
     if (dayNumber(from) > dayNumber(upper)) continue;
     if (dayNumber(upper) - dayNumber(from) + 1 > MAX_DAYS_PER_PAIR) {
       from = addDaysLocal(upper, -(MAX_DAYS_PER_PAIR - 1));

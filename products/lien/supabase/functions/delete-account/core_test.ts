@@ -657,7 +657,7 @@ const membership = (
   ...over,
 });
 
-Deno.test("photoPathsToRemove: 現役ペアは成立日から今日の翌日まで、原寸とサムネの両方", () => {
+Deno.test("photoPathsToRemove: 現役ペアは成立日の前日から今日の翌日まで、原寸とサムネの両方", () => {
   const paths = photoPathsToRemove({
     userId: "u1",
     memberships: [membership({ pairId: "p1", startedOn: "2026-06-08" })],
@@ -665,6 +665,8 @@ Deno.test("photoPathsToRemove: 現役ペアは成立日から今日の翌日ま�
     todayLocal: "2026-06-10",
   });
   assertEquals(paths, [
+    "pairs/p1/2026-06-07/u1/photo.jpg",
+    "pairs/p1/2026-06-07/u1/photo_thumb.jpg",
     "pairs/p1/2026-06-08/u1/photo.jpg",
     "pairs/p1/2026-06-08/u1/photo_thumb.jpg",
     "pairs/p1/2026-06-09/u1/photo.jpg",
@@ -692,6 +694,7 @@ Deno.test("photoPathsToRemove: 解消済みのペアは解消日の +2 日まで
     }).filter((p) => p.endsWith("/photo.jpg")).map((p) => p.split("/")[2]);
 
   assertEquals(dates("2026-06-20"), [
+    "2026-05-31", // 成立日の前日(タイムゾーン違いで date_local が 1 日前になりうる)
     "2026-06-01",
     "2026-06-02",
     "2026-06-03",
@@ -700,6 +703,7 @@ Deno.test("photoPathsToRemove: 解消済みのペアは解消日の +2 日まで
   ]);
   // 解消した日のうちに削除する場合は、今日の翌日までで打ち切る
   assertEquals(dates("2026-06-03"), [
+    "2026-05-31",
     "2026-06-01",
     "2026-06-02",
     "2026-06-03",
