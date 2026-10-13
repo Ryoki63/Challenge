@@ -95,14 +95,22 @@ targets:
       - path: Lien/Core/Models/PairSnapshot.swift
       - path: Lien/Core/AppGroupStore.swift
       - path: Lien/Core/Strings.swift
-      # 植物の描画(issue #56。S ウィジェットの試作 — 本実装は T17a)。SwiftUI と Foundation と PairSnapshot だけに
-      # 依存する純粋なファイルなので、アプリ本体とソース共有する。カタログも同じものを入れる(全レイヤーを
-      # 重ねてもウィジェットのメモリに収まるかは実機で確かめる — GROWTH §9.5)
+      # 植物の描画(issue #56)。SwiftUI と Foundation と PairSnapshot だけに依存する純粋なファイルなので、
+      # アプリ本体とソース共有する。カタログも同じものを入れる(全レイヤーを重ねてもウィジェットのメモリに収まるかは
+      # 実機で確かめる — GROWTH §9.5)
       - path: Lien/Core/DesignSystem/PlantLayers.swift
       - path: Lien/Core/DesignSystem/PlantCharacterView.swift
       # 成長の進み具合(のぞきを出す判定 — PlantLayers の PlantCharacterState(snapshot:) が使う。PB #57)。
-      # Foundation と PairSnapshot・PlantLayers だけに依存する純粋なファイル(T17a の「細い進み具合のバー」でも使う)
+      # Foundation と PairSnapshot・PlantLayers だけに依存する純粋なファイル(ウィジェットの「細い進み具合のバー」でも使う)
       - path: Lien/Core/PlantProgress.swift
+      # 植物の VoiceOver の読み上げ文(PlantVoiceOver。GROWTH §5.4: ウィジェットも「みどり、わかば。あなた: 完了、…」と読み上げる)。
+      # Foundation と PairSnapshot・PlantProgress・PlantLayers・Strings だけに依存する純粋なファイル
+      - path: Lien/Core/GrowthGauge.swift
+      # ウィジェットの中身(issue #17 T17a): 何を見せるか(WidgetContent)・タイムラインの計画(WidgetTimelinePlan)・寸法(WidgetMetrics)の
+      # 純粋関数と、ホーム S / M・ロック画面の円形・インラインのビュー(Widget/Views/)。**WidgetKit の TimelineProvider・WidgetBundle・
+      # WidgetFamily だけが LienWidget/ にあり、それ以外はここ**。アプリ本体にも入る(LienTests が単体テストと一覧画像の描画をするため)。
+      # フォルダごと入れる(ファイルを足しても、ここは直さない。PrivacyManifestTests の directories もこのフォルダを見る)
+      - path: Lien/Core/Widget
       - path: ../assets/plant/PlantAssets.xcassets
         buildPhase: resources
     settings:

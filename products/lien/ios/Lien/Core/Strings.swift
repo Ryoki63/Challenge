@@ -35,6 +35,18 @@ enum Strings {
 
         /// ソロ状態(ペア未成立・タネの子は鉢の土の中で眠っている — REQUIREMENTS §3.9)の一言
         static let soloCaption = "ペアになると、タネの子が目をさますよ"
+
+        // VoiceOver(ロック画面の2種。ホーム S / M は植物の読み上げ文 PlantVoiceOver を使う — GROWTH §5.4)
+
+        /// ロック画面・円形(相手の葉の開閉): 「ゆうき: 完了」/「ゆうき: まだ」
+        static func partnerStatus(_ partnerName: String, done: Bool) -> String {
+            "\(partnerName): \(done ? Plant.voiceDone : Plant.voicePending)"
+        }
+
+        /// ロック画面・インライン(ストリーク): 「ふたりの記録: 23日」(植物の読み上げ文 Plant.voiceStatus と同じ「名前: 値」の形)
+        static func streakSpoken(_ days: Int) -> String {
+            "\(Home.streakCaption): \(streakDays(days))"
+        }
     }
 
     /// オンボーディング3画面(REQUIREMENTS §3.1, §6 / T10)

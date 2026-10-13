@@ -98,7 +98,8 @@ final class PrivacyManifestTests: XCTestCase {
         BundleSpec(
             name: "LienWidget",
             manifest: "LienWidget/PrivacyInfo.xcprivacy",
-            directories: ["LienWidget"],
+            // Lien/Core/Widget は、ウィジェットの中身(純粋関数とビュー。T17a #17)。project.yml がフォルダごと入れている
+            directories: ["LienWidget", "Lien/Core/Widget"],
             sharedFiles: [
                 "Lien/Core/Models/PairSnapshot.swift",
                 "Lien/Core/AppGroupStore.swift",
@@ -106,6 +107,7 @@ final class PrivacyManifestTests: XCTestCase {
                 "Lien/Core/DesignSystem/PlantLayers.swift",
                 "Lien/Core/DesignSystem/PlantCharacterView.swift",
                 "Lien/Core/PlantProgress.swift",
+                "Lien/Core/GrowthGauge.swift",
             ]
         ),
         BundleSpec(

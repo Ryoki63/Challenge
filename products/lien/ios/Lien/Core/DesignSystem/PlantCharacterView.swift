@@ -15,12 +15,25 @@
 //     ソロには葉が無いので出さない。位置と大きさは PlantLayers.leafBadge*(キャンバス座標)
 //   - 小さな揺れ(片方だけ完了のそわそわ): 鉢の底を支点に、**プレート以外**の絵と絵文字を回す。
 //     ダークモードのプレートまで回ると、背景の四角が一緒に傾いてしまう(PA の手直し — #57)
+//   - 各レイヤーの Image に付ける装飾 imageStyle(T17a #17): ウィジェットが、iOS 18 の「色合い(accented)」表示でも植物が単色に
+//     ならないよう widgetAccentedRenderingMode(.fullColor) を付けるのに使う。WidgetKit の API はここには持ち込まず、
+//     描き手(ウィジェット。Lien/Core/Widget/Views/WidgetAccent.swift)が注入する。既定は何もしない
 //
 // このファイルは Lien / LienWidget の2ターゲットでソース共有される(project.yml 参照)。
 // SwiftUI と Foundation 以外に依存させないこと(WidgetKit の API はウィジェット側で付ける)。
 // 植物は装飾画像として扱う(accessibilityText が nil なら VoiceOver から隠す。意味は周囲のテキストで伝える)。
 
 import SwiftUI
+
+/// 各レイヤーの Image(`.resizable()` まで済ませたもの)に、描き手が付ける装飾。
+/// 例: ウィジェットは widgetAccentedRenderingMode(.fullColor) を付けて、色合い(accented)表示でも色を保つ。
+/// Image にしか付けられない API(Image のメソッド)のために、Image の段階で渡す
+struct PlantImageStyle: Sendable {
+    let apply: @Sendable (Image) -> AnyView
+
+    /// 何もしない(アプリ本体・シェア画像)
+    static let plain = PlantImageStyle { AnyView($0) }
+}
 
 struct PlantCharacterView: View {
     let state: PlantCharacterState
@@ -36,6 +49,8 @@ struct PlantCharacterView: View {
     var swayDegrees: Double = 0
     /// VoiceOver で読み上げる文。nil なら装飾画像として隠す
     var accessibilityText: String?
+    /// 各レイヤーの Image に付ける装飾(ウィジェットの色合い表示への対策 — PlantImageStyle)。既定は何もしない
+    var imageStyle: PlantImageStyle = .plain
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -84,15 +99,11 @@ struct PlantCharacterView: View {
     @ViewBuilder
     private func layerImage(_ layer: PlantLayer) -> some View {
         if let tint = layer.tint {
-            Image(layer.assetName)
-                .renderingMode(.template)
-                .resizable()
+            imageStyle.apply(Image(layer.assetName).renderingMode(.template).resizable())
                 .scaledToFit()
                 .foregroundStyle(tint == .me ? meFlowerColor : partnerFlowerColor)
         } else {
-            Image(layer.assetName)
-                .renderingMode(.original)
-                .resizable()
+            imageStyle.apply(Image(layer.assetName).renderingMode(.original).resizable())
                 .scaledToFit()
         }
     }

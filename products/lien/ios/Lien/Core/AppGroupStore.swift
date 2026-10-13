@@ -136,6 +136,13 @@ struct AppGroupStore {
         }
     }
 
+    /// snapshot のファイルが、**あるのに中身を取り出せない**(データ保護で、再起動後の最初のアンロックの前は読めない)か。
+    /// 壊れた JSON・将来のスキーマ(取り出せるがデコードできない)は含まない — そちらは待っても直らない。
+    /// ウィジェットが、その間に「はじめよう」の表示を 1 日出しつづけず、少しあとに読み直す(WidgetTimelinePlan.lockedRetryInterval)ために使う
+    func snapshotFileIsLocked(fileManager: FileManager = .default) -> Bool {
+        isPresentButUnreadable(snapshotFileURL, fileManager: fileManager) { _ in true }
+    }
+
     /// ローカル通知の設定のファイルが、**あるのに読めない**(中身が取り出せない)か。壊れた JSON は読めた扱い
     /// (設定は欠けた値を既定で埋めて読む — NotificationPreferences)
     func notificationPreferencesAreLocked(fileManager: FileManager = .default) -> Bool {

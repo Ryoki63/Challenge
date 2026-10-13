@@ -159,7 +159,7 @@ gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false -f in
 | `check_release_inputs.py` | リリース前に、運営者の連絡先(`SupportLinks.contactEmail`)と法務ページの公開(HTTP 200)を確かめる(§8.2) |
 | `scan_required_reason_apis.py` | 出来上がったバイナリの必須理由 API の棚卸し |
 | `export_attachments.py` | xcresult のテスト添付(植物の実描画の一覧画像)を、読みやすい名前の PNG として取り出す(§10) |
-| `macos-check/check.sh` | Xcode 無しの Mac で、Foundation 系のコードの macOS ビルド・LienTests の実行・View の型検査をする push 前の下見(§1。[README](scripts/macos-check/README.md)) |
+| `macos-check/check.sh` | Xcode 無しの Mac で、Foundation 系のコードの macOS ビルド・LienTests の実行・View の型検査・LienWidget(WidgetKit の拡張)の型検査をする push 前の下見(§1。[README](scripts/macos-check/README.md)) |
 | `test_*.py` | 上記の単体テスト(`python3 -m unittest discover -s scripts -p 'test_*.py'`。lien-ios でも毎回実行) |
 
 ## 10. 植物の描画と、実描画の一覧画像(issue #56)
@@ -167,7 +167,7 @@ gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false -f in
 - 植物「タネの子」は **SVG レイヤー34点の重ね合わせ**。絵の正本は [`../assets/plant/`](../assets/plant/mapping.md)(`svg/` と `PlantAssets.xcassets`。重ね順・状態対応・のぞきの位置は `mapping.md`)
   - `Lien/Core/DesignSystem/PlantLayers.swift` — 状態 → 重ねるレイヤーの並び(純粋関数)。snapshot からの状態の導出(GROWTH.md §4.1)もここ
   - `Lien/Core/DesignSystem/PlantCharacterView.swift` — ZStack で重ねる。右の葉・右の花は左右反転、花の塗りはコード側で着色、ダークは背面プレート
-  - ウィジェット(LienWidget)も同じ2ファイルと同じカタログを使う(S ウィジェットは試作 — 本実装は T17a)
+  - ウィジェット(LienWidget)も同じ2ファイルと同じカタログを使う(本実装は T17a — §13)
 - テスト: `PlantLayersTests`(重ね順の規則・`assets/plant/layer_stacks.json` との一致・導出の表・34レイヤーが空白でなく描けること・着色)/ `PlantRenderTests`(一覧画像)
 - **実描画の一覧画像**: lien-ios の artifact `plant-render-sheets`(`PlantRenderTests` が `ios/build/plant-render/` に書く。ライト/ダーク × 全段階 × 今日の状態・40/60/80pt・表情・のぞき・花の色)。
   同じ画像を xcresult の添付からも取り出して `plant-render-sheets-xcresult` に、xcresult 自体を `xcresult` に残す(テストが失敗しても残る)
@@ -306,3 +306,59 @@ v1.0 の端末のローカル通知は 2 つだけ(REQUIREMENTS §3.12)。配送
 11. **再起動後の最初のアンロック前**: 端末を再起動して、**アンロックせずに**、相手に約束を変更するか、チェックインを取り消してもらう(サイレント push でアプリがバックグラウンドで起動され、同期が走る)→ アンロックして、アプリを開かずに待つ → 予約が消えていない(その日の夜 9 時の分とリマインドが届く)
 12. **日付をまたぐチェックイン**: 23:58 に機内モードでチェックインして、0:10 に機内モードを切る → 翌日のリマインドが取り消されていない(0:00〜1:00 に作られた snapshot の完了は不明扱い)
 13. **画面の見た目**: 設定 → 通知の画面と、設定の行(右側にリマインドの要約)を、通常と最大の文字サイズ・ダークモードで見る(CI の一覧画像と見比べる)。ストリーク危機のスイッチが、操作の瞬間に元へ戻って見えない
+
+
+## 13. ウィジェット: ホーム S / M・ロック画面の円形とインライン(issue #17 T17a)
+
+v1.0 のウィジェットは1つ(kind `LienWidget`)で、4つのファミリー(REQUIREMENTS §3.10。植物は PA #56 の `PlantCharacterView` = SVG レイヤーの重ね合わせ)。
+
+| ファミリー | 内容 |
+|---|---|
+| ホーム S | 植物(ふたりの葉 = 今日の2人。左 = 自分・右 = 相手)+ストリーク「🔥 23日」+2人の今日の状態(約束の絵文字+○×。葉の意味が伝わるまでの補助 — GROWTH §5.4)+**細い進み具合のバー(数字なし)**+相手が先に完了していれば「(名前)が待ってるよ」。ソロ・データ無しは、眠るタネの子+一言(「ペアになると、タネの子が目をさますよ」/「アプリを開いてはじめよう」) |
+| ホーム M | S の内容+**植物を大きく**(高さいっぱい)。右の列に2人の呼び名つき(高さに収まらないときは呼び名を外す)。**相手の写真は v1.0.1(T17b)**。REQUIREMENTS §3.10 と TASKPLAN §9.4 は M ごと v1.0.1 としているが、オーケストレータの指示で写真なしの M を入れた(外すときは `LienWidget.supportedFamilies` から `.systemMedium` を取る 1 行) |
+| ロック画面・円形 | **相手の今日の状態** = 相手(右)の葉の開閉(ひらく = 済み / たたむ = まだ。薄く出す。段階0は芽の光る / 閉じる)。形でも見分けられる(ロック画面は単色化される)。ソロ・データ無しは眠るタネの子。v1.0.1 で進み具合のリングにする |
+| ロック画面・インライン | 🔥 ストリーク数(SF Symbols の炎+「23日」)。ストリークが無いとき(0・ソロ・データ無し)はアプリ名 |
+
+**数字はストリークだけ**(GROWTH §5.4。進み具合のバーに数字も文も付けない)。ストリークが 0 のときは「0日」を出さない(罰なし)。進み具合のバーは、snapshot の新キー3つ(`plantGrownDays` / `plantStageFloor` / `plantNextStageAt`)から「区間の中での位置」(`PlantProgress`)を作る。新しいキーが無い・値が食い違うときは出さず、最後の段階(次の段階が無い)はいっぱいにする。
+
+### 構成(WidgetKit に触るのは `LienWidget/` だけ)
+
+| 何 | どこ |
+|---|---|
+| WidgetKit との接ぎ手: `WidgetBundle` / `Widget`(ファミリー4つ)/ `TimelineProvider` / ファミリー → 描画方式の写し / 背景(`containerBackground`・円形は `AccessoryWidgetBackground`)/ `imageStyle: .widgetFullColor` | `LienWidget/LienWidgetBundle.swift`・`LienWidgetEntryView.swift` |
+| **何を見せるか**(snapshot → 3つの状態(データ無し・ソロ・ペア)× 植物の状態・ストリーク・2人の状態・バーの長さ・「待ってるよ」・円形の葉・読み上げ文)— 純粋関数 | `Lien/Core/Widget/WidgetContent.swift` |
+| **タイムラインの計画**(今 + 翌日 0:00。前の日に作られた snapshot の「今日」は「まだ」として描く)— 純粋関数 | `Lien/Core/Widget/WidgetTimelinePlan.swift` |
+| 寸法(S の植物と右の列・M の植物・円形の葉の切り抜き範囲)— 純粋な計算 | `Lien/Core/Widget/WidgetMetrics.swift` |
+| ビュー(S / M / 円形 / インライン / 部品 / 色合い表示の装飾)。WidgetKit のファミリーは持たない(`WidgetLayout` を受け取る) | `Lien/Core/Widget/Views/` |
+| 植物の各レイヤーの Image に付ける装飾の差し込み口(`PlantImageStyle`。既定は何もしない) | `Lien/Core/DesignSystem/PlantCharacterView.swift` |
+
+`Lien/Core/Widget/` は `project.yml` が LienWidget にフォルダごと入れる(アプリ本体にも入る — LienTests が単体テストと一覧画像の描画をするため)。ファイルを足しても `project.yml` は直さない。
+
+### 設計のポイント
+
+- **日付またぎ**(DESIGN §3.5): エントリは2点 — 今(now)と翌日 0:00(2枚の葉をたたむ。ストリーク・段階・進み具合・名前は保つ — GROWTH §7.3)。policy は `.atEnd`。**前の日に作られた snapshot**(`updatedAt` のローカル日が今日より前)の「今日の完了」は前の日のことなので、今日の分は「まだ」として描く(相手の push を何日も受け取らず、アプリも開かなかったとき、昨日の「ふたりそろった」を出しつづけない)。`updatedAt` が今日・未来(端末の時計とのずれ)ならそのまま信じる。日付の判断は端末のローカル日(`Calendar`。夏時間・0:00 ちょうども `WidgetTimelinePlanTests` で固定)
+- **再起動後の最初のアンロックの前**: App Group のファイルがデータ保護で読めない。そのまま `.atEnd` にすると「アプリを開いてはじめよう」を翌日 0:00 まで出しつづけるので、**あるのに取り出せない間だけ**(`AppGroupStore.snapshotFileIsLocked`。壊れた JSON は含めない)2 分後に読み直す(`WidgetTimelinePlan.lockedRetryInterval`)
+- **色合い(accented)表示**(iOS 18 のホーム画面): 画像は何もしないと脱色されて単色になる。植物の各レイヤーの Image に `widgetAccentedRenderingMode(.fullColor)`(`#available(iOS 18)`)を付けて色を保つ。`PlantCharacterView` は WidgetKit に依存させない(シェア画像・アプリ本体でも使う)ので、`PlantImageStyle` として外から渡す。ウィジェットが `PlantCharacterView` を作るときは必ず `imageStyle:` を渡す(`WidgetSourceTests` が確かめる)。進み具合のバーの塗りは `.widgetAccentable()`(色合いの色になる)
+- **ダーク**: `PlantCharacterView` が最背面に `bg_plate`(クリーム色のプレート)を敷く(ロック画面の眠るタネの子は、単色化でプレートが絵を塗りつぶすので、常にライトで描く)
+- **ロック画面は単色化(vibrant)される**: ひらく / たたむを**形で**見分けられるようにしてある(ひらいた葉は横に広く、たたんだ葉は縦に細い。たたんだ方はさらに薄く出す — 罰ではなく眠っているだけ)。円形の葉は、他のレイヤーと同じキャンバス(240×320)の最終位置の絵を、葉のある範囲(`WidgetLeafFocus`。実際に描いて測った塗りの範囲に余白を足した値)が円の中心に来るよう拡大して切り抜く。アセットを差し替えたら `WidgetRenderTests.testTheLeafFocusContainsThePaintedLayers` が落ちて気づく
+- **文字**: ホーム S / M は Dynamic Type に連れて大きくなるが、小さな枠に収まるよう xxLarge で止める。S の右の列には最小の幅(46pt)を残し(足りないぶんは植物を削る)、絵文字は縮めて収める。M の右の列は、高さに収まらないときは呼び名を外した小さい方に替える(`ViewThatFits`)
+- **VoiceOver**: ウィジェット全体で1つの要素。ホーム S / M は植物の読み上げ文(`PlantVoiceOver` — 「みどり、わかば。あなた: 完了、ゆうき: まだ。ふたりそろって あと2回で よりそい」)に、ストリークと「待ってるよ」を足す。円形は「ゆうき: 完了」、インラインは「ふたりの記録: 23日」
+- **メモリ**: 全レイヤーを重ねる(ベクターのまま)。S の植物は約 68×91pt(標準の機種)・M は約 95×126pt。目安は S サイズで1レイヤー約1MB・10枚前後(GROWTH §9.5)。収まらないと分かったときの代案は、ウィジェット用だけ「段階 × 葉の状態」を1枚に合成した画像を持つこと(`PlantCharacterView` の差し替えで局所化できる)。**実機で確かめる(T20)**
+
+### テスト・手元の下見・一覧画像
+
+- 単体テスト(macOS の下見でも走る): `WidgetContentTests`(状態の導出)/ `WidgetTimelinePlanTests`(日付またぎ・前の日の snapshot・タイムゾーン・夏時間)/ `WidgetLayoutTests`(寸法・円形の切り抜き)/ `WidgetSourceTests`(ファミリー4つ・`imageStyle` を必ず渡す・共有ファイルの依存・日本語の文言を直書きしない・自分では reload しない)/ `AppGroupStoreTests`(`snapshotFileIsLocked`)/ `StringsReviewTests`(新しい文言)
+- 実描画(iOS のみ): `WidgetRenderTests` — どの状態・大きさ・文字サイズ・ライト/ダークでも**内側の余白(システムの 16pt)に描き込まない**・進み具合のバーが内容の長さどおりに塗られる / 新しいキーが無いときは出ない・ダークでプレートが敷かれる・円形の葉が測った範囲に収まり円の縁に付かず、開閉が形で見分けられる
+- 一覧画像(lien-ios の artifact `plant-render-sheets` の `widget_*.png`): `widget_01_small_light` / `_02_small_dark`(S の状態16通り)・`_03_medium_light` / `_04_medium_dark`(M)・`_05_lock_screen`(円形とインライン)・`_06_small_sizes` / `_07_medium_sizes`(機種の大きさ × 文字の大きさ)。システムが足す内側の余白・背景・円形の背景・単色化は近似(`WidgetRenderSupport.swift`)
+- `scripts/macos-check/check.sh widget`: LienWidget ターゲットを、`project.yml` の sources のとおりに集めて macOS の SDK で型検査する(ロック画面の accessory 系ファミリーは macOS に無いので、型検査用のコピーでだけ別のファミリーに読み替える)
+
+### 確認できていること・できていないこと
+
+- **CI(シミュレータ)と手元の macOS で確認済み**: 上のテスト一式 / 手元で macOS 向けに描いた一覧(iPhone SE・標準・Pro Max の大きさ、標準と xxLarge の文字)/ ライト・ダーク・ロック画面の見え方(エージェントの目視。承認は人が artifact の画像を見て行う)
+- **実機でしか確認できない(T20)**:
+  1. **メモリ**: ホーム S / M・ロック画面の各ウィジェットが、全レイヤーを重ねても収まるか(拡張が強制終了されない・空白にならない)。収まらなければ上の代案
+  2. **色合い(accented)表示**(iOS 18 以降。ホーム画面を長押し → 編集 → カスタマイズ → 色合い): 植物が色を保つか(花の着色・背面プレート・文字・バーの塗りの色)
+  3. **ロック画面**: 円形の葉のひらく / たたむが、明るい壁紙・暗い壁紙で見分けられるか(実際の単色化)/ インラインの表示 / 眠るタネの子
+  4. **日付またぎ**: 0:00 に2枚とも葉をたたむ / 2 日以上アプリを開かず push も受け取らなかったあと、前の日の「ふたりそろった」が出ない
+  5. **再起動後**: 夜間の自動更新などで再起動したあと、最初のアンロックの前後で「アプリを開いてはじめよう」が残らない(2 分後の読み直し)
+  6. 反映 60 秒以内(相手のチェックイン → NSE → ウィジェット。T07 から続く M0 の確認)/ StandBy・Smart Stack での見え方 / VoiceOver の読み上げ / 文字を大きくした設定 / iPhone SE の大きさ

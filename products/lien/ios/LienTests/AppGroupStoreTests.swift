@@ -192,6 +192,25 @@ final class AppGroupStoreTests: XCTestCase {
         XCTAssertFalse(store.snapshotIsPresentButUnreadable(), "次の同期で正しい snapshot が書かれれば、読める")
     }
 
+    func testTheSnapshotFileIsLockedOnlyWhenItsContentCannotBeTakenOut() throws {
+        // ウィジェットが読み直しを決める判定(T17a #17): 「無い」「読める」「壊れている」は、待っても変わらないので鍵がかかっているとは言わない
+        XCTAssertFalse(store.snapshotFileIsLocked(), "無い")
+
+        try store.saveSnapshot(makeSnapshot())
+        XCTAssertFalse(store.snapshotFileIsLocked(), "読める")
+
+        try Data("{ not json".utf8).write(to: store.snapshotFileURL)
+        XCTAssertFalse(store.snapshotFileIsLocked(), "壊れた JSON は、取り出せる(待っても直らない)")
+
+        try store.saveSnapshot(makeSnapshot())
+        guard makeUnreadable(store.snapshotFileURL) else { return }
+        defer { restorePermissions(store.snapshotFileURL) }
+        XCTAssertTrue(store.snapshotFileIsLocked(), "あるのに取り出せない = データ保護で読めない(再起動後の最初のアンロックの前)")
+        XCTAssertNil(store.loadSnapshot())
+        restorePermissions(store.snapshotFileURL)
+        XCTAssertFalse(store.snapshotFileIsLocked(), "アンロックされれば読める")
+    }
+
     func testNotificationPreferencesAreLockedOnlyWhenTheFileCannotBeRead() throws {
         XCTAssertFalse(store.notificationPreferencesAreLocked(), "無い")
 

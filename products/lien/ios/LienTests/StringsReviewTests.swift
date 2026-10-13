@@ -115,9 +115,12 @@ enum StringsCatalog {
         add("Widget.soloCaption", Strings.Widget.soloCaption)
         for name in representativeNames {
             add("Widget.partnerWaiting(\(name))", Strings.Widget.partnerWaiting(name))
+            add("Widget.partnerStatus(\(name), done)", Strings.Widget.partnerStatus(name, done: true))
+            add("Widget.partnerStatus(\(name), pending)", Strings.Widget.partnerStatus(name, done: false))
         }
         for days in representativeDays {
             add("Widget.streakDays(\(days))", Strings.Widget.streakDays(days))
+            add("Widget.streakSpoken(\(days))", Strings.Widget.streakSpoken(days))
         }
 
         // Onboarding
@@ -664,12 +667,16 @@ final class StringsReviewTests: XCTestCase {
         // 代表的な引数が文言に反映されている(引数を無視した固定文言になっていない)
         for name in StringsCatalog.representativeNames {
             XCTAssertTrue(Strings.Widget.partnerWaiting(name).contains(name))
+            // ロック画面・円形の読み上げ(T17a #17): 名前と、完了 / まだ
+            XCTAssertEqual(Strings.Widget.partnerStatus(name, done: true), "\(name): \(Strings.Plant.voiceDone)")
+            XCTAssertEqual(Strings.Widget.partnerStatus(name, done: false), "\(name): \(Strings.Plant.voicePending)")
             XCTAssertTrue(Strings.Home.partnerWaiting(name).contains(name))
             XCTAssertTrue(Strings.PartnerPhoto.caption(name).contains(name))
             XCTAssertTrue(Strings.PartnerPhoto.viewerLabel(name).contains(name))
         }
         for days in StringsCatalog.representativeDays {
             XCTAssertTrue(Strings.Widget.streakDays(days).contains("\(days)"))
+            XCTAssertEqual(Strings.Widget.streakSpoken(days), "\(Strings.Home.streakCaption): \(days)日")
             XCTAssertTrue(Strings.Home.streakDays(days).contains("\(days)"))
             XCTAssertTrue(Strings.Home.streakBestNote(days).contains("\(days)"))
         }

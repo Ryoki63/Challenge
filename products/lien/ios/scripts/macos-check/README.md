@@ -17,6 +17,7 @@ scripts/macos-check/check.sh test PartnerPhotoTests PartnerPhotoNetworkTests   #
 ONLY='PartnerPhotoModel' scripts/macos-check/check.sh test   # "クラス名.メソッド名" の正規表現で絞る
 VERBOSE=1 scripts/macos-check/check.sh test        # PASS の行も出す
 scripts/macos-check/check.sh views                 # SwiftUI の View と AppServices+Live の型検査だけ
+scripts/macos-check/check.sh widget                # LienWidget(WidgetKit の拡張)の型検査だけ
 ```
 
 - 終了コード: 0 = すべて通った / 1 = コンパイルエラー・テスト失敗
@@ -29,13 +30,14 @@ scripts/macos-check/check.sh views                 # SwiftUI の View と AppSer
 |---|---|
 | `build` | `Lien/` のうち UIKit・Supabase・SwiftUI の View に依存しないファイル(約 40 本。モデル・ViewModel・API クライアント・サービス)を、macOS 向けの static ライブラリ **module `Lien`**(`-enable-testing`)としてコンパイルする |
 | `test` | `build` のあと、`LienTests/` のテストを `@testable import Lien` のままコンパイルして走らせる。XCTest は `XCTestShim.swift`(必要な API だけを作り直したもの)で代用する |
+| `widget` | LienWidget ターゲット(WidgetKit の拡張。`LienWidgetBundle` / `LienWidgetEntryView`)を、`project.yml` の `LienWidget` の sources(Swift のファイルとフォルダ)のとおりに集めて、macOS の SDK で**型検査だけ**する。ロック画面の accessory 系ファミリー(`accessoryCircular` / `accessoryInline`)は macOS の SDK に無いので、型検査用のコピーでだけ macOS にあるファミリーへ読み替える(API の使い方の検査には影響しない)。`views` が `Lien/Core/Widget/Views/`(ホーム S / M・ロック画面のビュー)を型検査し、`widget` が WidgetKit の接ぎ手を型検査する |
 | `views` | View(`HomeView` ほか)と `AppServices+Live.swift` を macOS の SDK で**型検査だけ**する。`Colors.swift`(UIKit の色)は macOS の色に書き換えたコピーで、`SupabaseService` / `PushManager` は `stubs/LiveStubs.swift` の代役で、`fullScreenCover` と(設定画面が使う)`PromiseSetupView` は `stubs/ViewShims.swift` の代役で通す。`-strict-concurrency=complete` を付けるので、Swift の並行性の警告(Xcode 26 / Swift 6.3 で出うるもの)も事前に見える |
 
 ## 検査しないもの(`check.sh` の `exclude_from_module` / `EXCLUDE_TESTS`)
 
 - `AppDelegate` / `LienApp` / `RootView` / `SupabaseService` / `PushManager` / `QRCodeGenerator` / Debug の View: UIKit・UserNotifications・supabase-swift・`@main`・iOS 専用 API
-- テスト `AppServicesTests` / `ConfigTests`(`AppServices+Live` を使う)・`PlantRenderTests` / `PlantLayersTests` / `HomeRenderChecksTests` / `NotificationSettingsRenderTests`(アセットカタログ・描画・UIKit のウィンドウと色・`XCTAttachment`)・`DeviceTokenStoreTests` / `QRCodeGeneratorTests` / `SmokeTests`
-- 描画の見た目・実機の挙動・シミュレータ上の UI・ウィジェットと NSE のターゲット: CI と実機(T20)で見る
+- テスト `AppServicesTests` / `ConfigTests`(`AppServices+Live` を使う)・`PlantRenderTests` / `PlantLayersTests` / `HomeRenderChecksTests` / `NotificationSettingsRenderTests` / `WidgetRenderTests`(と、その道具 `WidgetRenderSupport`)(アセットカタログ・描画・UIKit のウィンドウと色・`XCTAttachment`)・`DeviceTokenStoreTests` / `QRCodeGeneratorTests` / `SmokeTests`
+- 描画の見た目・実機の挙動・シミュレータ上の UI・NSE のターゲット: CI と実機(T20)で見る。ウィジェットの WidgetKit の接ぎ手は `widget` で型検査できるが、動かしてはいない(実描画の一覧と画素の検査は CI の `WidgetRenderTests`)
 
 新しいファイルが UIKit などに依存するようになって `build` が落ちたら、`check.sh` の除外に足す(理由をコメントに)。
 `PushAuthorizing`(`PushManager.swift`)や `SupabaseService` の公開面を変えたら、`stubs/` の代役も同じに直す。

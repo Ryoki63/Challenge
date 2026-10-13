@@ -6,6 +6,8 @@
 #   check.sh build            UIKit / Supabase に依存しない部分を macOS 用の module "Lien" としてビルド
 #   check.sh test [名前...]   build して LienTests を走らせる(名前は LienTests/ のファイル名(拡張子なし)。省略で除外以外すべて)
 #   check.sh views            SwiftUI の View と AppServices+Live を macOS の SDK で型検査する(Swift の並行性の厳密な検査つき)
+#   check.sh widget           LienWidget ターゲット(WidgetKit の拡張)を、project.yml の sources のとおりに集めて型検査する
+#                             (ロック画面の accessory 系ファミリーは macOS の SDK に無いので、型検査用のコピーでだけ別のファミリーに読み替える)
 #
 # 環境変数:  ONLY=<正規表現>   test で "クラス名.メソッド名" を絞る(例: ONLY='PartnerPhotoModel')
 #            VERBOSE=1         test で PASS の行も出す
@@ -44,6 +46,7 @@ exclude_from_module() {
     Lien/Core/PushManager.swift) return 0 ;;                # UIKit・UserNotifications(stubs/PushAuthorizingStub.swift が代わり)
     Lien/Core/DesignSystem/Colors.swift) return 0 ;;        # UIKit(views で macOS 用に書き換えて型検査する)
     Lien/Core/DesignSystem/PlantCharacterView.swift) return 0 ;;  # SwiftUI の View
+    Lien/Core/Widget/Views/*) return 0 ;;                   # SwiftUI の View(ウィジェットの S / M / ロック画面。views で型検査する)
     Lien/Features/Debug/*) return 0 ;;                      # UIKit
     Lien/Features/Pairing/QRCodeGenerator.swift) return 0 ;; # UIImage
     Lien/Features/*View.swift|Lien/Features/*Sheet.swift) return 0 ;; # SwiftUI の View
@@ -53,11 +56,11 @@ exclude_from_module() {
 
 # 走らせないテスト(LienTests/ のファイル名)。理由:
 #   AppServicesTests / ConfigTests : AppServices+Live.swift(supabase-swift)を使う
-#   PlantRenderTests / PlantLayersTests / HomeRenderChecksTests / NotificationSettingsRenderTests : アセットカタログ・SwiftUI の描画・UIKit のウィンドウと色・XCTAttachment を使う
+#   PlantRenderTests / PlantLayersTests / HomeRenderChecksTests / NotificationSettingsRenderTests / WidgetRenderTests(と、その道具 WidgetRenderSupport): アセットカタログ・SwiftUI の描画・UIKit のウィンドウと色・XCTAttachment を使う
 #   DeviceTokenStoreTests : AppDelegate.swift(UIKit)を使う
 #   QRCodeGeneratorTests : QRCodeGenerator.swift(UIImage)を使う
 #   SmokeTests : アプリ本体のバンドルの前提
-EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
+EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSupport DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
 
 is_excluded_test() {
   local name="$1" e
@@ -228,6 +231,67 @@ do_views() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# widget: LienWidget ターゲットの型検査(issue #17 T17a)
+# ---------------------------------------------------------------------------------------------
+
+do_widget() {
+  prepare_toolchain || return 1
+
+  # project.yml の LienWidget の sources(Swift のファイルとフォルダ)を、同じ相対パスで作業ディレクトリへ集める。
+  # アセットカタログ(.xcassets)は型検査に要らない
+  local dir="$OUT/widget_src"
+  rm -rf "$dir"
+  mkdir -p "$dir"
+  python3 - "$IOS" "$dir" <<'PY' || return 1
+import io, os, re, shutil, sys
+ios, dest = sys.argv[1], sys.argv[2]
+yml = io.open(os.path.join(ios, "project.yml"), encoding="utf-8").read()
+start = yml.index("\n  LienWidget:\n")
+rest = yml[start + 1:]
+end = re.search(r"\n  [A-Za-z][A-Za-z0-9]*:\n", rest[1:])
+block = rest[: end.start() + 1] if end else rest
+paths = [m.group(1).strip() for m in re.finditer(r"^\s*- path: (.+)$", block, re.M)]
+count = 0
+for rel in paths:
+    if rel.endswith(".xcassets"):
+        continue
+    src = os.path.join(ios, rel)
+    if os.path.isdir(src):
+        for root, _, files in os.walk(src):
+            for f in files:
+                if f.endswith(".swift"):
+                    target = os.path.join(dest, os.path.relpath(os.path.join(root, f), ios))
+                    os.makedirs(os.path.dirname(target), exist_ok=True)
+                    shutil.copyfile(os.path.join(root, f), target)
+                    count += 1
+    elif rel.endswith(".swift"):
+        target = os.path.join(dest, rel)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copyfile(src, target)
+        count += 1
+print("LienWidget の Swift ファイル: %d" % count)
+PY
+
+  # accessory 系(ロック画面)は macOS の SDK に無い。型検査のコピーでだけ、macOS にあるファミリーへ読み替える
+  # (ファミリーの名前を使う箇所だけで、API の使い方の検査には影響しない)
+  local f
+  for f in "$dir"/LienWidget/*.swift; do
+    sed -i '' -e 's/\.accessoryCircular/.systemLarge/g' -e 's/\.accessoryInline/.systemExtraLarge/g' -e 's/\.accessoryRectangular/.systemExtraLarge/g' "$f"
+  done
+
+  local files=()
+  while IFS= read -r f; do files+=("$f"); done < <(find "$dir" -name '*.swift' | sort)
+  swiftc -typecheck -parse-as-library "${COMMON[@]}" -strict-concurrency=complete "${files[@]}" > "$OUT/widget.log" 2>&1
+  local status=$?
+  show_diagnostics "$OUT/widget.log"
+  if [ $status -ne 0 ]; then
+    echo "LienWidget の型検査に失敗(${#files[@]} ファイル)" >&2
+    return 1
+  fi
+  echo "widget OK(${#files[@]} ファイル。ロック画面のファミリーは読み替えた型検査。上に出た warning は、この変更で増えていないか確かめる)"
+}
+
+# ---------------------------------------------------------------------------------------------
 
 cmd="${1:-all}"
 [ $# -gt 0 ] && shift
@@ -235,14 +299,15 @@ case "$cmd" in
   build) do_build ;;
   test) do_test "$@" ;;
   views) do_views ;;
+  widget) do_widget ;;
   all)
-    do_test && do_views
+    do_test && do_views && do_widget
     ;;
   -h|--help|help)
     sed -n '2,15p' "$0"
     ;;
   *)
-    echo "使い方: check.sh [all|build|test [名前...]|views]" >&2
+    echo "使い方: check.sh [all|build|test [名前...]|views|widget]" >&2
     exit 1
     ;;
 esac
