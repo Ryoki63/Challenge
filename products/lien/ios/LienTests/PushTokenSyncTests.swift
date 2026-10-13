@@ -8,6 +8,8 @@
 //   - push_env は注入した環境(このビルドの環境を署名から決める判定は PushEnvironmentTests)
 //   - サーバー側のずれの検知(issue #62): サーバーが 410 / BadDeviceToken で push_token を null にした後でも、
 //     コールドスタート時と(間隔をあけた)前面復帰時に自分の users 行を読んで、ずれていれば送り直す
+//   - 再入(PB #57 の持ち越し): 送信の最中(通信を待っている間)に、別のトリガー(トークンの更新・セッションの変化・前面復帰)が
+//     来ても、二重に送らず、走っている flush が送信後に最新の宛先を再評価して拾う(actor は await のたびに割り込みを受ける)
 
 import XCTest
 @testable import Lien
@@ -53,6 +55,33 @@ private final class MockRegistrar: PushRegistrationUpdating {
         clearCount += 1
         if clearFails { throw Offline() }
         serverRegistration = ServerPushRegistration(token: nil, environment: nil)
+    }
+}
+
+/// 最初の updatePushRegistration を、gate が開くまで止めるモック(送信の最中に別の更新が割り込む再入の検証用)。
+/// 呼び出しの記録はロックで守る(actor の実行場所と、テストの側の両方から読み書きされる)
+private final class GatedRegistrar: PushRegistrationUpdating {
+    let gate = AsyncGate()
+    private let lock = NSLock()
+    private var recorded: [(token: String, environment: PushEnvironment)] = []
+    private var server = ServerPushRegistration(token: nil, environment: nil)
+
+    var calls: [(token: String, environment: PushEnvironment)] {
+        lock.withLock { recorded }
+    }
+
+    func updatePushRegistration(token: String, environment: PushEnvironment) async throws {
+        let isFirst = lock.withLock { () -> Bool in
+            recorded.append((token, environment))
+            return recorded.count == 1
+        }
+        // 最初の1回だけ、通信の最中のように止める
+        if isFirst { await gate.wait() }
+        lock.withLock { server = ServerPushRegistration(token: token, environment: environment) }
+    }
+
+    func fetchPushRegistration() async throws -> ServerPushRegistration {
+        lock.withLock { server }
     }
 }
 
@@ -447,6 +476,93 @@ final class PushTokenSyncTests: XCTestCase {
         clock.advance(-3600) // 端末の時計が過去に戻った
         await relaunched.flush()
         XCTAssertEqual(registrar.fetchCount, 2, "時計が戻っても確認が止まり続けない")
+    }
+
+    // MARK: 再入(送信の最中に別のトリガーが来る)
+
+    func testTokenUpdatedWhileASendIsInFlightIsPickedUpByTheRunningFlush() async {
+        // PushTokenSync は actor で、通信を待つ await のたびに別の呼び出しが割り込める。
+        // 送信中にトークンが更新されたとき、割り込んだ flush は(送信中なので)すぐ戻り、
+        // 走っている flush が送信のあとで最新の宛先を読み直して送る
+        let registrar = GatedRegistrar()
+        let session = SessionBox()
+        session.userID = UUID()
+        let ledger = InMemoryPushRegistrationLedger()
+        let sync = PushTokenSync(
+            registrar: registrar,
+            currentUserID: { session.userID },
+            environment: .sandbox,
+            ledger: ledger
+        )
+
+        let first = Task { await sync.receive(token: "aabbcc") }
+        await waitUntil { registrar.calls.count == 1 } // 1回目の送信が、通信の最中で止まっている
+        XCTAssertNil(ledger.lastSynced, "送信が終わるまで、記録は空")
+
+        await sync.receive(token: "ddeeff") // 送信中に、APNs がトークンを更新した
+        XCTAssertEqual(registrar.calls.map(\.token), ["aabbcc"], "割り込んだ呼び出しは、二重に送らない")
+
+        registrar.gate.open() // 1回目の通信が終わる
+        await first.value
+
+        XCTAssertEqual(registrar.calls.map(\.token), ["aabbcc", "ddeeff"], "走っている flush が、最新のトークンを続けて送る")
+        XCTAssertEqual(ledger.lastSynced?.token, "ddeeff", "最後に送れた登録が記録される")
+    }
+
+    func testDuplicateTriggersWhileASendIsInFlightDoNotSendTwice() async {
+        let registrar = GatedRegistrar()
+        let session = SessionBox()
+        session.userID = UUID()
+        let ledger = InMemoryPushRegistrationLedger()
+        let sync = PushTokenSync(
+            registrar: registrar,
+            currentUserID: { session.userID },
+            environment: .sandbox,
+            ledger: ledger
+        )
+
+        let first = Task { await sync.receive(token: "aabbcc") }
+        await waitUntil { registrar.calls.count == 1 }
+
+        // 前面復帰・セッションの確立・同じトークンの再通知が、送信の最中に重なる
+        await sync.flush()
+        await sync.sessionDidChange()
+        await sync.receive(token: "aabbcc")
+        XCTAssertEqual(registrar.calls.count, 1)
+
+        registrar.gate.open()
+        await first.value
+
+        XCTAssertEqual(registrar.calls.map(\.token), ["aabbcc"], "同じ内容は1回だけ")
+        XCTAssertEqual(ledger.lastSynced?.token, "aabbcc")
+    }
+
+    func testUserChangedWhileASendIsInFlightIsSentForTheNewUser() async {
+        // 送信の最中に、匿名ユーザーが作り直された(アカウントの削除 → 新しいアカウント)。
+        // 古いユーザーの送信が終わったあと、同じトークンを新しいユーザーの行へも送る
+        let registrar = GatedRegistrar()
+        let session = SessionBox()
+        let oldUser = UUID()
+        session.userID = oldUser
+        let ledger = InMemoryPushRegistrationLedger()
+        let sync = PushTokenSync(
+            registrar: registrar,
+            currentUserID: { session.userID },
+            environment: .sandbox,
+            ledger: ledger
+        )
+
+        let first = Task { await sync.receive(token: "aabbcc") }
+        await waitUntil { registrar.calls.count == 1 }
+        let newUser = UUID()
+        session.userID = newUser
+        await sync.sessionDidChange() // 送信中なので、すぐ戻る
+
+        registrar.gate.open()
+        await first.value
+
+        XCTAssertEqual(registrar.calls.count, 2, "新しいユーザーのぶんも送る")
+        XCTAssertEqual(ledger.lastSynced?.userID, newUser.uuidString.lowercased())
     }
 
     // MARK: 環境の語彙(判定そのものは PushEnvironmentTests)

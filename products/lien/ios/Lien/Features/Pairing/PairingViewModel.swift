@@ -3,7 +3,7 @@
 // - 発行: issueInvite() → idle/loading/issued。issued でリンク共有・QR・コード表示の3導線を出す
 // - 受諾: acceptInvite() → 8文字形式はクライアントで先に検証(不正形式はサーバーへ送らない —
 //   invite-accept/core.ts も同じ判定で 400 を返す)。成功で snapshot を App Group へ保存し
-//   onPaired → ルートが .paired へ
+//   onPaired → AppModel.pairingSucceeded が phase を導き直す(.solo → .paired。招待シートは自動で閉じる)
 // - エラーは InviteClientError → Strings.Pairing の文言へ変換(罰・恥系の表現は使わない)
 
 import Foundation

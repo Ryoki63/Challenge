@@ -31,7 +31,9 @@ struct NudgeResponse: Equatable, Sendable, Codable {
 
 /// POST /react の 200 応答(react/core.ts ReactResult.body)
 struct ReactResponse: Equatable, Sendable, Codable {
-    /// 新規 or スタンプ変更で push を送った場合 true。同一スタンプの再送(無変更)は false
+    /// 保存内容が変わったか(新規・別のスタンプへの付け替え = true / 同じスタンプの再送 = false)。
+    /// push を送ったかとは別: サーバーは push を**最初のリアクションの1回だけ**に絞っている
+    /// (付け替えでは changed が true でも push を送らない — DESIGN §5.3 の react の行)
     let changed: Bool
 }
 

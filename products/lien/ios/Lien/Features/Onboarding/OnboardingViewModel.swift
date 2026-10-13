@@ -1,6 +1,7 @@
 // OnboardingViewModel.swift — オンボーディング3画面の状態管理(T10 / REQUIREMENTS §3.1, §6)
 //
-// - 遷移: concept → nickname → notification(完了で onFinished → ルートが .solo へ)
+// - 遷移: concept → nickname → notification(完了で onFinished → ルートが約束設定(.promiseSetup)へ。
+//   約束を決めてから、ソロのホーム(.solo)に着く — AppRouter / DESIGN §3.3)
 // - 認証は AuthServicing 経由(実体は SupabaseService / Config 未設定時 StubAuthService /
 //   テストはモック)。通知許可は PushAuthorizing 経由
 // - ニックネーム検証は DB の check 制約 char_length(Unicode コードポイント数)に合わせて

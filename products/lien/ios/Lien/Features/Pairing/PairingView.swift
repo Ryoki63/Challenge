@@ -1,6 +1,7 @@
 // PairingView.swift — 招待画面(T11 / REQUIREMENTS §3.2 / DESIGN §6)
 //
-// solo 系統のルート画面。招待の3導線(リンク共有 / QR 表示 / 8文字コード手入力)を1画面に置く。
+// ソロのホームから開くシート(RootView の PairingSheet。ディープリンクのコードがあれば自動で開く — DESIGN §3.6)。
+// 招待の3導線(リンク共有 / QR 表示 / 8文字コード手入力)を1画面に置く。
 // 文言は Strings.Pairing に集約(View 内に直書きしない — DESIGN §3.8)。
 // QR には webUrl をエンコードする(アプリ未所持の相手でも静的ページ経由で誘導できる。
 // アプリ所持済みなら静的ページの「アプリで開く」→ lien:// で合流 — DESIGN §6)。
@@ -52,9 +53,10 @@ struct PairingView: View {
         .onChange(of: pendingInviteToken) { consumePendingToken() }
     }
 
-    /// ディープリンクのコードを入力欄へプリフィルする(自動送信はしない — 受諾は明示のタップ。
-    /// DESIGN §3.6 は「onOpenURL → invite-accept 自動呼び出し」だが、ペア解消(T23)が入るまでは
-    /// 取り消せないため据え置き。実機 E2E の結果で変更する余地を followups に残してある)
+    /// ディープリンクのコードを入力欄へプリフィルする(自動送信はしない — 受諾は明示のタップ)。
+    /// DESIGN §3.6 の決定(2026-10-13・issue #61): リンクを開いただけ・誤って開いただけでペアが成立すると戻せないことと、
+    /// 招待した人の名前は受諾の応答で初めて分かる(リンクの中には無い)ので受諾の前に確認の一歩を置くこと。
+    /// ペア解消(T23)は入ったが、自動受諾へ戻すかは実機 E2E の結果で判断する(戻すなら DESIGN §3.6 と同時に直す)
     private func consumePendingToken() {
         guard let token = pendingInviteToken else { return }
         viewModel.prefill(token: token)

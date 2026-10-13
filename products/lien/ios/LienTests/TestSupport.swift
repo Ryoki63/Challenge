@@ -164,6 +164,39 @@ func waitUntil(timeout: TimeInterval = 15, _ condition: () -> Bool) async {
     }
 }
 
+// MARK: - 非同期処理を途中で止めておく門
+
+/// テストが、非同期処理を途中(通信の最中など)で止めておくための門。open() するまで wait() が返らない。
+/// 止まっている間の状態を観測してから open() で先へ進める(割り込みの再入のテストなど)。
+/// wait() が止まる前に open() が呼ばれても、取りこぼさず、すぐ返る(ロックで守っている)
+final class AsyncGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var isOpen = false
+
+    func wait() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            if isOpen {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                self.continuation = continuation
+                lock.unlock()
+            }
+        }
+    }
+
+    func open() {
+        lock.lock()
+        isOpen = true
+        let waiting = continuation
+        continuation = nil
+        lock.unlock()
+        waiting?.resume()
+    }
+}
+
 // MARK: - temp dir ストア
 
 struct TempStore {
