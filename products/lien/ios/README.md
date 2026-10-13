@@ -131,9 +131,15 @@ xcodebuild test -project Lien.xcodeproj -scheme Lien \
 ```sh
 gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=true    # まず無署名 archive と検査だけ
 gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false   # 署名して TestFlight へ
+gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false -f internal_only=true   # G4・Pages 公開の前に、内部 TestFlight だけに使うとき
 ```
 
 - `dry_run=false` で secrets が 1 つでも足りないと、最初のステップで**足りない名前を出して止まる**
+- `dry_run=false` では、**運営者の連絡先と法務ページが揃っていないと止まる**(`scripts/check_release_inputs.py`): `SupportLinks.contactEmail` が空でない・
+  利用規約とプライバシーポリシーの公開先(`SupportLinks.termsURL` / `privacyURL`)が HTTP 200。審査員と利用者が連絡できる・規約を読めることが前提のため
+  (G4 #42 の連絡先の確定と、Pages 公開 — TASKPLAN §9.2 — が済むまでは止まる)。
+  **G4・Pages 公開の前に、内部 TestFlight だけに使うビルド(T28a の最初のアップロードなど)を上げるときは `-f internal_only=true` を付ける**
+  (止めずに注意として step summary に残る。そのビルドは外部テスト・審査に使わない)。dry-run は常に止めずに結果を表示する
 - archive のあと `scripts/verify_archive.py` が次を**アップロード前に**検査し、1 つでも NG なら止まる:
   Bundle ID(3 バンドル)・版とビルド番号の一致・最低 OS 17.0・iOS 26 SDK・AppIcon・PrivacyInfo.xcprivacy が 3 バンドルに入っていること・
   **Info.plist に Supabase の URL と anon キーが入っていること**(service_role / secret キーなら拒否)
@@ -150,6 +156,7 @@ gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false   # �
 | `supabase_config.py` | 接続情報の検証・`Secrets.xcconfig` の生成・Info.plist の検査 |
 | `release.sh` | `xcodebuild archive` / `-exportArchive`(`RELEASE_PRINT_ONLY=1` でコマンドの表示のみ) |
 | `verify_archive.py` | `.xcarchive` のアップロード前検査 |
+| `check_release_inputs.py` | リリース前に、運営者の連絡先(`SupportLinks.contactEmail`)と法務ページの公開(HTTP 200)を確かめる(§8.2) |
 | `scan_required_reason_apis.py` | 出来上がったバイナリの必須理由 API の棚卸し |
 | `export_attachments.py` | xcresult のテスト添付(植物の実描画の一覧画像)を、読みやすい名前の PNG として取り出す(§10) |
 | `macos-check/check.sh` | Xcode 無しの Mac で、Foundation 系のコードの macOS ビルド・LienTests の実行・View の型検査をする push 前の下見(§1。[README](scripts/macos-check/README.md)) |

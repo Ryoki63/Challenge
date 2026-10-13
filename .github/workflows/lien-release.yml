@@ -11,6 +11,9 @@
 #       lien-ios は ios などが変わった push でだけ起動するので、ios 以外だけのコミットで実行が無いときは、
 #       Actions の lien-ios を手動実行してから、もう一度この workflow を実行する。
 #       dry_run = true でも同じ確認を通して結果を表示する(止めない)ので、権限や API の呼び方の不具合は dry-run で見つかる
+#       さらに、外向きの入力(運営者の連絡先 SupportLinks.contactEmail が空でない・規約とプライバシーポリシーのページが HTTP 200)を
+#       確かめ、揃っていなければ止まる(issue #23 のレビュー指摘。ios/scripts/check_release_inputs.py)。G4(#42)・Pages 公開の前に、
+#       内部 TestFlight だけに使うビルドを上げるときは `internal_only = true` にする(止めずに注意として残す。外部テスト・審査には使えない)
 #
 # 必要な GitHub secrets(リポジトリ Settings > Secrets and variables > Actions。G0 のあとに人間が登録 — ios/README.md):
 #   ASC_KEY_P8          App Store Connect API キー(.p8)の中身(BEGIN PRIVATE KEY … 。base64 にしたものでも可)
@@ -35,6 +38,10 @@ on:
         description: "true = 無署名 archive まで(署名・アップロードしない)/ false = 署名して TestFlight へアップロード"
         type: boolean
         default: true
+      internal_only:
+        description: "true = 内部 TestFlight だけに使うビルド。運営者の連絡先・規約ページが未整備でも止めない(外部テスト・審査には使えない)/ false(既定)= 揃っていなければ止める"
+        type: boolean
+        default: false
 
 concurrency:
   group: lien-release
@@ -54,6 +61,7 @@ jobs:
         working-directory: products/lien/ios
     env:
       DRY_RUN: ${{ inputs.dry_run }}
+      INTERNAL_ONLY: ${{ inputs.internal_only }}
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - name: Checkout
@@ -121,6 +129,17 @@ jobs:
           args=(--repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA" --workflow lien-ios.yml --workflow lien-ci.yml --summary "$GITHUB_STEP_SUMMARY")
           if [ "$DRY_RUN" != "true" ]; then args+=(--require); fi
           python3 scripts/ci_status.py "${args[@]}"
+
+      # 外向きの入力が揃っているか: 運営者の連絡先(SupportLinks.contactEmail)が空でない・規約とプライバシーポリシーのページが
+      # HTTP 200(issue #23 のレビュー指摘。審査員と利用者が連絡できる・規約を読める、が前提)。
+      #   dry_run=false かつ internal_only=false: 揃っていなければここで止まる
+      #   それ以外(dry_run=true、または internal_only=true): 結果と注意を表示するだけで止めない
+      #     (internal_only は G4・Pages 公開の前の、内部 TestFlight だけに使うビルド用。外部テスト・審査には使えない)
+      - name: Preflight (support contact and legal pages)
+        run: |
+          args=(--summary "$GITHUB_STEP_SUMMARY")
+          if [ "$DRY_RUN" != "true" ] && [ "$INTERNAL_ONLY" != "true" ]; then args+=(--require); fi
+          python3 scripts/check_release_inputs.py "${args[@]}"
 
       # ios/.xcode-version の Xcode に切り替え、iOS 26 SDK 以上であることを確かめる(lien-ios と共通)
       - name: Select Xcode (pinned) + iOS 26 SDK check
