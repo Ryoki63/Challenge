@@ -60,6 +60,22 @@ export const PHOTO_1: Uint8Array<ArrayBuffer> = decode(PHOTO_1_B64);
 export const PHOTO_2: Uint8Array<ArrayBuffer> = decode(PHOTO_2_B64);
 export const THUMB: Uint8Array<ArrayBuffer> = decode(THUMB_B64);
 
+/**
+ * photos バケットの file_size_limit(6 MiB。migration 0008。アプリが受け取る原寸の上限 PartnerPhotoLimits.original と同じ)。
+ * これを 1 バイトでも超えるファイルは、署名付きアップロードでも断られる
+ */
+export const PHOTO_LIMIT_BYTES = 6 * 1024 * 1024;
+
+/** 上限を 1 バイトだけ超える、JPEG の見た目のバイト列(先頭は JPEG の SOI。中身に意味はない)。上限超えの確認用 */
+export function oversizedJpegLike(): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(PHOTO_LIMIT_BYTES + 1);
+  out.set([0xff, 0xd8, 0xff, 0xe0]);
+  return out;
+}
+
+/** PNG のシグネチャ(89 50 4E 47 0D 0A 1A 0A)と IHDR の長さで始まる小さなバイト列。JPEG 以外の画像(許可する MIME タイプの確認用) */
+export const PNG_LIKE: Uint8Array<ArrayBuffer> = decode("iVBORw0KGgoAAAAN");
+
 /** JPEG の先頭 3 バイト(FF D8 FF)か */
 export function looksLikeJpeg(bytes: Uint8Array): boolean {
   return bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 &&

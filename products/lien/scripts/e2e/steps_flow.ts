@@ -2,7 +2,15 @@
 //
 // 手順の流れ・守ること・登場人物は scenario.ts。共有の型と道具は scenario_lib.ts。
 
-import { looksLikeJpeg, PHOTO_1, PHOTO_2, sha256Hex, THUMB } from "./images.ts";
+import {
+  looksLikeJpeg,
+  oversizedJpegLike,
+  PHOTO_1,
+  PHOTO_2,
+  PNG_LIKE,
+  sha256Hex,
+  THUMB,
+} from "./images.ts";
 import { Abort, redact } from "./report.ts";
 import { jsonEqual } from "./shape.ts";
 import {
@@ -16,6 +24,7 @@ import {
   partnerRowsQuery,
   signFailureProblems,
   tamperSignedUrl,
+  UPLOAD_REJECTED_STATUS,
   UUID_RE,
   viaSignedUrl,
   type World,
@@ -45,11 +54,13 @@ export async function stepsFlow(c: Ctx, w: World): Promise<void> {
         plantMood: "normal",
         plantName: null,
         hasPartnerPhotoToday: false,
+        // お休みチケットの残数(issue #19): 初期付与の 2 枚。ペアの2人に同じ値が見える
+        ticketBalance: 2,
       };
       const sa = await getSnapshot(c, a, "A");
       expectFields(
         c,
-        "A: 成立直後の値(新キー plantGrownDays / plantStageFloor / plantNextStageAt を含む)",
+        "A: 成立直後の値(新キー plantGrownDays / plantStageFloor / plantNextStageAt / ticketBalance を含む)",
         sa,
         {
           ...base,
@@ -214,6 +225,67 @@ export async function stepsFlow(c: Ctx, w: World): Promise<void> {
         "A: 差し替え後の photoPath 付き再送 → 200・alreadyCheckedIn = true",
         fin2.status === 200 && obj(fin2.json).alreadyCheckedIn === true,
         brief(fin2),
+      );
+
+      // 4b. バケットの制限(migration 0008): 上限(6 MiB)を超えるファイルと JPEG 以外は、署名付きアップロードでも断られる。
+      //     断られ方は、署名の発行の失敗(S12)と同じく **HTTP 400 + 本文の statusCode / error**(HTTP ステータスは 413 / 415 でない。
+      //     本番の実測 2026-10-13)。断られたあとも置いてある写真(差し替え後の PHOTO_2)は変わらない(S12 が SHA-256 で確かめる)。
+      //     試すたびに新しい署名付き URL を受け取る(失敗が署名の使い回しのせいでないことを分けるため)
+      const rejectedUpload = async (
+        name: string,
+        bytes: Uint8Array<ArrayBuffer>,
+        contentType: string,
+        expected: { statusCode: string; error: string },
+      ) => {
+        const fresh = await api.fn(a.jwt, "checkin", "POST", {
+          json: { dateLocal: today, requestPhotoUpload: true },
+        });
+        const target = obj(obj(obj(fresh.json).photoUpload).photo);
+        if (
+          fresh.status !== 200 || typeof target.token !== "string" ||
+          target.path !== d.photoPath
+        ) {
+          rep.fail(
+            name,
+            `署名付きアップロード URL を受け取れない: ${brief(fresh)}`,
+          );
+          return;
+        }
+        const r = await api.signedUpload(
+          String(target.path),
+          String(target.token),
+          bytes,
+          { "Content-Type": contentType },
+        );
+        const body = obj(r.json);
+        rep.check(
+          name,
+          r.status === UPLOAD_REJECTED_STATUS &&
+            body.statusCode === expected.statusCode &&
+            body.error === expected.error,
+          `期待 HTTP ${UPLOAD_REJECTED_STATUS}・statusCode ${expected.statusCode}・error ${expected.error}、実際 ${
+            brief(r)
+          }`,
+          `HTTP ${r.status} statusCode ${body.statusCode} ${body.error}`,
+        );
+      };
+      await rejectedUpload(
+        "A: 上限(6 MiB)を 1 バイト超える JPEG は断られる(Payload too large)",
+        oversizedJpegLike(),
+        "image/jpeg",
+        { statusCode: "413", error: "Payload too large" },
+      );
+      await rejectedUpload(
+        "A: PNG(Content-Type: image/png)は断られる(invalid_mime_type)",
+        PNG_LIKE,
+        "image/png",
+        { statusCode: "415", error: "invalid_mime_type" },
+      );
+      await rejectedUpload(
+        "A: JPEG の中身でも Content-Type が application/octet-stream なら断られる(invalid_mime_type)",
+        PHOTO_1,
+        "application/octet-stream",
+        { statusCode: "415", error: "invalid_mime_type" },
       );
 
       // 5. photoPath の規約違反は 400(本人の原寸パス以外は受け付けない)
@@ -808,6 +880,7 @@ export async function stepsFlow(c: Ctx, w: World): Promise<void> {
         "plantNextStageAt",
         "plantMood",
         "plantName",
+        "ticketBalance",
       ];
       const diffs = shared.filter((k) => !jsonEqual(sa[k], sb[k]));
       rep.check(

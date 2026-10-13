@@ -21,6 +21,11 @@ import type {
 import type { StreakDayKind, StreakDayRecord } from "../_shared/streak.ts";
 import { createPusher } from "../_shared/pusher.ts";
 import {
+  ACTIVE_PAIR_SELECT,
+  type PairDbRow,
+  toSnapshotPair,
+} from "../_shared/pair_rows.ts";
+import {
   PARTNER_SELECT,
   toSnapshotUser,
   USER_COLUMNS,
@@ -58,16 +63,13 @@ function makeRepo(db: SupabaseClient): CheckinRepo {
     async getActivePair(userId: string): Promise<SnapshotPairRow | null> {
       const { data: membership, error: e1 } = await db
         .from("pair_members")
-        .select("pair_id, pairs!inner(id, status, started_on)")
+        .select(ACTIVE_PAIR_SELECT)
         .eq("user_id", userId)
         .eq("pairs.status", "active")
         .maybeSingle();
       if (e1) throw e1;
       if (!membership) return null;
-      const pair = membership.pairs as unknown as {
-        id: string;
-        started_on: string;
-      };
+      const pair = membership.pairs as unknown as PairDbRow;
       const { data: partnerRow, error: e2 } = await db
         .from("pair_members")
         .select(PARTNER_SELECT)
@@ -76,11 +78,10 @@ function makeRepo(db: SupabaseClient): CheckinRepo {
         .maybeSingle();
       if (e2) throw e2;
       if (!partnerRow) return null;
-      return {
-        pairId: pair.id,
-        startedOn: pair.started_on,
-        partner: toSnapshotUser(partnerRow.users as unknown as UserDbRow),
-      };
+      return toSnapshotPair(
+        pair,
+        toSnapshotUser(partnerRow.users as unknown as UserDbRow),
+      );
     },
 
     async getCheckin(
@@ -124,6 +125,7 @@ function makeRepo(db: SupabaseClient): CheckinRepo {
     async upsertCheckin(params): Promise<{
       created: boolean;
       photoUpdated: boolean;
+      previousPhotoPath?: string | null;
     }> {
       // UNIQUE(user_id, date_local)。重複は無視して created を判定(DESIGN §5.5 冪等)
       const { data: inserted, error: e1 } = await db
@@ -161,7 +163,21 @@ function makeRepo(db: SupabaseClient): CheckinRepo {
         .update({ photo_path: params.photoPath })
         .eq("id", existing.id);
       if (e3) throw e3;
-      return { created: false, photoUpdated: true };
+      // 更新前の photo_path も返す: どの行からも指されなくなった古い実体の掃除に使う(issue #68)
+      return {
+        created: false,
+        photoUpdated: true,
+        previousPhotoPath: typeof existing.photo_path === "string"
+          ? existing.photo_path
+          : null,
+      };
+    },
+
+    async removePhotos(paths: string[]): Promise<void> {
+      // service role で消す(クライアントには delete を許さない — migration 0002 / DESIGN §5.2)。
+      // 存在しないキーは無視される(エラーにならない)
+      const { error } = await db.storage.from("photos").remove(paths);
+      if (error) throw error;
     },
 
     async createSignedUploadUrl(path: string): Promise<{ token: string }> {

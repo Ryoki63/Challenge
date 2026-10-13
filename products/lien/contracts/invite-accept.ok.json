@@ -19,6 +19,7 @@
     "plantNextStageAt": 1,
     "plantMood": "normal",
     "plantName": null,
-    "hasPartnerPhotoToday": false
+    "hasPartnerPhotoToday": false,
+    "ticketBalance": 2
   }
 }

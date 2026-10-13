@@ -93,8 +93,13 @@ class World {
     },
   ];
   promises = new Map<string, { id: string; title: string; emoji: string }>();
-  pair: { pairId: string; startedOn: string; memberIds: string[] } | null =
-    null;
+  pair: {
+    pairId: string;
+    startedOn: string;
+    memberIds: string[];
+    /** pairs.ticket_balance(ペア共有のお休みチケットの残数) */
+    ticketBalance: number;
+  } | null = null;
   checkins: CheckinRow[] = [];
   streakDays: Array<{ dateLocal: string; kind: "both" | "ticket" }> = [];
   plant: { grownDays: number; name: string | null } | null = null;
@@ -121,6 +126,8 @@ class World {
         pairId: PAIR_ID,
         startedOn: "2026-06-01",
         memberIds: [USER_ME, USER_PARTNER],
+        // 無料プランの月次付与(2枚)のまま。この世界ではチケットを使った日が無い(issue #19: snapshot の ticketBalance)
+        ticketBalance: 2,
       };
       this.streakDays = [
         "2026-06-05",
@@ -169,6 +176,7 @@ class World {
     return Promise.resolve({
       pairId: this.pair.pairId,
       startedOn: this.pair.startedOn,
+      ticketBalance: this.pair.ticketBalance,
       partner: this.users.find((u) => u.id === partnerId)!,
     });
   }
@@ -202,8 +210,13 @@ class World {
       return Promise.resolve({ created: true, photoUpdated: false });
     }
     if (p.photoPath !== null && existing.photoPath !== p.photoPath) {
+      const previousPhotoPath = existing.photoPath;
       existing.photoPath = p.photoPath;
-      return Promise.resolve({ created: false, photoUpdated: true });
+      return Promise.resolve({
+        created: false,
+        photoUpdated: true,
+        previousPhotoPath,
+      });
     }
     return Promise.resolve({ created: false, photoUpdated: false });
   }
@@ -217,11 +230,17 @@ class World {
 
   // -- CheckinCancelRepo --
   deleteCheckin(p: { userId: string; dateLocal: string }) {
+    const row = this.checkins.find((c) =>
+      c.userId === p.userId && c.dateLocal === p.dateLocal
+    );
     const before = this.checkins.length;
     this.checkins = this.checkins.filter((c) =>
       !(c.userId === p.userId && c.dateLocal === p.dateLocal)
     );
-    return Promise.resolve({ deleted: this.checkins.length < before });
+    return Promise.resolve({
+      deleted: this.checkins.length < before,
+      photoPath: row?.photoPath ?? null,
+    });
   }
 
   // -- PromiseSetRepo --
@@ -294,8 +313,13 @@ class World {
     row.usedAtIso = usedAtIso;
     return Promise.resolve(true);
   }
-  createPair(p: { startedOn: string }) {
-    this.pair = { pairId: PAIR_ID, startedOn: p.startedOn, memberIds: [] };
+  createPair(p: { startedOn: string; ticketBalance: number }) {
+    this.pair = {
+      pairId: PAIR_ID,
+      startedOn: p.startedOn,
+      memberIds: [],
+      ticketBalance: p.ticketBalance, // 初期付与(無料プランは 2 枚)
+    };
     return Promise.resolve({ pairId: PAIR_ID });
   }
   addPairMembers(_pairId: string, userIds: string[]) {
@@ -332,7 +356,7 @@ class World {
     return Promise.resolve(had);
   }
 
-  // -- DeleteAccountRepo --
+  // -- DeleteAccountRepo(removePhotos は checkin / checkin-cancel の Repo と同じ署名。issue #68)--
   removedPhotoPaths: string[] = [];
   listMemberships(_userId: string) {
     // 解消後の呼び出しなので、ペアは解消済みの形で返る(delete-account/core.ts の順序と同じ)

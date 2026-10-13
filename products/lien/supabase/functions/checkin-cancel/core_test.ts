@@ -3,6 +3,7 @@
 //        / REQUIREMENTS §3.4「取り消しは当日中のみ可」
 
 import {
+  cancelledPhotoPaths,
   type CheckinCancelRepo,
   handleCheckinCancel,
   type Pusher,
@@ -51,11 +52,24 @@ interface World {
   users: SnapshotUserRow[];
   promises: Record<string, SnapshotPromiseRow>; // userId → 現役の約束
   pair:
-    | { pairId: string; startedOn: string; memberIds: [string, string] }
+    | {
+      pairId: string;
+      startedOn: string;
+      memberIds: [string, string];
+      ticketBalance?: number;
+    }
     | null;
   checkins: Map<string, { photoPath: string | null }>; // key: `${userId}|${dateLocal}`
   streakDays: StreakDayRecord[];
   plant: SnapshotPlantRow | null;
+  /** Storage の photos バケットにあるオブジェクトのキー(removePhotos で消える) */
+  storage: Set<string>;
+  /** removePhotos の呼び出し(引数のパス)を順に記録する */
+  removeCalls: string[][];
+  /** true なら removePhotos が失敗する(Storage の障害) */
+  removeFails: boolean;
+  /** 操作の順序の記録("remove" / "push") */
+  events: string[];
 }
 
 function makeRepo(world: World): CheckinCancelRepo {
@@ -72,6 +86,7 @@ function makeRepo(world: World): CheckinCancelRepo {
       return Promise.resolve({
         pairId: world.pair.pairId,
         startedOn: world.pair.startedOn,
+        ticketBalance: world.pair.ticketBalance,
         partner,
       });
     },
@@ -81,8 +96,18 @@ function makeRepo(world: World): CheckinCancelRepo {
     getPlant: () => Promise.resolve(world.plant),
     deleteCheckin: (params) => {
       const key = `${params.userId}|${params.dateLocal}`;
+      const row = world.checkins.get(key);
       const deleted = world.checkins.delete(key);
-      return Promise.resolve({ deleted });
+      return Promise.resolve({ deleted, photoPath: row?.photoPath ?? null });
+    },
+    removePhotos: (paths) => {
+      world.events.push("remove");
+      world.removeCalls.push([...paths]);
+      if (world.removeFails) {
+        return Promise.reject(new Error("storage down"));
+      }
+      for (const path of paths) world.storage.delete(path); // 存在しないキーは無視
+      return Promise.resolve();
     },
   };
 }
@@ -95,12 +120,14 @@ interface SentPush {
 
 function makePusher(
   behavior: "ok" | "fail" | "throw" = "ok",
+  events?: string[],
 ): { sent: SentPush[]; pusher: Pusher } {
   const sent: SentPush[] = [];
   return {
     sent,
     pusher: {
       send: (deviceToken, payload, opts) => {
+        events?.push("push");
         sent.push({ deviceToken, payload, opts });
         if (behavior === "throw") {
           return Promise.reject(new Error("apns down"));
@@ -144,6 +171,7 @@ function makeWorld(overrides: Partial<World> = {}): World {
       pairId: "pair-1",
       startedOn: "2026-06-01",
       memberIds: ["user-a", "user-b"],
+      ticketBalance: 2,
     },
     checkins: new Map(),
     // 確定済みの連続5日(6/5〜6/9)+途切れた前の1日(6/2)= ふたり達成 6 回(わかば(7回)の一歩手前)。
@@ -158,6 +186,10 @@ function makeWorld(overrides: Partial<World> = {}): World {
     ),
     // grown_days は控え。snapshot は読まない(わざと行数と違う値にして、読んでいないことを検知する)
     plant: { grownDays: 99, name: "みどり" },
+    storage: new Set(),
+    removeCalls: [],
+    removeFails: false,
+    events: [],
     ...overrides,
   };
 }
@@ -203,6 +235,7 @@ Deno.test("checkin-cancel: 当日削除成功 — 削除後snapshot返却+相手
     plantMood: "normal",
     plantName: "みどり",
     hasPartnerPhotoToday: false,
+    ticketBalance: 2,
   };
   assertEquals(result.body.snapshot, expectedMine, "自分用 snapshot(削除後)");
 
@@ -385,6 +418,7 @@ Deno.test("checkin-cancel: ソロ状態(未ペア)でも自分のcheckin削除�
     plantMood: "normal",
     plantName: null,
     hasPartnerPhotoToday: false,
+    ticketBalance: null,
   };
   assertEquals(result.body.snapshot, expected, "ソロ snapshot");
   assertEquals(sent.length, 0, "ソロは push 先がない");
@@ -480,4 +514,343 @@ Deno.test("checkin-cancel: 相手の push_env を、サイレント push の送�
     assertEquals(sent[0].deviceToken, "token-b");
     assertEquals(sent[0].opts, expected, `push_env=${pushEnv}`);
   }
+});
+
+// ---- 写真の実体の削除(issue #68。DESIGN §5.2・§5.3) ----
+//
+// 取り消すと、行の写真(原寸 photo.jpg とサムネ photo_thumb.jpg)を Storage から消す。#59 の方式ではクライアントが
+// 署名付き URL を作るので、パスは決定的(pair_id・日付・取り消した人の user_id は相手にも分かる)。行を消すだけだと、
+// 相手は取消のあとも同じパスから写真を取れてしまう。消すのは本人の区画だけ。失敗しても取消は成功
+
+/** 本人の区画のオブジェクト 2 つ(原寸 + サムネ)のキー */
+const objectsOf = (
+  user: string,
+  date: string = TODAY,
+  pair: string = "pair-1",
+): [string, string] => [
+  `pairs/${pair}/${date}/${user}/photo.jpg`,
+  `pairs/${pair}/${date}/${user}/photo_thumb.jpg`,
+];
+
+/** console.error を差し替えて、出力を集める(エラーログの出方も検査するため。テストの出力を汚さない) */
+async function captureErrors<T>(
+  fn: () => Promise<T>,
+): Promise<{ result: T; logs: string[] }> {
+  const original = console.error;
+  const logs: string[] = [];
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  try {
+    return { result: await fn(), logs };
+  } finally {
+    console.error = original;
+  }
+}
+
+Deno.test("cancelledPhotoPaths: 行の photo_path(本人の区画・この日)+ 現役のペアのこの日の本人の区画。重複なし", () => {
+  const [photo, thumb] = objectsOf("user-a");
+  // 行の photo_path と現役のペアが同じ区画 → 2 つだけ(重複しない)
+  assertEquals(
+    cancelledPhotoPaths({
+      userId: "user-a",
+      dateLocal: TODAY,
+      pairId: "pair-1",
+      rowPhotoPath: photo,
+    }),
+    { paths: [photo, thumb], rowPhotoPathIgnored: false },
+  );
+  // 行に photo_path が無くても、現役のペアのこの日の区画は消す(行に記録される前にアップロードだけ済んだ孤児)
+  assertEquals(
+    cancelledPhotoPaths({
+      userId: "user-a",
+      dateLocal: TODAY,
+      pairId: "pair-1",
+      rowPhotoPath: null,
+    }),
+    { paths: [photo, thumb], rowPhotoPathIgnored: false },
+  );
+  // 同じ日のうちにペアを組み直した: 行は前のペアの区画を指す → 前のペアの区画も消す(4 つ)
+  const [oldPhoto, oldThumb] = objectsOf("user-a", TODAY, "pair-0");
+  assertEquals(
+    cancelledPhotoPaths({
+      userId: "user-a",
+      dateLocal: TODAY,
+      pairId: "pair-1",
+      rowPhotoPath: oldPhoto,
+    }),
+    { paths: [oldPhoto, oldThumb, photo, thumb], rowPhotoPathIgnored: false },
+  );
+  // ソロ(ペアなし・写真なし)は消すものがない
+  assertEquals(
+    cancelledPhotoPaths({
+      userId: "user-a",
+      dateLocal: TODAY,
+      pairId: null,
+      rowPhotoPath: null,
+    }),
+    { paths: [], rowPhotoPathIgnored: false },
+  );
+  // ペアを解消してソロになったあとでも、行が指す本人の区画は消す
+  assertEquals(
+    cancelledPhotoPaths({
+      userId: "user-a",
+      dateLocal: TODAY,
+      pairId: null,
+      rowPhotoPath: oldPhoto,
+    }),
+    { paths: [oldPhoto, oldThumb], rowPhotoPathIgnored: false },
+  );
+});
+
+Deno.test("cancelledPhotoPaths: 他人の区画・別の日・旧形式・サムネ・規約外の photo_path は消さない(本人のこの日の決定的なパスだけ)", () => {
+  const [photo, thumb] = objectsOf("user-a");
+  const ignored = [
+    ["相手の区画", objectsOf("user-b")[0]],
+    ["別の日(昨日)の区画", objectsOf("user-a", "2026-06-09")[0]],
+    ["旧形式(ペア×日付単位)", `pairs/pair-1/${TODAY}/photo.jpg`],
+    ["サムネのパス", thumb],
+    ["規約外のファイル名", `pairs/pair-1/${TODAY}/user-a/other.png`],
+    ["余計な階層", `pairs/pair-1/${TODAY}/user-a/x/photo.jpg`],
+    ["区画に ..", `pairs/../${TODAY}/user-a/photo.jpg`],
+    ["空の区画", `pairs//${TODAY}/user-a/photo.jpg`],
+    ["pairs でない", `other/pair-1/${TODAY}/user-a/photo.jpg`],
+    ["空文字", ""],
+  ] as const;
+  for (const [name, rowPhotoPath] of ignored) {
+    assertEquals(
+      cancelledPhotoPaths({
+        userId: "user-a",
+        dateLocal: TODAY,
+        pairId: "pair-1",
+        rowPhotoPath,
+      }),
+      { paths: [photo, thumb], rowPhotoPathIgnored: true },
+      name,
+    );
+  }
+  // 現役のペアが無ければ何も消さない(無視した事実だけが返る)
+  assertEquals(
+    cancelledPhotoPaths({
+      userId: "user-a",
+      dateLocal: TODAY,
+      pairId: null,
+      rowPhotoPath: objectsOf("user-b")[0],
+    }),
+    { paths: [], rowPhotoPathIgnored: true },
+  );
+});
+
+Deno.test("checkin-cancel: 写真つきのチェックインを取り消すと、原寸とサムネの実体も消える(相手の写真は残る)", async () => {
+  const world = makeWorld();
+  const [aPhoto, aThumb] = objectsOf("user-a");
+  const [bPhoto, bThumb] = objectsOf("user-b");
+  world.checkins.set(`user-a|${TODAY}`, { photoPath: aPhoto });
+  world.checkins.set(`user-b|${TODAY}`, { photoPath: bPhoto });
+  for (const k of [aPhoto, aThumb, bPhoto, bThumb]) world.storage.add(k);
+  const { sent, pusher } = makePusher("ok", world.events);
+
+  const result = await handleCheckinCancel(deps(world, pusher), {
+    userId: "user-a",
+    dateLocal: TODAY,
+  });
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.alreadyCanceled, false);
+  assertEquals(
+    Object.keys(result.body).sort(),
+    ["alreadyCanceled", "snapshot"],
+    "応答の形は変えない",
+  );
+  assertEquals(
+    [...world.storage].sort(),
+    [bPhoto, bThumb].sort(),
+    "A の原寸とサムネだけが消え、B の写真は残る",
+  );
+  assertEquals(world.removeCalls.length, 1, "Storage の削除は 1 回の呼び出し");
+  assertEquals(
+    [...world.removeCalls[0]].sort(),
+    [aPhoto, aThumb].sort(),
+    "消すのは本人の区画の 2 つだけ",
+  );
+  assertEquals(
+    world.events,
+    ["remove", "push"],
+    "相手へ知らせる前に実体を消す(知らせを受けた相手が、まだ残っている実体を取りに行く隙を作らない)",
+  );
+  assertEquals(sent.length, 1);
+});
+
+Deno.test("checkin-cancel: 行に photo_path が記録される前にアップロードだけ済んだ写真(孤児)も消える", async () => {
+  const world = makeWorld();
+  const [aPhoto, aThumb] = objectsOf("user-a");
+  world.checkins.set(`user-a|${TODAY}`, { photoPath: null }); // 行は作ったが、photoPath 付きの再送の前
+  world.storage.add(aPhoto);
+  world.storage.add(aThumb);
+  const { pusher } = makePusher();
+
+  const result = await handleCheckinCancel(deps(world, pusher), {
+    userId: "user-a",
+    dateLocal: TODAY,
+  });
+
+  assertEquals(result.status, 200);
+  assertEquals([...world.storage], [], "決定的なパスの実体が消える");
+});
+
+Deno.test("checkin-cancel: 写真が無いソロの取消では Storage を呼ばない", async () => {
+  const world = makeWorld({ pair: null, streakDays: [], plant: null });
+  world.checkins.set(`user-a|${TODAY}`, { photoPath: null });
+  const { sent, pusher } = makePusher();
+
+  const result = await handleCheckinCancel(deps(world, pusher), {
+    userId: "user-a",
+    dateLocal: TODAY,
+  });
+
+  assertEquals(result.status, 200);
+  assertEquals(
+    world.removeCalls,
+    [],
+    "消すものが無いので Storage の削除を呼ばない",
+  );
+  assertEquals(sent.length, 0);
+});
+
+Deno.test("checkin-cancel: 同じ日のうちにペアを解消してソロになっていても、行が指す本人の区画の写真は消える(相手の区画は残る)", async () => {
+  const world = makeWorld({ pair: null, streakDays: [], plant: null });
+  const [oldPhoto, oldThumb] = objectsOf("user-a", TODAY, "pair-0");
+  const [exPhoto, exThumb] = objectsOf("user-b", TODAY, "pair-0");
+  world.checkins.set(`user-a|${TODAY}`, { photoPath: oldPhoto });
+  for (const k of [oldPhoto, oldThumb, exPhoto, exThumb]) world.storage.add(k);
+  const { pusher } = makePusher();
+
+  const result = await handleCheckinCancel(deps(world, pusher), {
+    userId: "user-a",
+    dateLocal: TODAY,
+  });
+
+  assertEquals(result.status, 200);
+  assertEquals(
+    [...world.storage].sort(),
+    [exPhoto, exThumb].sort(),
+    "元の相手の区画には触れない",
+  );
+});
+
+Deno.test("checkin-cancel: すでに取消済み(行なし)の再送でも、残っていた実体を片付ける。push はしない(冪等)", async () => {
+  // 前回の取消で実体の削除に失敗していた状況の再送
+  const world = makeWorld();
+  const [aPhoto, aThumb] = objectsOf("user-a");
+  world.storage.add(aPhoto);
+  world.storage.add(aThumb);
+  const { sent, pusher } = makePusher();
+
+  const result = await handleCheckinCancel(deps(world, pusher), {
+    userId: "user-a",
+    dateLocal: TODAY,
+  });
+
+  assertEquals(result.status, 200);
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.alreadyCanceled, true);
+  assertEquals([...world.storage], [], "再送で片付く");
+  assertEquals(sent.length, 0, "状態が変わっていないので push しない");
+});
+
+Deno.test("checkin-cancel: 実体の削除に失敗しても取消は成功(応答はそのまま・push も送る)。ログだけ残す", async () => {
+  const world = makeWorld();
+  const [aPhoto, aThumb] = objectsOf("user-a");
+  world.checkins.set(`user-a|${TODAY}`, { photoPath: aPhoto });
+  world.storage.add(aPhoto);
+  world.storage.add(aThumb);
+  world.removeFails = true;
+  const { sent, pusher } = makePusher();
+
+  const { result, logs } = await captureErrors(() =>
+    handleCheckinCancel(deps(world, pusher), {
+      userId: "user-a",
+      dateLocal: TODAY,
+    })
+  );
+
+  assertEquals(result.status, 200, "取消自体は成功");
+  if (result.status !== 200) throw new Error("unreachable");
+  assertEquals(result.body.alreadyCanceled, false);
+  assertEquals(world.checkins.has(`user-a|${TODAY}`), false, "行は消えている");
+  assertEquals(sent.length, 1, "相手への更新は送る");
+  assertEquals(world.storage.size, 2, "実体は残る(次の取消の再送で片付く)");
+  assertEquals(
+    logs.some((l) => l.includes("写真の実体の削除に失敗")),
+    true,
+    "ログに残す",
+  );
+  assertEquals(
+    logs.some((l) => l.includes("user-a") || l.includes("pair-1")),
+    false,
+    "ログにパス・ID を出さない",
+  );
+});
+
+Deno.test("checkin-cancel: 行の photo_path が他人の区画・別の日・旧形式を指していても、本人のこの日の区画しか消さない", async () => {
+  const [aPhoto, aThumb] = objectsOf("user-a");
+  const [bPhoto, bThumb] = objectsOf("user-b");
+  const [yPhoto, yThumb] = objectsOf("user-a", "2026-06-09");
+  const legacy = `pairs/pair-1/${TODAY}/photo.jpg`;
+  for (
+    const [name, rowPath] of [
+      ["相手の区画", bPhoto],
+      ["別の日(昨日)の本人の区画", yPhoto],
+      ["旧形式(ペア×日付単位。2 人の行が同じ実体を指しうる)", legacy],
+    ] as const
+  ) {
+    const world = makeWorld();
+    world.checkins.set(`user-a|${TODAY}`, { photoPath: rowPath });
+    for (const k of [aPhoto, aThumb, bPhoto, bThumb, yPhoto, yThumb, legacy]) {
+      world.storage.add(k);
+    }
+    const { pusher } = makePusher();
+
+    const { result, logs } = await captureErrors(() =>
+      handleCheckinCancel(deps(world, pusher), {
+        userId: "user-a",
+        dateLocal: TODAY,
+      })
+    );
+
+    assertEquals(result.status, 200, name);
+    assertEquals(
+      [...world.storage].sort(),
+      [bPhoto, bThumb, yPhoto, yThumb, legacy].sort(),
+      `${name}: 消えるのは本人のこの日の決定的なパス(原寸とサムネ)だけ`,
+    );
+    assertEquals(
+      logs.some((l) => l.includes("本人のこの日の区画を指していない")),
+      true,
+      `${name}: 無視したことをログに残す`,
+    );
+  }
+});
+
+Deno.test("checkin-cancel: 取り消せない日(昨日・明日・形式不正・ユーザー不在)では Storage に触らない", async () => {
+  const world = makeWorld();
+  const [yPhoto, yThumb] = objectsOf("user-a", "2026-06-09");
+  const [aPhoto, aThumb] = objectsOf("user-a");
+  world.checkins.set("user-a|2026-06-09", { photoPath: yPhoto });
+  for (const k of [yPhoto, yThumb, aPhoto, aThumb]) world.storage.add(k);
+  const { pusher } = makePusher();
+  const d = deps(world, pusher);
+
+  for (const dateLocal of ["2026-06-09", "2026-06-11", "2026-6-10"]) {
+    const r = await handleCheckinCancel(d, { userId: "user-a", dateLocal });
+    assertEquals(r.status, 400, dateLocal);
+  }
+  const ghost = await handleCheckinCancel(d, {
+    userId: "user-zzz",
+    dateLocal: TODAY,
+  });
+  assertEquals(ghost.status, 404);
+  assertEquals(world.removeCalls, [], "400 / 404 では削除を呼ばない");
+  assertEquals(world.storage.size, 4, "実体は何も消えない");
 });

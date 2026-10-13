@@ -52,13 +52,24 @@ interface World {
   users: SnapshotUserRow[];
   promises: Record<string, SnapshotPromiseRow>; // userId → 現役の約束
   pair:
-    | { pairId: string; startedOn: string; memberIds: [string, string] }
+    | {
+      pairId: string;
+      startedOn: string;
+      memberIds: [string, string];
+      ticketBalance?: number;
+    }
     | null;
   checkins: Map<string, { photoPath: string | null }>; // key: `${userId}|${dateLocal}`
   streakDays: StreakDayRecord[];
   plant: SnapshotPlantRow | null;
   /** createSignedUploadUrl が要求されたパスの記録(パス規約の検証用) */
   signedUploadPaths: string[];
+  /** Storage の photos バケットにあるオブジェクトのキー(removePhotos で消える) */
+  storage: Set<string>;
+  /** removePhotos の呼び出し(引数のパス)を順に記録する */
+  removeCalls: string[][];
+  /** true なら removePhotos が失敗する(Storage の障害) */
+  removeFails: boolean;
 }
 
 function makeRepo(world: World): CheckinRepo {
@@ -75,6 +86,7 @@ function makeRepo(world: World): CheckinRepo {
       return Promise.resolve({
         pairId: world.pair.pairId,
         startedOn: world.pair.startedOn,
+        ticketBalance: world.pair.ticketBalance,
         partner,
       });
     },
@@ -92,10 +104,23 @@ function makeRepo(world: World): CheckinRepo {
       if (
         params.photoPath !== null && existing.photoPath !== params.photoPath
       ) {
+        const previousPhotoPath = existing.photoPath;
         existing.photoPath = params.photoPath;
-        return Promise.resolve({ created: false, photoUpdated: true });
+        return Promise.resolve({
+          created: false,
+          photoUpdated: true,
+          previousPhotoPath,
+        });
       }
       return Promise.resolve({ created: false, photoUpdated: false });
+    },
+    removePhotos: (paths) => {
+      world.removeCalls.push([...paths]);
+      if (world.removeFails) {
+        return Promise.reject(new Error("storage down"));
+      }
+      for (const path of paths) world.storage.delete(path); // 存在しないキーは無視
+      return Promise.resolve();
     },
     createSignedUploadUrl: (path) => {
       world.signedUploadPaths.push(path);
@@ -163,6 +188,7 @@ function makeWorld(overrides: Partial<World> = {}): World {
       pairId: "pair-1",
       startedOn: "2026-06-01",
       memberIds: ["user-a", "user-b"],
+      ticketBalance: 2,
     },
     checkins: new Map(),
     // 確定済みの連続5日(6/5〜6/9)+途切れた前の1日(6/2)= ふたり達成 6 回(わかば(7回)の一歩手前)。
@@ -178,6 +204,9 @@ function makeWorld(overrides: Partial<World> = {}): World {
     // grown_days は控え。snapshot は読まない(わざと行数と違う値にして、読んでいないことを検知する)
     plant: { grownDays: 99, name: "みどり" },
     signedUploadPaths: [],
+    storage: new Set(),
+    removeCalls: [],
+    removeFails: false,
     ...overrides,
   };
 }
@@ -221,6 +250,7 @@ Deno.test("checkin: 初回(相手未完)— 自分用snapshot返却+相手へ可
     plantMood: "fidget",
     plantName: "みどり",
     hasPartnerPhotoToday: false,
+    ticketBalance: 2,
   };
   assertEquals(result.body.snapshot, expectedMine, "自分用 snapshot");
 
@@ -435,6 +465,158 @@ Deno.test("isOwnPhotoPath / photoUploadPaths: 発行したパスは検査を通�
   assertEquals(theirs.thumb !== mine.thumb, true);
 });
 
+// ---- 写真の差し替えで参照されなくなった古い実体の掃除(issue #68。DESIGN §5.2・§5.3) ----
+
+/** 本人の区画のオブジェクト 2 つ(原寸 + サムネ)のキー */
+const objectsOf = (
+  user: string,
+  date: string = TODAY,
+  pair: string = "pair-1",
+): [string, string] => [
+  `pairs/${pair}/${date}/${user}/photo.jpg`,
+  `pairs/${pair}/${date}/${user}/photo_thumb.jpg`,
+];
+
+Deno.test("checkin: 同じパスへの差し替え(ふつうの貼り直し)では、実体を消さない(上書きされた新しい写真を消してしまう)", async () => {
+  const world = makeWorld();
+  const [photo, thumb] = objectsOf("user-a");
+  world.checkins.set(`user-a|${TODAY}`, { photoPath: null });
+  world.storage.add(photo);
+  world.storage.add(thumb);
+  const { pusher } = makePusher();
+  const d = deps(world, pusher);
+
+  // 1 枚目を記録 → 同じパスで貼り直し(photoPath は同じなので photoUpdated にならない)
+  const first = await handleCheckin(d, {
+    userId: "user-a",
+    dateLocal: TODAY,
+    photoPath: photo,
+  });
+  const second = await handleCheckin(d, {
+    userId: "user-a",
+    dateLocal: TODAY,
+    photoPath: photo,
+  });
+
+  assertEquals(first.status, 200);
+  assertEquals(second.status, 200);
+  assertEquals(world.removeCalls, [], "同じパスでは消さない");
+  assertEquals(world.storage.size, 2, "実体は残る");
+});
+
+Deno.test("checkin: 同じ日のうちに別のペアの区画へ photo_path が変わったら、前のペアの区画の実体(原寸+サムネ)を消す", async () => {
+  const world = makeWorld();
+  const [oldPhoto, oldThumb] = objectsOf("user-a", TODAY, "pair-0");
+  const [newPhoto, newThumb] = objectsOf("user-a");
+  const [exPhoto, exThumb] = objectsOf("user-b", TODAY, "pair-0");
+  world.checkins.set(`user-a|${TODAY}`, { photoPath: oldPhoto });
+  for (const k of [oldPhoto, oldThumb, newPhoto, newThumb, exPhoto, exThumb]) {
+    world.storage.add(k);
+  }
+  const { pusher } = makePusher();
+
+  const result = await handleCheckin(deps(world, pusher), {
+    userId: "user-a",
+    dateLocal: TODAY,
+    photoPath: newPhoto,
+  });
+
+  assertEquals(result.status, 200);
+  assertEquals(world.checkins.get(`user-a|${TODAY}`)?.photoPath, newPhoto);
+  assertEquals(world.removeCalls.length, 1);
+  assertEquals(
+    [...world.removeCalls[0]].sort(),
+    [oldPhoto, oldThumb].sort(),
+    "消すのは古い区画の原寸とサムネだけ",
+  );
+  assertEquals(
+    [...world.storage].sort(),
+    [newPhoto, newThumb, exPhoto, exThumb].sort(),
+    "新しい写真と、元の相手の区画は残る",
+  );
+});
+
+Deno.test("checkin: 古い photo_path が別の日・旧形式・他人の区画なら、差し替えても消さない(別の日の行の写真・相手の写真を巻き込まない)", async () => {
+  const [newPhoto] = objectsOf("user-a");
+  for (
+    const [name, previous] of [
+      ["別の日(昨日)の本人の区画", objectsOf("user-a", "2026-06-09")[0]],
+      ["旧形式(ペア×日付単位)", `pairs/pair-1/${TODAY}/photo.jpg`],
+      ["相手の区画", objectsOf("user-b")[0]],
+    ] as const
+  ) {
+    const world = makeWorld();
+    world.checkins.set(`user-a|${TODAY}`, { photoPath: previous });
+    world.storage.add(previous);
+    const { pusher } = makePusher();
+
+    const result = await handleCheckin(deps(world, pusher), {
+      userId: "user-a",
+      dateLocal: TODAY,
+      photoPath: newPhoto,
+    });
+
+    assertEquals(result.status, 200, name);
+    assertEquals(world.removeCalls, [], `${name}: 消さない`);
+    assertEquals(world.storage.has(previous), true, name);
+  }
+});
+
+Deno.test("checkin: 新規のチェックイン・写真なしの再送では実体を消さない", async () => {
+  const world = makeWorld();
+  const [photo] = objectsOf("user-a");
+  const { pusher } = makePusher();
+  const d = deps(world, pusher);
+
+  await handleCheckin(d, { userId: "user-a", dateLocal: TODAY }); // 新規
+  await handleCheckin(d, { userId: "user-a", dateLocal: TODAY }); // 写真なしの再送
+  await handleCheckin(d, {
+    userId: "user-b",
+    dateLocal: TODAY,
+    photoPath: objectsOf("user-b")[0],
+  }); // 別の人の初めての写真
+  await handleCheckin(d, {
+    userId: "user-a",
+    dateLocal: TODAY,
+    photoPath: photo,
+  }); // 前の photo_path が null → 古い実体はない
+
+  assertEquals(world.removeCalls, []);
+});
+
+Deno.test("checkin: 古い実体の削除に失敗しても checkin は成功(ログだけ残す)", async () => {
+  const world = makeWorld();
+  const [oldPhoto] = objectsOf("user-a", TODAY, "pair-0");
+  const [newPhoto] = objectsOf("user-a");
+  world.checkins.set(`user-a|${TODAY}`, { photoPath: oldPhoto });
+  world.removeFails = true;
+  const { sent, pusher } = makePusher();
+  const original = console.error;
+  const logs: string[] = [];
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  let result;
+  try {
+    result = await handleCheckin(deps(world, pusher), {
+      userId: "user-a",
+      dateLocal: TODAY,
+      photoPath: newPhoto,
+    });
+  } finally {
+    console.error = original;
+  }
+
+  assertEquals(result.status, 200, "差し替え自体は成功");
+  assertEquals(world.checkins.get(`user-a|${TODAY}`)?.photoPath, newPhoto);
+  assertEquals(sent.length, 1, "写真を添えた通知は送る");
+  assertEquals(
+    logs.some((l) => l.includes("古い写真の実体の削除に失敗")),
+    true,
+    "ログに残す",
+  );
+});
+
 Deno.test("checkin: ソロ状態 — pairId null の snapshot・push なし", async () => {
   const world = makeWorld({ pair: null, streakDays: [], plant: null });
   const { sent, pusher } = makePusher();
@@ -466,6 +648,7 @@ Deno.test("checkin: ソロ状態 — pairId null の snapshot・push なし", as
     plantMood: "normal",
     plantName: null,
     hasPartnerPhotoToday: false,
+    ticketBalance: null,
   };
   assertEquals(result.body.snapshot, expected);
   assertEquals(sent.length, 0, "ソロは push 先がない");

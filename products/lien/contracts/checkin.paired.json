@@ -19,6 +19,7 @@
     "plantNextStageAt": 14,
     "plantMood": "happy",
     "plantName": "みどり",
-    "hasPartnerPhotoToday": false
+    "hasPartnerPhotoToday": false,
+    "ticketBalance": 2
   }
 }

@@ -10,6 +10,8 @@
 //         + 昨日の仮判定(§7.3。close-day が昨日を確定する前の 0:00〜1:00 だけ)+ 今日の先取り
 //       表情: normal / happy(両者完了)/ fidget(片方未完)/ sad(=「すやすや」。ふたり達成もお休みチケットも
 //         ない日が昨日まで2日以上続く)。枯れない・後退しない
+//   - お休みチケットの残数(2026-10-13・issue #19 / REQUIREMENTS §3.6): ticketBalance = pairs.ticket_balance
+//       (ペア共有の残数。ホームのバッジ用)。ソロは null(ペアが無いので持ち主がいない)。キーは省略せず null で出す
 //   - ストリーク導出: docs/DESIGN.md §5.4(確定は close-day。表示はプレビュー値)
 //
 // 設計:
@@ -63,6 +65,13 @@ export interface PairSnapshot {
   plantMood: PlantMood;
   plantName: string | null;
   hasPartnerPhotoToday: boolean;
+  /**
+   * ペア共有のお休みチケットの残数(pairs.ticket_balance。0 以上の整数)。ホームの残数バッジ用
+   * (REQUIREMENTS §3.6 [v1.0])。ソロは null(キーは省略せず null で出す)。ペアの2人に同じ値が見える。
+   * 読めていない・不正な値も null(アプリはバッジを出さない)。古いサーバーはこのキー自体を出さない
+   * (アプリは無いキーを nil として扱う — DESIGN §3.4 の互換性)
+   */
+  ticketBalance: number | null;
 }
 
 // ---- 植物の導出(REQUIREMENTS §3.9 / GROWTH §3) ----
@@ -319,6 +328,20 @@ export interface PromiseSummary {
   emoji: string;
 }
 
+/**
+ * pairs.ticket_balance → snapshot の ticketBalance。0 以上の整数だけ通す。
+ * 読めていない(undefined = getActivePair が ticket_balance を読んでいない)・null・不正な値は null:
+ * 誤った「0枚」を見せるより、バッジを出さない側に倒す(DB の CHECK(ticket_balance >= 0)があるので、本番で不正な値は来ない)
+ */
+export function normalizeTicketBalance(
+  balance: number | null | undefined,
+): number | null {
+  return typeof balance === "number" && Number.isInteger(balance) &&
+      balance >= 0
+    ? balance
+    : null;
+}
+
 export interface BuildPairSnapshotInput {
   pairId: string;
   /** サーバーが snapshot を組み立てた時刻(ISO8601) */
@@ -339,6 +362,8 @@ export interface BuildPairSnapshotInput {
   partnerPromise: PromiseSummary | null;
   plantName: string | null;
   hasPartnerPhotoToday: boolean;
+  /** pairs.ticket_balance(省略 = 読んでいない → snapshot では null) */
+  ticketBalance?: number | null;
 }
 
 /**
@@ -391,12 +416,14 @@ export function buildPairSnapshot(input: BuildPairSnapshotInput): PairSnapshot {
     }),
     plantName: input.plantName,
     hasPartnerPhotoToday: input.hasPartnerPhotoToday,
+    ticketBalance: normalizeTicketBalance(input.ticketBalance),
   };
 }
 
 /**
  * ソロ状態(ペア未成立)の snapshot。鉢は土だけ=クライアントは pairId=null で土を描画。
- * 植物の進み具合は 0 / 0 / null(ゲージを出さない — GROWTH §5.1)
+ * 植物の進み具合は 0 / 0 / null(ゲージを出さない — GROWTH §5.1)。お休みチケットの残数も null
+ * (ペア共有の在庫なので、ペアが無ければ持ち主がいない。バッジを出さない)
  */
 export function buildSoloSnapshot(input: {
   updatedAtIso: string;
@@ -423,6 +450,7 @@ export function buildSoloSnapshot(input: {
     plantMood: "normal",
     plantName: null,
     hasPartnerPhotoToday: false,
+    ticketBalance: null,
   };
 }
 
@@ -522,6 +550,11 @@ export interface SnapshotPromiseRow extends PromiseSummary {
 export interface SnapshotPairRow {
   pairId: string;
   startedOn: string;
+  /**
+   * pairs.ticket_balance(ペア共有のお休みチケットの残数)。snapshot の ticketBalance になる(issue #19)。
+   * 実装は _shared/pair_rows.ts の ACTIVE_PAIR_SELECT / toSnapshotPair で読む。省略 = 読んでいない(null として出す)
+   */
+  ticketBalance?: number;
   partner: SnapshotUserRow;
 }
 
@@ -641,5 +674,6 @@ export async function loadSnapshotForUser(
     partnerPromise,
     plantName: plant?.name ?? null,
     hasPartnerPhotoToday: partnerCheckin?.photoPath != null,
+    ticketBalance: pair.ticketBalance,
   });
 }

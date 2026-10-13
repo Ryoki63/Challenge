@@ -35,6 +35,15 @@ import {
   photoAttachedBody,
   pushDisplayName,
 } from "../_shared/messages.ts";
+import {
+  isOwnPhotoPath,
+  ownPhotoObjectsOf,
+  photoUploadPaths,
+} from "../_shared/photo_paths.ts";
+
+// 写真のパス規約は _shared/photo_paths.ts に移した(checkin-cancel も使う — issue #68)。
+// 既存の import 元(このファイル)を壊さないよう再エクスポートする
+export { isOwnPhotoPath, photoUploadPaths };
 
 /** 深夜0時前後のクライアント/サーバー時計ずれの許容幅(日)。遡及チェックインは不可(§3.4) */
 const DATE_LOCAL_TOLERANCE_DAYS = 1;
@@ -46,14 +55,25 @@ export interface CheckinRepo extends SnapshotRepo {
    * checkins へのupsert。
    * - 行が無ければ insert(created: true)
    * - 既存行があれば insert しない(created: false)。photoPath が指定され、既存の
-   *   photo_path と異なる場合のみ写真を更新する(photoUpdated: true)
+   *   photo_path と異なる場合のみ写真を更新する(photoUpdated: true)。このとき
+   *   previousPhotoPath に、更新前の photo_path(無ければ null)を返す(古い実体の掃除に使う — issue #68)
    */
   upsertCheckin(params: {
     userId: string;
     promiseId: string;
     dateLocal: string;
     photoPath: string | null;
-  }): Promise<{ created: boolean; photoUpdated: boolean }>;
+  }): Promise<{
+    created: boolean;
+    photoUpdated: boolean;
+    previousPhotoPath?: string | null;
+  }>;
+
+  /**
+   * photos バケットのオブジェクトを消す(issue #68)。存在しないキーは無視する(エラーにしない)。失敗は例外。
+   * 写真の差し替えで photo_path が変わったとき、どの行からも指されなくなった古い実体の掃除にだけ使う
+   */
+  removePhotos(paths: string[]): Promise<void>;
 
   /**
    * Storage の署名付きアップロードURLトークンを発行する(DESIGN §5.6 — issue #48)。
@@ -76,41 +96,6 @@ export interface PhotoUploadTarget {
 export interface PhotoUploadUrls {
   photo: PhotoUploadTarget;
   thumb: PhotoUploadTarget;
-}
-
-/**
- * 写真オブジェクトのパス規約(DESIGN §5.2 / migration 0004 の storage ポリシーと一致):
- *   'pairs/<pair_id>/<date_local>/<user_id>/photo.jpg' / 'photo_thumb.jpg'
- * user_id 区画で本人単位にする(旧: 'pairs/<pair_id>/<date_local>/photo.jpg' はペア×日付単位で、
- * 同じ日に2人目が付けると上書きされた — issue #52)。user_id は呼び出し本人(認証済み)。
- */
-export function photoUploadPaths(
-  pairId: string,
-  dateLocal: string,
-  userId: string,
-): { photo: string; thumb: string } {
-  const dir = `pairs/${pairId}/${dateLocal}/${userId}`;
-  return { photo: `${dir}/photo.jpg`, thumb: `${dir}/photo_thumb.jpg` };
-}
-
-/**
- * checkin の photoPath が「本人の」原寸写真パスか。
- * 'pairs/<pair_id>/<YYYY-MM-DD>/<user_id>/photo.jpg' に厳密一致するときだけ true
- * (相手の区画・旧形式・サムネ・余計な階層はすべて false)。
- * 日付区画は形式のみ検査する(storage ポリシーと同じ。±1日の許容は dateLocal 側のガードが担う)
- */
-export function isOwnPhotoPath(
-  photoPath: string,
-  pairId: string,
-  userId: string,
-): boolean {
-  const parts = photoPath.split("/");
-  return parts.length === 5 &&
-    parts[0] === "pairs" &&
-    parts[1] === pairId &&
-    /^\d{4}-\d{2}-\d{2}$/.test(parts[2]) &&
-    parts[3] === userId &&
-    parts[4] === "photo.jpg";
 }
 
 /** push 送信口(実装は ApnsClient。テストはモック)。結果の ok は記録用で処理は止めない */
@@ -151,6 +136,36 @@ export type CheckinResult =
     };
   }
   | { status: 400 | 404 | 409; body: { error: string } };
+
+/**
+ * 写真の差し替えで参照されなくなった古い写真(原寸+サムネ)を Storage から消す。
+ * - 消すのは**本人の区画で、この行の日付の区画**のものだけ(ownPhotoObjectsOf。旧形式・他人の区画・規約外・
+ *   別の日の区画は触らない: 別の日の行の写真を巻き込まない)。ふつうに起きるのは、同じ日のうちにペアを解消して
+ *   組み直し、行が前のペアの区画を指していたとき
+ * - 新しい写真と同じ区画(同じパスへの上書き = ふつうの差し替え)なら何もしない: 実体は上書きされていて、
+ *   消すと貼ったばかりの写真を消してしまう
+ * - 失敗しても checkin は成功(ログだけ残す。実体の掃除は付随の処理。自己修復経路は delete-account の全削除と取消の掃除)
+ */
+async function removeSupersededPhotos(
+  repo: Pick<CheckinRepo, "removePhotos">,
+  params: {
+    userId: string;
+    dateLocal: string;
+    previousPhotoPath: string | null;
+    newPhotoPath: string;
+  },
+): Promise<void> {
+  if (params.previousPhotoPath === null) return;
+  const previous = ownPhotoObjectsOf(params.previousPhotoPath, params.userId);
+  if (!previous || previous.dateLocal !== params.dateLocal) return;
+  const next = ownPhotoObjectsOf(params.newPhotoPath, params.userId);
+  if (next && next.photo === previous.photo) return;
+  try {
+    await repo.removePhotos([previous.photo, previous.thumb]);
+  } catch (e) {
+    console.error("checkin: 古い写真の実体の削除に失敗:", e);
+  }
+}
 
 export async function handleCheckin(
   deps: CheckinDeps,
@@ -206,12 +221,24 @@ export async function handleCheckin(
   }
 
   // 5. upsert(UNIQUE(user_id, date_local)。重複は 200 冪等 — DESIGN §5.5)
-  const { created, photoUpdated } = await deps.repo.upsertCheckin({
-    userId: req.userId,
-    promiseId: promise.id,
-    dateLocal: req.dateLocal,
-    photoPath,
-  });
+  const { created, photoUpdated, previousPhotoPath } = await deps.repo
+    .upsertCheckin({
+      userId: req.userId,
+      promiseId: promise.id,
+      dateLocal: req.dateLocal,
+      photoPath,
+    });
+
+  // 5b. 写真を差し替えて photo_path が変わったら、どの行からも指されなくなった古い実体を消す
+  //     (issue #68。相手は決まったパスから署名付き URL を作れてしまうので、行を書き換えるだけでは見えなくならない)
+  if (photoUpdated && photoPath !== null) {
+    await removeSupersededPhotos(deps.repo, {
+      userId: req.userId,
+      dateLocal: req.dateLocal,
+      previousPhotoPath: previousPhotoPath ?? null,
+      newPhotoPath: photoPath,
+    });
+  }
 
   // 6. 自分用 snapshot(upsert 後の状態で組み立てる)
   const snapshot = await loadSnapshotForUser(deps.repo, {

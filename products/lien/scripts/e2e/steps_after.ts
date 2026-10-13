@@ -3,6 +3,7 @@
 //
 // 手順の流れ・守ること・登場人物は scenario.ts。共有の型と道具は scenario_lib.ts。
 
+import { PHOTO_1, sha256Hex, THUMB } from "./images.ts";
 import { E2E_META_KEY } from "./marker.ts";
 import { Abort, redact } from "./report.ts";
 import { jsonEqual } from "./shape.ts";
@@ -19,6 +20,9 @@ import {
   type Label,
   obj,
   partnerRowsQuery,
+  SIGN_EXPIRES_IN,
+  SIGN_FAILURE_STATUS,
+  signFailureProblems,
   type User,
   UUID_RE,
   viaSignedUrl,
@@ -177,6 +181,22 @@ export async function stepsAfter(c: Ctx, w: World): Promise<void> {
       const b = need("B");
       const cu = users.C;
       const photoPath = d.photoPath as string;
+      const thumbPath = d.thumbPath as string;
+
+      // 取消の前に、相手(B)が原寸の署名付き URL を「作っておく」(寿命 3600 秒。まだ取りには行かない)。
+      // 取消のあとに同じ URL で取れるかを見る。取りに行った URL は CDN にキャッシュされ、削除のあとも寿命内は
+      // 同じ URL に画像が返りうる(相手がすでに見た画像だけ。下の注記)ので、ここでは取らない
+      const issuedBefore = await c.api.storageSign(
+        b.jwt,
+        photoPath,
+        SIGN_EXPIRES_IN,
+      );
+      const issuedUrl = obj(issuedBefore.json).signedURL;
+      rep.check(
+        "取消の前(対照): B は A の原寸の署名付き URL を作れる(S12 で画像が取れることは確認済み)",
+        issuedBefore.status === 200 && typeof issuedUrl === "string",
+        brief(issuedBefore),
+      );
 
       const cancel = await api.fn(a.jwt, "checkin-cancel", "POST", {
         json: { dateLocal: today },
@@ -262,18 +282,64 @@ export async function stepsAfter(c: Ctx, w: World): Promise<void> {
         "invalid_date_local",
       );
 
-      // 観測: 取消しても、アップロード済みの写真の実体は Storage に残る(DESIGN §5.7-3・migration 0002 の想定)。
-      // #59 はクライアントが署名付き URL を作る方式なので、相手は決定的なパスから取消後の写真も取れてしまう
-      const after = await viaSignedUrl(c, b.jwt, photoPath);
-      if (after.sign.status === 200 && after.get?.status === 200) {
-        rep.note(
-          "取消後も写真の実体は Storage に残り、相手(B)は決まったパスから署名付き URL を作って取れる",
-          "DESIGN §5.2 の「署名付きURLで配布」の前提(Function が発行しない限り見えない)は、#59 の方式では成り立たない。通常のアプリの画面からは行が消えるので見えない(改造クライアントだけ)。取消時にサーバーが写真の実体も消す案は issue #68",
+      // 取消のあと、写真の実体(原寸 + サムネ)は Storage から消える(issue #68)。#59 の方式ではクライアントが RLS の
+      // 範囲で署名付き URL を作るので、パスは決定的(pair_id・日付・取り消した人の user_id は相手にも分かる)。
+      // 実体が残っていると、行が消えたあとも相手は同じパスから写真を取れてしまう
+      if (c.mgmt && c.options.dbChecks) {
+        const pid = d.pairId as string;
+        if (!UUID_RE.test(pid)) throw new Abort("pairId が UUID でない");
+        const left = await c.mgmt.sql<J>(
+          `select count(*) as n from storage.objects where bucket_id = 'photos' and name like 'pairs/${pid}/%'`,
+        );
+        rep.check(
+          "DB: 取消のあと、このペアの Storage のオブジェクトは 0 件(原寸もサムネも消えた)",
+          Number(left[0]?.n) === 0,
+          `objects=${left[0]?.n}`,
         );
       } else {
-        rep.pass(
-          "取消後は相手も署名付き URL を作れない(写真の実体は見えない)",
-          brief(after.sign),
+        rep.skip(
+          "DB: 取消のあとの Storage のオブジェクト数",
+          c.options.dbChecks
+            ? "SUPABASE_ACCESS_TOKEN が無い"
+            : "--no-db-checks",
+        );
+      }
+      for (
+        const [who, jwt] of [["B(相手)", b.jwt], ["A(本人)", a.jwt]] as const
+      ) {
+        for (
+          const [what, path] of [["原寸", photoPath], [
+            "サムネ",
+            thumbPath,
+          ]] as const
+        ) {
+          const after = await viaSignedUrl(c, jwt, path);
+          const problems = after.sign.status === 200
+            ? ["署名付き URL を作れてしまう(実体が残っている)"]
+            : fx.storageSignNotFound
+            ? signFailureProblems(
+              after.sign.status,
+              after.sign.json,
+              fx.storageSignNotFound,
+            )
+            : after.sign.status === SIGN_FAILURE_STATUS
+            ? []
+            : [`HTTP ${after.sign.status}(契約は ${SIGN_FAILURE_STATUS})`];
+          rep.check(
+            `取消のあと: ${who}は${what}の署名付き URL を作れない(HTTP ${SIGN_FAILURE_STATUS}・not_found = storage-sign.not-found.json)`,
+            problems.length === 0 && after.get === null,
+            `${problems.join(" / ")} ${brief(after.sign)}`,
+            `HTTP ${after.sign.status}`,
+          );
+        }
+      }
+      if (typeof issuedUrl === "string") {
+        const stale = await c.api.signedGet(issuedUrl);
+        rep.check(
+          "取消の前に発行済みで、まだ取りに行っていない署名付き URL(寿命内)も、実体が消えたので画像を返さない",
+          stale.status !== 200,
+          `HTTP ${stale.status}`,
+          `HTTP ${stale.status}`,
         );
       }
 
@@ -317,6 +383,53 @@ export async function stepsAfter(c: Ctx, w: World): Promise<void> {
           "B: 行の形が partner-checkin.no-photo.json と一致(photo_path は null)",
           noPhoto.json,
           fx.partnerCheckin,
+        );
+      }
+
+      // 取消のあとの写真の取り直し: 消した実体と同じパスへ、もう一度アップロードして記録できる。
+      // 後続の手順(S20 クライアントからの削除は効かない / S23 解消後の閲覧境界 / S25 アカウント削除で写真が消える)は、
+      // この写真が Storage にあることを前提にする
+      const reissue = await api.fn(a.jwt, "checkin", "POST", {
+        json: { dateLocal: today, requestPhotoUpload: true },
+      });
+      const rUp = obj(obj(reissue.json).photoUpload);
+      const rPhoto = obj(rUp.photo);
+      const rThumb = obj(rUp.thumb);
+      rep.check(
+        "A: 取消のあと、写真用の署名付きアップロード URL を受け取れる(同じパス)",
+        reissue.status === 200 && rPhoto.path === photoPath &&
+          rThumb.path === thumbPath && typeof rPhoto.token === "string" &&
+          typeof rThumb.token === "string",
+        brief(reissue),
+      );
+      if (
+        typeof rPhoto.token === "string" && typeof rThumb.token === "string"
+      ) {
+        const upPhoto = await api.signedUpload(
+          photoPath,
+          rPhoto.token,
+          PHOTO_1,
+        );
+        const upThumb = await api.signedUpload(thumbPath, rThumb.token, THUMB);
+        rep.check(
+          "A: 原寸とサムネを取り直してアップロード(PUT)→ 200(消した実体と同じパスに置ける)",
+          upPhoto.status === 200 && upThumb.status === 200,
+          `${brief(upPhoto)} / ${brief(upThumb)}`,
+        );
+        const rec = await api.fn(a.jwt, "checkin", "POST", {
+          json: { dateLocal: today, photoPath },
+        });
+        rep.check(
+          "A: photoPath 付きで再送 → 200・alreadyCheckedIn = true",
+          rec.status === 200 && obj(rec.json).alreadyCheckedIn === true,
+          brief(rec),
+        );
+        const back = await viaSignedUrl(c, b.jwt, photoPath);
+        rep.check(
+          "B: 取り直した写真を、署名付き URL で取り戻せる(取り直した画像と同じバイト列)",
+          back.get?.status === 200 &&
+            await sha256Hex(back.get.bytes) === await sha256Hex(PHOTO_1),
+          back.get ? `HTTP ${back.get.status}` : brief(back.sign),
         );
       }
 
@@ -697,7 +810,7 @@ export async function stepsAfter(c: Ctx, w: World): Promise<void> {
         `used=${r.invites_used} unused=${r.invites_unused} promises=${r.promises}`,
       );
       rep.check(
-        "Storage: photos に A の原寸とサムネの 2 オブジェクト(取消後も残る = S18 の NOTE)",
+        "Storage: photos に A の原寸とサムネの 2 オブジェクト(S18 で取消のたびに消え、取り直した写真だけが残る)",
         n("photo_objects") === 2,
         `objects=${r.photo_objects}`,
       );

@@ -145,6 +145,7 @@ export async function stepsAccount(c: Ctx, w: World): Promise<void> {
           partnerPromiseEmoji: null,
           streakCurrent: 0,
           hasPartnerPhotoToday: false,
+          ticketBalance: null, // ペア共有の在庫なので、ソロには持ち主がいない
           myPromiseTitle: b.promise.title,
           myPromiseEmoji: b.promise.emoji,
         },
@@ -225,7 +226,7 @@ export async function stepsAccount(c: Ctx, w: World): Promise<void> {
   // ------------------------------------------------------------------
   await rep.run(
     "S24",
-    "組み直し(解消のあと、同じ 2 人が新しく招待 → 受諾。新しいペアは 0 から)",
+    "組み直し(解消のあと、同じ 2 人が新しく招待 → 受諾。新しいペアは名前・残数を引き継がない)",
     async () => {
       const a = need("A");
       const b = need("B");
@@ -264,17 +265,23 @@ export async function stepsAccount(c: Ctx, w: World): Promise<void> {
         UUID_RE.test(pair2) && pair2 !== d.pairId,
         `pairId=${pair2}`,
       );
+      // 新しいペアには、解消したペアの植物の名前も残数も引き継がれない。close-day は呼んでいないので streak_days の行は無く、
+      // 数えられるのは「今日のふたりのチェックイン」だけ: S15(B)と S18(A のやり直し)で、今日は 2 人ともチェックイン済み
+      // なので、新しいペアも今日は「ふたり達成」(ストリーク 1・成長 1 回・段階 1)。チェックインの行はペアに属さない
       expectFields(
         c,
-        "B: 新しいペアは 0 から(ストリーク 0・植物の名前なし・成長 0 回)— 解消したペアの記録は復活しない",
+        "B: 新しいペアは植物の名前なし・お休みチケット 2 枚から(解消したペアの名前・残数は引き継がない)。今日のふたりのチェックインだけが数えられる(ストリーク 1・成長 1 回)",
         obj(obj(r.json).snapshot),
         {
           pairId: pair2,
           partnerName: a.nickname,
-          streakCurrent: 0,
           plantName: null,
-          plantGrownDays: 0,
-          plantStage: 0,
+          todayMeDone: true,
+          todayPartnerDone: true,
+          streakCurrent: 1,
+          plantGrownDays: 1,
+          plantStage: 1,
+          ticketBalance: 2, // 新しいペアも初期付与の 2 枚から(解消したペアの残数は引き継がない)
         },
       );
       expectFields(
@@ -284,8 +291,9 @@ export async function stepsAccount(c: Ctx, w: World): Promise<void> {
         {
           pairId: pair2,
           partnerName: b.nickname,
-          streakCurrent: 0,
+          streakCurrent: 1,
           plantName: null,
+          ticketBalance: 2,
         },
       );
     },

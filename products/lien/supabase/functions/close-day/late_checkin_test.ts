@@ -93,6 +93,7 @@ function makeWorld(initialBothDays: string[]) {
       return Promise.resolve({ created, photoUpdated: false });
     },
     createSignedUploadUrl: () => Promise.resolve({ token: "t" }),
+    removePhotos: () => Promise.resolve(),
     // CloseDayRepo
     listPairsForClose: () =>
       Promise.resolve([{

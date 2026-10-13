@@ -25,6 +25,11 @@ import type {
 import type { StreakDayKind, StreakDayRecord } from "../_shared/streak.ts";
 import { createPusher } from "../_shared/pusher.ts";
 import {
+  ACTIVE_PAIR_SELECT,
+  type PairDbRow,
+  toSnapshotPair,
+} from "../_shared/pair_rows.ts";
+import {
   PARTNER_SELECT,
   toSnapshotUser,
   USER_COLUMNS,
@@ -62,16 +67,13 @@ function makeRepo(db: SupabaseClient): CheckinCancelRepo {
     async getActivePair(userId: string): Promise<SnapshotPairRow | null> {
       const { data: membership, error: e1 } = await db
         .from("pair_members")
-        .select("pair_id, pairs!inner(id, status, started_on)")
+        .select(ACTIVE_PAIR_SELECT)
         .eq("user_id", userId)
         .eq("pairs.status", "active")
         .maybeSingle();
       if (e1) throw e1;
       if (!membership) return null;
-      const pair = membership.pairs as unknown as {
-        id: string;
-        started_on: string;
-      };
+      const pair = membership.pairs as unknown as PairDbRow;
       const { data: partnerRow, error: e2 } = await db
         .from("pair_members")
         .select(PARTNER_SELECT)
@@ -80,11 +82,10 @@ function makeRepo(db: SupabaseClient): CheckinCancelRepo {
         .maybeSingle();
       if (e2) throw e2;
       if (!partnerRow) return null;
-      return {
-        pairId: pair.id,
-        startedOn: pair.started_on,
-        partner: toSnapshotUser(partnerRow.users as unknown as UserDbRow),
-      };
+      return toSnapshotPair(
+        pair,
+        toSnapshotUser(partnerRow.users as unknown as UserDbRow),
+      );
     },
 
     async getCheckin(
@@ -125,16 +126,32 @@ function makeRepo(db: SupabaseClient): CheckinCancelRepo {
         : null;
     },
 
-    async deleteCheckin(params): Promise<{ deleted: boolean }> {
-      // 本人の (user_id, date_local) の行のみ削除。行不在は冪等に deleted: false
+    async deleteCheckin(params): Promise<{
+      deleted: boolean;
+      photoPath: string | null;
+    }> {
+      // 本人の (user_id, date_local) の行のみ削除。行不在は冪等に deleted: false。
+      // 消した行の photo_path も返す(写真の実体の掃除に使う — issue #68)
       const { data, error } = await db
         .from("checkins")
         .delete()
         .eq("user_id", params.userId)
         .eq("date_local", params.dateLocal)
-        .select("id");
+        .select("id, photo_path");
       if (error) throw error;
-      return { deleted: (data ?? []).length > 0 };
+      const rows = data ?? [];
+      const photoPath = rows[0]?.photo_path;
+      return {
+        deleted: rows.length > 0,
+        photoPath: typeof photoPath === "string" ? photoPath : null,
+      };
+    },
+
+    async removePhotos(paths: string[]): Promise<void> {
+      // service role で消す(クライアントには delete を許さない — migration 0002 / DESIGN §5.2)。
+      // 存在しないキーは無視される(エラーにならない)。バケットは非公開の photos(migration 0001 §6)
+      const { error } = await db.storage.from("photos").remove(paths);
+      if (error) throw error;
     },
   };
 }

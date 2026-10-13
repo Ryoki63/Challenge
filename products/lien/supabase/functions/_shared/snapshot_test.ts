@@ -17,6 +17,7 @@ import {
   loadSnapshotForUser,
   localDateAndHour,
   needsProvisionalYesterday,
+  normalizeTicketBalance,
   type PairSnapshot,
   PLANT_STAGE_THRESHOLDS,
   provisionalYesterdayRow,
@@ -621,7 +622,10 @@ Deno.test("resolveTodayLocal: override が無ければ実際の今日、確定�
 
 // ---- snapshot 組み立て(DESIGN §3.4。キー名一字一句一致) ----
 
-/** DESIGN §3.4 schemaVersion=1 の全19キー(成長ルール v2 でキー3つを足した: 16 → 19) */
+/**
+ * DESIGN §3.4 schemaVersion=1 の全20キー(成長ルール v2 でキー3つを足した: 16 → 19、
+ * お休みチケットの残数 ticketBalance を足した: 19 → 20。issue #19)
+ */
 const SNAPSHOT_KEYS = [
   "schemaVersion",
   "pairId",
@@ -642,6 +646,7 @@ const SNAPSHOT_KEYS = [
   "plantMood",
   "plantName",
   "hasPartnerPhotoToday",
+  "ticketBalance",
 ].sort();
 
 /**
@@ -671,11 +676,12 @@ function baseInput() {
     partnerPromise: { title: "ランニング", emoji: "🏃" },
     plantName: "みどり",
     hasPartnerPhotoToday: false,
+    ticketBalance: 2,
   };
 }
 
-Deno.test("SNAPSHOT_KEYS は 19 個", () => {
-  assertEquals(SNAPSHOT_KEYS.length, 19);
+Deno.test("SNAPSHOT_KEYS は 20 個", () => {
+  assertEquals(SNAPSHOT_KEYS.length, 20);
 });
 
 Deno.test("buildPairSnapshot: キー集合が §3.4 と一字一句一致する", () => {
@@ -714,6 +720,7 @@ Deno.test("buildPairSnapshot: 自分だけ完了 = 確定ストリーク表示+f
     plantMood: "fidget",
     plantName: "みどり",
     hasPartnerPhotoToday: false,
+    ticketBalance: 2,
   };
   assertEquals(snapshot, expected);
 });
@@ -849,8 +856,66 @@ Deno.test("buildSoloSnapshot: ソロ状態は pairId null・土だけ・約束�
     plantMood: "normal",
     plantName: null,
     hasPartnerPhotoToday: false,
+    ticketBalance: null,
   };
   assertEquals(snapshot, expected);
+});
+
+// ---- お休みチケットの残数 ticketBalance(issue #19 / REQUIREMENTS §3.6。ホームの残数バッジ) ----
+
+Deno.test("normalizeTicketBalance: 0 以上の整数だけ通し、読めていない・不正な値は null(誤った「0枚」を見せない)", () => {
+  assertEquals(normalizeTicketBalance(0), 0, "0 枚は 0(null ではない)");
+  assertEquals(normalizeTicketBalance(2), 2);
+  assertEquals(normalizeTicketBalance(10), 10, "プレミアムの上限(v1.1)");
+  assertEquals(normalizeTicketBalance(undefined), null, "読んでいない");
+  assertEquals(normalizeTicketBalance(null), null);
+  assertEquals(
+    normalizeTicketBalance(-1),
+    null,
+    "負の残数は DB の CHECK で来ない",
+  );
+  assertEquals(normalizeTicketBalance(1.5), null);
+  assertEquals(normalizeTicketBalance(Number.NaN), null);
+  assertEquals(normalizeTicketBalance(Number.POSITIVE_INFINITY), null);
+});
+
+Deno.test("buildPairSnapshot: ticketBalance はペアの残数をそのまま出す(0 枚は 0。自分の操作とは無関係なペア共有の値)", () => {
+  assertEquals(buildPairSnapshot(baseInput()).ticketBalance, 2);
+  assertEquals(
+    buildPairSnapshot({ ...baseInput(), ticketBalance: 0 }).ticketBalance,
+    0,
+    "0 枚でも 0 を出す(null にするとバッジが消える。罰なしの表示は 0 枚でも出す)",
+  );
+  assertEquals(
+    buildPairSnapshot({ ...baseInput(), ticketBalance: 10 }).ticketBalance,
+    10,
+  );
+  const { ticketBalance: _omit, ...withoutBalance } = baseInput();
+  assertEquals(
+    buildPairSnapshot(withoutBalance).ticketBalance,
+    null,
+    "読んでいない(省略)なら null。0 と取り違えない",
+  );
+  assertEquals(
+    buildPairSnapshot({ ...baseInput(), ticketBalance: -3 }).ticketBalance,
+    null,
+    "不正な値は null",
+  );
+});
+
+Deno.test("ticketBalance は JSON にしたとき必ず残る(ソロは undefined ではなく null で出す)", () => {
+  const solo = JSON.parse(JSON.stringify(buildSoloSnapshot({
+    updatedAtIso: "2026-06-10T03:00:00.000Z",
+    todayMeDone: false,
+    myPromise: null,
+  })));
+  assertEquals("ticketBalance" in solo, true);
+  assertEquals(solo.ticketBalance, null);
+  const zero = JSON.parse(JSON.stringify(
+    buildPairSnapshot({ ...baseInput(), ticketBalance: 0 }),
+  ));
+  assertEquals("ticketBalance" in zero, true);
+  assertEquals(zero.ticketBalance, 0);
 });
 
 // ---- 昨日の仮判定(GROWTH §7.3 の最小版。純粋関数) ----
@@ -1027,7 +1092,13 @@ interface FakeWorld {
   users: SnapshotUserRow[];
   promises: Record<string, SnapshotPromiseRow>;
   pair:
-    | { pairId: string; startedOn: string; memberIds: [string, string] }
+    | {
+      pairId: string;
+      startedOn: string;
+      memberIds: [string, string];
+      /** pairs.ticket_balance(省略 = getActivePair が読んでいない) */
+      ticketBalance?: number;
+    }
     | null;
   checkins: Record<string, SnapshotCheckinRow>; // key: `${userId}|${dateLocal}`
   streakDays: StreakDayRecord[];
@@ -1052,6 +1123,7 @@ function makeFakeRepo(
       return Promise.resolve({
         pairId: world.pair.pairId,
         startedOn: world.pair.startedOn,
+        ticketBalance: world.pair.ticketBalance,
         partner,
       });
     },
@@ -1130,6 +1202,54 @@ Deno.test("loadSnapshotForUser: 受信者視点で me/partner が組み上がる
   assertEquals(forA.todayPartnerDone, false);
   assertEquals(forA.partnerName, "ゆうき");
   assertEquals(forA.hasPartnerPhotoToday, false);
+});
+
+Deno.test("loadSnapshotForUser: ticketBalance は現役のペアの残数。ペアの2人に同じ値が見える", async () => {
+  const world = pairWorld();
+  world.pair!.ticketBalance = 1;
+  const repo = makeFakeRepo(world);
+  const now = new Date("2026-06-10T03:00:00Z");
+  const forA = await loadSnapshotForUser(repo, { userId: "user-a", now });
+  const forB = await loadSnapshotForUser(repo, { userId: "user-b", now });
+  assertEquals(forA.ticketBalance, 1);
+  assertEquals(forB.ticketBalance, 1, "ペア共有の在庫(受信者視点で反転しない)");
+});
+
+Deno.test("loadSnapshotForUser: 残数 0 枚は 0。残数を読んでいない repo は null(0 と取り違えない)", async () => {
+  const now = new Date("2026-06-10T03:00:00Z");
+  const zeroWorld = pairWorld();
+  zeroWorld.pair!.ticketBalance = 0;
+  assertEquals(
+    (await loadSnapshotForUser(makeFakeRepo(zeroWorld), {
+      userId: "user-a",
+      now,
+    })).ticketBalance,
+    0,
+  );
+  assertEquals(
+    (await loadSnapshotForUser(makeFakeRepo(pairWorld()), {
+      userId: "user-a",
+      now,
+    })).ticketBalance,
+    null,
+    "getActivePair が ticket_balance を読んでいない",
+  );
+});
+
+Deno.test("loadSnapshotForUser: ソロの ticketBalance は null(ペア共有の在庫なので持ち主がいない)", async () => {
+  const repo = makeFakeRepo({
+    users: [userA],
+    promises: { "user-a": { id: "prom-a", title: "筋トレ", emoji: "💪" } },
+    pair: null,
+    checkins: {},
+    streakDays: [],
+    plant: null,
+  });
+  const snapshot = await loadSnapshotForUser(repo, {
+    userId: "user-a",
+    now: new Date("2026-06-10T03:00:00Z"),
+  });
+  assertEquals(snapshot.ticketBalance, null);
 });
 
 Deno.test("loadSnapshotForUser: ペア未成立はソロ snapshot", async () => {

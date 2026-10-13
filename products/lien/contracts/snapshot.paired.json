@@ -18,6 +18,7 @@
     "plantNextStageAt": 7,
     "plantMood": "fidget",
     "plantName": "みどり",
-    "hasPartnerPhotoToday": true
+    "hasPartnerPhotoToday": true,
+    "ticketBalance": 2
   }
 }

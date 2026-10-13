@@ -161,6 +161,13 @@ export async function viaSignedUrl(
 export const SIGN_FAILURE_STATUS = 400;
 
 /**
+ * 署名付きアップロード(PUT)が、バケットの制限(上限 6 MiB・image/jpeg だけ。migration 0008)で断られるときの HTTP ステータス。
+ * 413 / 415 ではなく 400 で、本文の statusCode("413" / "415")と error("Payload too large" / "invalid_mime_type")に理由が入る
+ * (本番の実測 2026-10-13。署名の発行の失敗と同じ流儀)
+ */
+export const UPLOAD_REJECTED_STATUS = 400;
+
+/**
  * 署名の発行が失敗したときの応答が、手書きフィクスチャ(storage-sign.not-found.json)の契約どおりか。
  * 契約: HTTP 400・本文の statusCode と error がフィクスチャと同じ(message は文字列であればよい。アプリは前の 2 つだけ読む)。
  * 返すのは食い違いの説明(空なら契約どおり)

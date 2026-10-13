@@ -9,6 +9,11 @@
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { isAuthServiceUnavailable } from "../_shared/auth_errors.ts";
+import {
+  ACTIVE_PAIR_SELECT,
+  type PairDbRow,
+  toSnapshotPair,
+} from "../_shared/pair_rows.ts";
 import { handleSnapshot } from "./core.ts";
 import type {
   SnapshotCheckinRow,
@@ -54,16 +59,13 @@ function makeRepo(db: SupabaseClient): SnapshotRepo {
     async getActivePair(userId: string): Promise<SnapshotPairRow | null> {
       const { data: membership, error: e1 } = await db
         .from("pair_members")
-        .select("pair_id, pairs!inner(id, status, started_on)")
+        .select(ACTIVE_PAIR_SELECT)
         .eq("user_id", userId)
         .eq("pairs.status", "active")
         .maybeSingle();
       if (e1) throw e1;
       if (!membership) return null;
-      const pair = membership.pairs as unknown as {
-        id: string;
-        started_on: string;
-      };
+      const pair = membership.pairs as unknown as PairDbRow;
       const { data: partnerRow, error: e2 } = await db
         .from("pair_members")
         .select("user_id, users!inner(id, nickname, timezone, push_token)")
@@ -78,16 +80,12 @@ function makeRepo(db: SupabaseClient): SnapshotRepo {
         timezone: string | null;
         push_token: string | null;
       };
-      return {
-        pairId: pair.id,
-        startedOn: pair.started_on,
-        partner: {
-          id: partner.id,
-          nickname: partner.nickname ?? "",
-          timezone: partner.timezone ?? "Asia/Tokyo",
-          pushToken: partner.push_token ?? null,
-        },
-      };
+      return toSnapshotPair(pair, {
+        id: partner.id,
+        nickname: partner.nickname ?? "",
+        timezone: partner.timezone ?? "Asia/Tokyo",
+        pushToken: partner.push_token ?? null,
+      });
     },
 
     async getCheckin(

@@ -31,6 +31,11 @@ import type {
 import type { StreakDayKind, StreakDayRecord } from "../_shared/streak.ts";
 import { createPusher } from "../_shared/pusher.ts";
 import {
+  ACTIVE_PAIR_SELECT,
+  type PairDbRow,
+  toSnapshotPair,
+} from "../_shared/pair_rows.ts";
+import {
   PARTNER_SELECT,
   toSnapshotUser,
   USER_COLUMNS,
@@ -68,16 +73,13 @@ function makeRepo(db: SupabaseClient): CloseDayRepo {
     async getActivePair(userId: string): Promise<SnapshotPairRow | null> {
       const { data: membership, error: e1 } = await db
         .from("pair_members")
-        .select("pair_id, pairs!inner(id, status, started_on)")
+        .select(ACTIVE_PAIR_SELECT)
         .eq("user_id", userId)
         .eq("pairs.status", "active")
         .maybeSingle();
       if (e1) throw e1;
       if (!membership) return null;
-      const pair = membership.pairs as unknown as {
-        id: string;
-        started_on: string;
-      };
+      const pair = membership.pairs as unknown as PairDbRow;
       const { data: partnerRow, error: e2 } = await db
         .from("pair_members")
         .select(PARTNER_SELECT)
@@ -86,11 +88,10 @@ function makeRepo(db: SupabaseClient): CloseDayRepo {
         .maybeSingle();
       if (e2) throw e2;
       if (!partnerRow) return null;
-      return {
-        pairId: pair.id,
-        startedOn: pair.started_on,
-        partner: toSnapshotUser(partnerRow.users as unknown as UserDbRow),
-      };
+      return toSnapshotPair(
+        pair,
+        toSnapshotUser(partnerRow.users as unknown as UserDbRow),
+      );
     },
 
     async getCheckin(
