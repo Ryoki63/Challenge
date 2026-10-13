@@ -29,7 +29,7 @@ scripts/macos-check/check.sh views                 # SwiftUI の View と AppSer
 |---|---|
 | `build` | `Lien/` のうち UIKit・Supabase・SwiftUI の View に依存しないファイル(約 40 本。モデル・ViewModel・API クライアント・サービス)を、macOS 向けの static ライブラリ **module `Lien`**(`-enable-testing`)としてコンパイルする |
 | `test` | `build` のあと、`LienTests/` のテストを `@testable import Lien` のままコンパイルして走らせる。XCTest は `XCTestShim.swift`(必要な API だけを作り直したもの)で代用する |
-| `views` | View(`HomeView` ほか)と `AppServices+Live.swift` を macOS の SDK で**型検査だけ**する。`Colors.swift`(UIKit の色)は macOS の色に書き換えたコピーで、`SupabaseService` / `PushManager` は `stubs/LiveStubs.swift` の代役で、`fullScreenCover` は `stubs/ViewShims.swift` の代役で通す。`-strict-concurrency=complete` を付けるので、Swift の並行性の警告(Xcode 26 / Swift 6.3 で出うるもの)も事前に見える |
+| `views` | View(`HomeView` ほか)と `AppServices+Live.swift` を macOS の SDK で**型検査だけ**する。`Colors.swift`(UIKit の色)は macOS の色に書き換えたコピーで、`SupabaseService` / `PushManager` は `stubs/LiveStubs.swift` の代役で、`fullScreenCover` と(設定画面が使う)`PromiseSetupView` は `stubs/ViewShims.swift` の代役で通す。`-strict-concurrency=complete` を付けるので、Swift の並行性の警告(Xcode 26 / Swift 6.3 で出うるもの)も事前に見える |
 
 ## 検査しないもの(`check.sh` の `exclude_from_module` / `EXCLUDE_TESTS`)
 

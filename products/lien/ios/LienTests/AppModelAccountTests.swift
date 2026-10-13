@@ -437,15 +437,22 @@ final class AppModelAccountTests: XCTestCase {
 
     // MARK: 設定画面を開く
 
-    func testPresentSettingsOnlyOnTheHome() async throws {
-        let h = try await makeHarness()
-        defer { h.temp.cleanup() }
-        h.model.presentSettings()
-        XCTAssertTrue(h.model.showsSettings)
+    func testPresentSettingsOnTheHomeAndBeforeThePromiseButNotInOnboarding() async throws {
+        let home = try await makeHarness()
+        defer { home.temp.cleanup() }
+        home.model.presentSettings()
+        XCTAssertTrue(home.model.showsSettings)
+
+        // 約束を決める前でも、サインアウト・アカウントの削除には入れる
+        let beforePromise = try await makeHarness(local: SnapshotFactory.noPromise())
+        defer { beforePromise.temp.cleanup() }
+        XCTAssertEqual(beforePromise.model.phase, .promiseSetup)
+        beforePromise.model.presentSettings()
+        XCTAssertTrue(beforePromise.model.showsSettings)
 
         let onboarding = try await makeHarness(signedIn: false, local: nil)
         defer { onboarding.temp.cleanup() }
         onboarding.model.presentSettings()
-        XCTAssertFalse(onboarding.model.showsSettings, "ホームを出していないときは開かない")
+        XCTAssertFalse(onboarding.model.showsSettings, "アカウントを作る前(オンボーディング)では開かない")
     }
 }

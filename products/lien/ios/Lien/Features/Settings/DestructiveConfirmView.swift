@@ -29,7 +29,9 @@ struct DestructiveConfirmView: View {
     let content: Content
 
     var body: some View {
-        Form {
+        // 観測する状態は body の中で読む(Binding の getter の中で読むと、変化が画面の更新に結びつかないことがある)
+        let isFinalPromptShown = flow.stage == .finalPrompt
+        return Form {
             Section {
                 Text(content.lead)
                     .font(.body)
@@ -82,7 +84,7 @@ struct DestructiveConfirmView: View {
         // 実行中は戻れない(途中で閉じて、結果を見失わないように)
         .navigationBarBackButtonHiddenWhile(flow.stage == .working)
         .interactiveDismissDisabled(flow.stage == .working)
-        .alert(content.finalTitle, isPresented: finalPromptBinding) {
+        .alert(content.finalTitle, isPresented: finalPromptBinding(isShown: isFinalPromptShown)) {
             Button(content.finalConfirm, role: .destructive) {
                 flow.confirm()
             }
@@ -96,9 +98,9 @@ struct DestructiveConfirmView: View {
 
     /// 最後の確認のアラートを出しているか。閉じられたとき(「やめる」・外側のタップ)に、
     /// 実行へ進んでいなければ説明の画面へ戻す(finalPromptDidClose)
-    private var finalPromptBinding: Binding<Bool> {
+    private func finalPromptBinding(isShown: Bool) -> Binding<Bool> {
         Binding(
-            get: { flow.stage == .finalPrompt },
+            get: { isShown },
             set: { isPresented in
                 if !isPresented { flow.finalPromptDidClose() }
             }

@@ -134,10 +134,15 @@ struct ModerationPresentation: ViewModifier {
     @Environment(\.openURL) private var openURL
 
     func body(content: Content) -> some View {
-        content
+        // 観測する状態は body の中で読む(Binding の getter の中で読むと、変化が画面の更新に結びつかないことがある)
+        let isReportConfirmationShown = moderation.pendingReport != nil
+        let isMailFailureShown = moderation.showsMailFailure
+        let isBlockSheetShown = moderation.block.stage != .idle
+        let isBlockWorking = moderation.block.stage == .working
+        return content
             .confirmationDialog(
                 Strings.Report.confirmTitle,
-                isPresented: reportBinding,
+                isPresented: reportBinding(isShown: isReportConfirmationShown),
                 titleVisibility: .visible
             ) {
                 Button(Strings.Report.openMail) {
@@ -149,12 +154,12 @@ struct ModerationPresentation: ViewModifier {
             } message: {
                 Text(Strings.Report.confirmMessage)
             }
-            .alert(Strings.Report.mailFailedTitle, isPresented: mailFailureBinding) {
+            .alert(Strings.Report.mailFailedTitle, isPresented: mailFailureBinding(isShown: isMailFailureShown)) {
                 Button(Strings.Report.mailFailedOK, role: .cancel) {}
             } message: {
                 Text(Strings.Report.mailFailedMessage)
             }
-            .sheet(isPresented: blockBinding) {
+            .sheet(isPresented: blockBinding(isShown: isBlockSheetShown)) {
                 NavigationStack {
                     DissolvePairConfirmView(flow: moderation.block)
                         .toolbar {
@@ -166,30 +171,30 @@ struct ModerationPresentation: ViewModifier {
                             }
                         }
                 }
-                .interactiveDismissDisabled(moderation.block.stage == .working)
+                .interactiveDismissDisabled(isBlockWorking)
             }
     }
 
-    private var reportBinding: Binding<Bool> {
+    private func reportBinding(isShown: Bool) -> Binding<Bool> {
         Binding(
-            get: { moderation.pendingReport != nil },
+            get: { isShown },
             set: { isPresented in
                 if !isPresented { moderation.cancelReport() }
             }
         )
     }
 
-    private var mailFailureBinding: Binding<Bool> {
+    private func mailFailureBinding(isShown: Bool) -> Binding<Bool> {
         Binding(
-            get: { moderation.showsMailFailure },
+            get: { isShown },
             set: { moderation.showsMailFailure = $0 }
         )
     }
 
     /// ブロックの説明シートを出しているか(流れが idle でない間)。下げて閉じたら取り消す(実行中は閉じられない)
-    private var blockBinding: Binding<Bool> {
+    private func blockBinding(isShown: Bool) -> Binding<Bool> {
         Binding(
-            get: { moderation.block.stage != .idle },
+            get: { isShown },
             set: { isPresented in
                 if !isPresented { moderation.block.cancel() }
             }

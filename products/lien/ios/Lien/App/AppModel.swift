@@ -278,9 +278,10 @@ final class SyncGate {
 // MARK: - アカウント・ペアの操作(AccountOperating — issue #23)
 
 extension AppModel: AccountOperating {
-    /// 設定画面を開く(ホームの歯車。ホームを出していないときは開かない)
+    /// 設定画面を開く(歯車)。ホームと、約束を決める前の画面で開ける(サインアウト・アカウントの削除に入れるように)。
+    /// オンボーディング(アカウントを作る前)では開かない
     func presentSettings() {
-        guard phase.isHome else { return }
+        guard phase != .onboarding else { return }
         showsSettings = true
     }
 

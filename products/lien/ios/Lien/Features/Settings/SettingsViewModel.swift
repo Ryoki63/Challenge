@@ -88,10 +88,10 @@ final class SettingsViewModel {
     /// 約束の表示用の文("💪 筋トレ")。サーバーから読めた値を優先し、無ければ snapshot の値
     var promiseSummary: String? {
         if let promise {
-            return "\(promise.emoji) \(promise.title)"
+            return [promise.emoji, promise.title].filter { !$0.isEmpty }.joined(separator: " ")
         }
         guard let snapshot, snapshot.hasActivePromise, let title = snapshot.myPromiseTitle else { return nil }
-        return [snapshot.myPromiseEmoji, title].compactMap { $0 }.joined(separator: " ")
+        return [snapshot.myPromiseEmoji, title].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     /// 約束の編集を開けるか(サーバーの値が読めているときだけ。読めていない間は元のリマインド時刻が分からない)

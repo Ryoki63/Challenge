@@ -35,7 +35,10 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        Form {
+        // 観測する状態は body の中で読む(Binding の getter の中で読むと、変化が画面の更新に結びつかないことがある)
+        let showsDissolveScreen = viewModel.dissolve.stage != .idle
+        let showsDeletionScreen = viewModel.deletion.stage != .idle
+        return Form {
             profileSection
             promiseSection
             notificationSection
@@ -49,10 +52,10 @@ struct SettingsView: View {
         #endif
         .task { await viewModel.load() }
         // 取り消せない操作の説明の画面(確認の1段階目)。最後の確認(2段階目)はその画面のアラート
-        .navigationDestination(isPresented: flowBinding(viewModel.dissolve)) {
+        .navigationDestination(isPresented: flowBinding(viewModel.dissolve, isShown: showsDissolveScreen)) {
             DissolvePairConfirmView(flow: viewModel.dissolve)
         }
-        .navigationDestination(isPresented: flowBinding(viewModel.deletion)) {
+        .navigationDestination(isPresented: flowBinding(viewModel.deletion, isShown: showsDeletionScreen)) {
             DeleteAccountConfirmView(flow: viewModel.deletion)
         }
         .alert(Strings.SignOut.confirmTitle, isPresented: $viewModel.showsSignOutConfirmation) {
@@ -238,10 +241,11 @@ struct SettingsView: View {
         }
     }
 
-    /// 説明の画面を出しているか(流れの stage が idle でない間)。戻る・下げるで閉じられたら、流れを取り消す
-    private func flowBinding(_ flow: DestructiveFlow) -> Binding<Bool> {
+    /// 説明の画面を出しているか(流れの stage が idle でない間。呼び出し側が body の中で読んだ値)。
+    /// 戻る・下げるで閉じられたら、流れを取り消す
+    private func flowBinding(_ flow: DestructiveFlow, isShown: Bool) -> Binding<Bool> {
         Binding(
-            get: { flow.stage != .idle },
+            get: { isShown },
             set: { isPresented in
                 if !isPresented { flow.cancel() }
             }

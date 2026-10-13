@@ -36,6 +36,8 @@ struct RootView: View {
                             store: model.services.store,
                             onSaved: { _ in model.promiseSaved() }
                         )
+                        // 約束を決める前でも、設定(サインアウト・アカウントの削除)には入れる
+                        .toolbar { settingsButton }
                     }
                 }
             case .solo, .paired:
@@ -56,16 +58,7 @@ struct RootView: View {
                         onInvite: model.phase == .solo ? { model.presentPairing() } : nil,
                         moderation: model.moderation
                     )
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button {
-                                model.presentSettings()
-                            } label: {
-                                Image(systemName: "gearshape")
-                            }
-                            .accessibilityLabel(Strings.Settings.openButtonLabel)
-                        }
-                    }
+                    .toolbar { settingsButton }
                 }
             }
         }
@@ -77,7 +70,7 @@ struct RootView: View {
         }
         // セッションが使えなくなったとき: 一時的な不調かもしれないので、勝手には消さない。「はじめからやり直す」を選んだときだけ
         // サインアウトして端末の記録を消し、オンボーディングへ戻る(登録なしで始めたアカウントには戻れない)
-        .alert(Strings.Session.lostTitle, isPresented: sessionLostBinding) {
+        .alert(Strings.Session.lostTitle, isPresented: sessionLostBinding(isShown: model.sessionLost)) {
             Button(Strings.Session.restart, role: .destructive) {
                 Task { await model.restartAfterSessionLost() }
             }
@@ -101,10 +94,23 @@ struct RootView: View {
 }
 
 extension RootView {
+    /// 右上の歯車(設定画面をシートで開く)。ホームと、約束を決める前の画面に付ける
+    @ToolbarContentBuilder
+    fileprivate var settingsButton: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                model.presentSettings()
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .accessibilityLabel(Strings.Settings.openButtonLabel)
+        }
+    }
+
     /// 「ログイン状態を確認できません」の確認を出しているか。閉じられたら(「あとで」・外側のタップ)数え直す
-    fileprivate var sessionLostBinding: Binding<Bool> {
+    fileprivate func sessionLostBinding(isShown: Bool) -> Binding<Bool> {
         Binding(
-            get: { model.sessionLost },
+            get: { isShown },
             set: { isPresented in
                 if !isPresented { model.dismissSessionLostPrompt() }
             }

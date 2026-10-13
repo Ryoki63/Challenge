@@ -58,7 +58,7 @@ enum Strings {
         static let consentLabel = "利用規約とプライバシーポリシーに同意します"
         static let consentTermsLink = "利用規約を読む"
         static let consentPrivacyLink = "プライバシーポリシーを読む"
-        static let consentNote = "不適切な写真や言葉、迷惑行為は認められていません。気になる内容は、画面を長押しして通報したり、ペアを解消したりできます。"
+        static let consentNote = "不適切な写真や言葉、迷惑行為は禁止されています。気になる内容は、画面を長押しして通報したり、ペアを解消したりできます。"
         /// 同意のチェック(VoiceOver の値)
         static let consentCheckedValue = "同意済み"
         static let consentUncheckedValue = "未同意"
