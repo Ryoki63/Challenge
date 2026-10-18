@@ -112,3 +112,49 @@ JOURNAL がだらだら伸びないよう、**古いエントリはマージ・�
 - コードを書いたら必ず実行・ビルドして動作確認する(「書けたはず」で完了にしない)
 - 可能なら Agent ツール(サブエージェント)に「完了条件を満たすか批判的に確認して」と独立検証を依頼する
 - 検証失敗は最大3回まで修正リトライ。それでもダメなら BLOCKED にして止まる
+
+## HQ（solo-company）との連携
+
+このリポジトリの `agent:W` Issue は、HQ（`Ryoki63/solo-company`）のデーモンが振り分けて実行する。
+モデルの選択・役職・承認待ちの扱いは HQ の台帳と `config/routing.yaml` が決める。
+
+### 振り分けと手動ループの関係
+
+- HQ が稼働している間は、既存の手動 `ralph.sh` ループを起動しない（同じ Issue を二重に取るため）。
+- 手動ループで回したい Issue には `hq:skip` ラベルを付ける。HQ は `hq:skip` の付いた Issue を拾わない。
+- HQ の心拍が 15 分以上途絶えている（デーモン停止）ときだけ、従来どおり手動ループを使ってよい。
+- アサインが排他の代わり。着手前に自分が assignee か確認する:
+  `gh issue view <番号> --repo Ryoki63/Challenge --json assignees`
+
+### モデルの経路
+
+- モデルの経路は HQ の `config/routing.yaml` に従う（route_class ごとに chain を順に試し、失敗したら次の経路へ）。
+- このリポジトリ側でモデルを固定しない。`--model` で上書きしない。経路が決めた effort も変えない。
+- 費用上限（日 $3）と経路の冷却（3 連続失敗で 30 分停止）は HQ 側の仕組みに任せる。
+
+### 承認プロトコル（従来どおり継続）
+
+- 承認待ちは `🔔 @Ryoki63 [承認待ち] <1 行サマリ>` コメント。末尾に必ず `<!-- lien-agent -->` を付ける。
+- ラベルは `needs-approval,human-gate`。`approval-ping.yml` の bot メンション（GitHub Mobile 通知）も継続する。
+- 再開判定は従来どおり「bot を除いた最新コメントに `<!-- lien-agent -->` が無ければ人間の返信」。
+- **マーカーの不一致に注意**: HQ がこのリポジトリに書くコメントのマーカーは `<!-- lien-agent -->`
+  （HQ の `config/repos.yaml` の `marker`）。agent-loop-kit の `<!-- agent-loop -->` は**使わない**。
+  kit の `LOOP.md` をこのリポジトリでそのまま使うと、エージェントのコメントを人間の返信と誤認し、
+  承認待ちを勝手に再開する。kit を使う場合は手順 0.5 のマーカーを `<!-- lien-agent -->` に読み替える。
+
+### ラベルの意味
+
+- `agent:W` — HQ（または手動ループ）が実行してよいタスク。
+- `app:APP-001` — アプリ Lien（APP-001）のタスク。他のアプリの作業を混ぜない。
+- `difficulty:high` — 設計判断を伴う。実行と評価は別モデル系統。HQ の `critical_review` 相当。
+- `status:ready` / `status:in-progress` / `status:review` / `status:waiting` / `status:blocked` / `status:done`
+  — 進行状態。HQ が更新する。人間は `status:*` を付け替えない（`/pause` などの制御は HQ Control Issue で行う）。
+- `role:<id>` — 実行する役職（例 `role:eng-exec`、`role:qa-review`）。1 タスク 1 役職。
+- `human-gate` / `needs-approval` — 人間の判断待ち。エージェントは close しない。
+- `hq:skip` — HQ の振り分けから除外する（手動ループ専用にする）。
+
+### リリースを守る変更
+
+- 12/11 のリリース、申請期間 11/23–27、外部テスト 11/13 を脅かす変更は `critical_review` 必須。
+- 該当する変更は `difficulty:high` を付け、HQ の `critical_review`（opus-5-5 → sonnet-5-5）を通す。通るまでマージしない。
+- リリース日を動かす判断は HQ の判断カード（`type:decision`）で行う。このリポジトリで独断で期限を変えない。
