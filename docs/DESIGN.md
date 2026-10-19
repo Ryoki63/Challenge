@@ -304,6 +304,23 @@ APNs は sandbox(`api.sandbox.push.apple.com`)と production(`api.push.apple.com
 - **失敗の扱いは従来どおり**(§5.5): 5xx・ネットワーク断はリトライ1回、失敗しても本処理は成功扱い。無効トークンの掃除の失敗も本処理を止めない(ログに残す)
 - **実装**: `_shared/apns.ts`(`ApnsClient.send` の `environment` 指定・失敗結果の `invalidToken`・`TokenAwarePusher`)と `_shared/pusher.ts`(Supabase 版の `PushTokenStore`=無効トークンの掃除だけ・`createPusher`)・`_shared/user_rows.ts`(users 行の読み出し)。Function の `index.ts` は `createPusher(adminClient, "<関数名>")` を使い、users の読み出しは `USER_COLUMNS` / `PARTNER_SELECT` / `toSnapshotUser` を使う(新しい push 送信 Function もこれを使うこと)。テストは `apns_test.ts` / `pusher_test.ts` / `user_rows_test.ts`(+ `scripts/ops/push_env_static_test.ts`)
 
+### 4.2 ローカル通知（リマインド・ストリーク危機。T16 #16）
+
+v1.0 の端末ローカル通知は **リマインド** と **夜 9 時のストリーク危機** の2つだけ（REQUIREMENTS §3.12）。
+配送の主体は端末で、この2つのためにサーバーの cron・新しい Function・migration は使わない
+（サーバーから届く通知＝相手のチェックイン・つつく・リアクション等とは別。上の §4 のパイプラインは変えない）。
+
+- **リマインド**: 約束の `remind_at`（端末のローカル時刻）に出す。`repeats: true` は使わず、日付ごとの
+  1 回きりの通知を**先の 14 日ぶん**予約し、起動・前面復帰・同期・チェックイン・約束の保存などのたびに作り直す。
+  14 日アプリを開かなければ、その先のリマインドは届かない（静かに終わる）。
+- **ストリーク危機**: 21:00。ペアのストリークが続いていると分かる日だけ予約する。アプリの同期と
+  NSE（相手の push を受けたとき）が **同じ `StreakRiskPlan`** で予約を合わせる。アプリを開かない日の分は
+  NSE が足す。NSE が本体の予約を読み・消し・足せるかは実機でしか確かめられず、**T20 の確認項目**。
+  扱えなかった場合のふるまい（通知が届かない／1 回だけ届く）は README §12 に固定している。
+- **リセットの通知**はサーバー側の `streak_reset` push（`messages.ts` の `streakResetBody`）で、T16 の
+  縮小版では変えない。T16 が扱うのは端末ローカルの2つだけ。
+- 実装と確認の詳細、T20 の実機項目は `products/lien/ios/README.md` §12 を正とする。
+
 ## 5. バックエンド設計(Supabase)
 
 ### 5.1 マイグレーション
