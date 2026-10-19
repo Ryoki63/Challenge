@@ -297,3 +297,11 @@
 - G0(#38)は未完了のまま(最終更新 6/11)
 - 次(第4波): ios-serial(#16 通知 縮小版 → #17 ウィジェット S+ロック → #18 履歴 → #19 チケット残数 → #22 シェア画像)∥ backend(#19 サーバー側 ticketBalance+#68 写真の削除+バケット制限 → #16 サーバー側 節目の通知)∥ docs
 - 第4波 起動(Workflow wf_61db8718-7fe): ios-serial(仕上げ=#59/#57 の改善提案 → #16 通知 縮小版 → #17 ウィジェット S/M/ロック → #18 履歴 → #19 チケット残数 → #22 シェア画像+節目のお祝い)∥ backend(#19 サーバー側 ticketBalance+#68 取消時の写真削除+バケット制限)∥ docs #69(文書の追随+KPI の SQL+#63 の判断材料)。判断: 節目の通知は v1.0 では出さずアプリ内のお祝い+シェア誘導にする(サーバー側の通知設定が v1.1 のため、オフにできない通知を作らない=D3 の帰結)
+
+## 2026-10-20 09:10 (HQ/eng-exec #17) — T17a の完了確認と記録(コード変更なし)
+
+- 着手: HQ から issue #17 の再実行(worktree `Challenge-17`、基点 `89d8c3e` = origin/main)。最初に origin の対象ブランチと PR を確認 → リモートブランチ・PR は無し。main に T17a の commit `cbcb5f9` が入っていることを確認した
+- 事実: T17a は 2026-10-13 に main へ直接コミット済み(`cbcb5f9`)。lien-ios run [38371316613](https://github.com/Ryoki63/Challenge/actions/runs/38371316613) が success、**1061 tests / 0 failures**。S / M(写真なし)/ ロック画面の円形・インラインの4ファミリー、日付跨ぎ、前の日の snapshot の解釈、スナップショット解釈テスト(`WidgetContentTests` / `WidgetTimelinePlanTests` / `WidgetLayoutTests` / `WidgetSourceTests` / `WidgetRenderTests`)を含む
+- 判断: NSE のサムネ取得(`photoThumbUrl` / `photo_thumb.jpg`)は 2026-10-12 の計画更新コメントと docs/TASKPLAN.md §9.4 のとおり **T17b(v1.0.1)**。v1.0 の機能凍結(10/24)前なので実装しない。issue タイトルの「NSE 本実装」は T17b の範囲
+- 検証: T17a の受入条件「CI 緑+スナップショット解釈テスト緑」は上の CI で満たしている。Xcode はこの Mac に無い(Xcode は CI の macos-26)ため、ローカルの xcodebuild は実行せず、CI の結果を確認した
+- 結果: 完了の記録を BACKLOG / DONE / JOURNAL に反映し、PR を作成(コードの差分は無し — 実装は main に既にある)。issue #17 はレビュー後に閉じる
