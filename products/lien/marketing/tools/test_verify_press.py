@@ -79,7 +79,7 @@ def fact_sheet_html():
 <h2>本資料に載せていないこと</h2><p>実績値は記載しない。</p>
 <h2>画面イメージ（v4）</h2>
 <img src="screenshots/02_home_waiting.png" alt="ホーム（相手が待っている）">
-<img src="screenshots/04_history.png" alt="カレンダー（ふたりの記録）">
+<img src="screenshots/06_home_solo.png" alt="ソロのホーム（招待）">
 <img src="screenshots/05_share.png" alt="シェア画像">
 <p>出典: docs/REQUIREMENTS.md、docs/CONCEPT.md、legal/terms.html。</p>
 </body>
@@ -102,7 +102,7 @@ def screenshots_readme_text():
     return """# スクリーンショット
 
 - [相手待ち](02_home_waiting.png)
-- [カレンダー](04_history.png)
+- [ペアのはじめかた](06_home_solo.png)
 - [シェア画像](05_share.png)
 """
 
@@ -280,7 +280,7 @@ class PressKitTest(unittest.TestCase):
 
     def test_screenshot_duplicate(self):
         data = (self.root / "screenshots" / "02_home_waiting.png").read_bytes()
-        (self.root / "screenshots" / "04_history.png").write_bytes(data)
+        (self.root / "screenshots" / "06_home_solo.png").write_bytes(data)
         errors = self.errors()
         self.assertTrue(any("と同じ画像" in error for error in errors), errors)
 

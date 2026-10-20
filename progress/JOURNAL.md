@@ -619,3 +619,16 @@
 - 次: `verify_press.py` と marketing tools の回帰テスト、画像の寸法/ハッシュ、HTMLの1ページ描画、差分整合を検証する。レビュー結果は mkt-review に相当する独立確認1回を依頼する。
 - 提出: 差分を commit `da7d4e6` として作成し、PR #117 の既存ブランチへ push。local HEAD と origin branch SHA は一致、tracked/untracked の残差分なし。PR CI 6 job は push 直後のため pending（成功未確定）。
 - レビュー/描画境界: mkt-review 観点の独立 read-only レビューを1回依頼中。ローカル環境に Chromium / PDF renderer がないため、A4 1ページの実描画確認は未実施。PR #117 の再レビューを依頼する。
+
+## 2026-10-20 23:12 (mkt-exec) — Issue #94 再開: 受入条件の再検証と PR 本文の整合
+- 着手: PR #117（head `ec045cd`、origin と一致）を継続。ブランチ名は指定の `consilium/94-mkt-m8-1-3` ではなく PR #117 の `consilium/94-mkt-m8-review-followup`（指定ブランチは PR #108 で使用済みのため、二重 PR を避けて既存フォローアップを継続）。
+- 受入条件の照合: ファクトシートに機能・対象・価格・提供元・連絡先の見出しあり。提供元・連絡先は G4 #42 の未確定値（`G4-REVIEW.md` で事業者表記・問い合わせメールとも `null`）なので、推測で埋めず `<OPERATOR_NAME>` / `<CONTACT_EMAIL>` を維持。v1.0 の範囲は REQUIREMENTS §3.2–§3.13 と照合し、スクショ3枚は v1.0 の 02 / 04 / 05（M ウィジェットの 03 は不使用）。
+- 検証: `python3 tools/verify_press.py` OK / `python3 -m unittest discover -s tools -p 'test_*.py'` 64 tests OK / `python3 tools/verify_screenshots.py` OK（各6枚）/ 紹介文 60・200・582 字（宣言一致）/ 3枚とも 1290×2796・元画像と SHA-256 一致 / `git diff --check` OK。
+- A4 再確認: Chrome headless で `fact-sheet.html` を PDF 印刷し、`/Count 1`・MediaBox 595×842pt（A4 1ページ）を確認（出力は /tmp、リポジトリ外・未追跡）。
+- PR 本文の訂正: スクショの記載が旧構成（01 / 02 / 05）・文字数が旧値（196 / 578）のままだったため、実物に合わせて 02 / 04 / 05・60 / 200 / 582 に修正。PR #117 の本文を更新した。
+- レビュー: mkt-review 観点の独立 read-only レビューを依頼中。結果を受けて Blocker があれば修正し、PASS を確認してから完了とする。正式な mkt-review の承認はまだ得ていない。
+- レビュー結果(23:20 JST): mkt-review 観点の独立レビューは **FAIL**。Blocker 3件 = ①04_history のカレンダー（10/13 途切れ）と 02/05 の23日ストリークが矛盾、②200/600字の「ウィジェットでふたりの記録」が REQUIREMENTS §3.10 を超える、③提供元・連絡先が G4 未確定のトークン。Minor = 対象の出典が CONCEPT §5（設計原則）で §2 が正、fact-sheet の「（null）」が内部用語。
+- 修正(23:22 JST): ①04 を削除し v1.0 の 06_home_solo（ペア前の招待画面）へ差し替え。プレス3枚は 02 / 06 / 05。ファクトシート・README・verify_press.py・test_verify_press.py を追随し、04 を使わない理由を明記。②200字を「ホームとウィジェットで、今日の状態とストリークを確かめられます。」（200字）、600字を「…今日の状態、ストリーク、植物の様子…」（581字）に修正。③は G4 の実値が無いためトークンを維持し、人間ゲートとして残す。Minor も修正（CONCEPT §2、null の表現）。
+- 再検証: verify_press.py OK / marketing tools 64 tests OK / verify_screenshots.py OK / 文字数 60・200・581（宣言一致）/ 3枚 1290×2796・元画像と SHA-256 一致 / Chrome headless で A4 1ページ（`/Count 1`、595×842pt）/ `git diff --check` OK（変更後）。
+- 次: 修正版の再レビュー結果を確認し、PASS なら PR #117 に記録。Blocker 3 は G4 #42 の実値が入るまで外部掲載不可のため、needs_owner に1件で残す。
+- 時刻訂正: 直前の「レビュー結果(23:20 JST)」「修正(23:22 JST)」は入力時の未来時刻だった。実際は 23:14〜23:16。過去行は編集せず、本行で訂正する。

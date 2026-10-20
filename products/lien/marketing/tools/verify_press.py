@@ -55,10 +55,11 @@ REQUIRED_SECTIONS = (
 # プレスに使う v1.0 の3枚。01_home_both.png は画像内のサブコピー「ふたりで決めて」が
 # 本文の「ふたりがそれぞれ」と食い違うため使わない（MK7 の完成画像を加工しない。
 # 直すなら captions.json を更新して再生成する）。03_widget.png は v1.0.1 の M を含むため
-# 使わない（REQUIREMENTS §3.10）
+# 使わない（REQUIREMENTS §3.10）。04_history.png はデモデータの 10/13 途切れと
+# 23日のストリークが両立しないため使わない（10/13 で途切れれば現在は7日）。
 SCREENSHOTS = (
     "02_home_waiting.png",
-    "04_history.png",
+    "06_home_solo.png",
     "05_share.png",
 )
 
