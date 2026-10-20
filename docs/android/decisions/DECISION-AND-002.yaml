@@ -2,7 +2,7 @@ id: DECISION-AND-002
 title: Play 登録 25 USD・D-U-N-S・Android 検証端末の予算計上（総損失上限 3 万円）
 status: open
 created_at: "2026-10-20T23:58:00+09:00"
-updated_at: "2026-10-21T01:35:00+09:00"
+updated_at: "2026-10-21T01:52:00+09:00"
 issue: 119
 repo: Ryoki63/Challenge
 route_class: critical_review
@@ -41,7 +41,7 @@ options:
       - "新規の事業用住所/電話/ドメイン契約をしない"
     cons:
       - "LLM を上限内に含める会計では成立しない（29,485 円 + 3,750 円 = 33,235 円）"
-      - "Supabase Pro の対象期間を 2 か月以上に広げると超過する（5 か月なら固定費だけで 35,300 円）"
+      - "Supabase Pro を 4 か月分以上計上すると超過する（Apple 12,800 円 + Play 3,750 円 + Supabase 3,750 円 × 4 か月 = 31,550 円。3 か月なら 27,800 円）"
       - "端末を借りられない場合は購入費が増える"
       - "無料 D-U-N-S は 30 営業日かかり、B の公開が 2027 年に延びる"
     recommendation: true
@@ -97,7 +97,7 @@ consequences:
     - "Android 実機は借用する。購入が必要なら別の判断カードを出す。"
     - "D-U-N-S は無料 30 営業日を選ぶ。有料 7 営業日は選ばない。"
     - "#126 が LLM の扱いと Supabase の対象期間を確定する。"
-    - "Play の支払いは 10/27 までに実行する（A の日程を守る場合）。"
+    - "Play の支払いは 11/1〜11/5 の iOS 保護期間後に実行する（A の日程を守る場合）。"
   B:
     - "DECISION-006 の上限を増額する判断カードを別に作り、オーナーの承認を取る。"
     - "Play の支払い・有料 D-U-N-S・端末購入は、増額の承認後に行う。"
@@ -108,7 +108,7 @@ consequences:
 evidence:
   - "https://support.google.com/googleplay/android-developer/answer/6112435?hl=en"
   - "https://support.google.com/googleplay/android-developer/answer/14316361?hl=en"
-  - "https://support.google.com/googleplay/android-developer/answer/15633622?hl=en"
+  - "https://support.google.com/googleplay/android-developer/answer/15633622?co=GENIE.CountryCode%3DJP&hl=en"
   - "https://duns.tsr-net.co.jp/duns-web/index?showOther=true"
   - "marketing/plan.md §5"
   - "docs/android/PLAN-ANDROID.md §4.6"

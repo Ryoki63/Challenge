@@ -631,3 +631,9 @@
 - 修正: PLAN の F3/F10/F16、§2.2/§3.3/§4.1/§4.2/§4.3/§9、判断カード 2 枚、DEPENDENCIES、README を同じ根拠に同期。F10 の「相互インストール」断定を公式条文（不正な install count 水増し・報酬付き評価・他アプリ install を主機能として誘引）に直した。Issue 状態を #124 は in-progress、#122 は waiting（human-gate）など 2026-10-21 01:13 時点に更新。
 - 検証: PyYAML でカード 2 件（status open / decision null / 推奨 option が 1 つ）を確認。Markdown の表の列数・内部リンク OK。F1〜F16 の重複なし、G1〜G12 の参照と定義が一致。出典 URL 17 件すべて HTTP 200。日付算術（12/15〜12/28 = 14 日、10/23 申請 + 30 営業日 = 12/8、30,300 − 30,000 = 300、29,485 + 3,750 = 33,235、12,800 + 3,750 + 15,000 = 31,550）と `git diff --check` を確認。
 - 結果: docs を `f22d3c7` に commit。PR #131 を更新し、Issue #119 に提出コメントを投稿する。A/B/C の決定（期限 10/23 18:00）と予算の会計基準（10/27 18:00）はオーナー待ちのため Issue は close しない。外部送信・Play 登録・支払い・D-U-N-S 申請・ストア申請・コード変更は行っていない。
+
+## 2026-10-21 01:51 (pmo-lead) — #119 PR #131 レビュー差戻し修正
+- 着手: 指定 worktree `Challenge-119` / branch `consilium/119-and-pmo-android-12-14`。開始時 tracked/untracked 差分なし、HEAD `01ef4f2`、`git pull --rebase` は `Already up to date`。PR #131 は OPEN、同じ head branch。Issue #119 は OPEN / `status:in-progress`。
+- 指示: 既存 PR の同じブランチを維持し、レビューの3 blocker（DECISION-AND-002 の Supabase 月数、A 案の iOS 保護期間重複、G12 日本向け URL）を修正して再提出する。新規 PR は作らない。
+- 修正: DECISION-AND-002 の Supabase 閾値を 4 か月（31,550 円）/3 か月（27,800 円）に訂正。A の Play 登録・支払・本人確認・端末確認とテスター打診を iOS 保護期間後の 11/1〜11/5 に移し、11/5 を越えた場合の D3・後続ゲート再計算、テスト日数を圧縮せずずらす規則を追記。PLAN、両判断カード、DEPENDENCIES、README の A 日程を同期。G12 を日本指定の公式 URL に統一。
+- 根拠確認: Google Play Console の公式日本向けページを開き、Sole proprietor は Opening/Closing Notification of a Private Business で organization として確認可能との記載を確認（行 67）。
