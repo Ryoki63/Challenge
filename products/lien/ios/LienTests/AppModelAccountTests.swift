@@ -717,7 +717,7 @@ final class AppModelAccountTests: XCTestCase {
 
         await h.auth.signOut() // SDK がセッションを消した(アプリは何もしていない)
         await h.model.refresh() // 次の同期のあと、phase を導き直すときに気づく
-        await waitUntil { h.store.loadSnapshot() == nil }
+        await waitUntil { h.store.loadSnapshot() == nil && !h.store.sessionCleanupIsPending() }
 
         XCTAssertNil(h.auth.currentUserID)
         assertLocalDataIsErased(h)
@@ -732,7 +732,7 @@ final class AppModelAccountTests: XCTestCase {
         defer { h.temp.cleanup() }
         await h.auth.signOut()
         await h.model.refresh()
-        await waitUntil { h.store.loadSnapshot() == nil }
+        await waitUntil { h.store.loadSnapshot() == nil && !h.store.sessionCleanupIsPending() }
 
         // 同じ端末で、新しい匿名アカウントを作る
         try await h.auth.signInAnonymously()
