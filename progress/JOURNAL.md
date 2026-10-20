@@ -609,3 +609,6 @@
 - 検証: `python3 tools/verify_metadata.py` / `verify_screenshots.py` / `verify_press.py` はすべて OK、`python3 -m unittest discover -s tools -p 'test_*.py'` は64件 PASS (marketing ディレクトリ)。`git diff --check` PASS。型/lint/iOS build は対象外(アプリ/設定/CI の変更なし、文書の直接検査で代替)。実ビルド採証・ストア返信・デモ発行・再提出は今回未実施で、実施済みと書いていない。
 - 独立レビュー: 文書の受入条件・根拠/事実境界・権限・課金/UGC を1人にまとめて依頼し、必須修正なし。実ビルドと運営基準等の未確認境界はガイドに保持。追加の全体レビューは行わない。
 - 提出前確認: 受入条件3項目の文書は揃った。差分は審査用 Markdown 3件と JOURNAL の追記だけで、secret/個人情報/アプリ挙動の変更なし。指定ブランチへ commit/push 後、PR を作成して CI とリモート SHA を確認する(レビュー役職が判断するためマージしない)。
+- 提出(23:27): `6adf2e2` を `consilium/107-g5b` へ push し、PR #130 (https://github.com/Ryoki63/Challenge/pull/130) を作成。ローカル/リモート HEAD 一致、PR は OPEN / base main / 未マージ。`lien-ci` run 39439002890 は6ジョブすべて success (store metadata / pages / deno / ops / plant / e2e unit+type check、ネットワークE2Eではない)。
+- 結果: Issue #107 の受入条件3項目について文書を実装・検証し PR 提出まで完了。最終監査追記も別 commit で push し、その HEAD の CI は PR/Issue へ記録する。レビュー役職の判断を待つため Issue close・main マージ・status ラベルの変更・DONE 台帳の完了扱いは行わない。採証/申請/公開は未実施。
+- 完了チェック: [PASS] 受入条件3項目の文書 [PASS] 関連既存テスト64件 [PASS] 出典/リンク/表示/独立レビュー [PASS] diff 検査・残実装TODOゼロ [対象外] 型/lint/iOS build (Markdownのみ。CIの型検査成功とiOSビルドを混同しない) [対象外] 実機/ASC操作 (手順作成が契約、実行は別承認)。
