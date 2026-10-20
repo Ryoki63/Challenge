@@ -474,3 +474,5 @@
 - 公開状態: Pages GET は HTTP 404。リポジトリ本体は public だが Pages サイトの有効化・配備成功は確認できない。設定の変更・workflow_dispatch・法務公開は実行しない。PR #100 の GitHub review は0件であり、mkt-review 済みとする証拠にはならない。
 - 時刻補正: 上の見出しと着手コメントの「20:21」は転記時の誤り。再開直前の実測は `2026-10-20 20:15:27 +0900`、本追記直前の実測は `2026-10-20 20:19:23 +0900`。既存記録を改変せず訂正を追記する。
 - 検証: web の unittest **47件 PASS**、`build_site.py` **11件生成 PASS(生成物差分なし)**、`--check` **11件一致 PASS**。`--check-publishable` は **exit 1(法務4出力の未記入・xUrl未設定)**。公開不可を検知した結果であり、公開検査のPASSとは扱わない。`git diff --check origin/main` PASS。型チェック/lint/iOS build はコード変更なしのため対象外。
+- 独立レビュー1回: サブエージェントに mkt-review 観点をまとめて依頼し、**要修正/公開不可**。約束の各自1つという単位、チケット保護/記録伸長の条件、実画面と SVG の差を指摘。`web/PUBLISH-STATUS.md` に根拠と未確認境界を記録。正式な Consilium 役職評価や文言承認済みとはしない。公開情報が未提供のため停止し、未解決指摘をPASSに変えない。
+- 変更: web README と G4 チェックリストに公開先承認を反映。Pages 有効化や mkt-review は `--check-publishable` が検査しないことを明確化。`PUBLISH-STATUS.md` に Issue 本文の完了条件を逐語的に照合し、公開未達・X未達・スクショ受入留保・文言未承認を明記。

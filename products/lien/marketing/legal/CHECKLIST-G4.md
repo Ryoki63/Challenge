@@ -28,7 +28,7 @@
 
 ## 3. 公開作業
 
-- [ ] GitHub Pages の公開URLを確定する。**#76(MK3)で配備の仕組みを作った**ので、URL はアプリの `SupportLinks.webBaseURL` に合わせて次の2つ(リポジトリは `Ryoki63/Challenge`)
+- [x] GitHub Pages の公開URLを確定する。2026-10-20 の #76 オーナー返信(issuecomment-6287900053)で推奨案を採用。**公開自体は未実施**。URL はアプリの `SupportLinks.webBaseURL` に合わせて次の2つ(リポジトリは `Ryoki63/Challenge`)
       - `https://ryoki63.github.io/Challenge/lien/legal/privacy.html`
       - `https://ryoki63.github.io/Challenge/lien/legal/terms.html`
       - ティザーが `https://ryoki63.github.io/Challenge/`、招待が `.../lien/i/`。配信するのは `products/lien/web/site/` だけ
