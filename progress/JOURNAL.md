@@ -394,6 +394,19 @@
 - 検証: `python3 x/tools/check_posts.py` = OK 13本 / unittest 35件 OK / 既存の `verify_metadata.py` OK・unittest 24件 OK（回帰なし）/ YAML の構文とステップ追加を確認
 - 結果: **PR #99 作成**（https://github.com/Ryoki63/Challenge/pull/99）。CI `lien-ci` run 39375076692 は全ジョブ success（store-metadata に追加した2ステップも実行され、`OK: 13 本` と unittest 35 件を確認）。`status: ready` は mkt-lead 承認 + mkt-review レビュー待ちのため付けていない（検査で固定）。issue は承認待ちとして開いたまま
 
+## 2026-10-20 14:05 (mkt-lead) — MK1 #74 公開前後 30 日の獲得計画
+- 着手: Issue #74。worktree `Challenge-74` / ブランチ `consilium/74-mk1-30-10-21-11-30`(origin/main `fdf1ef5`)。作業前に origin の対象ブランチ・PR を確認(重複なし)
+- 置き場所の判断: Issue の完了条件は「docs/GROWTH.md か marketing/plan.md」。`docs/GROWTH.md` は**植物の成長ルール**(プロダクト仕様)で獲得計画の置き場ではないため、`marketing/plan.md` を新設する。MK2(#75)の `marketing/x/`・MK5(#78)の `marketing/measurement.md` と同じく、マーケの新しい文書はリポジトリ直下の `marketing/` に置く(既存アセットは `products/lien/marketing/`)
+- 事実確認(計画に書く前に読む): KPI ゲートは TASKPLAN §5(500 DL / 40% / D30 25%)、率の定義と分母は KPI.md §4、DL の出どころは KPI.md §2-8(ASC App Analytics のみ)。**D30 は式 `started_on + 31 <= 今日` により 11/30 時点で分母 0**(公開 10/31 のコホートは 12/1 から)。11/30 に判定できるのは 2 項目だけ
+- 予算: 追加支出の上限は 30,000 円。固定費(Apple 年会費 12,800 円・Supabase Pro 約 3,750 円)を足しても収まる範囲に、広告枠を 10,000 円で抑える設計にする
+- 成果: `marketing/plan.md`(344 行)。6 区間(W-0〜W4)・週次カレンダー・チャネル 3 つ・予算・広告の上限と停止条件・週次の指標(分母つき)・KPI ゲートとの整合・未達時の動き・公開日がずれた場合の読み替え・書いてはいけないこと・承認の流れ。ルート `marketing/` を新設したので `docs/STRUCTURE.md` にも役割を追記(ストア文言は `products/lien/marketing/` のまま)
+- 設計上の判断: ①30,000 円は「使ってよい額」ではなく「失ってよい額」なので、既定はオーガニック 0 円・広告は最大 10,000 円の非常口にした ②固定費(Apple 12,800 + Supabase Pro 約 3,750)を足しても 26,550 円で上限内 ③しきい値は 40% / 50% の 2 本だけに統一(広告の停止と §8 の立て直しで同じ基準を使う)④キーワードは v1.1 提出(11/9)でしか変えられない 1 回きりの機会なので、広告は 1 週ずらして切り分ける ⑤測れないもの(シェア画像・招待発行率・ティザー PV)は 0 ではなく null と明記
+- 検証: リンク 13 本すべて解決 / 曜日の記載 23 か所すべて一致 / 表の列数 0 不整合 / DL 配分の合計 = 500 / 予算 26,550 ≤ 30,000 / しきい値 63・45 の計算一致 / `git diff --check` OK / `verify_metadata.py` OK(99/100 字・変更なし)/ unittest 24 件 OK。**deno はこの Mac に無い**ため ops テストと CI は push 後に確認する
+- レビュー前の自己点検で直した点: KPI の SQL の節番号(§4→§3)/ 公開前の本数(10 日→11 日)/ 広告の停止条件と §8 のしきい値を 40%・50% の 2 本に統一(別々の基準を持たない)/ 「同じ週に 2 つ以上変えない」と「キーワード差し替え + 広告」の矛盾を、広告を 1 週ずらすことで解消 / 罰を使わない原則の根拠を GROWTH §3.1 から CONCEPT §5-1 に修正 / ティザーの解析タグは #76 の判断であることを明記
+- 結果: **PR #98 作成**(https://github.com/Ryoki63/Challenge/pull/98)。7 commit・docs のみ(+365 行)。CI(lien-ci)5 ジョブすべて success(head `69ea55f`)。受入条件のうち **mkt-review の承認が残り**なので、issue は閉じず、レビュー役職の判断を待つ
+- 補記: 独立レビューのサブエージェントを 1 体起動したが、長時間応答が返らなかったため中断した(成果物には未反映)。代わりに、リンク・曜日・算数・表の列数・節の実在を機械的に検査し、引用した数値と分母はすべて KPI.md §4 / TASKPLAN §5 と突き合わせ済み
+- 追記: 2 体目の独立検証(対象を `marketing/plan.md` と KPI.md §4・TASKPLAN §5 に絞ったもの)が完了。A〜E すべて一致、**受入条件は満たす**との判定。①§6.1 の分母が KPI.md §4 の母数条件と同値(D7=+8日・D30=+31日・招待=結果確定・つながり=作成+7日)②11/30 の D30 分母 0 は `started_on + 31 <= 11/30 ⇒ started_on <= 10/30` で正しい ③500/40%/25% は改変なし ④DL 合計 500・予算 26,550 ≤ 30,000 ⑤受入条件の記載節は §3・§4・§5・§6・§5.1・§11
+
 ## 2026-10-20 13:18 (eng-exec) — T33 #33 RevenueCat組込 + ペイウォール(3文脈)
 - 着手: G6(#44)/T37 前でも実装・CI 検証できる範囲を実装する。実際の課金設定(RevenueCat アカウント・商品・価格・特商法・ストア申請)は行わない。
 - サーバー: `_shared/premium.ts` に `derivePairPlan` を抽出(grant-tickets から再エクスポート)。`snapshot.pairPlan`(free/premium)をメンバーの `users.premium_until` から導出し、`USER_COLUMNS`/`PARTNER_SELECT` に premium_until を追加。RevenueCat Webhook(`revenuecat-webhook`。Authorization の定数時間比較、期限は延ばす方向だけ・EXPIRATION は現在の期限以下だけ失効)を追加。contract fixtures 22 件再生成。
