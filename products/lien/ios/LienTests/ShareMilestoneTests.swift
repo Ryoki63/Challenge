@@ -25,7 +25,7 @@ final class ShareMilestoneTests: XCTestCase {
         // この版を初めて起動した既存の利用者(30日)。さかのぼって祝わない
         XCTAssertNil(memory.observe(pairId: "pair-A", streakDays: 30, streakStartDay: 100))
         XCTAssertTrue(memory.initialized)
-        XCTAssertEqual(memory.records["pair-A"], ShareMilestoneRecord(streakStartDay: 100, celebratedDays: 30))
+        XCTAssertEqual(memory.records["pair-A"], ShareMilestoneRecord(streakStartDay: 100, lastStreakDays: 30, celebratedDays: 30))
 
         // 同じストリークでは、もう 30日を祝わない
         XCTAssertNil(memory.observe(pairId: "pair-A", streakDays: 30, streakStartDay: 100))
@@ -71,23 +71,40 @@ final class ShareMilestoneTests: XCTestCase {
         let first = memory.observe(pairId: "pair-A", streakDays: 7, streakStartDay: 100)
         memory.markShown(first!)
 
-        // 途切れて、新しいストリークの 7日目(1日目が 200 に変わった)
+        // 途切れて 1日目になった(日数が減った)あと、新しいストリークの 7日目
+        XCTAssertNil(memory.observe(pairId: "pair-A", streakDays: 1, streakStartDay: 200))
         let again = memory.observe(pairId: "pair-A", streakDays: 7, streakStartDay: 200)
         XCTAssertEqual(again, ShareMilestone(pairId: "pair-A", days: 7, streakStartDay: 200))
     }
 
-    func testANewStreakAtTheSameDayCountIsCelebratedAgain() {
-        var memory = ShareMilestoneMemory()
-        XCTAssertNil(memory.observe(pairId: "pair-A", streakDays: 30, streakStartDay: 100))
-        // 最初の観測で 30 は静かに記録済み。ストリークが変わって再び 30日
-        let again = memory.observe(pairId: "pair-A", streakDays: 30, streakStartDay: 200)
-        XCTAssertEqual(again, ShareMilestone(pairId: "pair-A", days: 30, streakStartDay: 200))
+    func testANewDayAloneDoesNotCelebrateAgain() {
+        var memory = ShareMilestoneMemory(initialized: true)
+        let first = memory.observe(pairId: "pair-A", streakDays: 30, streakStartDay: 100)
+        XCTAssertEqual(first?.days, 30)
+        memory.markShown(first!)
+
+        // close-day 前の 0 時台: 日付は変わったが、ストリーク日数はまだ 30 のまま。
+        // 1日目を計算し直すと 101 になるが、日数が減っていないので新しいストリークではない
+        XCTAssertNil(memory.observe(pairId: "pair-A", streakDays: 30, streakStartDay: 101))
+        XCTAssertEqual(memory.records["pair-A"]?.streakStartDay, 100)
+    }
+
+    func testTheAnchorIsTheFirstDayOfTheStreakNotThePairCreationDay() {
+        var memory = ShareMilestoneMemory(initialized: true)
+        XCTAssertNil(memory.observe(pairId: "pair-A", streakDays: 0, streakStartDay: 100))
+
+        // ペア成立の日(100)ではなく、最初の「ふたり達成」の日(101)が 1日目
+        XCTAssertNil(memory.observe(pairId: "pair-A", streakDays: 1, streakStartDay: 101))
+        XCTAssertEqual(memory.records["pair-A"]?.streakStartDay, 101)
+
+        let milestone = memory.observe(pairId: "pair-A", streakDays: 7, streakStartDay: 101)
+        XCTAssertEqual(milestone, ShareMilestone(pairId: "pair-A", days: 7, streakStartDay: 101))
     }
 
     func testBelowSevenIsNotCelebrated() {
         var memory = ShareMilestoneMemory(initialized: true)
         XCTAssertNil(memory.observe(pairId: "pair-A", streakDays: 6, streakStartDay: 100))
-        XCTAssertEqual(memory.records["pair-A"], ShareMilestoneRecord(streakStartDay: 100, celebratedDays: 0))
+        XCTAssertEqual(memory.records["pair-A"], ShareMilestoneRecord(streakStartDay: 100, lastStreakDays: 6, celebratedDays: 0))
     }
 
     func testANewPairAfterInitializationIsCelebrated() {
@@ -113,10 +130,16 @@ final class ShareMilestoneTests: XCTestCase {
     func testMarkShownIgnoresAnOldStreak() {
         var memory = ShareMilestoneMemory(initialized: true)
         let old = memory.observe(pairId: "pair-A", streakDays: 7, streakStartDay: 100)!
-        _ = memory.observe(pairId: "pair-A", streakDays: 7, streakStartDay: 200) // 新しいストリーク
+        _ = memory.observe(pairId: "pair-A", streakDays: 1, streakStartDay: 200) // 途切れた
+        let current = memory.observe(pairId: "pair-A", streakDays: 7, streakStartDay: 200)
+        XCTAssertEqual(current, ShareMilestone(pairId: "pair-A", days: 7, streakStartDay: 200))
+
         memory.markShown(old) // 古いストリークの記録は進めない
         XCTAssertEqual(memory.records["pair-A"]?.streakStartDay, 200)
         XCTAssertEqual(memory.records["pair-A"]?.celebratedDays, 0)
+
+        memory.markShown(current!)
+        XCTAssertEqual(memory.records["pair-A"]?.celebratedDays, 7)
     }
 
     func testCodableRoundTripAndMissingKeys() throws {

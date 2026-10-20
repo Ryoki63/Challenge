@@ -33,12 +33,13 @@ final class ShareImageModelTests: XCTestCase {
     private func makeModel(
         nameLoader: ShareImageModel.NameLoader? = { "ゆうき" },
         memory: ShareMilestoneStoring = InMemoryShareMilestoneStore(ShareMilestoneMemory(initialized: true)),
-        defaults: UserDefaults? = nil
+        defaults: UserDefaults? = nil,
+        nowProvider: (() -> Date)? = nil
     ) -> ShareImageModel {
         ShareImageModel(
             nameLoader: nameLoader,
             memoryStore: memory,
-            now: { self.now },
+            now: nowProvider ?? { self.now },
             calendar: calendar,
             defaults: defaults ?? makeDefaults()
         )
@@ -221,10 +222,13 @@ final class ShareImageModelTests: XCTestCase {
 
     func testReachingSevenDaysShowsTheCelebrationOnce() {
         let memory = InMemoryShareMilestoneStore(ShareMilestoneMemory(initialized: true))
-        let model = makeModel(memory: memory)
+        var currentNow = now
+        let model = makeModel(memory: memory, nowProvider: { currentNow })
         model.snapshotDidChange(snapshot(streak: 6))
         XCTAssertNil(model.presentation)
 
+        // 翌日: 6日目の1日目はそのまま(アンカーは動かない)
+        currentNow = calendar.date(byAdding: .day, value: 1, to: now)!
         model.snapshotDidChange(snapshot(streak: 7))
         XCTAssertEqual(
             model.presentation,
@@ -232,7 +236,7 @@ final class ShareImageModelTests: XCTestCase {
                 ShareMilestone(
                     pairId: "pair-A",
                     days: 7,
-                    streakStartDay: PlantDay.number(of: now, calendar: calendar) - 6
+                    streakStartDay: PlantDay.number(of: now, calendar: calendar) - 5
                 )
             )
         )

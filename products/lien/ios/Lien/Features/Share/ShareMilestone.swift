@@ -42,8 +42,10 @@ struct ShareMilestone: Equatable, Identifiable, Sendable {
 
 /// 1ペアぶんの記録
 struct ShareMilestoneRecord: Codable, Equatable, Sendable {
-    /// 記録したときのストリークの1日目。変わったら「新しいストリーク」として祝い直す
+    /// このストリークの1日目(通し日数)。ふつうの日は変えない(日付が変わっただけで新しいストリークにしない)
     var streakStartDay: Int
+    /// 最後に見たストリーク日数。減ったらストリークが途切れた(新しいストリーク)と判断する
+    var lastStreakDays: Int
     /// もう出した、いちばん大きい節目(まだ出していなければ 0)
     var celebratedDays: Int
 }
@@ -77,7 +79,9 @@ struct ShareMilestoneMemory: Codable, Equatable, Sendable {
     /// - この版の最初の観測(initialized が false): いまの節目を静かに記録して nil(さかのぼって祝わない)
     /// - 新しいペア(記録が無い): そのストリークで最初に届いた節目を祝う
     /// - 同じストリーク: 前回出した節目より大きいものだけ
-    /// - ストリークが変わった(1日目が違う): 記録をそのストリークで作り直して、届いていれば祝う
+    /// - ストリークが減った(= 途切れた): 記録をそのストリークで作り直して、届いていれば祝う
+    ///   (1日目を毎日計算し直すと、close-day 前の 0 時台に「新しいストリーク」と誤認して、
+    ///    同じ 30日を二度祝うことがある。だから「日数が減ったか」で判断する)
     mutating func observe(pairId: String, streakDays: Int, streakStartDay: Int) -> ShareMilestone? {
         forgetOtherPairs(keeping: pairId)
         let highest = ShareMilestone.highest(atOrBelow: streakDays)
@@ -87,20 +91,37 @@ struct ShareMilestoneMemory: Codable, Equatable, Sendable {
             initialized = true
             records[pairId] = ShareMilestoneRecord(
                 streakStartDay: streakStartDay,
+                lastStreakDays: streakDays,
                 celebratedDays: highest ?? 0
             )
             return nil
         }
 
-        var record = records[pairId] ?? ShareMilestoneRecord(streakStartDay: streakStartDay, celebratedDays: 0)
-        if record.streakStartDay != streakStartDay {
-            // 新しいストリーク: そのストリークではまだ何も祝っていない
-            record = ShareMilestoneRecord(streakStartDay: streakStartDay, celebratedDays: 0)
+        var record = records[pairId] ?? ShareMilestoneRecord(
+            streakStartDay: streakStartDay,
+            lastStreakDays: 0,
+            celebratedDays: 0
+        )
+        if streakDays < record.lastStreakDays {
+            // ストリークが途切れた: そのストリークではまだ何も祝っていない
+            record = ShareMilestoneRecord(
+                streakStartDay: streakStartDay,
+                lastStreakDays: streakDays,
+                celebratedDays: 0
+            )
+        } else {
+            // 0日(まだ記録なし)から最初の1日目に入ったら、その日がストリークの1日目
+            // (ペア成立の日を 1日目にしてしまわない)
+            if record.lastStreakDays == 0, streakDays > 0 {
+                record.streakStartDay = streakStartDay
+            }
+            record.lastStreakDays = max(record.lastStreakDays, streakDays)
+            if record.streakStartDay == 0 { record.streakStartDay = streakStartDay }
         }
         records[pairId] = record
 
         guard let highest, highest > record.celebratedDays else { return nil }
-        return ShareMilestone(pairId: pairId, days: highest, streakStartDay: streakStartDay)
+        return ShareMilestone(pairId: pairId, days: highest, streakStartDay: record.streakStartDay)
     }
 
     /// 節目のお祝いを、前面で実際に見せた。ここで初めて「出した」と記録する
