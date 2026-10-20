@@ -1,7 +1,7 @@
 # App Review Notes — Lien (v1.0)
 
 - Status: **提出用文書を整理済み / 提出不可**。実ビルド・署名・公開URL・連絡先・UGC対策・Privacy申告のゲートは [G5-CHECKLIST.md](store_metadata/G5-CHECKLIST.md) を正とする(#115、2026-10-20)。文書完成を実機適合や審査承認とは扱わない。
-- Last updated: 2026-10-20
+- Last updated: 2026-10-21 JST
 - Related issues: #30 (this task) / #8 (Supabase deploy, G0 待ち) / #23 (T23: 設定・通報・ブロック・アカウント削除。**実装済み** 2026-10-13) / #28 (T28準備は済み。内部 TestFlight は G0 の後) / #55 (W1: ソロモード・招待シート。完了) / #58 (レビューで見つかった文書の食い違い。**T30 で 2026-10-20 に反映**) / #59 (PV: 相手の今日の写真。**実装済み**) / #61 (§1.1・§1.2 を W1 の実装に合わせた) / #65 (§1.1 の約束の編集の記述・ソロの植物の記述、§1.2 手順5の前提を実装に合わせた) / #69 (§1.1・§1.2・§1.4・§1.5 と §2.6 を PV・T23 の実装に合わせた) / #81 (公開目標 10/31・機能凍結 10/24 への前倒し)
 - 正本の優先順位: `docs/REQUIREMENTS.md` → `docs/DESIGN.md` → `docs/CONCEPT.md`(矛盾時はこの順で優先)
 
@@ -9,7 +9,7 @@
 
 ## 0. Notes for Review に貼る本文
 
-**オーナー向け**: 下の英文だけをコピーする。ゲート全通過後、1台デモを使う場合だけ、ASC内で2組の実コード・失効日時を末尾に追加する。コード・セッション・審査連絡先はGit/Issue/PRへ書かない。全文の長い§1や内部日本語記録を丸ごと貼らない。本文は無料v1.0用で、課金が有効なビルドには使用禁止。
+**オーナー向け**: G5の入力開始前条件を満たした後、下の英文だけをコピーし、**必須の2組**の実コード・失効日時・運用連絡手順をASC内で末尾に追加する。REQUIREMENTS §8の2組を、審査員の端末数にかかわらず用意する。未発行のまま貼付/提出しない。コード・セッション・審査連絡先はGit/Issue/PRへ書かない。全文の長い§1や内部日本語記録を丸ごと貼らない。本文は無料v1.0用で、課金が有効なビルドには使用禁止。
 
 ```text
 Lien is an iPhone app for keeping one daily promise with a chosen partner.
@@ -136,7 +136,7 @@ Lien v1.0 uses **anonymous authentication only** (Supabase anonymous sign-in). T
 
 Lien v1.0 uses **anonymous authentication** (see §1.2): there are **no usernames, passwords or demo credentials to hand over**. For App Review, a "test pair" is therefore provided as **an invite code plus a partner account that we operate**, not as an account/password pair.
 
-Two demonstration procedures are documented (not provisioned in this task). **Demo A is the self-service two-device path** in §1.2. Demo B needs only one device but depends on fresh codes and an available operator; do not present it as an unattended, permanently available demo.
+Two demonstration procedures are documented (not provisioned in this task). **Two operated demo partners and their valid invite codes are mandatory under REQUIREMENTS §8**, regardless of the reviewer's device count. Demo A is an additional self-service two-device path in §1.2, not a substitute for supplying those two partners. Demo B needs only one device but depends on fresh codes and an available operator; do not present it as an unattended, permanently available demo.
 
 | Demonstration | What the reviewer does | What we provide | Where the value lives |
 |---|---|---|---|

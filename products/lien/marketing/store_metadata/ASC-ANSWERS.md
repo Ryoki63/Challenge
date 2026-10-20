@@ -1,6 +1,6 @@
 # G5 — ASC 質問票の回答表 (#115)
 
-確認日: 2026-10-20 / 対象: 無料の Lien v1.0 / ASC操作なし。
+確認日: 2026-10-21 JST / 対象: 無料の Lien v1.0 / ASC操作なし。
 
 これは**入力用回答案と適用条件**。質問票の実画面は未操作。ラベルが変わっていたら意味を照合し、未掲載の設問を一律Noにしない。提出可否は [G5-CHECKLIST.md](G5-CHECKLIST.md)。`null` は取得不能/未確認でありNoや0ではない。要件は変更しない。
 
@@ -66,11 +66,11 @@ Apple [App Privacy Details](https://developer.apple.com/app-store/app-privacy-de
 | Other Data / Other Data Types | Yes (追加案) | App Functionality | Yes | No | `users.timezone`はユーザー生成コンテンツではない。日付境界のため保存する。現行manifestに未宣言、OtherUserContent包含の旧案は採用保留 |
 | User Content / Customer Support | Yes (追加案) | App Functionality | Yes | No | ReportComposerはペアID/対象/日付/版をメールへ添える。任意サポート申告免除の全条件(表示名等)を満たす証跡なしのため、免除と断定しない |
 | Contact Info / Email Address | Yes (サポート受信時の追加案) | App Functionality | Yes | No | 運営が受ける問い合わせ/通報の返信先。通常オンボでは取得しない。ASCの説明とポリシーの収集表へ反映が必要 |
-| Usage Data / Product Interaction | Yes (追加案) | Analytics | Yes | No | 保存されたcheckin/nudge/invite等からD1/D7や転換を評価する実運用(§7)。分析イベントの専用送信はしないが、未収集/用途なしとは扱わない |
+| Usage Data / Product Interaction | Yes (追加案) | App Functionality + Analytics | Yes | No | checkin/nudge/invite等は機能提供のため保存し、D1/D7や転換の評価にも使用する(§7)。分析イベントの専用送信はしないが、未収集/用途なしとは扱わない |
 | Purchases / Purchase History | No **条件付き** | — | — | — | 無料ビルドでRevenueCat非初期化・非通信・購入入口なしを実測できた場合だけ。有効なら下の分岐 |
 | Location / Health & Fitness / Contacts / Audio / Browsing History / Search History / Financial Info / Sensitive Info / Diagnostics / Advertising Data / Surroundings / Body | No **棚卸し条件付き** | — | — | — | 自前コードに取得APIなし。約束/写真を医療情報として解析しない。サーバーログ・SDKの実保持が判明した型は追加し、未掲載のものを一律Noにしない |
 
-**重要な未整合**: 現行 `Lien/PrivacyInfo.xcprivacy` はName/Photos/OtherUserContent/UserID/DeviceIDの5型・機能用途だけ、現行ポリシーは「利用状況を収集しない」。上記の保守的な回答案をそのままASCだけへ入れて整合済みにはできない。eng/法務担当が実データ用途・保持/SDKを照合し、manifest/ポリシー/ASCの3点を同じ実態へ直すことを提出前ゲートにする。本タスクではコード/ポリシーや運用を独断で変えない。
+**重要な照合残件**: 現行 `Lien/PrivacyInfo.xcprivacy` はName/Photos/OtherUserContent/UserID/DeviceIDの5型・機能用途だけ。現行 `privacy-policy.md` §1は分析SDK/計測専用テーブルなし・利用統計の専用送信なしを説明し、機能提供のため保存した情報の集計を明記している。§2にも品質改善の統計分析と問い合わせ対応を記載済みで、集計用途がポリシーに無いという指摘ではない。未整合はmanifestの集計用途/追加型と、サポート返信先等の収集表への反映・SDK/ログの実保持の照合にある。上記の保守的な回答案をASCだけへ入れて整合済みにはできない。eng/法務担当が実態と照合し、必要なmanifest/ポリシーの修正とASC回答の確定を行うことを提出前ゲートにする。本タスクではコード/ポリシーや運用を独断で変えない。
 
 サポート申告を省く場合はAppleのOptional disclosureの**全条件**の証拠が必要。「任意」だけでは足りない。サーバーログの保持期間/識別用途/診断情報は本タスクで管理画面を開いておらず `null`。これも担当者が照合する。
 
