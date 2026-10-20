@@ -10,39 +10,39 @@ final class PushSnapshotWriterTests: XCTestCase {
     func testNSEPayloadWritesSharedSnapshotAndReloadsOnce() throws {
         let temp = TempStore()
         defer { temp.cleanup() }
-        let reloads = ReloadCounter()
-        let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { reloads.value += 1 })
+        var reloadCount = 0
+        let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { reloadCount += 1 })
         let snapshot = SnapshotFactory.paired(todayPartnerDone: true)
         XCTAssertEqual(try writer.receive(payload(snapshot)), snapshot)
         XCTAssertEqual(temp.store.loadSnapshot(), snapshot)
         XCTAssertEqual(try writer.receive(payload(snapshot)), snapshot)
-        XCTAssertEqual(reloads.value, 1)
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testDelayedPushCannotRollBackNewerState() throws {
         let temp = TempStore()
         defer { temp.cleanup() }
-        let reloads = ReloadCounter()
+        var reloadCount = 0
         let newest = SnapshotFactory.paired(todayPartnerDone: true, updatedAt: SnapshotFactory.fixedDate.addingTimeInterval(5))
         try temp.store.saveSnapshot(newest)
-        let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { reloads.value += 1 })
+        let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { reloadCount += 1 })
         XCTAssertEqual(try writer.receive(payload(SnapshotFactory.paired())), newest)
         XCTAssertEqual(temp.store.loadSnapshot(), newest)
-        XCTAssertEqual(reloads.value, 0)
+        XCTAssertEqual(reloadCount, 0)
     }
 
     func testTimestampOnlyPushSavesWithoutReload() throws {
         let temp = TempStore()
         defer { temp.cleanup() }
-        let reloads = ReloadCounter()
+        var reloadCount = 0
         let first = SnapshotFactory.paired()
         try temp.store.saveSnapshot(first)
         var next = first
         next.updatedAt = first.updatedAt.addingTimeInterval(5)
-        let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { reloads.value += 1 })
+        let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { reloadCount += 1 })
         XCTAssertEqual(try writer.receive(payload(next)), next)
         XCTAssertEqual(temp.store.loadSnapshot(), next)
-        XCTAssertEqual(reloads.value, 0)
+        XCTAssertEqual(reloadCount, 0)
     }
 
     func testMalformedAndMissingPayloadPreserveCache() throws {
@@ -81,16 +81,16 @@ final class PushSnapshotWriterTests: XCTestCase {
         let temp = TempStore()
         defer { temp.cleanup() }
         try Data().write(to: temp.directory)
-        let reloads = ReloadCounter()
-        let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { reloads.value += 1 })
+        var reloadCount = 0
+        let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { reloadCount += 1 })
         let snapshot = SnapshotFactory.paired()
         XCTAssertThrowsError(try writer.receive(payload(snapshot)))
-        XCTAssertEqual(reloads.value, 0)
+        XCTAssertEqual(reloadCount, 0)
         try FileManager.default.removeItem(at: temp.directory)
         XCTAssertEqual(try writer.receive(payload(snapshot)), snapshot)
         _ = try writer.receive(payload(snapshot))
         XCTAssertEqual(temp.store.loadSnapshot(), snapshot)
-        XCTAssertEqual(reloads.value, 1)
+        XCTAssertEqual(reloadCount, 1)
     }
 
     func testConditionalWriteRejectsStateChangedByAnotherStore() throws {

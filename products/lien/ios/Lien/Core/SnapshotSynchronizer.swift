@@ -112,8 +112,6 @@ final class SnapshotSynchronizer {
             } catch {
                 return .failed(.storage)
             }
-            // 表示が変わるときだけウィジェットを reload する(updatedAt だけの差では reload しない —
-            // WidgetKit の reload 予算を前面復帰のたびに消費しない — DESIGN §3.5)
         }
         return .applied(fetched)
     }

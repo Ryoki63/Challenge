@@ -3,6 +3,7 @@ import XCTest
 
 private final class ConditionalSnapshotClient: SnapshotClient {
     var snapshot = SnapshotFactory.paired(todayPartnerDone: true)
+    var revision = "revision-1"
     var requests: [String?] = []
     var failFirst = false
     var onFetch: (() -> Void)?
@@ -13,12 +14,32 @@ private final class ConditionalSnapshotClient: SnapshotClient {
         requests.append(etag)
         onFetch?()
         if failFirst, requests.count == 1 { throw SnapshotClientError.network }
-        return etag == "revision-1" ? .unchanged : .snapshot(snapshot, etag: "revision-1")
+        return etag == revision ? .unchanged : .snapshot(snapshot, etag: revision)
     }
 }
 
 @MainActor
 final class SnapshotRecoveryTests: XCTestCase {
+    func testRelaunchRepairsMissedPushFromPreviousCheckpoint() async throws {
+        let temp = TempStore()
+        defer { temp.cleanup() }
+        let client = ConditionalSnapshotClient()
+        let reloads = ReloadCounter()
+        let first = SnapshotSynchronizer(client: client, store: temp.store, reloadWidgets: { reloads.value += 1 })
+        _ = await first.sync()
+        client.snapshot.todayPartnerDone = false
+        client.revision = "revision-2"
+        let relaunched = SnapshotSynchronizer(client: client, store: temp.store, reloadWidgets: { reloads.value += 1 })
+        let outcome = await relaunched.sync()
+        XCTAssertEqual(outcome, .applied(client.snapshot))
+        XCTAssertEqual(client.requests[1], "revision-1")
+        XCTAssertEqual(temp.store.loadSnapshot(), client.snapshot)
+        XCTAssertEqual(SnapshotCheckpoint.load(from: temp.store)?.etag, "revision-2")
+        _ = await relaunched.sync()
+        XCTAssertEqual(client.requests[2], "revision-2")
+        XCTAssertEqual(reloads.value, 2)
+    }
+
     func testRelaunchRequestsChangesFromLastPersistedSyncWithoutDuplicateReload() async throws {
         let temp = TempStore()
         defer { temp.cleanup() }

@@ -160,6 +160,17 @@ final class EdgeFunctionSnapshotClientTests: XCTestCase {
         EdgeFunctionSnapshotClient(baseURL: baseURL, tokenProvider: tokenProvider, session: makeSession())
     }
 
+    func testChangedSnapshotReturnsServerETagForNextSync() async throws {
+        let client = makeClient()
+        StubURLProtocol.responseHeaders = ["ETag": "W/\"revision-2\""]
+        reply(200, #"{"snapshot":\#(snapshotJSON)}"#)
+        let result = try await client.fetchChanges(etag: "W/\"revision-1\"")
+        guard case .snapshot(let snapshot, let etag) = result else { return XCTFail("変更は200のsnapshot") }
+        XCTAssertEqual(snapshot.myPromiseTitle, "筋トレ")
+        XCTAssertEqual(etag, "W/\"revision-2\"")
+        XCTAssertEqual(StubURLProtocol.captured.first?.header("If-None-Match"), "W/\"revision-1\"")
+    }
+
     func testConditionalFetchSendsCheckpointAndAccepts304() async throws {
         let client = makeClient()
         reply(304, "")
