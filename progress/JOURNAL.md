@@ -739,3 +739,22 @@
 - 10/20 23:17 JST レビュー: qa-review に独立レビューを依頼。結果を受けて must-fix を反映し、PR/Issue に PASS を記録する。
 - 10/20 23:18 JST レビュー結果: qa-review は **PASS**（must_fix 0）。should_fix 3件（#12の主語、#2でBも保存する理由、#8のチェック印）を反映し、再確認も PASS。commit `1172aa2`。
 - 10/20 23:18 JST 最終検証: 最終 HEAD の CI 6ジョブがすべて pass。PR #128 はレビュー済みでマージ待ち（マージはしない）。Issue は `status:review` のまま。
+
+## 2026-10-20 23:01 (eng-lead) — Issue #106 T28b 本番リリース実行手順
+- 着手: 指定 worktree・ブランチ・origin と追跡差分なしを確認。Issue #106 の受入条件だけを対象に、Secrets 6件の取得担当、dry_run → 本番、切り戻し、内部 TestFlight の確認を1枚にまとめる。
+- 範囲: release workflow・署名スクリプト・既存 README の読み取りと手順書／導線／レビュー記録のみ。secret・.env の読み書き、workflow の実起動、Apple／Supabase の変更、配布・招待送信、main への push／マージは行わない。
+- 前提: 役職カードの旧12/11ではなく、現行指示の10/24機能凍結・10/27審査提出・10/31公開を基準とする。1時間は目標であり、Apple側の処理時間や署名権限を確認せず達成済みとは扱わない。
+- 節目: assigneeをRyoki63に設定・再取得し、着手コメントを投稿。開始直後のJOURNAL追記によりpull --rebaseが未ステージ差分で停止したため、autostash付きで同期し「Already up to date」を確認。needs-approvalを走査し、#29に人間返信があるがon-holdかつ今回の単一タスク範囲外のため変更しない。
+- 設計判断: 単一Markdownの実行シートを追加し既存README §8から案内。workflow/署名/ExportOptions/CI gateを照合し、internal_onlyはApple側の配布制限ではないこと、署名warning・アップロード結果不明・run_number再利用の境界を明記。データ移行は対象外。
+- 出典確認: Apple公式のTeam API keys・クラウド証明書・内部テスター、およびSupabase公式のAPI keysを確認。Adminというロール名だけで初回署名を保証しない。ローカルはCommand Line Toolsのみで、署名・iOS実ビルドを実測したとは扱わない。
+- 検証途中: release関連Python unittest 130件PASS。既存release成功履歴は別SHAであり、今回の本番署名成功とは扱わない。1枚の手順に対するeng-reviewを次に実施する。
+- 23:14 節目: 独立eng-reviewは4受入条件すべてPASS・重大指摘なし。非阻害のmain更新race指摘を採用し、SHA不一致/取得不能時の取消・ASC到達確認・配布禁止を明記した。限定段落のみ再確認を依頼する。レビューと検証の境界はdocs/REVIEW-106-RELEASE.mdへ記録。
+- 表示確認: 外部通信を遮断したChromeのローカルプレビューで表2個・各7行・コード例3個・横overflowなしを確認、Secrets表と切り戻し表を目視。full-page撮影は失敗したためviewport撮影で代替した。QA生成物はworktree内の無視対象build配下のみ。
+- 23:22 検証ゲート: eng-reviewの限定再確認PASS・未解決指摘なし。全要件の記載PASS／関連テスト130件PASS／コード例3ブロックとrelease.shのbash -n PASS／ローカルリンク・Secrets6件一致・秘密値形式不在・JOURNAL追記のみ・git diff --check PASS。型チェック・lint・ローカルiOS buildは文書のみのため対象外（Xcode未導入）。署名・Appleアップロード・招待送信は未実行。残TODOゼロ（今回の文書受入範囲）。
+- 提出準備: 指定ブランチへcommit/pushしPRを作成する。mainへ直接pushせず、PRのマージはレビュー役職へ委ねる。push後CIは提出SHAで確認し、既存runの緑で代替しない。
+- 23:24 提出: 実装コミットf3311d9を指定ブランチへpushしPR #129を作成。mainへの直接push・マージは行っていない。提出SHAのlien-ci run 39438487582は6ジョブsuccess、lien-ios run 39438492922は実行中。最終CI結果はPR #129へ追記し、実行中を成功とは扱わない。
+- 結果（文書・レビュー）: Issue #106の4受入条件を満たす単一実行シートと導線、eng-review PASS記録をPR #129へ提出済み。署名・TestFlight到達・招待受信は今回の実行対象外。公開期限は変更せず、初回署名とApple処理待ちのリスクを残検証として明記。PRはOPENのままレビュー役職へ引き継ぐ。
+- 23:42 CI障害: lien-ios run 39438492922の初回はSwiftPM依存取得中にGitHub:443接続不能およびRevenueCat cloneのcurl 56 timeout/early EOFで失敗（exit 74）。アプリのbuild/testには到達しておらず、完了ゲート未達。無関係なworkflow/依存定義は変更せず、同runの失敗ジョブを1回だけ再実行した。再失敗時は3回目を行わず未完了として返す。
+- 23:50 CI節目: attempt 2はSwiftPM依存解決を23:45 JSTに通過し、初回の接続障害箇所は回復。iPhone 17シミュレータ起動中でbuild/testはまだ未到達。結果を待ち、依存解決成功だけでCI全体PASSとは扱わない。
+- 2026-10-21 00:03 CI最終: attempt 2は無署名build/testがsuccess、1221件・0 failures・TEST SUCCEEDEDをログで確認。しかしジョブ全体は20分15秒で上限超過、API conclusion=cancelled。CI全体successではないため完了扱いにしない。同操作の3回目は行わない。
+- 結果（最終判定）: failed。文書4受入条件・eng-review・ローカル130件・CIの無署名1221件はPASSだが、提出実装SHAのlien-ios全体緑ゲートは未達。PR #129はOPEN・未マージ、Issue #106もOPENを維持。CI実行時間の復旧と再検証を引き継ぎ、今回はworkflowやアプリを変更しない。secret/Appleアップロード/招待/本番変更なし。
