@@ -298,12 +298,23 @@
 - 次(第4波): ios-serial(#16 通知 縮小版 → #17 ウィジェット S+ロック → #18 履歴 → #19 チケット残数 → #22 シェア画像)∥ backend(#19 サーバー側 ticketBalance+#68 写真の削除+バケット制限 → #16 サーバー側 節目の通知)∥ docs
 - 第4波 起動(Workflow wf_61db8718-7fe): ios-serial(仕上げ=#59/#57 の改善提案 → #16 通知 縮小版 → #17 ウィジェット S/M/ロック → #18 履歴 → #19 チケット残数 → #22 シェア画像+節目のお祝い)∥ backend(#19 サーバー側 ticketBalance+#68 取消時の写真削除+バケット制限)∥ docs #69(文書の追随+KPI の SQL+#63 の判断材料)。判断: 節目の通知は v1.0 では出さずアプリ内のお祝い+シェア誘導にする(サーバー側の通知設定が v1.1 のため、オフにできない通知を作らない=D3 の帰結)
 
-## 2026-10-20 12:25 (HQ/eng-exec — T30 審査チェックリスト消化 / issue #30) — 文書側を確定・PR 作成
-- 着手: worktree `Challenge-30`(origin/main `35bad0d`)。Issue #30 の残り(REQUIREMENTS §8 の文書・App Privacy・年齢レーティング・プライバシーマニフェスト・審査用デモ運用)を実施。iOS の実機/TestFlight 確認は G0(#38)後で、この Mac には Xcode が無い(`xcodebuild` は CommandLineTools)ため、実ビルドは CI と 10/23 の内部 TestFlight に委ねる
-- 変更(文書): `marketing/privacy-policy.md`・`legal/privacy.html` から「Sign in with Apple の識別子」「利用状況(自動取得)」の行を削除し、D3(v1.0 は SIWA なし)・D6(分析 SDK・計測テーブルなし。アプリは計測のために何も送らない)を明記。§8 を「v1.0.1 以降」に。`legal/CHECKLIST-G4.md` の計測手段の未決定項目を D6 の確認に置き換え、SIWA の確認を追加
-- 変更(review-notes): §1.3 を匿名認証の実態に合わせた**2組のデモ運用**に確定(相手役のニックネーム+提出日に発行する招待コード。コードはリポジトリに置かず ASC の Notes for Review へ)。§2.1 を `PrivacyInfo.xcprivacy` の5型(Name / Photos / Other User Content / User ID / Device ID)に一致。§2.2 に年齢レーティングの UGC 設問(4+/9+ の分岐、健康・ウェルネスは要確認)、§2.7 にプライバシーマニフェストの台帳を追加。§1.1・§1.4・§1.5 にコードで一致を確認した証跡を追記
-- 追加(道具): `products/lien/scripts/review-demo/`(partner.sh / partner.ts / partner_lib.ts / partner_lib_test.ts / README.md)。公開 anon キーだけを使い、セッションはリポジトリ外の 0600 ファイル。create / new-invite / checkin(--photo)/ nudge / status / delete を用意
-- 追加(テスト): `products/lien/scripts/ops/marketing_docs_static_test.ts` を新設し、D6・D3 の記載漏れ、§2.1 とマニフェストの不一致、§1.3 の TBD 残り、G4 の未決定項目を CI で止める。`review-demo` の単体テストを lien-ci の e2e-tests ジョブに追加
-- 変更(仕様・計画): REQUIREMENTS §8 に 2026-10-20 の反映注記と各項目の追記(チェックボックスは実ビルド確認まで `[ ]` のまま)。TASKPLAN §9.4 の T30 行と #58 引き継ぎ2・3 に完了を記録
-- 検証(ローカル): supabase functions `deno test` 393 passed / 契約フィクスチャ 22 件一致 / ops `deno test --allow-read` 76 passed(新規8件を含む)/ e2e unit 65 passed + `deno check` / review-demo 17 passed + `deno check` / store metadata OK / `git diff --check` OK / 秘密の混入なし
-- 残り: G0 承認後の内部 TestFlight(10/23)で §1.1・§1.4・§1.5 の手順を実ビルドで再現 → §8 のチェックを埋める。提出日(10/27)に相手役の招待コードを2つ発行して ASC の Notes for Review に記入。Support URL/Privacy URL の Pages 公開と連絡先は G4(#42)
+## 2026-10-20 09:55 — T19a(#19) iOS: チケット残数バッジ
+- 着手: Issue #19 の iOS 残分を実装する。範囲は D3(2026-10-12)・TASKPLAN §9 の T19a = snapshot の `ticketBalance` を読む `PairSnapshot` + ホームの残数バッジ(0枚でも表示)。**お休み宣言 UI / rest-declare は 1.0.1 のため作らない**(Issue 本文の古い計画より D3 と TASKPLAN §9 を優先)。
+- サーバー側(ticketBalance)は 2026-10-13 に完了済み。契約フィクスチャにも `snapshot.paired=2` / `snapshot.solo=null` が入っていることを確認。
+- 作業場所: worktree `/Users/kojimaryoki/.consilium/wt/Challenge-19`、ブランチ `consilium/19-t19-ui`。origin に対象ブランチ・既存 PR は無し(重複作業なし)。
+- 検証予定: `products/lien/ios/scripts/macos-check/check.sh test PairSnapshotTests HomeViewModelTests ContractFixtureTests StringsReviewTests` と `views`。Xcode は無いためフルのシミュレータ CI は push 後に GitHub Actions で確認する。
+- 実装: `PairSnapshot.ticketBalance: Int?`(キー欠落・null・型違いは nil、0 は有効値、エンコードは null を明示) / `HomeViewModel.ticketBalance`(ペア成立かつ 0 以上のときだけ返す。ソロ・負の値は nil)/ `TicketBalanceBadge`(ホームのストリーク直下。0枚でも表示、アイコン+「お休みチケット 残り○枚」)/ `Strings.Tickets`。`HomeView` は nil のときバッジごと出さない。
+- テスト: PairSnapshot の欠落/null/型違い/0/往復/翌日リセット、HomeViewModel の 2・0・nil・ソロ・負・空状態、契約フィクスチャ(snapshot/checkin/invite-accept/nudge/plant-name/pair-dissolve/push)の値、StringsCatalog、0枚バッジの実描画(白紙でない)。既存の全テストに回帰なし。
+- 検証: `scripts/macos-check/check.sh all` = module 74 ファイル・**998 tests / 0 failures / 20152 assertions**、views 103 ファイル、widget 18 ファイルとも OK(既存の ISO8601DateFormatter の Swift 6 警告のみ。この変更では増えていない)。フルのシミュレータ CI は push 後。
+- CI(正本): **lien-ios run 39351451628 success**(12m44s・commit d229f32)。`Executed 1075 tests, with 0 failures` / `** TEST SUCCEEDED **`。新規の `TicketBalanceBadgeRenderTests` 2件、`PairSnapshotTests` / `HomeViewModelTests` / `ContractFixtureTests` の ticketBalance テストがログ上で passed。lien-ci run 39351451853 も success(サーバー側の変更なし)。
+- 目視: CI artifact `plant-render-sheets` の `ticket_01_balances.png` / `ticket_zero_large.png` / `ticket_zero_accessibility5.png` を取得して確認。0枚でもバッジが表示され、最大の文字サイズ(accessibility5)でも折り返して欠けない。
+- 結果: **PR #84 作成**(https://github.com/Ryoki63/Challenge/pull/84)。お休み宣言 UI / rest-declare は D3・TASKPLAN §9 のとおり v1.0.1 の対象なので実装していない。レビュー役職(eng-review)の判断待ちで、issue は閉じない。
+
+## 2026-10-20 11:54 (eng-exec) — T27 #27 Strings.swift 全文言のレビュー
+- 着手: オンボ磨き・空状態・エラー文言の総点検(罰なし原則)。`Strings.swift` を全件読み、`StringsCatalog` の 297 単位(580 出力)をレビュー
+- 成果: `docs/STRINGS-REVIEW.md` に全 297 単位の判定(OK 291 / 修正 6 / 保留 0)、空状態 14・エラー文言 33 の点検、判定基準、修正理由、変えないと決めた点を記録
+- 修正 6 件: Dissolve の「ストリーク」「アーカイブ」をユーザーの言葉に / 閉じるボタン2件を「閉じる」に / 「名前をかえる」→「名前を変える」/ 「写真をおくっています…」→「写真を送っています…」/ nameInvalidError を「改行や見えない文字は、名前に使えません」に
+- 検査: `scripts/macos-check/check.sh` = module 74ファイル・**992 tests 0 failed**(assertions 24446)・views 102ファイル・widget 18ファイル。レビュー関連 28 tests 0 failed。CI `lien-ios` は PR #86 で確認
+- 回帰検査: `StringsReviewTests` にログ網羅・文言一致・集計・開発者ことば・閉じる・通信エラーの6テストを追加
+- 残: 初回同期失敗時に `.promiseSetup` を出す画面遷移は文言では決められないため、`docs/STRINGS-REVIEW.md` §6.1 に判断材料と推奨案を残した(eng-lead / T30)。実機 VoiceOver は T20
+- 結果: PR #86 を作成(レビュー待ち。マージはしない)

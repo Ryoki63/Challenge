@@ -19,7 +19,8 @@
 //     "plantNextStageAt": 14,
 //     "plantMood": "normal | happy | fidget | sad",
 //     "plantName": "みどり",
-//     "hasPartnerPhotoToday": false
+//     "hasPartnerPhotoToday": false,
+//     "ticketBalance": 2
 //   }
 //
 // - snapshot は**受信者視点**でサーバーが組み立てる(me/partner をクライアントで反転しない — §3.4)
@@ -31,6 +32,9 @@
 //   * 成長ルール v2 の新キー3つ(plantGrownDays / plantStageFloor / plantNextStageAt。DESIGN §3.4)は**省略可**:
 //     無いとき(古いサーバー・古いキャッシュ)は nil のまま持ち、画面はゲージを出さない(0 で埋めると、
 //     表示が「0回」と出てちらつく — GROWTH §8.6)。型が違っても snapshot 全体を壊さず nil として扱う
+//   * お休みチケットの残数(ticketBalance。DESIGN §3.4)は**省略可**: 無い(古いサーバー・古いキャッシュ)・
+//     null(ソロ、またはサーバーが残数を読めていない)は nil のまま持ち、ホームはバッジを出さない。
+//     0 は「0枚」の有効な値として持ち、バッジを出す(罰なし — REQUIREMENTS §3.5)。型が違っても壊さず nil
 // - このファイルは Lien / LienWidget / LienNSE の3ターゲットでソース共有される(project.yml 参照)。
 //   Foundation 以外に依存させないこと。
 
@@ -90,6 +94,11 @@ struct PairSnapshot: Equatable, Sendable {
     var plantMood: PlantMood
     var plantName: String?
     var hasPartnerPhotoToday: Bool
+    /// お休みチケットの残数(ペア共有の在庫。`pairs.ticket_balance`。DESIGN §3.4)。
+    /// 0 以上の整数。**0 は有効**(0枚でもホームにバッジを出す — 罰なし)。nil = キーが無い(古いサーバー・
+    /// 古いキャッシュ)・null(ソロ、またはサーバーが残数を読めていない)・型違い → バッジを出さない。
+    /// ペアの2人に同じ値が見える(受信者視点で反転しない)
+    var ticketBalance: Int? = nil
 }
 
 // MARK: - Codable(§3.4 のキー名と一字一句一致させる)
@@ -115,6 +124,7 @@ extension PairSnapshot: Codable {
         case plantMood
         case plantName
         case hasPartnerPhotoToday
+        case ticketBalance
     }
 
     init(from decoder: Decoder) throws {
@@ -140,6 +150,8 @@ extension PairSnapshot: Codable {
         plantMood = try c.decodeIfPresent(PlantMood.self, forKey: .plantMood) ?? .normal
         plantName = try c.decodeIfPresent(String.self, forKey: .plantName)
         hasPartnerPhotoToday = try c.decodeIfPresent(Bool.self, forKey: .hasPartnerPhotoToday) ?? false
+        // 残数: 省略可。無い・null・型違いは nil(バッジを出さない)。0 はそのまま 0(0枚でもバッジを出す)
+        ticketBalance = try? c.decodeIfPresent(Int.self, forKey: .ticketBalance)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -169,6 +181,8 @@ extension PairSnapshot: Codable {
         try c.encode(plantMood, forKey: .plantMood)
         try c.encode(plantName, forKey: .plantName)
         try c.encode(hasPartnerPhotoToday, forKey: .hasPartnerPhotoToday)
+        // 残数は、nil でもキーを省略せず null で書く(サーバーの形と同じ。DESIGN §3.4「キーは省略せず null で出す」)
+        try c.encode(ticketBalance, forKey: .ticketBalance)
     }
 }
 

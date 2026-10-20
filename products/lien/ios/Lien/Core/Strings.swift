@@ -245,7 +245,7 @@ enum Strings {
         static func stageUpBody(_ grownDays: Int) -> String {
             "ふたりで \(grownDays)回 そろったよ"
         }
-        static let celebrationClose = "とじる"
+        static let celebrationClose = "閉じる"
         /// 変わる前 / 後の植物(VoiceOver)
         static func celebrationBefore(_ stageName: String) -> String {
             "さっきまで: \(stageName)"
@@ -269,7 +269,7 @@ enum Strings {
         // MARK: 名前付け(GROWTH §5.3。最初の「ふたば」の演出の中で付ける。先に付けた人の名前に決まる)
 
         static let nameTitle = "名前をつけてあげよう"
-        static let renameTitle = "名前をかえる"
+        static let renameTitle = "名前を変える"
         static let namePlaceholder = "なまえ(8文字まで)"
         static let nameNote = "どちらかが先につけると、その名前に決まります。あとからいつでも変えられます。"
         static let nameSubmit = "名前をつける"
@@ -282,7 +282,7 @@ enum Strings {
         static let nameEmptyError = "名前を入力してね"
         static let nameTooLongError = "名前は8文字までです"
         /// 改行・見えない文字・向きを変える制御文字など(サーバーの invalid_name と同じ規則)
-        static let nameInvalidError = "使えない文字が入っています"
+        static let nameInvalidError = "改行や見えない文字は、名前に使えません"
         static let nameSaveError = "保存できませんでした。通信状態を確認して、もう一度お試しください"
         static let nameNoPairError = "いまはペアがいないので、名前をつけられません"
         /// 自分が付けた: 「『みどり』と名づけたよ」
@@ -420,12 +420,22 @@ enum Strings {
         static let emptyMessage = "ふたりの今日を準備しています"
     }
 
+    /// お休みチケット(REQUIREMENTS §3.6 / DESIGN §3.4 / T19a #19)。
+    /// v1.0 は自動消費と残数バッジまで(D3)。お休み宣言 UI は 1.0.1。
+    /// 罰・恥系の表現は使わない(§3.5。0枚でも責めない)
+    enum Tickets {
+        /// ホームの残数バッジ。0枚でも出す(罰なし — REQUIREMENTS §3.5)
+        static func balance(_ count: Int) -> String {
+            "お休みチケット 残り\(count)枚"
+        }
+    }
+
     /// チェックインフロー(写真添付+当日取消 — REQUIREMENTS §3.4 / T14)。
     /// 罰・恥系の表現は使わない(§3.5。取消も「誤タップ対応」であって責めない)
     enum Checkin {
         // 写真を添える(完了後・任意・その日1枚 — §3.4)
         static let attachPhotoButton = "写真を添える"
-        static let attachPhotoSending = "写真をおくっています…"
+        static let attachPhotoSending = "写真を送っています…"
         static let attachPhotoDoneNote = "今日の写真を添えました"
         static let attachPhotoErrorMessage = "写真を送れませんでした。もう一度お試しください"
 
@@ -478,7 +488,7 @@ enum Strings {
             "\(partnerName)の今日の写真(大きい表示)"
         }
         /// 全画面を閉じるボタンの VoiceOver 名
-        static let viewerCloseButton = "とじる"
+        static let viewerCloseButton = "閉じる"
         /// 全画面の通報・ブロックのメニューボタンの VoiceOver 名(App Store ガイドライン 1.2: 拡大したままでも通報できる)
         static let viewerMenuButton = "通報・ブロック"
     }
@@ -630,7 +640,7 @@ enum Strings {
         static let lead = "ペアを解消すると、相手との共有がすべて止まります。"
         static let effectPhotos = "相手の写真・約束・チェックインは、お互いに見えなくなります"
         static let effectNudges = "つつく・リアクション・通知も、相手とのあいだで届かなくなります"
-        static let effectArchive = "植物とストリークの記録はアーカイブされ、同じ相手と組み直しても復活しません"
+        static let effectArchive = "植物とふたりの記録は、ここでいったん区切られます。同じ相手と組み直しても、前の続きにはなりません"
         static let effectHistory = "あなたのチェックイン履歴は、あなたの記録として残ります"
         static let partnerNote = "相手には通知は届きません。次にアプリを開いたときに、ペアが終わったことがわかります。"
         static let button = "ペアを解消する"
@@ -714,5 +724,45 @@ enum Strings {
         static let lostMessage = "この端末のログイン情報が使えなくなっているようです。通信状態が悪いだけのときは「あとで」を選んでください。「はじめからやり直す」を選ぶと、この端末の記録を消して、最初の画面に戻ります。"
         static let restart = "はじめからやり直す"
         static let later = "あとで"
+    }
+
+    /// カレンダー履歴(REQUIREMENTS §3.11 / T18 #18)。
+    /// 途切れた日は無彩色の点だけにして、言葉で責めない(REVIEW-2026-10-12 §4.2)。
+    enum History {
+        static let title = "ふたりの記録"
+        static let openButtonLabel = "ふたりの記録を開く"
+        static let previousMonth = "前の月"
+        static let nextMonth = "次の月"
+
+        // 月の見出しと曜日(日曜はじまり。Calendar.lienHistory の firstWeekday = 1 と揃える)
+        static let weekdaySymbols = ["日", "月", "火", "水", "木", "金", "土"]
+
+        // 凡例と読み上げ。noRecord / beforePair / future / todayPending は画面に文字を出さない
+        static let bothDone = "ふたり達成"
+        static let meOnly = "じぶんだけ"
+        static let partnerOnly = "あいてだけ"
+        static let restTicket = "お休み"
+        static let noRecord = "記録なし"
+        static let beforePair = "ペアになる前"
+        static let future = "これから"
+        static let todayPending = "今日"
+
+        // 読み込み・空状態(責めない文言)
+        static let loadFailed = "記録を読み込めませんでした。通信状態を確認して、もう一度お試しください"
+        static let retry = "もう一度"
+        static let empty = "ペアになると、ふたりの記録がのこります"
+
+        static func monthTitle(year: Int, month: Int) -> String {
+            "\(year)年\(month)月"
+        }
+
+        static func dayTitle(month: Int, day: Int) -> String {
+            "\(month)月\(day)日"
+        }
+
+        /// VoiceOver の読み上げ(例:「10月5日、ふたり達成」)
+        static func dayAccessibility(_ dateText: String, _ markText: String) -> String {
+            "\(dateText)、\(markText)"
+        }
     }
 }

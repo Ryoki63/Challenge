@@ -15,7 +15,8 @@
 //      どの文言にも含まれてしまい、足し忘れを見逃す(#57 の持ち越し)
 //
 // 機械チェックは補助にすぎない(責めるニュアンスは語では捕まらない)。
-// 全文言の目視レビュー(レビュー表)は T27 本体(#27)で行い、StringsCatalog がその一覧の元になる。
+// 全文言の目視レビュー(T27 本体 #27)は docs/STRINGS-REVIEW.md に記録する。StringsCatalog がその一覧の元で、
+// testReviewLog* が「全単位がログにあること・文言がずれていないこと」を CI で検査する。
 
 import XCTest
 @testable import Lien
@@ -78,6 +79,8 @@ enum StringsCatalog {
     /// 名前は日本語・英字・絵文字入り、日数は 0 と大きい値を含める
     static let representativeNames = ["ゆうき", "Aki", "🌱はな"]
     static let representativeDays = [0, 1, 23, 365]
+    /// お休みチケットの残数の代表(0枚でもバッジを出す — REQUIREMENTS §3.5)
+    static let representativeTicketBalances = [0, 1, 2, 5]
     static let representativeDates = ["2026年10月20日 21:00", "Oct 20, 2026 at 9:00 PM"]
     /// 運営の連絡先として文言に入るメールアドレスの代表(メールを開けなかったときの案内)
     static let representativeAddresses = ["support@example.com"]
@@ -207,6 +210,11 @@ enum StringsCatalog {
         }
         for name in representativeNames {
             add("Home.partnerWaiting(\(name))", Strings.Home.partnerWaiting(name))
+        }
+
+        // Tickets(お休みチケットの残数バッジ — T19a #19)
+        for count in representativeTicketBalances {
+            add("Tickets.balance(\(count))", Strings.Tickets.balance(count))
         }
 
         // Checkin
@@ -505,6 +513,44 @@ enum StringsCatalog {
             }
         }
 
+        // History(T18 #18)
+        add("History.title", Strings.History.title)
+        add("History.openButtonLabel", Strings.History.openButtonLabel)
+        add("History.previousMonth", Strings.History.previousMonth)
+        add("History.nextMonth", Strings.History.nextMonth)
+        for (index, symbol) in Strings.History.weekdaySymbols.enumerated() {
+            add("History.weekdaySymbols[\(index)]", symbol)
+        }
+        add("History.bothDone", Strings.History.bothDone)
+        add("History.meOnly", Strings.History.meOnly)
+        add("History.partnerOnly", Strings.History.partnerOnly)
+        add("History.restTicket", Strings.History.restTicket)
+        add("History.noRecord", Strings.History.noRecord)
+        add("History.beforePair", Strings.History.beforePair)
+        add("History.future", Strings.History.future)
+        add("History.todayPending", Strings.History.todayPending)
+        add("History.loadFailed", Strings.History.loadFailed)
+        add("History.retry", Strings.History.retry)
+        add("History.empty", Strings.History.empty)
+        for year in [2025, 2026] {
+            for month in [1, 10, 12] {
+                add("History.monthTitle(\(year), \(month))", Strings.History.monthTitle(year: year, month: month))
+            }
+        }
+        for day in [1, 5, 31] {
+            add("History.dayTitle(\(day))", Strings.History.dayTitle(month: 10, day: day))
+        }
+        for mark in [
+            Strings.History.bothDone, Strings.History.meOnly, Strings.History.partnerOnly,
+            Strings.History.restTicket, Strings.History.noRecord, Strings.History.beforePair,
+            Strings.History.future, Strings.History.todayPending,
+        ] {
+            add(
+                "History.dayAccessibility(\(mark))",
+                Strings.History.dayAccessibility(Strings.History.dayTitle(month: 10, day: 5), mark)
+            )
+        }
+
         return items
     }
 }
@@ -574,6 +620,89 @@ private enum LienSourceFiles {
                 userInfo: [NSLocalizedDescriptionKey: "\(relativePath) が読めません(\(url.path)): \(error)"]
             )
         }
+    }
+
+    /// リポジトリ直下からの相対パス(docs/STRINGS-REVIEW.md など)を読む。
+    /// products/lien/ の2つ上 = リポジトリのルート
+    static func repoRead(_ relativePath: String, file: StaticString = #filePath) throws -> String {
+        let url = lienRoot(from: file)
+            .deletingLastPathComponent() // products
+            .deletingLastPathComponent() // リポジトリのルート
+            .appendingPathComponent(relativePath)
+        do {
+            return try String(contentsOf: url, encoding: .utf8)
+        } catch {
+            throw NSError(
+                domain: "StringsReviewTests",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "\(relativePath) が読めません(\(url.path)): \(error)"]
+            )
+        }
+    }
+}
+
+// MARK: - レビューログ(docs/STRINGS-REVIEW.md)の読み取り
+
+/// T27 本体の目視レビューの記録。`StringsCatalog` の名前から引数部・添字を落とした「単位」と、
+/// ログの表の1行を対応させる。文言を足したら、ログにも1行足す(忘れると CI が落ちる)。
+enum StringsReviewLog {
+    static let path = "docs/STRINGS-REVIEW.md"
+    /// ログの表では改行を ⏎ で表す(1行の表に収めるため)
+    static let newlineMark = "⏎"
+
+    struct Row {
+        let name: String
+        let text: String
+        let verdict: String
+        let note: String
+    }
+
+    /// 表の行(`| `名前` | 文言 | 判定 | メモ |`)を読む。見出し・説明の表は名前が backtick で始まらないので拾わない
+    static func rows() throws -> [Row] {
+        let source = try LienSourceFiles.repoRead(path)
+        return source.split(separator: "\n", omittingEmptySubsequences: false).compactMap { line in
+            guard line.hasPrefix("| `") else { return nil }
+            let cells = line.split(separator: "|", omittingEmptySubsequences: false)
+                .map { String($0).trimmingCharacters(in: .whitespaces) }
+            // 先頭と末尾の空セルを含めて 6 個。文言・メモに `|` は使わない(使うときは ｜ にする)
+            guard
+                cells.count == 6,
+                cells[1].hasPrefix("`"),
+                cells[1].hasSuffix("`"),
+                // 判定の列がある表だけを読む(§3 の「変更前 → 変更後」の表も backtick で始まるため)
+                ["OK", "修正", "保留"].contains(cells[3])
+            else { return nil }
+            return Row(
+                name: String(cells[1].dropFirst().dropLast()),
+                text: cells[2],
+                verdict: cells[3],
+                note: cells[4]
+            )
+        }
+    }
+
+    /// レビューの単位。`StringsCatalog` の名前から、関数の引数部 `(…)` と配列の添字 `[n]` を落とす。
+    /// 例: `Plant.voiceHeader(みどり, たね)` → `Plant.voiceHeader` / `Onboarding.avatarPalette[0]` → `Onboarding.avatarPalette`
+    static func units() -> [(name: String, texts: [String])] {
+        var order: [String] = []
+        var texts: [String: [String]] = [:]
+        for item in StringsCatalog.all {
+            let base = baseName(item.name)
+            if texts[base] == nil { order.append(base) }
+            texts[base, default: []].append(item.text)
+        }
+        return order.map { (name: $0, texts: texts[$0] ?? []) }
+    }
+
+    static func baseName(_ name: String) -> String {
+        var base = name
+        if let paren = base.firstIndex(of: "(") {
+            base = String(base[..<paren])
+        }
+        if let bracket = base.lastIndex(of: "[") {
+            base = String(base[..<bracket])
+        }
+        return base
     }
 }
 
@@ -834,6 +963,102 @@ final class StringsReviewTests: XCTestCase {
         for text in gentle {
             XCTAssertEqual(PunishmentFreeLint.violations(in: text), [], text)
         }
+    }
+
+    // MARK: 4. T27 本体のレビューログ(docs/STRINGS-REVIEW.md)
+
+    func testReviewLogCoversEveryStringsCatalogEntry() throws {
+        let units = StringsReviewLog.units()
+        let rows = try StringsReviewLog.rows()
+        XCTAssertGreaterThan(units.count, 250, "レビューの単位が少なすぎる(StringsCatalog を読めていない?)")
+
+        let rowNames = rows.map(\.name)
+        XCTAssertEqual(Set(rowNames).count, rowNames.count, "レビューログに同じ名前が2回出ている")
+        let unitNames = Set(units.map(\.name))
+        let missing = unitNames.subtracting(rowNames)
+        let extra = Set(rowNames).subtracting(unitNames)
+        XCTAssertTrue(missing.isEmpty, "レビューログに無い文言: \(missing.sorted())")
+        XCTAssertTrue(extra.isEmpty, "レビューログにだけある文言: \(extra.sorted())")
+    }
+
+    func testReviewLogTextsMatchStringsCatalog() throws {
+        let rows = Dictionary(try StringsReviewLog.rows().map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        for unit in StringsReviewLog.units() {
+            guard let row = rows[unit.name] else {
+                XCTFail("レビューログに \(unit.name) が無い")
+                continue
+            }
+            if unit.texts.count == 1 {
+                XCTAssertEqual(
+                    row.text,
+                    unit.texts[0].replacingOccurrences(of: "\n", with: StringsReviewLog.newlineMark),
+                    "\(unit.name) の文言がログと違う(文言を変えたらログも直す)"
+                )
+            } else {
+                // 関数型・配列は代表を1行だけ載せる。全通りは StringsReviewTests の lint が検査する
+                XCTAssertTrue(
+                    row.text.contains(unit.texts[0].replacingOccurrences(of: "\n", with: StringsReviewLog.newlineMark)),
+                    "\(unit.name) の代表文言がログに無い: \(row.text)"
+                )
+            }
+        }
+    }
+
+    func testReviewLogSummaryMatchesVerdicts() throws {
+        let source = try LienSourceFiles.repoRead(StringsReviewLog.path)
+        let rows = try StringsReviewLog.rows()
+        let verdicts = Dictionary(grouping: rows, by: \.verdict).mapValues { $0.count }
+        let expected = "- 対象: \(rows.count) 件（OK \(verdicts["OK"] ?? 0) / 修正 \(verdicts["修正"] ?? 0) / 保留 \(verdicts["保留"] ?? 0)）"
+        XCTAssertTrue(source.contains(expected), "レビューログの集計が表と違う。期待する行: \(expected)")
+
+        XCTAssertTrue(
+            rows.allSatisfy { ["OK", "修正", "保留"].contains($0.verdict) },
+            "判定は OK / 修正 / 保留 のいずれか"
+        )
+        for row in rows where row.verdict == "修正" {
+            XCTAssertFalse(row.note.isEmpty, "修正した \(row.name) に理由が無い")
+        }
+    }
+
+    func testUserFacingStringsAvoidDeveloperJargon() {
+        // 画面に出さない開発者ことば(T27 のレビューで「ストリーク」「アーカイブ」を除去した)
+        let jargon = ["ストリーク", "アーカイブ", "セッション", "snapshot", "ペイロード", "RLS", "API"]
+        for item in StringsCatalog.all {
+            for word in jargon {
+                XCTAssertFalse(
+                    item.text.contains(word),
+                    "Strings.\(item.name) に開発者ことば「\(word)」: \(item.text)"
+                )
+            }
+        }
+    }
+
+    func testCloseLabelsAreConsistent() {
+        let labels = [
+            Strings.Settings.closeButton,
+            Strings.Report.mailFailedOK,
+            Strings.Plant.nameNoticeClose,
+            Strings.Plant.celebrationClose,
+            Strings.PartnerPhoto.viewerCloseButton,
+        ]
+        XCTAssertEqual(Set(labels), ["閉じる"], "閉じるボタンの文言を「閉じる」に統一する")
+    }
+
+    func testNetworkErrorMessagesAreIdentical() {
+        let messages = [
+            Strings.Onboarding.submitErrorMessage,
+            Strings.Pairing.errorNetwork,
+            Strings.PromiseSetup.saveErrorMessage,
+            Strings.Home.checkinErrorMessage,
+            Strings.Checkin.cancelErrorMessage,
+            Strings.Nudge.errorMessage,
+            Strings.Reaction.errorMessage,
+        ]
+        XCTAssertEqual(
+            Set(messages),
+            ["通信がうまくいきませんでした。もう一度お試しください"],
+            "同じ状況の通信エラーは、同じ言い方にする"
+        )
     }
 }
 
