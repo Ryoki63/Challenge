@@ -133,8 +133,15 @@ Deno.test("募集文のファイルが揃っている", async () => {
 });
 
 Deno.test("X の本文は 140 字以内で、日付・禁止語・未実装機能・競合名を含まない", async () => {
-  const bodies = quoteBlocks(await read(X_POST));
-  assert(bodies.length === 4, `X の本文は 4 本のはずが ${bodies.length} 本`);
+  const text = await read(X_POST);
+  const bodies = quoteBlocks(text);
+  assert(
+    bodies.length >= 4,
+    `X の本文が ${bodies.length} 本しかない(4 本以上)`,
+  );
+  for (const id of ["X-1", "X-2", "X-3", "X-4"]) {
+    assert(text.includes(`## ${id} `), `${id} の見出しが無い`);
+  }
 
   for (const [index, body] of bodies.entries()) {
     const label = `X 本文 ${index + 1}`;
@@ -150,9 +157,12 @@ Deno.test("X の本文は 140 字以内で、日付・禁止語・未実装機�
     assert(!COMPETITOR.test(body), `${label} に競合サービス名がある`);
   }
 
-  const text = await read(X_POST);
-  const explained = text.split("数値の根拠").length - 1;
-  assert(explained >= 4, `数値の根拠が ${explained} 個しかない(投稿は 4 本)`);
+  const explained =
+    text.split("\n").filter((line) => line.startsWith("- 数値の根拠:")).length;
+  assert(
+    explained >= bodies.length,
+    `数値の根拠が ${explained} 個しかない(本文は ${bodies.length} 本)`,
+  );
 });
 
 Deno.test("受け入れ手順の文面に禁止語・未実装機能が混ざらない", async () => {
