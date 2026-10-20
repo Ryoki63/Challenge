@@ -610,3 +610,10 @@
 - 着手: Issue #94 は OPEN（assignees は空。HQ 振り分けの role:mkt-exec / status:in-progress で再開）。PR #108 は main マージ済み、フォローアップ PR #117（head fc95e23）は main と CONFLICTING。
 - 注意: worktree は指定ブランチ `consilium/94-mkt-m8-1-3` ではなく PR #117 のブランチ `consilium/94-mkt-m8-review-followup` に乗っている。指定ブランチは origin から削除済み（PR #108 で使用済み）。新規ブランチを切ると PR が二重になるため、PR #117 のブランチに積む。
 - 方針: 履歴は書き換えず、origin/main を merge で取り込む。受入条件（字数・v1.0 範囲・数値の出典・スクショ v4）を照合したあと、再レビューに出す。
+
+## 2026-10-20 23:02 (mkt-exec) — Issue #94 再開: PR #117 の差分確認
+- 着手: Issue #94 は OPEN、role:mkt-exec / status:in-progress。PR #117 は OPEN・MERGEABLE、直近の lien-ci 6 job はすべて成功。正式レビューは未登録。
+- 作業境界: 指定 worktree 内で確認。ブランチ名は指定値でなく `consilium/94-mkt-m8-review-followup`（PR #117 head）。指定 branch は PR #108 で使用済みのため、既存フォローアップ PR を継続する。既存未コミット差分（press素材・検査コード変更、01画像削除、04画像追加）を確認し、破棄せず保持する。
+- 同期: HEAD `413ee6e` は origin/main を merge 済みで、PR #117 の現在の head と一致。未コミット差分の範囲と新しい画面構成を受入条件・v1.0仕様に照合する。
+- 仕様照合: REQUIREMENTS §3.2–§3.13 で各主張を確認。03(M ウィジェット)は除外。04 のカレンダーに出るお休みマークは v1.0 の §3.6 に規定された履歴表示。提供元・メールは G4 #42 未確定なのでトークンを維持し、数値実績は資料に載せていない。画像3枚を実表示し、キャプションと画面の対応を確認。
+- 次: `verify_press.py` と marketing tools の回帰テスト、画像の寸法/ハッシュ、HTMLの1ページ描画、差分整合を検証する。レビュー結果は mkt-review に相当する独立確認1回を依頼する。

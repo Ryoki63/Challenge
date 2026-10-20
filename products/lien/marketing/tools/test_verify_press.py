@@ -78,8 +78,8 @@ def fact_sheet_html():
 <h2>連絡先</h2><p>&lt;CONTACT_EMAIL&gt;</p>
 <h2>本資料に載せていないこと</h2><p>実績値は記載しない。</p>
 <h2>画面イメージ（v4）</h2>
-<img src="screenshots/01_home_both.png" alt="ホーム（ふたり達成）">
 <img src="screenshots/02_home_waiting.png" alt="ホーム（相手が待っている）">
+<img src="screenshots/04_history.png" alt="カレンダー（ふたりの記録）">
 <img src="screenshots/05_share.png" alt="シェア画像">
 <p>出典: docs/REQUIREMENTS.md、docs/CONCEPT.md、legal/terms.html。</p>
 </body>
@@ -101,8 +101,8 @@ mkt-review のレビュー待ち。提供元・連絡先は G4 で確定する�
 def screenshots_readme_text():
     return """# スクリーンショット
 
-- [ホーム](01_home_both.png)
 - [相手待ち](02_home_waiting.png)
+- [カレンダー](04_history.png)
 - [シェア画像](05_share.png)
 """
 
@@ -269,18 +269,18 @@ class PressKitTest(unittest.TestCase):
     # MARK: screenshots/
 
     def test_screenshot_wrong_dimensions(self):
-        (self.root / "screenshots" / "01_home_both.png").write_bytes(png_bytes(100, 100))
+        (self.root / "screenshots" / "02_home_waiting.png").write_bytes(png_bytes(100, 100))
         errors = self.errors()
         self.assertTrue(any("寸法が 100×100" in error for error in errors), errors)
 
     def test_screenshot_with_alpha(self):
-        (self.root / "screenshots" / "01_home_both.png").write_bytes(png_bytes(1290, 2796, 6))
+        (self.root / "screenshots" / "02_home_waiting.png").write_bytes(png_bytes(1290, 2796, 6))
         errors = self.errors()
         self.assertTrue(any("color type 2）でない" in error for error in errors), errors)
 
     def test_screenshot_duplicate(self):
-        data = (self.root / "screenshots" / "01_home_both.png").read_bytes()
-        (self.root / "screenshots" / "02_home_waiting.png").write_bytes(data)
+        data = (self.root / "screenshots" / "02_home_waiting.png").read_bytes()
+        (self.root / "screenshots" / "04_history.png").write_bytes(data)
         errors = self.errors()
         self.assertTrue(any("と同じ画像" in error for error in errors), errors)
 
@@ -290,12 +290,12 @@ class PressKitTest(unittest.TestCase):
         self.assertTrue(any("screenshots/05_share.png がありません" in error for error in errors), errors)
 
     def test_screenshot_extra(self):
-        (self.root / "screenshots" / "04_extra.png").write_bytes(png_bytes(1290, 2796))
+        (self.root / "screenshots" / "99_extra.png").write_bytes(png_bytes(1290, 2796))
         errors = self.errors()
         self.assertTrue(any("余計な画像を置かない" in error for error in errors), errors)
 
     def test_screenshot_not_matching_source(self):
-        path = self.root / "screenshots" / "01_home_both.png"
+        path = self.root / "screenshots" / "02_home_waiting.png"
         path.write_bytes(path.read_bytes() + b"x")
         errors = self.errors()
         self.assertTrue(any("SHA-256 で一致しない" in error for error in errors), errors)
