@@ -100,6 +100,8 @@ xcodebuild test -project Lien.xcodeproj -scheme Lien \
 
 `lien-release`(`.github/workflows/lien-release.yml`)が archive・署名・アップロードまで行う。**手動起動のみ**。
 
+**実行時は [本番実行シート（Secrets 6件・dry_run → 本番・切り戻し・内部配布）](RELEASE-RUNBOOK.md) を使う。** 取得・登録担当と承認境界もこの1枚にまとめている。`internal_only` はApple側の配布制限ではなく、連絡先・公開ページ検査の緩和だけなので、内部グループへの割当はオーナーが確認する。
+
 ### 8.1 準備(1 回だけ。順序に注意)
 
 1. Apple Developer Program へ加入する(G0)

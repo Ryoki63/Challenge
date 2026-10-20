@@ -597,3 +597,16 @@
 - 発見: T33 でペイウォールが main に入った。`REVENUECAT_API_KEY` が公開ビルドに入ると、商品設定（T37 / G6・〜11/1）より先に「購入できないペイウォール」が出て、10/31 の「いまは全部、無料で使えます」と矛盾する。review.md §5-7 に、公開ビルドのキーを G4 で確認するよう記録（マーケ側では直せない）
 - 検証: `check_posts.py` OK（13本 + branding）/ unittest **52件** OK / `verify_metadata.py` OK・unittest 24件 OK（回帰なし）
 - 結果: 追補の PR を作成（マージしない）。`status: ready` は mkt-review 待ちのため付けない
+
+## 2026-10-20 23:01 (eng-lead) — Issue #106 T28b 本番リリース実行手順
+- 着手: 指定 worktree・ブランチ・origin と追跡差分なしを確認。Issue #106 の受入条件だけを対象に、Secrets 6件の取得担当、dry_run → 本番、切り戻し、内部 TestFlight の確認を1枚にまとめる。
+- 範囲: release workflow・署名スクリプト・既存 README の読み取りと手順書／導線／レビュー記録のみ。secret・.env の読み書き、workflow の実起動、Apple／Supabase の変更、配布・招待送信、main への push／マージは行わない。
+- 前提: 役職カードの旧12/11ではなく、現行指示の10/24機能凍結・10/27審査提出・10/31公開を基準とする。1時間は目標であり、Apple側の処理時間や署名権限を確認せず達成済みとは扱わない。
+- 節目: assigneeをRyoki63に設定・再取得し、着手コメントを投稿。開始直後のJOURNAL追記によりpull --rebaseが未ステージ差分で停止したため、autostash付きで同期し「Already up to date」を確認。needs-approvalを走査し、#29に人間返信があるがon-holdかつ今回の単一タスク範囲外のため変更しない。
+- 設計判断: 単一Markdownの実行シートを追加し既存README §8から案内。workflow/署名/ExportOptions/CI gateを照合し、internal_onlyはApple側の配布制限ではないこと、署名warning・アップロード結果不明・run_number再利用の境界を明記。データ移行は対象外。
+- 出典確認: Apple公式のTeam API keys・クラウド証明書・内部テスター、およびSupabase公式のAPI keysを確認。Adminというロール名だけで初回署名を保証しない。ローカルはCommand Line Toolsのみで、署名・iOS実ビルドを実測したとは扱わない。
+- 検証途中: release関連Python unittest 130件PASS。既存release成功履歴は別SHAであり、今回の本番署名成功とは扱わない。1枚の手順に対するeng-reviewを次に実施する。
+- 23:14 節目: 独立eng-reviewは4受入条件すべてPASS・重大指摘なし。非阻害のmain更新race指摘を採用し、SHA不一致/取得不能時の取消・ASC到達確認・配布禁止を明記した。限定段落のみ再確認を依頼する。レビューと検証の境界はdocs/REVIEW-106-RELEASE.mdへ記録。
+- 表示確認: 外部通信を遮断したChromeのローカルプレビューで表2個・各7行・コード例3個・横overflowなしを確認、Secrets表と切り戻し表を目視。full-page撮影は失敗したためviewport撮影で代替した。QA生成物はworktree内の無視対象build配下のみ。
+- 23:22 検証ゲート: eng-reviewの限定再確認PASS・未解決指摘なし。全要件の記載PASS／関連テスト130件PASS／コード例3ブロックとrelease.shのbash -n PASS／ローカルリンク・Secrets6件一致・秘密値形式不在・JOURNAL追記のみ・git diff --check PASS。型チェック・lint・ローカルiOS buildは文書のみのため対象外（Xcode未導入）。署名・Appleアップロード・招待送信は未実行。残TODOゼロ（今回の文書受入範囲）。
+- 提出準備: 指定ブランチへcommit/pushしPRを作成する。mainへ直接pushせず、PRのマージはレビュー役職へ委ねる。push後CIは提出SHAで確認し、既存runの緑で代替しない。
