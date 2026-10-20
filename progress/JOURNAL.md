@@ -318,3 +318,12 @@
 - 回帰検査: `StringsReviewTests` にログ網羅・文言一致・集計・開発者ことば・閉じる・通信エラーの6テストを追加
 - 残: 初回同期失敗時に `.promiseSetup` を出す画面遷移は文言では決められないため、`docs/STRINGS-REVIEW.md` §6.1 に判断材料と推奨案を残した(eng-lead / T30)。実機 VoiceOver は T20
 - 結果: PR #86 を作成(レビュー待ち。マージはしない)
+
+## 2026-10-20 13:18 (eng-exec) — T33 #33 RevenueCat組込 + ペイウォール(3文脈)
+- 着手: G6(#44)/T37 前でも実装・CI 検証できる範囲を実装する。実際の課金設定(RevenueCat アカウント・商品・価格・特商法・ストア申請)は行わない。
+- サーバー: `_shared/premium.ts` に `derivePairPlan` を抽出(grant-tickets から再エクスポート)。`snapshot.pairPlan`(free/premium)をメンバーの `users.premium_until` から導出し、`USER_COLUMNS`/`PARTNER_SELECT` に premium_until を追加。RevenueCat Webhook(`revenuecat-webhook`。Authorization の定数時間比較、期限は延ばす方向だけ・EXPIRATION は現在の期限以下だけ失効)を追加。contract fixtures 22 件再生成。
+- iOS: `PurchasesClient`(RevenueCat / Mock / 利用不可)・`EntitlementStore`(自分の購読 ∪ pairPlan、相手プレミアムの適用済み判定)・`PaywallContext`(節目/アルバム30日超/チケット切れ)・`PaywallViewModel`/`PaywallView`(価格・トライアルは offerings から。閉じる・復元常設)。`Strings.Paywall` 追加。チケット0枚のバッジからチケット切れ文脈を結線(節目・アルバムは画面側の実装後)。
+- プロジェクト: RevenueCat 5.96.0 を Lien ターゲットだけに SPM 追加。`REVENUECAT_API_KEY` を xcconfig/Info.plist に追加(空なら利用不可の実装。偽の価格を出さない)。
+- 既存 main の不具合修正: `HomeViewModel.presentShareImage()` と `HomeView` の `if canShareRecord` の閉じ括弧が無く、ローカル型検査が通らなかったため最小修正。
+- 検証: `scripts/macos-check/check.sh test` = 87 ファイル・**1086 tests / 0 failures / 26419 assertions**、`views` 120 ファイル OK。`deno test` = **409 passed / 0 failed**、contract fixtures `--check` = 22 件一致、ops tests 77 passed。
+- 残(G6/T37 後): RevenueCat の実キー設定・商品ID・トライアル日数・Webhook URL/秘密・サンドボックス購入の実機確認。アルバム30日超(T21)と節目からのペイウォール導線の結線。
