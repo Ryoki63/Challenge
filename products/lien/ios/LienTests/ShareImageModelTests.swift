@@ -266,6 +266,35 @@ final class ShareImageModelTests: XCTestCase {
         XCTAssertEqual(model.presentation?.milestone?.days, 7)
     }
 
+    func testAnUnreadableSnapshotKeepsTheMilestoneRecords() {
+        let memory = InMemoryShareMilestoneStore(ShareMilestoneMemory(initialized: true))
+        let model = makeModel(memory: memory)
+        model.snapshotDidChange(snapshot(streak: 1))
+        let before = memory.load()
+
+        model.snapshotDidChange(nil)
+
+        XCTAssertNil(model.presentation)
+        XCTAssertEqual(memory.load(), before, "読めないだけの snapshot で、端末の記録を消さない")
+    }
+
+    func testAStreakResetToZeroIsRecordedForTheNextStreak() {
+        let memory = InMemoryShareMilestoneStore(ShareMilestoneMemory(initialized: true))
+        let model = makeModel(memory: memory)
+        model.snapshotDidChange(snapshot(streak: 7))
+        model.presentationDidAppear()
+        XCTAssertEqual(memory.load().records["pair-A"]?.celebratedDays, 7)
+
+        model.snapshotDidChange(snapshot(streak: 0))
+
+        // 前面で見せたお祝いは、ユーザーが閉じるまで残す(記録は次のストリークのために戻す)
+        XCTAssertNotNil(model.presentation)
+        model.dismissPresentation()
+        XCTAssertNil(model.presentation)
+        XCTAssertEqual(memory.load().records["pair-A"]?.lastStreakDays, 0)
+        XCTAssertEqual(memory.load().records["pair-A"]?.celebratedDays, 0, "次のストリークでは、また 7日を祝える")
+    }
+
     func testSoloDismissesTheOpenShareSheet() {
         let model = makeModel()
         model.snapshotDidChange(snapshot(streak: 1))

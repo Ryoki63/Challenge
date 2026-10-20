@@ -135,6 +135,8 @@ final class ShareImageModel {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var currentSnapshot: PairSnapshot?
     @ObservationIgnored private var cachedMyName: String?
+    /// 出している節目のお祝いを、前面で実際に見せたか(見せたあとは、snapshot が変わっても勝手に閉じない)
+    @ObservationIgnored private var presentationWasShown = false
 
     /// 端末の時刻を Asia/Tokyo の日付で見るための既定のカレンダー
     nonisolated static var defaultCalendar: Calendar {
@@ -170,6 +172,7 @@ final class ShareImageModel {
     /// ホームの「シェア画像をつくる」(任意タイミング — REQUIREMENTS §3.13)
     func presentManual() {
         guard canShare else { return }
+        presentationWasShown = false
         presentation = .manual
     }
 
@@ -179,6 +182,7 @@ final class ShareImageModel {
             markShown(milestone)
         }
         presentation = nil
+        presentationWasShown = false
         loadState = .idle
         content = nil
     }
@@ -189,12 +193,14 @@ final class ShareImageModel {
             dismissPresentation()
             return
         }
+        if self.presentation != presentation { presentationWasShown = false }
         self.presentation = presentation
     }
 
     /// シートが前面に表示された。節目ならここで初めて「出した」と記録する
     func presentationDidAppear() {
         guard let milestone = presentation?.milestone else { return }
+        presentationWasShown = true
         markShown(milestone)
     }
 
@@ -203,10 +209,17 @@ final class ShareImageModel {
     /// ホームが snapshot を読み直す・更新するたびに呼ばれる。節目に届いていれば、お祝いのシートを出す
     func snapshotDidChange(_ snapshot: PairSnapshot?) {
         currentSnapshot = snapshot
-        guard let snapshot, let pairId = snapshot.pairId, snapshot.streakCurrent > 0 else {
-            // ソロに戻った・記録が無い: 開いているシェア画像を閉じ、旧ペアの記録も忘れる
+        guard let snapshot else {
+            // snapshot が読めないだけ(再起動後の最初のアンロック前など)。記録は消さない
+            presentation = nil
+            presentationWasShown = false
+            return
+        }
+        guard let pairId = snapshot.pairId else {
+            // ソロに戻った: 開いているシェア画像を閉じ、旧ペアの記録も忘れる
             // (旧ペアの名前を出したままにしない。記録は pairId だけだが、端末に残さない)
             presentation = nil
+            presentationWasShown = false
             var memory = memoryStore.load()
             let before = memory
             memory.forgetOtherPairs(keeping: nil)
@@ -214,19 +227,28 @@ final class ShareImageModel {
             return
         }
 
-        let streakStartDay = PlantDay.number(of: now(), calendar: calendar) - (snapshot.streakCurrent - 1)
+        // ストリーク 0 も観測する(途切れたことを記録し、次のストリークを1日目から数え直す)
+        let streakDays = max(snapshot.streakCurrent, 0)
+        let streakStartDay = PlantDay.number(of: now(), calendar: calendar) - (max(streakDays, 1) - 1)
         var memory = memoryStore.load()
         let before = memory
         let milestone = memory.observe(
             pairId: pairId,
-            streakDays: snapshot.streakCurrent,
+            streakDays: streakDays,
             streakStartDay: streakStartDay
         )
         if memory != before { memoryStore.save(memory) }
 
         // すでに何か出している(手動のシェアなど)ときは、閉じたあとの次の読み込みで改めて判定する
-        if let milestone, presentation == nil {
-            presentation = .milestone(milestone)
+        if let milestone {
+            if presentation == nil {
+                presentationWasShown = false
+                presentation = .milestone(milestone)
+            }
+        } else if presentation?.milestone != nil, !presentationWasShown {
+            // ストリークが途切れたなどで、出していたお祝いの前提が消えた。まだ見せていないお祝いは下げる
+            // (前面で見せたあとは、ユーザーが閉じるまで残す)
+            presentation = nil
         }
     }
 
