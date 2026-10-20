@@ -221,13 +221,16 @@ private extension View {
 
 // MARK: - snapshot あり(通常表示)
 
-private struct SnapshotContent: View {
+/// ホームの中身(スクロールの外側を除く)。ストア用スクリーンショット(issue #80)は、
+/// ImageRenderer が ScrollView を描けないため、この View を直接 端末と同じ大きさで描く。
+struct SnapshotContent: View {
     let viewModel: HomeViewModel
     let snapshot: PairSnapshot
     let onInvite: (() -> Void)?
     let moderation: ModerationViewModel?
-    /// ペイウォールを開く(T33)。nil なら課金の導線を出さない
-    let onShowPaywall: ((PaywallContext) -> Void)?
+    /// ペイウォールを開く(T33)。nil なら課金の導線を出さない。
+    /// 既定 nil は、課金の導線を持たないストア用スクリーンショット(issue #80)の実描画のため
+    var onShowPaywall: ((PaywallContext) -> Void)? = nil
 
     var body: some View {
         VStack(spacing: LienSpacing.m) {

@@ -684,8 +684,8 @@ function baseInput() {
   };
 }
 
-Deno.test("SNAPSHOT_KEYS は 21 個", () => {
-  assertEquals(SNAPSHOT_KEYS.length, 21);
+Deno.test("SNAPSHOT_KEYS は 22 個", () => {
+  assertEquals(SNAPSHOT_KEYS.length, 22);
 });
 
 Deno.test("buildPairSnapshot: キー集合が §3.4 と一字一句一致する", () => {
@@ -982,6 +982,7 @@ Deno.test("buildPairSnapshot: pairPlan は渡された値(省略は free)。キ�
   assertEquals(json.pairPlan, "free");
   const solo = JSON.parse(JSON.stringify(buildSoloSnapshot({
     updatedAtIso: "2026-06-10T03:00:00.000Z",
+    todayLocal: "2026-06-10",
     todayMeDone: false,
     myPromise: null,
   })));

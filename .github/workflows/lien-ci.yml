@@ -151,6 +151,12 @@ jobs:
       - name: "Verify store_metadata/ja (T32: 文字数制限 + 罰なし原則 + keywords の重複/表示名との重複 + Pairy 語の不在)"
         run: python3 tools/verify_metadata.py
 
+      # ストア用スクリーンショット(issue #80 / MK7)。6.7in / 6.1in 各6枚の寸法・アルファなし・
+      # captions.json と manifest.json(SHA-256)の一致・一覧画像の有無を、Pillow 無しで確かめる。
+      # 画像は CI(lien-ios)の artifact からコミットする。文言を変えて画像を作り直していないと落ちる
+      - name: "Verify store screenshots (issue #80: 寸法 + アルファなし + captions/manifest の一致)"
+        run: python3 tools/verify_screenshots.py
+
       - name: "Test verify_metadata.py (検査ロジックの単体テスト)"
         run: python3 -m unittest discover -s tools -p "test_*.py" -v
 

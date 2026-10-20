@@ -440,3 +440,29 @@
 - 検証: `scripts/macos-check/check.sh test` = 87 ファイル・**1086 tests / 0 failures / 26419 assertions**、`views` 120 ファイル OK。`deno test` = **409 passed / 0 failed**、contract fixtures `--check` = 22 件一致、ops tests 77 passed。
 - 残(G6/T37 後): RevenueCat の実キー設定・商品ID・トライアル日数・Webhook URL/秘密・サンドボックス購入の実機確認。アルバム30日超(T21)と節目からのペイウォール導線の結線。
 - 追記(13:40): 自分の購読が有効なときは購入ボタンを押せないようにした(二重購入防止)。ローカル 1087 tests / views OK。CI は再実行。
+
+## 2026-10-20 15:10 (ux-exec) — MK7 #80 ストア用スクリーンショット(v4・6.7/6.1)
+- 着手: ブランチ `consilium/80-mk7-v4-6-7-6-1`(origin/main `fdf1ef5`)。T26 の下絵(旧ドット絵・旧範囲)を、v4「タネの子」の実画面から作り直す。完成画像は CI のシミュレータで描く(この Mac に Xcode は無い)
+- **判明(重大): main が赤**。`#85`(T22 シェア画像)が 2026-10-20 03:38 の lien-ios **failure** のままマージされ、`HomeView.swift` の `if viewModel.canShareRecord {` と `HomeViewModel.swift` の `func presentShareImage()` の閉じ括弧が1つずつ落ちていた。ほかに `StringsReviewTests` が T18/T19a/T22 で追加された 43 単位を `docs/STRINGS-REVIEW.md` に持たずに赤(2件)。どちらもこの作業の前提(ビルド・テスト緑)を満たせないため、最小の修正を同じブランチに入れた
+- 方針: 画像は (1) 本物の View(HomeView/HistoryView/WidgetRootView/ShareImageCardView)を 430×932 / 393×852pt・3倍で ImageRenderer 描画 → raw、(2) キャプションと合成して 1290×2796 / 1179×2556。キャプションの正本は `marketing/screenshots/captions.json`(mkt-exec と共有)。システムが描くもの(ステータスバー・ナビバー・壁紙)は描かない
+- ローカル検証: `scripts/macos-check/check.sh all` = module 80 ファイル・**1069 tests / 0 failures / 25851 assertions**、views 112 ファイル、widget 18 ファイルとも OK(既存の ISO8601DateFormatter の Swift 6 警告のみ)。新テストは枠と一緒に views の型検査セットで型検査し、CI の実描画に回す
+
+## 2026-10-20 16:50 (ux-exec) — MK7 #80 続き(CI artifact を取り込んで確定)
+- lien-ios #39385881488(commit b5265f9)の artifact `store-screenshots` を取得。6.7in 1290×2796 / 6.1in 1179×2556 の PNG 各6枚、manifest(provenance=b5265f9 / runId=39385881488)、G4 用の一覧 `contact-sheet-6.7in.png` を `marketing/screenshots/` に追加
+- 目視: 12枚とも実画面(ホーム・相手待ち・ウィジェット・カレンダー・シェア画像・ソロ)が描けている。空画像・文字切れは無し。カレンダー10/13 は薄い点(途切れ)で、赤や「失敗」の表現は無い
+- 旧 T26 の SVG 下絵10枚と `gen_screenshot_svg.py` を削除(plan.md / README.md の「廃止」と実体を一致させた)。画像の縦横比は元の実描画のまま(歪めていない)
+- 検証: `cd products/lien/marketing && python3 tools/verify_screenshots.py` = OK(各6枚・アルファなし・寸法一致・captions の SHA-256 一致)、`python3 -m unittest discover -s tools` = 36 tests OK
+- 結果: 画像・manifest・一覧・設計/手順・機械検査をコミットし、PR を作成(レビュー待ち)
+
+## 2026-10-20 17:10 (ux-exec) — MK7 #80 main 取り込み(実画面が変わったため画像を描き直す)
+- PR #104 が main と conflict。origin/main は 8 commit 進み、#96(T33 RevenueCat)で HomeView / HistoryView / Strings が変わっていた。b5265f9 の画像は main の画面と一致しなくなるため、merge して CI で描き直す
+- 解消: `docs/STRINGS-REVIEW.md` は main 版を採用し、§11 に紛れていた T19a/T18/T22 の重複43行を削除(main の StringsReviewTests が赤だった原因。369 行で緑に戻した)。`check.sh` の EXCLUDE_TESTS は PaywallRenderTests と StoreScreenshot 系の両方を残す
+- `HomeView.SnapshotContent` の `onShowPaywall` に既定 nil を付け、課金導線を持たないスクショ描画から呼べるようにした(UI は変えない)
+- ローカル検証: `check.sh test` = **1106 tests / 0 failures / 26519 assertions**、`views` 120 ファイル OK、`widget` 18 ファイル OK
+- 次: merge commit を push → lien-ios で最新 main の画面から画像を生成 → artifact を差し替える
+
+## 2026-10-20 17:32 (ux-exec) — MK7 #80 main 取り込み後の再生成と CI の赤直し
+- merge 後 `lien-ios` #39389661638 で再生成。1回目は全ステップ成功後に20分の実行上限で cancelled(artifact は取得可)、再実行(attempt 2)で **success**。manifest = commit `c308e5c` / runAttempt 2 / generatedAt 17:28 JST
+- 画像12枚 + 一覧は b5265f9 の版と SHA-256 で**完全一致**(main の課金導線はスクショでは nil のため、画面の見た目は変わらない)。manifest と README の来歴だけ更新
+- main が赤だった2件を補修(どちらもテストの期待値のみ): deno 型検査は #97 の `todayLocal` 必須化に `snapshot_test.ts` の pairPlan ケースが未追随、`SNAPSHOT_KEYS` は #96 の `pairPlan` 追加で22個なのに期待値21
+- 検証: `verify_screenshots.py` OK / unittest 36 OK / `lien-ci` #39392331252 success / `lien-ios` #39389661638(attempt 2) success
