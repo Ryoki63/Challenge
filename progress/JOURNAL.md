@@ -467,6 +467,36 @@
 - main が赤だった2件を補修(どちらもテストの期待値のみ): deno 型検査は #97 の `todayLocal` 必須化に `snapshot_test.ts` の pairPlan ケースが未追随、`SNAPSHOT_KEYS` は #96 の `pairPlan` 追加で22個なのに期待値21
 - 検証: `verify_screenshots.py` OK / unittest 36 OK / `lien-ci` #39392331252 success / `lien-ios` #39389661638(attempt 2) success
 
+## 2026-10-20 21:17 — G4 #42 承認返信の反映 (eng-exec)
+- 着手: 指定 worktree / branch `consilium/42-g4` は clean。origin/main と同一 HEAD `13f0570`、同名リモート branch・既存 PR は無し。Issue の assignee は空だが、今回の Consilium 作業者タスクで直接割当済み。main は変更しない。
+- 承認根拠: オーナー `Ryoki63` の 2026-10-20 18:48 JST「それでOK!」(issuecomment-6288190684)を確認。直前の承認依頼はストア文言6ファイルと Pairy 不採用・新年訴求の2方針。スクショ・法務記入事項・独自ドメインまで承認済みとは拡張せず、現物と依頼範囲を照合する。
+- 方針: 文言の承認記録と未決項目を分離する。ストア申請・外部公開・ドメイン購入は行わず、対象資料の検証後に PR を提出する。human-gate の Issue は close しない。
+- 照合: 承認依頼時 `37e12ed` と HEAD の差分を確認。表示名・サブタイトル・リリースノートは同一 blob、キーワード・プロモーション・説明文は変更済み。#90 の通年案を旧新年案への「それでOK!」だけで承認済みにしない。旧版へ戻すと成長ルール等の不整合が戻るため、素材は維持して再確認を求める。
+- 直接確認: スクショ12枚の寸法・アルファ・manifest とキャプション一致は既存検査で OK。6.7in 一覧画像も目視確認。法務原稿の制定日・事業者表記・連絡先・裁判所は未記入、`SupportLinks.contactEmail` は空。スクショのオーナー承認、実機表示、App Privacy、リージョン、提供地域、独自ドメインの判断は確認できていない。
+- 変更: `marketing/G4-REVIEW.md` に承認コメントの日時・対象版・文言 hash・各受入項目の状態・判断依頼1件を記録。ASC 投入シートと法務チェックリストから参照し、全体承認・ASC 設定完了との混同を防止する。実装・素材・法務原文は変更しない。
+- 検証: `marketing/tools/verify_metadata.py --print` PASS(6ファイル・keywords 99/100字)、`verify_screenshots.py` PASS(12枚)、marketing unittest **36 tests / 0 failures**。web `build_site.py --check` PASS(生成物11件一致)、web unittest **47 tests / 0 failures**。
+- 公開ゲート: `web/tools/build_site.py --check-publishable` は exit 1。法務HTML4件の G4 未記入と `site.json` の `xUrl` 未設定を検出(5件)。既存ブロッカーとして保持し、再実行・回避・公開はしない。iOS の型チェック/lint/バイナリ build は実装無変更のため対象外。
+- 機械検査補足: 文書の hash/リンク照合は実際の10件すべて一致したが、検査用ワンショットの総数assertを11件とした誤りで初回 exit 1。検査対象自体を減らさず、6文言+2画像来歴+2相対リンクの計10件へ集計を直して再確認する。
+- 独立レビュー1回: G4 完了と #76 の公開ゲート(`xUrl`)を混同する1文に P2 指摘。該当文だけ修正し、#42 本文の確認・承認とサイト公開可否を明確に分離した。全体の再レビューは追加しない。
+- 検査結果: hash/相対リンク照合 **10件 PASS**、`git diff --check` PASS。全要件の確認は一部未了(現行文言・画像・法務の人間承認待ち)、関連テスト83件 PASS、HTML生成11件 PASS。型チェック/lint/iOS build は文書変更のみで対象外、公開前ゲートは既存未記入で FAIL、残TODOゼロとはしない。
+- 結果: **blocked / 承認待ち**。承認済み範囲と証拠の記録は作成済み。残る判断は1件にまとめて #42 に通知し、PR を提出する。Issue close・マージ・ストア入力・申請・公開・購入は行わない。
+- 提出: commit `9d73be5` を `origin/consilium/42-g4` へ push。PR #114 https://github.com/Ryoki63/Challenge/pull/114 を作成(main 向け・未マージ)。`lien-ci` run 39422336491 は対象 SHA `9d73be5` で **success**。iOS build の新規実行を意味しない。
+- 【承認待ち】: #42 comment-6290842503 に現行素材と法務必須値の判断を1件に集約して通知し、`needs-approval,human-gate` を付与。Issue は open を維持。hash・相対リンク・差分検査済み。提出時点で tracked worktree clean / local HEAD = remote branch を確認(この提出記録の追記は別 commit で同期する)。
+
+## 2026-10-20 20:21 (ux-exec) — MK3 #76 公開先承認後の再開確認
+- 着手: 指定 worktree / `consilium/76-mk3-github-pages` のみで再開。開始時の tracked/untracked 差分なし。PR #100 は 2026-10-20 に main へマージ済み。公開先の推奨案に対するオーナー返信(issuecomment-6287900053)を確認し、`Ryoki63/Challenge` / `https://ryoki63.github.io/Challenge` を確定値として扱う。URL の再承認は求めない。
+- 同期: 公開済み履歴を書き換えず origin/main を merge。squash 済み PR #100 と元ブランチの重複による3ファイルの競合を、main の CI・構成図と両側の JOURNAL 記録を保持して解消。別 worktree や secret は読み書きしていない。
+- 判明: #76 は assignee 未設定(本セッションの Consilium 割当はあるが Issue による排他は未確認)。#42 の「それでOK!」は確認できたが、制定日・事業者名・公開連絡先・管轄裁判所の具体値は原本に未記入。#79 にも公開 X ハンドルの記載が無く `site.json.xUrl` は null。これらを包括的な「推奨案で」の返信から推測しない。
+- 公開状態: Pages GET は HTTP 404。リポジトリ本体は public だが Pages サイトの有効化・配備成功は確認できない。設定の変更・workflow_dispatch・法務公開は実行しない。PR #100 の GitHub review は0件であり、mkt-review 済みとする証拠にはならない。
+- 時刻補正: 上の見出しと着手コメントの「20:21」は転記時の誤り。再開直前の実測は `2026-10-20 20:15:27 +0900`、本追記直前の実測は `2026-10-20 20:19:23 +0900`。既存記録を改変せず訂正を追記する。
+- 検証: web の unittest **47件 PASS**、`build_site.py` **11件生成 PASS(生成物差分なし)**、`--check` **11件一致 PASS**。`--check-publishable` は **exit 1(法務4出力の未記入・xUrl未設定)**。公開不可を検知した結果であり、公開検査のPASSとは扱わない。`git diff --check origin/main` PASS。型チェック/lint/iOS build はコード変更なしのため対象外。
+- 独立レビュー1回: サブエージェントに mkt-review 観点をまとめて依頼し、**要修正/公開不可**。約束の各自1つという単位、チケット保護/記録伸長の条件、実画面と SVG の差を指摘。`web/PUBLISH-STATUS.md` に根拠と未確認境界を記録。正式な Consilium 役職評価や文言承認済みとはしない。公開情報が未提供のため停止し、未解決指摘をPASSに変えない。
+- 変更: web README と G4 チェックリストに公開先承認を反映。Pages 有効化や mkt-review は `--check-publishable` が検査しないことを明確化。`PUBLISH-STATUS.md` に Issue 本文の完了条件を逐語的に照合し、公開未達・X未達・スクショ受入留保・文言未承認を明記。
+- 【承認待ち】2026-10-20 20:25 JST: #76 に質問を1件へ集約して投稿(issuecomment-6289781172)。URLは再質問せず、残る公開用5項目の提供(推奨)か保留かを依頼。`needs-approval,human-gate` を付与。`status:*`・assignee は変更せず、Issue は開いたまま。
+- 提出: **PR #111** https://github.com/Ryoki63/Challenge/pull/111 を作成。変更を commit/push 済み、mainへの直接push・force push・マージはしない。PR作成時点のCIは lien-ci **6/6 PASS**、lien-ios は pending。iOS完了とは報告しない。
+- 最終確認: 全要件の実装=未達(公開・X・画像の受入・文言承認)、関連テスト=47件PASS、静的サイトbuild=11件成功、生成物一致=11件PASS、公開前チェック=FAIL(exit 1)、型/lint/iOS build=本変更は文書のみで対象外、直接文書検査=PASS、残TODOゼロ=未達。未達項目は PUBLISH-STATUS.md に明示。
+- 結果: **BLOCKED**。公開先承認の反映と検証・引継ぎまで実施。公開用の具体値は推測せず、法務原本・サイト設定・生成物・公開設定を変更しない。担当役職の未解決レビュー指摘と、オーナー入力後の公開作業が残る。
+
 ## 2026-10-20 19:45 (computer-operator) — #79 MK6 オーナー返信後の再開確認
 - 着手: 指定 worktree・`consilium/79-mk6-x` のみで再開。開始時の tracked/untracked 差分は無し。#79 の 18:30 JST のオーナー返信は「ブラウザ操作でアカウントを作成させ、そこで投稿などを開始」であり、以前の「既存アカウントの引継ぎ待ち」から新規作成の準備へ前提を更新した。
 - 同期: PR #103 は既にマージ済み、リモートの作業ブランチは削除済みのため `git pull --rebase` は対象 ref 不在で停止。公開済み履歴を書き換えず `origin/main` を merge。JOURNAL の末尾競合は両側の既存記録を残してマーカーのみ除去した。
