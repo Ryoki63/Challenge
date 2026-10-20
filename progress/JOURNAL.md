@@ -569,3 +569,19 @@
 - 20:36 CI失敗と原因: lien-ios #39414244122はbuild成功後、1221 XCTest中1件失敗。SDKセッション破棄テストがsnapshot削除だけを完了条件にし、後続のasyncサインアウト/植物メモリreset前に観測した。永続マーカー導入に合わせ、該当する2件の待機条件をsnapshot無しかつ消去待ちマーカー解除へ変更(テスト削除/skipなし)。製品動作の失敗と混同せず、失敗runを成功扱いしない。修正後の同じiOS CIで検証する。
 - 20:52 CI成功: 最終コードSHA `af426291d6e73141fe8ab00a475f74b1f31f159e` の lien-ios #39416345514 は 1221 XCTest / 0 failures、**TEST SUCCEEDED**(14m24s)。lien-ci #39416345543 も全ジョブ成功。受入条件4項目(NSE→App Group、起動/前面復帰の差分補完、リトライ/重複表示防止テスト、CI緑)を確認した。
 - 20:53 引き渡し: PR #109 を eng-review へ引き渡す。G1/T20 の APNs→NSE→WidgetKit 実機 p50≦60秒、NSE 実行/通知予約合わせ込み、写真サムネDL(T17b)は残課題であり、今回のPASSに含めない。マージ・本番デプロイ・ストア申請は行っていない。以後の差分は本JOURNALの監査記録のみで、製品コードは af42629 から変えない。
+
+## 2026-10-20 20:52 (eng-exec) — T32 #32 オーナー承認後の再開
+- 着手: 指定 worktree / consilium/32-t32-aso-pairy で再開。開始時の tracked/untracked 変更なし。PR #90 は 2026-10-20 13:01 JST に main へマージ済み、同一 head の追加 PR は未作成。
+- 承認確認: #32 のオーナー返信「それで良い」(2026-10-20 18:36 JST)は PR #90 の通年訴求・キーワード99字・「約束」重複維持と、G0 承認後に人間が ASC 投入する提案への同意。文言の再承認は求めない。
+- 依存確認: G0 #38 は OPEN で Apple Developer 加入完了の証跡なし。G4 #42 は OPEN だが 2026-10-20 18:48 JST にオーナー返信「それでOK!」あり。ASC 設定済みとは扱わず、投入手順・承認記録と残る人間操作を照合する。
+- 同期: PR #90 の head は origin から削除済みで pull --ff-only は同期不可。履歴を書き換えず origin/main を merge。CI は main の既存検査をすべて保持し、JOURNAL は両側の記録を保持して今回の記録だけ末尾へ置いた。
+- 変更: ASC-ENTRY と alternatives に #32 / #42 の承認原文と時刻を記録。#42 の返信は旧候補に対するものなので、通年版の採用根拠は #32 と明記。文言の再承認・ASC の代理操作・審査提出を行わず、人間の保存・再読み込み確認と証跡返却を次の工程にした。
+- 発見・修正: `verify_metadata.py --print` の見出しだけが「App 情報 > キーワード」のままだった。既存の ASC-ENTRY に合わせ「バージョン情報 > キーワード」へ修正し、回帰テスト1件を追加。承認済み `ja/*.txt` は main と差分なし。
+- ローカル検証: marketing で `PYTHONDONTWRITEBYTECODE=1 python3 tools/verify_metadata.py --print` = OK / keywords 99/100字、`python3 -m unittest discover -s tools -p 'test_*.py' -v` = 37件 PASS(メタデータ25件・スクショ12件)、`python3 tools/verify_screenshots.py` = 各6枚 OK。変更 Python 2ファイルは AST 構文検査 PASS、`git diff --check` PASS。
+- 適用外: iOS/バックエンド変更なしのため iOS ビルド・型チェックは対象外。Python の専用型チェック/lint/build 設定はなく、関連テスト・AST・CLI 実行・差分検査で確認。独立レビュー1回を依頼済み(結果待ち)。ASC の受入条件は未達のためタスク全体を done にしない。
+- 独立レビュー: 重大指摘なし。残リスク「G4 対象素材」を追加の受入条件と誤解しうる点だけ、ASC-ENTRY §3 に「G4 全体の close / スクショ完成はキーワード・説明文保存の追加受入条件にしない」と明記。再レビューが必要な重大未解決事項なし。
+- 提出: PR #113 を作成(未マージ)。`lien-ci` #39419045074 は6ジョブすべて success。main 同期によって自動起動した `lien-ios` #39419044975 は実行中のためビルド完了とはまだ扱わない。
+- 最新検査: head c5d7425 の `lien-ci` #39419301608 も6ジョブすべて success。PR #113 にコマンド・37件 PASS・独立レビュー・非該当/未確認の境界をコメントした。
+- 【承認待ち】#32 に comment 6290434543 を投稿し、`needs-approval,human-gate` を付与。質問は文言の再承認ではなく、G0確認後の人間による ASC 入力・保存・再読み込みと証跡返却の1点。#32 / #38 / #42 は close せず、status ラベルは HQ に委ねた。
+- 提出チェック: リポジトリ側修正 PASS / 関連37テスト PASS / CLI動作確認 PASS / AST構文 PASS / diff --check PASS / 独立レビュー1回・重大指摘なし / 型チェック・lint専用設定なし / iOS・バックエンドの実装変更なし。残TODOはASC保存証跡の人間返却で、受入「App Store Connect にキーワード・説明文設定完了」は未達。
+- 結果: **BLOCKED(人間のASC入力・保存証跡待ち)**。承認済み文言は変更せず、PR #113 を push 済み・未マージで提出。審査提出・公開・本番変更は未実施。
