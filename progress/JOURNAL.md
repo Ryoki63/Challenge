@@ -585,3 +585,11 @@
 - 【承認待ち】#32 に comment 6290434543 を投稿し、`needs-approval,human-gate` を付与。質問は文言の再承認ではなく、G0確認後の人間による ASC 入力・保存・再読み込みと証跡返却の1点。#32 / #38 / #42 は close せず、status ラベルは HQ に委ねた。
 - 提出チェック: リポジトリ側修正 PASS / 関連37テスト PASS / CLI動作確認 PASS / AST構文 PASS / diff --check PASS / 独立レビュー1回・重大指摘なし / 型チェック・lint専用設定なし / iOS・バックエンドの実装変更なし。残TODOはASC保存証跡の人間返却で、受入「App Store Connect にキーワード・説明文設定完了」は未達。
 - 結果: **BLOCKED(人間のASC入力・保存証跡待ち)**。承認済み文言は変更せず、PR #113 を push 済み・未マージで提出。審査提出・公開・本番変更は未実施。
+
+## 2026-10-20 22:04 — Issue #94 [mkt M8] mkt-review 指摘の修正
+- 背景: PR #108 は 2026-10-20 12:46:50Z にマージ済み（merge 26e7a70、CI 6件 success）だが、PR のレビューは 0 件で Issue #94 は OPEN。独立レビュー（mkt-review 観点・読み取り専用）に依頼した。
+- レビュー結果: **FAIL**。Blocker 1件 = `press/screenshots/03_widget.png` に v1.0.1 の M ウィジェットが写っている（`docs/REQUIREMENTS.md` §3.10、`docs/TASKPLAN.md` T17b。v1.0 は S とロック画面のみ）。`verify_press.py` は PNG の寸法・ハッシュしか見ないため、画像内の M を検出できない。Minor = 60字の「ふたりで約束をひとつ」の誤読、生成 commit `c308e5c` が main に無い監査性、ストア素材のデモデータ整合。
+- 修正: 03 を削除し、v1.0 の `05_share.png`（シェア画像）に差し替え。プレス3枚は 01 / 02 / 05。ファクトシート・press/README・screenshots/README・`verify_press.py`・`test_verify_press.py` を追随。60字版を「ふたりがそれぞれ約束をひとつ決める…」（実測60字）に、ヘッダも同様に変更。植物の説明を「タネの子の頭の植物が育つ」に修正（REQUIREMENTS §3.9）。
+- 検証: `verify_press.py` OK / `python3 -m unittest discover -s tools -p "test_*.py"` 64件 OK / `verify_screenshots.py` OK / 紹介文 60・196・578字 / ファクトシート A4 1ページ（595×842pt）/ 05_share の SHA-256 が元画像と一致 / リンク切れ0 / `git diff --check` OK。
+- 提出: PR #117 を作成（OPEN・未マージ）。CI は実行中。正式な mkt-review の承認は未取得で、再レビューを依頼中。
+- 残: ストア用 `marketing/screenshots/6.7in/03_widget.png` の M（MK7 / #80 の範囲。プレスでは不使用）、ストア README のデモデータ整合、G4 #42 の提供元・連絡先、mkt-lead 承認。
