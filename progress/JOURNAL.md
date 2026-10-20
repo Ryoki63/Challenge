@@ -371,6 +371,16 @@
 - 残り: mkt-lead 承認 → mkt-review(景表法・誇大表現・体験していない機能)→ 10/21 の承認後に知人連絡(10/22)・X 投稿(10/23)。G4 で contactEmail が決まったら置換、G0 後にストア URL を確定
 - 結果: PR を作成(レビュー待ち)。送信・投稿はしていない。Issue は閉じない
 
+## 2026-10-20 14:40 (mkt-exec) — MK5 #78 計測設計(UTM・App Analytics・週次 SQL)
+- 着手: worktree `Challenge-78`。issue #78 の完了条件(チャネル別 UTM 命名規則 / App Analytics の指標一覧 / KPI.md の SQL と組み合わせた週次の見方 / SDK を入れない代替案)を、`products/lien/marketing/measurement.md` にまとめる。D6(分析 SDK なし)・#30 の App Privacy と整合させる
+- 方針: 標準 UTM は App Store に渡らないため、DL のチャネル attribution は Apple のキャンペーンリンク(`pt`/`ct`/`mt`)を正とし、UTM は将来の Web 計測用の予約として同じ命名を定義する。アプリ側の変更・SDK・計測専用テーブルは足さない
+- 成果: `products/lien/marketing/measurement.md` を作成。§2 にチャネル別の `ct` 命名規則(X / ティザー / 紹介)と UTM 対応、§3 に ASC Analytics の指標一覧としきい値、§4 に KPI.md と組み合わせた週次シート・分母一覧・補助 SQL、§5/§6 に SDK を入れない代替案と #30 の App Privacy との整合を書いた。docs/KPI.md §2.8 と docs/STRUCTURE.md からリンクを追加
+- 判断: 標準 UTM は App Store の campaign 計測に使われないため、`ct` を正とし、UTM は将来の Web 計測用の対応表にした。公開日(10/31)は ASC の Campaigns が出る前で `ct` を発行できないため「タグなし」とし、0 ではなく null で記録する運用にした
+- 検証: 相対リンク7件の解決 OK / `ct` 例11件が `[a-z0-9_]`・30文字以内 / `pglast` で KPI.md の SQL に補助 SQL を差し替えた全文を構文解析 OK(2 statements)/ marketing tools の unittest 24件 OK / `git diff --check` OK
+- 結果: コミット `322cc4d` を push し、PR #101 を作成(https://github.com/Ryoki63/Challenge/pull/101)。マージはせず、mkt-review の判断待ち
+- CI: PR #101 の `lien-ci` 全5ジョブ(deno test / e2e / ops / plant assets / store metadata)が緑
+- 追記: 表記の定義(ASC / DL / D1・D7・D30)を `0db7a0d` で追加。最終 CI も全5ジョブ緑
+
 ## 2026-10-20 13:18 (eng-exec) — T33 #33 RevenueCat組込 + ペイウォール(3文脈)
 - 着手: G6(#44)/T37 前でも実装・CI 検証できる範囲を実装する。実際の課金設定(RevenueCat アカウント・商品・価格・特商法・ストア申請)は行わない。
 - サーバー: `_shared/premium.ts` に `derivePairPlan` を抽出(grant-tickets から再エクスポート)。`snapshot.pairPlan`(free/premium)をメンバーの `users.premium_until` から導出し、`USER_COLUMNS`/`PARTNER_SELECT` に premium_until を追加。RevenueCat Webhook(`revenuecat-webhook`。Authorization の定数時間比較、期限は延ばす方向だけ・EXPIRATION は現在の期限以下だけ失効)を追加。contract fixtures 22 件再生成。
