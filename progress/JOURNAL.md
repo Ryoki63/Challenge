@@ -618,3 +618,13 @@
 - 判断: 推奨の方向（Glance・FCM・Play Billing+RevenueCat 共用は条件付き）は変えない。確認できない条文は断定せず、実装・Play 判断の前に公式資料で確かめる前提に留めた。
 - 取得の制約: developer.android.com・support.google.com・firebase.google.com の該当ページは本セッションでは本文が切り詰められて届いた（HTTP 200 だが本文不足）。
 - 残り: PR #132 のレビュー（未マージ）。Play の条件の確定と組織アカウントの扱いは #119（AND-PMO）の判断事項。
+- 00:31 記録時刻の訂正: 上の「00:40」「00:45」は見積もりの誤記。実時刻は 00:31 JST（TZ=Asia/Tokyo の date で確認）。過去行は編集せず本行で訂正する。
+- 00:33 一次資料の再確認: Supabase 匿名認証の本文で、匿名ユーザーは authenticated ロール・JWT の is_anonymous で RLS 区別・端末間の記録共有は不可、を確認（文書の「UUID を OS 間で共有しない」と整合）。RevenueCat Identifying Customers の本文で、App User ID はプロジェクト単位・大文字小文字区別・同一 ID は全プラットフォームで権限を共有、を確認。Android 通知権限の本文は取得できず（未確認のまま）。
+
+## 2026-10-21 00:43 (product-lead) — Issue #120 再開・一次資料の再照合
+- 着手: PR #132 の未コミット差分を確認。Issue の排他担当が空欄だったため、直接依頼された本作業の担当 `Ryoki63` を Issue #120 に設定し、readback で確認した。
+- 範囲: 受入成果物は前回提出済み。今回は公式資料を一次確認して残っていた仮説表示を直し、PR #132 に反映する。PR は未マージのままレビュー待ちとし、Issue も閉じない。
+- 一次資料確認: Glance `updatePeriodMillis` は最大30分に1回、WorkManager は例として15分間隔。Android 13+ の `POST_NOTIFICATIONS` 実行時許可、Android 8+ の通知チャンネル、FCM 通知メッセージのバックグラウンド処理と data-only callback の区別、Play の対象個人アカウントにおける12人・14日連続 opt-in、Analytics が FCM 自体ではなく Console delivery reports / BigQuery export に必要な点を公式資料で確認。
+- 未確認のまま残す事項: 実際の Play developer account 種別・作成日、組織アカウントの適用条件、実機での更新/通知達成値、Android の実顧客需要。対象値は取得していないため `null`。
+- 独立レビュー: 外部仕様の変更箇所を別レビュワーが再確認。Android 8+ の通知チャンネル要件は targetSdk 26+ 条件を補うよう指摘され、その範囲表現に限定して修正。他の対象記述は公式資料と整合し、相互矛盾なしとの評価。
+- 最終ローカル確認: REQUIREMENTS の番号節26件と Android 分類表26行が順序一致。文書内相対リンク6件がすべて実在。`git diff --check` pass。コード/テスト対象に変更なし。
