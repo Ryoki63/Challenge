@@ -816,3 +816,5 @@
 - 03:30 検証: 文書機械検査 PASS(4ファイル範囲・JOURNAL upstream完全保持・§9.2無変更・ローカルリンク・表・secret値形式不在・Issueと担当)。既存release runのsigned archive/uploadはskippedと再確認。外部通信を遮断したChromeのローカルプレビュー2枚を目視し、表7行/5行・横overflowなし。表示検査初回はコマンド転記ミス(SyntaxError)で失敗、修正後1回で成功。独立レビュー依頼済み、結果を待つ。
 - 独立レビュー: eng-lead確認担当 `01a15a8c-7dd5-7c81-a42f-3271e93cc91b` の1回はPASS。本文受入条件4点すべてPASS・must-fix0件・未解決なし。担当・日程維持、提案承認と配布実行の区別、BACKLOG2行の整合範囲、JOURNAL履歴保持を確認した。
 - 提出前ゲート: 全要件の文書反映 PASS／出典照合 PASS／表示確認 PASS／差分検査 PASS／独立レビュー PASS／今回範囲の残TODO0。アプリテスト・型・lint・buildは文書のみのため対象外。通常CIはpush後のSHAで確認する。指定branchへcommit/pushしPR提出、mainへの直接push・マージ・Issue closeは行わない。
+- 03:32 提出・CI: 実装commit `8755d02` を指定branchへpushし PR #150 https://github.com/Ryoki63/Challenge/pull/150 を作成。local/remote SHA一致、PR OPEN・MERGEABLE。同SHAのlien-ci run `39475450784` は6ジョブsuccess(Deno588件・Python190件、計778件、失敗0)。iOSは文書paths対象外で未起動、releaseは未起動。
+- 結果: 文書整合・独立レビュー・実装SHAの通常CIまでPASS、追加実装・署名・配布・実機操作なし。証跡追記を小さく別commitしてpushし、その最終SHAのCIと提出状態をPR/Issueコメントへ記録してレビューへ引き継ぐ。Issueはopenのまま、human-gateや未検証範囲を達成扱いにしない。
