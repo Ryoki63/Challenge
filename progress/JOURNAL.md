@@ -356,3 +356,4 @@
 - 既存 main の不具合修正: `HomeViewModel.presentShareImage()` と `HomeView` の `if canShareRecord` の閉じ括弧が無く、ローカル型検査が通らなかったため最小修正。
 - 検証: `scripts/macos-check/check.sh test` = 87 ファイル・**1086 tests / 0 failures / 26419 assertions**、`views` 120 ファイル OK。`deno test` = **409 passed / 0 failed**、contract fixtures `--check` = 22 件一致、ops tests 77 passed。
 - 残(G6/T37 後): RevenueCat の実キー設定・商品ID・トライアル日数・Webhook URL/秘密・サンドボックス購入の実機確認。アルバム30日超(T21)と節目からのペイウォール導線の結線。
+- 追記(13:40): 自分の購読が有効なときは購入ボタンを押せないようにした(二重購入防止)。ローカル 1087 tests / views OK。CI は再実行。
