@@ -117,6 +117,7 @@ struct ShareImageSheet: View {
                     .frame(maxHeight: format == .story ? 380 : 300)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+                    .accessibilityElement(children: .ignore)
                     .accessibilityLabel(
                         Text(Strings.Share.previewLabel(content.myName, content.partnerName, content.streakDays))
                     )
