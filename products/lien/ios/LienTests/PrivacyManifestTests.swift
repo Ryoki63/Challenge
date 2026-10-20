@@ -124,6 +124,7 @@ final class PrivacyManifestTests: XCTestCase {
                 "Lien/Core/Notifications/StreakRiskPlan.swift",
                 "Lien/Core/Notifications/NotificationReconciler.swift",
                 "Lien/Core/Notifications/LocalNotificationPushSync.swift",
+                "Lien/Core/Notifications/PushSnapshotWriter.swift",
                 "Lien/Core/Notifications/UserNotificationCenterScheduler.swift",
             ]
         ),
