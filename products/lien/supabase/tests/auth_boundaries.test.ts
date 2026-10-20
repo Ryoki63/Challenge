@@ -78,10 +78,12 @@ async function createDatabase(): Promise<PGlite> {
         ('${pairs.davidEve}', '${users.eve}');
       insert into public.checkins (id, promise_id, user_id, date_local) values
         ('${checkins.eve}', '${users.eve}', '${users.eve}', '2026-10-19'),
-        ('${checkins.davidBeforePair}', '${users.david}', '${users.david}', '2026-10-19');
+        ('${checkins.davidBeforePair}', '${users.david}', '${users.david}', '2026-10-19'),
+        ('${checkins.david}', '${users.david}', '${users.david}', '2026-10-20');
       insert into public.reactions (checkin_id, from_user, stamp) values
         ('${checkins.eve}', '${users.david}', 'clap'),
-        ('${checkins.davidBeforePair}', '${users.eve}', 'heart');
+        ('${checkins.davidBeforePair}', '${users.eve}', 'heart'),
+        ('${checkins.david}', '${users.eve}', 'heart');
       update public.pairs set status = 'dissolved', dissolved_at = '2026-10-20T00:00:00Z'
         where id = '${pairs.davidEve}';
       insert into public.pairs (id, started_on) values
@@ -91,8 +93,7 @@ async function createDatabase(): Promise<PGlite> {
         ('${pairs.carolDavid}', '${users.david}');
       insert into public.checkins (id, promise_id, user_id, date_local) values
         ('${checkins.alice}', '${users.alice}', '${users.alice}', '2026-10-20'),
-        ('${checkins.carol}', '${users.carol}', '${users.carol}', '2026-10-20'),
-        ('${checkins.david}', '${users.david}', '${users.david}', '2026-10-20');
+        ('${checkins.carol}', '${users.carol}', '${users.carol}', '2026-10-20');
       insert into public.reactions (checkin_id, from_user, stamp) values
         ('${checkins.alice}', '${users.bob}', 'clap'),
         ('${checkins.carol}', '${users.david}', 'heart'),
@@ -174,7 +175,31 @@ Deno.test("reactions RLS isolates visible checkins after re-pairing", async (tes
             stamp: "heart",
           },
           { checkin_id: checkins.david, from_user: users.carol, stamp: "clap" },
+          { checkin_id: checkins.david, from_user: users.eve, stamp: "heart" },
         ]);
+      });
+    });
+
+    await test.step("visible partner checkin includes a previous sender's same-day reaction", async () => {
+      await asUser(database, users.carol, async () => {
+        assertEquals(
+          (await database.query(
+            "select id from public.checkins where id = $1",
+            [checkins.david],
+          )).rows,
+          [{ id: checkins.david }],
+        );
+        assertEquals(
+          (await readReactions(database)).filter((reaction) =>
+            reaction.checkin_id === checkins.david &&
+            reaction.from_user === users.eve
+          ),
+          [{
+            checkin_id: checkins.david,
+            from_user: users.eve,
+            stamp: "heart",
+          }],
+        );
       });
     });
 
@@ -212,6 +237,7 @@ Deno.test("reactions RLS isolates visible checkins after re-pairing", async (tes
             stamp: "heart",
           },
           { checkin_id: checkins.david, from_user: users.carol, stamp: "clap" },
+          { checkin_id: checkins.david, from_user: users.eve, stamp: "heart" },
           {
             checkin_id: checkins.davidBeforePair,
             from_user: users.eve,
@@ -226,6 +252,7 @@ Deno.test("reactions RLS isolates visible checkins after re-pairing", async (tes
       assertEquals(
         await asUser(database, users.eve, () => readReactions(database)),
         [
+          { checkin_id: checkins.david, from_user: users.eve, stamp: "heart" },
           {
             checkin_id: checkins.davidBeforePair,
             from_user: users.eve,
