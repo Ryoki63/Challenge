@@ -107,7 +107,7 @@ products/lien/
 ├── supabase/     # migrations(連番SQL)と Edge Functions(deno)
 ├── assets/       # 植物のイラスト(SVG レイヤー)・アイコン
 ├── web/invite/   # 招待用静的ページ(GitHub Pages)
-└── marketing/    # ASO文言・スクショ・プライバシーポリシー・利用規約
+└── marketing/    # ASO文言・スクショ・プライバシーポリシー・利用規約・計測設計(measurement.md)
 ```
 
 ### progress/ — 実行履歴・監査ログ
