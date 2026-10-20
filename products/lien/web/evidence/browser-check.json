@@ -1,0 +1,73 @@
+{
+  "checkedAt": "2026-10-20T12:47:07.860Z",
+  "browser": "Chrome/155.0.8059.85",
+  "scope": "local only; production not deployed",
+  "results": [
+    {
+      "width": 393,
+      "overflow": false,
+      "forms": 0,
+      "x": "https://x.com/lien_promise",
+      "shots": [
+        {
+          "src": "assets/shot-1-home.png",
+          "complete": true,
+          "width": 1290,
+          "height": 2796
+        },
+        {
+          "src": "assets/shot-2-waiting.png",
+          "complete": true,
+          "width": 1290,
+          "height": 2796
+        },
+        {
+          "src": "assets/shot-3-history.png",
+          "complete": true,
+          "width": 1290,
+          "height": 2796
+        }
+      ],
+      "screenshot": "products/lien/web/evidence/teaser-393.png",
+      "sha256": "cddddfed788f05861d585e37e161b95a961e44810093cd5d87e0e998662f0487"
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "forms": 0,
+      "x": "https://x.com/lien_promise",
+      "shots": [
+        {
+          "src": "assets/shot-1-home.png",
+          "complete": true,
+          "width": 1290,
+          "height": 2796
+        },
+        {
+          "src": "assets/shot-2-waiting.png",
+          "complete": true,
+          "width": 1290,
+          "height": 2796
+        },
+        {
+          "src": "assets/shot-3-history.png",
+          "complete": true,
+          "width": 1290,
+          "height": 2796
+        }
+      ],
+      "screenshot": "products/lien/web/evidence/teaser-1440.png",
+      "sha256": "89f93b2cb605839796fee78529a77f67024af7e87b5b2714b5abc925ab97be62"
+    },
+    {
+      "page": "privacy",
+      "localHttpStatus": 200,
+      "placeholdersRemain": true
+    },
+    {
+      "page": "terms",
+      "localHttpStatus": 200,
+      "placeholdersRemain": true
+    }
+  ]
+}

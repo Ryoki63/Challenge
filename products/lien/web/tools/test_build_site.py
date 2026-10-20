@@ -15,9 +15,9 @@
 import json
 import os
 import re
+import struct
 import tempfile
 import unittest
-import xml.etree.ElementTree as ET
 
 import build_site
 
@@ -170,6 +170,21 @@ class IndexPageTest(unittest.TestCase):
         self.assertEqual(len(shots), 3, shots)
         self.assertEqual(len(set(shots)), 3)
 
+    def test_promises_and_ticket_conditions_match_requirements(self):
+        self.assertIn("それぞれが、毎日つづけたい約束を1つ決めます", self.html)
+        self.assertIn("毎月2枚のペア共有チケット", self.html)
+        self.assertIn("残りがある日は自動で使い", self.html)
+        self.assertIn("残りがない日は今日から再スタート", self.html)
+        self.assertIn("最高記録は残ります", self.html)
+
+    def test_demo_images_are_disclosed(self):
+        self.assertIn("開発中の実画面", self.html)
+        self.assertIn("名前・約束・日数はデモデータ", self.html)
+
+    def test_teaser_does_not_claim_unconditional_growth(self):
+        self.assertNotIn("続いた日数だけ", self.html)
+        self.assertNotIn("記録がのびていきます", self.html)
+
     def test_coming_soon_badge(self):
         self.assertIn("近日公開", self.html)
 
@@ -239,9 +254,9 @@ class BuildAllTest(unittest.TestCase):
             "index.html",
             "assets/site.css",
             "assets/icon.svg",
-            "assets/shot-1-home.svg",
-            "assets/shot-2-widget.svg",
-            "assets/shot-3-checkin.svg",
+            "assets/shot-1-home.png",
+            "assets/shot-2-waiting.png",
+            "assets/shot-3-history.png",
             "lien/legal/privacy.html",
             "lien/legal/terms.html",
         ):
@@ -254,28 +269,25 @@ class BuildAllTest(unittest.TestCase):
             deployed = os.path.join(build_site.SITE_OUT_DIR, "lien", "legal", html_name)
             self.assertEqual(outputs[canonical], outputs[deployed], html_name)
 
-    def test_screenshots_are_valid_svg_of_the_right_size(self):
+    def test_screenshots_are_valid_png_of_the_right_size(self):
         outputs = build_site.build_all(default_config())
-        for name in ("shot-1-home.svg", "shot-2-widget.svg", "shot-3-checkin.svg"):
+        for name, source, alt in build_site.SCREENSHOTS:
             content = outputs[os.path.join(build_site.SITE_OUT_DIR, "assets", name)]
-            root = ET.fromstring(content)
-            self.assertEqual(root.get("width"), "660")
-            self.assertEqual(root.get("height"), "1430")
-            self.assertIn('xmlns="http://www.w3.org/2000/svg"', content)
+            self.assertEqual(content[:8], b"\x89PNG\r\n\x1a\n")
+            self.assertEqual(content[12:16], b"IHDR")
+            self.assertEqual(struct.unpack(">II", content[16:24]), (1290, 2796))
 
-    def test_no_external_references_in_screenshots(self):
-        # SVG を <img> で読むと外部参照は読み込まれない。立ち絵は埋め込みで完結させる
+    def test_screenshots_are_exact_copies_of_real_view_renders(self):
         outputs = build_site.build_all(default_config())
-        for name in ("shot-1-home.svg", "shot-2-widget.svg", "shot-3-checkin.svg"):
+        for name, source, alt in build_site.SCREENSHOTS:
             content = outputs[os.path.join(build_site.SITE_OUT_DIR, "assets", name)]
-            self.assertNotIn("xlink:href", content)
-            self.assertNotIn("<image", content)
+            with open(os.path.join(build_site.SCREENSHOT_DIR, source), "rb") as handle:
+                self.assertEqual(content, handle.read())
 
-    def test_widget_screenshot_does_not_claim_photos(self):
-        # v1.0 のウィジェットに相手の写真は出ない(D3)。出しているように見せない
+    def test_widget_preview_is_not_published_in_v1_teaser(self):
         outputs = build_site.build_all(default_config())
-        content = outputs[os.path.join(build_site.SITE_OUT_DIR, "assets", "shot-2-widget.svg")]
-        self.assertNotIn("写真", content)
+        self.assertFalse(any("widget" in path for path in outputs))
+        self.assertNotIn("03_widget.png", [source for name, source, alt in build_site.SCREENSHOTS])
 
 
 class DriftTest(unittest.TestCase):
@@ -296,7 +308,7 @@ class PublishableTest(unittest.TestCase):
         self.assertTrue(any("プレースホルダ" in p for p in problems), problems)
 
     def test_blocks_when_x_url_is_missing(self):
-        config = build_site.load_config()
+        config = default_config()
         outputs = build_site.build_all(config)
         legal = [(p, c) for p, c in outputs.items() if p.endswith(("privacy.html", "terms.html"))]
         index = outputs[os.path.join(build_site.SITE_OUT_DIR, "index.html")]

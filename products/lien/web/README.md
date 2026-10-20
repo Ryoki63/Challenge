@@ -11,16 +11,17 @@
 | `site/lien/legal/privacy.html` | プライバシーポリシー(`marketing/privacy-policy.md` から生成) |
 | `site/lien/legal/terms.html` | 利用規約(`marketing/terms.md` から生成) |
 | `site/lien/i/index.html` | 招待ページ(T11 の `web/invite/index.html` の複製) |
-| `site/assets/` | CSS・アイコン・スクリーンショット3枚(SVG) |
+| `site/assets/` | CSS・アイコン・実画面紹介画像3枚(PNG) |
 | `site.json` | 公開先と未確定の値(`null` は「未確定」) |
 | `tools/build_site.py` | 生成器(標準ライブラリだけ。Markdown パーサも自前) |
-| `tools/test_build_site.py` | 検査(47 件) |
+| `tools/test_build_site.py` | 検査(50 件) |
 
 ## 公開先
 
 **2026-10-20 オーナー承認済み**: #76 の返信
 https://github.com/Ryoki63/Challenge/issues/76#issuecomment-6287900053 で推奨案を採用。
-公開先の再承認は不要。承認は未提供の法務情報や X ハンドルを補うものではない。
+公開先の再承認は不要。「公開しちゃおう」の返信も受領済み。
+X は #79 のオーナー指定 `@lien_promise` を設定済み。法務4項目の具体値は未提供。
 再開時点の受入確認と未達項目は [PUBLISH-STATUS.md](PUBLISH-STATUS.md) を参照。
 
 アプリの `ios/Lien/Core/SupportLinks.swift` の `webBaseURL` と同じ土台にする(審査で開く URL の正本)。
@@ -59,8 +60,8 @@ python3 -m unittest discover -s tools -p "test_*.py" -v
 1. **G4(#42)のプレースホルダを埋める** — `marketing/privacy-policy.md` / `terms.md` の
    `【要記入: G4: …】` 4項目(制定日・事業者名・連絡先メール・管轄裁判所)。
    `marketing/legal/CHECKLIST-G4.md` §1 の表のとおりに置換して再生成する
-2. **X の @ハンドルを決める** — `site.json` の `xUrl`(例 `https://x.com/<handle>`)。
-   未設定のあいだ、ティザーに X のリンクは出ない(実在しないアカウントを指さないため)
+2. **X のリンクを確認する** — `site.json.xUrl` は `https://x.com/lien_promise`。
+   根拠は #79 issuecomment-6290455043。未設定時の公開拒否は維持する
 3. **GitHub Pages を有効にする** — リポジトリの Settings > Pages > Build and deployment >
    Source を **「GitHub Actions」** にする(初回だけ)
 4. **mkt-review の文言レビュー** — 対象と判定を記録する。マージや制作者の自己点検を
@@ -80,6 +81,10 @@ G4 が済んだら `.github/workflows/lien-pages.yml` の `on:` に push のパ�
 - **v1.0 に無い機能を書かない**。訴求の根拠は `docs/CONCEPT.md` §7 と `docs/REQUIREMENTS.md`
 - **数値・順位・受賞を書かない**。デモの「23日」は `marketing/screenshots/plan.md` §2 の
   デモデータで、実績ではない
-- 文言は `marketing/store_metadata/ja/`(ストア確定値)から取る。ティザー用に新しいコピーを作らない
-- スクリーンショットは v4 の立ち絵(`assets/plant/v4_drafts/composed/`)を埋め込んだ SVG。
-  実機キャプチャへの差し替えは #80(MK7)で行う
+- 1行説明は `marketing/store_metadata/ja/subtitle.txt` を使う。紹介文とチケット説明は
+  `docs/REQUIREMENTS.md` §3.3–3.6・3.10に合わせ、公開前にmkt-reviewへ回す。
+  ストア文言の採用承認を、独自に修正したティザー文言の承認へ流用しない
+- スクリーンショットは #80(MK7)の実View描画PNG(6.7in)を無加工で複製する。
+  `01_home_both`・`02_home_waiting`・`04_history` の3枚。開発中のデモデータと明示する。
+  Mウィジェットを含む `03_widget` はv1.0の掲載対象外。元画像の来歴は
+  `marketing/screenshots/manifest.json` (commit/runId)を参照する

@@ -585,3 +585,17 @@
 - 【承認待ち】#32 に comment 6290434543 を投稿し、`needs-approval,human-gate` を付与。質問は文言の再承認ではなく、G0確認後の人間による ASC 入力・保存・再読み込みと証跡返却の1点。#32 / #38 / #42 は close せず、status ラベルは HQ に委ねた。
 - 提出チェック: リポジトリ側修正 PASS / 関連37テスト PASS / CLI動作確認 PASS / AST構文 PASS / diff --check PASS / 独立レビュー1回・重大指摘なし / 型チェック・lint専用設定なし / iOS・バックエンドの実装変更なし。残TODOはASC保存証跡の人間返却で、受入「App Store Connect にキーワード・説明文設定完了」は未達。
 - 結果: **BLOCKED(人間のASC入力・保存証跡待ち)**。承認済み文言は変更せず、PR #113 を push 済み・未マージで提出。審査提出・公開・本番変更は未実施。
+
+## 2026-10-20 21:36 (ux-exec) — MK3 #76 オーナー公開指示後の再開
+- 着手: 「公開しちゃおう」(issuecomment-6289938523 / 6289938594)を確認。指定ブランチ・既存PR #111を継続し、公開先承認を再質問しない。公開用情報の根拠、未解決の文言/画像指摘、配備の実行条件を確認する。初期worktreeはclean、Issueのassigneeは空(他担当者なし)。mainへの直接push・PRマージ・secret参照は行わない。
+- 前提更新: #79 issuecomment-6290455043 にオーナー指定の公開X `@lien_promise` を発見。`site.json.xUrl` を反映。#42 の人間返信は「それでOK!」のみで法務4項目の具体値はない。公開指示を法務値の指定と読み替えない。
+- 修正: 各自1つの約束、毎月2枚・残数あり/なしのチケット条件を明記。無条件の植物成長の紹介文を削除。架空のSVG画面生成を廃止し、MK7実View描画PNG(達成ホーム/相手だけ完了/履歴)3枚をそのまま配信物へ複製。v1.0.1のMウィジェットが写る #80 の03_widgetは掲載しない。
+- 検証途中: unittest **50件PASS**(既存47件維持、条件/デモ明示/無条件成長の回帰3件追加)、生成**11件PASS**、生成物一致**11件PASS**。公開前チェックは法務4出力の未記入のみでexit 1(X未設定は解消)。Pages GETはHTTP 404、設定変更・配備は行っていない。独立レビュー1人とローカル画面確認を開始。
+- 同期: 作業中21:46 JSTにレビュー側でPR #111がマージ・リモートブランチ削除。HEAD差分をコミット後、origin/mainを履歴書換えなしでmerge。READMEは今回の公開X情報を維持、JOURNALはmainの全記録と今回の追記を保持。追加PRで提出する。
+- 独立レビュー: 修正箇所と生成器変更を1人が確認し高優先指摘なし。画像来歴/バイト一致/キャプションSHAも確認。正式mkt-review役職の承認は代行しない。`web/evidence/review-2026-10-20.md` に判定と境界を記録。
+- 表示確認: ローカルChrome 393px/1440pxで横はみ出しなし、フォーム0、画像3枚読み込み/寸法/リンク一致、法務2ページHTTP 200。PNG2枚と検査JSONを `web/evidence/` に保存し目視。初回はChrome内部UIのtargetへ接続してmetrics overrideが非対応、type=pageに絞って成功。本番/実機表示とは扱わない。
+- 関連静的検査: `deno test --allow-read products/lien/scripts/ops/marketing_docs_static_test.ts` 型チェック+8件PASS。法務原文は未変更。公開に必要な値は4項目へ絞り、Xの再指定や公開許可の取り直しは求めない。
+- 提出: 追補PR #116 https://github.com/Ryoki63/Challenge/pull/116 を作成し、指定ブランチへpush。main取り込み後も50件/生成物11件一致PASS。acac060時点のCIはlien-ciの6ジョブPASS、iOS build+testはpendingで未評価。公開前ゲートexit 1は別途の未達として保持し、CIのpages job成功を公開許可とは扱わない。
+- 【承認待ち】#76 comment 6291397238 に制定日・公開事業者名・公開サポートメール・管轄裁判所をまとめて指定するか保留するかの質問を1つ投稿し、needs-approval/human-gateを付与。正式mkt-review評価は引継ぎ事項。ローカル確認用HTTPサーバとChromeを終了。
+- 提出チェック: ローカル関連50テストPASS / Deno型検査・8テストPASS / 静的build11件PASS / 生成物一致PASS / 直接表示確認PASS / diff検査PASS / 独立レビュー1回・高優先指摘なし。Python専用型検査・lint設定なし、今回独自のiOS変更なしのためローカルiOS buildは対象外。全要件・残TODOゼロは未達(正式文言承認と公開・本番確認が残る)。
+- 結果: **BLOCKED(法務公開用4項目の具体値待ち)**。PR #116を未マージで提出、Issue #76はOPEN維持。公開・ストア申請・SNS投稿・本番データ変更は実行していない。
