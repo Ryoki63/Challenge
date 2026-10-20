@@ -12,6 +12,7 @@
   8. `根拠` の節（docs/*.md §N / §N.M / §N-M）が実在する
   9. `添付画像` のパスが実在する（`指定:` で始まる場合は、素材ができるまで投稿しない予約として許可）
  10. 承認が揃う前に `status: ready` にしていない（review.md の台帳と各ファイルのチェックボックスの両方を見る）
+ 11. `branding.md`（X アカウントのブランディング案）の表示名・bio・@handle・固定ポストも同じ原則で検査する
 
 使い方:
   python3 tools/check_posts.py          # 失敗時 exit 1
@@ -26,6 +27,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 X_DIR = os.path.normpath(os.path.join(HERE, ".."))
 REPO = os.path.normpath(os.path.join(X_DIR, "..", "..", "..", ".."))
 REVIEW_MD = os.path.join(X_DIR, "review.md")
+BRANDING_MD = os.path.join(X_DIR, "branding.md")
 
 # 想定する13本（日付 -> 種別）。日次10本は 10/21〜10/30、10/31 は公開日告知。
 EXPECTED = {
@@ -60,6 +62,15 @@ REQUIRED_FIELDS = (
 )
 
 BODY_LIMIT = 140
+
+# X のプロフィール上限（表示名 50 字 / bio 160 字 / @handle 15 字）。
+NAME_LIMIT = 50
+BIO_LIMIT = 160
+HANDLE_RE = re.compile(r"@[A-Za-z0-9_]{1,15}")
+
+# branding.md の推奨値フィールド（`- 表示名 A（推奨）: `...`` / `- bio A（推奨）: `...``）
+BRANDING_FIELD = re.compile(r"^-\s+(表示名|@handle|bio)([^:]*):\s*(.+)$", re.MULTILINE)
+FIELD_VALUE = re.compile(r"`([^`]+)`")
 
 # アプリ本体の禁止語（LienTests/StringsReviewTests.swift の PunishmentFreeLint.bannedWords と同じ8語）。
 # 投稿でも同じ語を使わない（REQUIREMENTS §3.5 / DESIGN §3.8）。
@@ -336,6 +347,138 @@ def validate_post(path, text, ledger):
     return errors
 
 
+def copy_problems(text, limit, basis, require=()):
+    """言い回しの共通ルール（字数・禁止語・競合名・日付・数字の根拠・必須語）。"""
+    problems = []
+    if limit is not None and effective_length(text) > limit:
+        problems.append("%d 字（上限 %d 字）" % (effective_length(text), limit))
+    for pattern, label in ((APP_BANNED, "罰・恥系の禁止語"), (MARKETING_BANNED, "誇大・煽り表現")):
+        m = pattern.search(text)
+        if m:
+            problems.append("%sを含みます: %r" % (label, m.group(0)))
+    hits = [t for t in COMPETITOR_TERMS if t in normalize(text)]
+    if hits:
+        problems.append("競合サービス名を含みます: %s" % ", ".join(hits))
+    m = DATE_ASSERTION.search(text)
+    if m:
+        problems.append("日付・年を断定しています: %r（公開日は未確定のため「近日公開」を使う）" % m.group(0))
+    for token in sorted(set(NUMERAL.findall(normalize(text)))):
+        if token not in basis:
+            problems.append("数字 %r が「数値の根拠」にありません" % token)
+    for word in require:
+        if word not in text:
+            problems.append("「%s」が入っていません" % word)
+    return problems
+
+
+def field_of(text, key):
+    """`- key: value` の1行フィールドを読む。"""
+    m = re.search(r"^-\s*%s:\s*(.+)$" % re.escape(key), text, re.MULTILINE)
+    return m.group(1).strip() if m else ""
+
+
+def thread_section(text):
+    """`## 固定ポスト` の節（次の `## ` まで）。無ければ None。"""
+    m = re.search(r"^##\s+(?:[0-9]+\.\s*)?固定ポスト.*$", text, re.MULTILINE)
+    if not m:
+        return None
+    rest = text[m.end():]
+    nxt = re.search(r"^##\s+", rest, re.MULTILINE)
+    return rest[:nxt.start()] if nxt else rest
+
+
+def thread_bodies(section):
+    """`### ...` ごとの `>` 引用を本文として取り出す。"""
+    bodies = []
+    for chunk in re.split(r"^###\s+", section, flags=re.MULTILINE)[1:]:
+        lines = []
+        for line in chunk.splitlines()[1:]:
+            if line.startswith("## "):
+                break
+            if line.startswith(">"):
+                content = line[1:]
+                if content.startswith(" "):
+                    content = content[1:]
+                lines.append(content.rstrip())
+        bodies.append("\n".join(lines).strip())
+    return bodies
+
+
+def validate_branding(text):
+    """branding.md（X アカウントのブランディング案）を検査する。"""
+    errors = []
+
+    def err(msg):
+        errors.append("branding.md: %s" % msg)
+
+    basis = normalize(field_of(text, "数値の根拠"))
+    status = field_of(text, "status")
+    if status not in ("draft", "ready"):
+        err("status は draft / ready のどちらかにしてください: %r" % status)
+
+    basis_refs = doc_refs(field_of(text, "根拠"))
+    if not basis_refs:
+        err("「根拠」に docs/*.md §N の参照がありません")
+    for ref_path, ref in basis_refs:
+        problem = resolve_doc_ref(ref_path, ref)
+        if problem:
+            err(problem)
+
+    counts = {"表示名": 0, "@handle": 0, "bio": 0}
+    recommended = {}
+    for key, suffix, raw in BRANDING_FIELD.findall(text):
+        m = FIELD_VALUE.search(raw)
+        if not m:
+            err("%s%s は値を `...` で囲んでください" % (key, suffix))
+            continue
+        candidate = m.group(1).strip()
+        counts[key] += 1
+        label = "%s%s" % (key, suffix)
+        if "推奨" in suffix:
+            recommended[key] = candidate
+
+        if key == "表示名":
+            if effective_length(candidate) > NAME_LIMIT:
+                err("%s が %d 字（上限 %d 字）" % (label, effective_length(candidate), NAME_LIMIT))
+            if "（リアン）" in candidate:
+                err("%s の括弧が全角です（ストア名に合わせて半角の (リアン)）" % label)
+            for problem in copy_problems(candidate, None, basis):
+                err("%s: %s" % (label, problem))
+        elif key == "@handle":
+            if not HANDLE_RE.fullmatch(candidate):
+                err("%s が @ + 英数字/アンダースコア 15 字以内ではありません: %r" % (label, candidate))
+        else:  # bio
+            for problem in copy_problems(candidate, BIO_LIMIT, basis, require=("ひとつだけ", "近日公開")):
+                err("%s: %s" % (label, problem))
+
+    for key in counts:
+        if counts[key] < 2:
+            err("%s の候補が2つ未満です（推奨 + 代替を並べる）" % key)
+    if "表示名" in recommended and "Lien(リアン)" not in recommended["表示名"]:
+        err("推奨の表示名に、ストア名と同じ「Lien(リアン)」が入っていません")
+
+    section = thread_section(text)
+    if section is None:
+        err("「## 固定ポスト」の節がありません")
+    else:
+        bodies = thread_bodies(section)
+        if len(bodies) < 2:
+            err("固定ポストのスレッド本文（`>`）が2本未満です")
+        for i, body in enumerate(bodies, 1):
+            if not body:
+                err("固定ポスト %d 本目の本文が空です" % i)
+                continue
+            for problem in copy_problems(body, BODY_LIMIT, basis):
+                err("固定ポスト %d 本目: %s" % (i, problem))
+
+    if status == "ready":
+        missing = [k for k, v in approvals_of(text).items() if not v]
+        if missing:
+            err("status: ready ですが承認のチェックがありません: %s" % ", ".join(missing))
+
+    return errors
+
+
 def check_all(x_dir=X_DIR):
     errors = []
     if not os.path.exists(REVIEW_MD):
@@ -352,6 +495,11 @@ def check_all(x_dir=X_DIR):
     for date in sorted(EXPECTED):
         if date not in present:
             errors.append("%s.md: 投稿案がありません（13本そろえる）" % date)
+
+    if not os.path.exists(BRANDING_MD):
+        errors.append("branding.md がありません（X アカウントのブランディング案）")
+    else:
+        errors.extend(validate_branding(read_text(BRANDING_MD)))
     return errors
 
 
@@ -362,7 +510,7 @@ def main():
         for e in errors:
             print("  - " + e)
         return 1
-    print("OK: %d 本の投稿案（140字以内・禁止語なし・根拠あり・承認前 ready なし）" % len(EXPECTED))
+    print("OK: %d 本の投稿案とブランディング案（140字以内・禁止語なし・根拠あり・承認前 ready なし）" % len(EXPECTED))
     return 0
 
 
