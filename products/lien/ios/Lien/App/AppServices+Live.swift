@@ -148,7 +148,16 @@ extension AppServices {
                 } catch {
                     return nil
                 }
-            })
+            }),
+            // カレンダー履歴(T18 #18): その月の checkins / streak_days を RLS の範囲で直接読む
+            // (新しい Edge Function は増やさない。pairs でペア成立日を取る)
+            history: PostgRESTHistoryRepository(
+                baseURL: baseURL,
+                apiKey: config.supabaseAnonKey,
+                tokenProvider: tokenProvider,
+                currentUserID: { supabase.currentUserID },
+                session: session
+            )
         )
     }
 }

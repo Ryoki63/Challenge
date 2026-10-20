@@ -715,4 +715,44 @@ enum Strings {
         static let restart = "はじめからやり直す"
         static let later = "あとで"
     }
+
+    /// カレンダー履歴(REQUIREMENTS §3.11 / T18 #18)。
+    /// 途切れた日は無彩色の点だけにして、言葉で責めない(REVIEW-2026-10-12 §4.2)。
+    enum History {
+        static let title = "ふたりの記録"
+        static let openButtonLabel = "ふたりの記録を開く"
+        static let previousMonth = "前の月"
+        static let nextMonth = "次の月"
+
+        // 月の見出しと曜日(日曜はじまり。Calendar.lienHistory の firstWeekday = 1 と揃える)
+        static let weekdaySymbols = ["日", "月", "火", "水", "木", "金", "土"]
+
+        // 凡例と読み上げ。noRecord / beforePair / future / todayPending は画面に文字を出さない
+        static let bothDone = "ふたり達成"
+        static let meOnly = "じぶんだけ"
+        static let partnerOnly = "あいてだけ"
+        static let restTicket = "お休み"
+        static let noRecord = "記録なし"
+        static let beforePair = "ペアになる前"
+        static let future = "これから"
+        static let todayPending = "今日"
+
+        // 読み込み・空状態(責めない文言)
+        static let loadFailed = "記録を読み込めませんでした。通信状態を確認して、もう一度お試しください"
+        static let retry = "もう一度"
+        static let empty = "ペアになると、ふたりの記録がのこります"
+
+        static func monthTitle(year: Int, month: Int) -> String {
+            "\(year)年\(month)月"
+        }
+
+        static func dayTitle(month: Int, day: Int) -> String {
+            "\(month)月\(day)日"
+        }
+
+        /// VoiceOver の読み上げ(例:「10月5日、ふたり達成」)
+        static func dayAccessibility(_ dateText: String, _ markText: String) -> String {
+            "\(dateText)、\(markText)"
+        }
+    }
 }

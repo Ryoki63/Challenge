@@ -51,6 +51,9 @@ struct AppServices {
     /// ローカル通知を扱わない。Live / Stub のどちらの構成でも AppServices が入れる。アカウントの削除・サインアウトの後始末で
     /// 設定と予約を消す(AppModel.endSession)
     var reminders: ReminderManaging?
+    /// カレンダー履歴(T18 #18)。nil のとき(これを渡さない既存の組み立て・プレビュー)は、ホームに導線を出さない。
+    /// Live は PostgREST を直接読み、Stub は決まったサンプルを返す
+    var history: HistoryRepository?
 }
 
 extension AppServices {
@@ -84,7 +87,9 @@ extension AppServices {
             plantNaming: StubPlantNaming(store: store),
             plantMemory: UserDefaultsPlantMemoryStore(),
             // サーバーの約束を持たない構成: リマインドの時刻は、約束を保存したとき(promiseSaved)に端末が覚える
-            reminders: makeReminders(store: store, reminderLoader: nil)
+            reminders: makeReminders(store: store, reminderLoader: nil),
+            // サーバーが無くてもカレンダーの画面と月移動を動かせるサンプル
+            history: StubHistoryRepository()
         )
     }
 
