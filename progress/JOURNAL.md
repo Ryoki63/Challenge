@@ -466,3 +466,6 @@
 - 画像12枚 + 一覧は b5265f9 の版と SHA-256 で**完全一致**(main の課金導線はスクショでは nil のため、画面の見た目は変わらない)。manifest と README の来歴だけ更新
 - main が赤だった2件を補修(どちらもテストの期待値のみ): deno 型検査は #97 の `todayLocal` 必須化に `snapshot_test.ts` の pairPlan ケースが未追随、`SNAPSHOT_KEYS` は #96 の `pairPlan` 追加で22個なのに期待値21
 - 検証: `verify_screenshots.py` OK / unittest 36 OK / `lien-ci` #39392331252 success / `lien-ios` #39389661638(attempt 2) success
+
+## 2026-10-20 18:29 — Issue #94 [mkt M8] 紹介記事とプレス向け素材
+- 着手: worktree・ブランチ・origin を確認。Issue #94 の受入条件に沿って、ファクトシート・紹介文 3 種・スクリーンショット素材を作成し、レビュー可能な PR まで進める。
