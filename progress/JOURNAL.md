@@ -617,3 +617,5 @@
 - 同期: HEAD `413ee6e` は origin/main を merge 済みで、PR #117 の現在の head と一致。未コミット差分の範囲と新しい画面構成を受入条件・v1.0仕様に照合する。
 - 仕様照合: REQUIREMENTS §3.2–§3.13 で各主張を確認。03(M ウィジェット)は除外。04 のカレンダーに出るお休みマークは v1.0 の §3.6 に規定された履歴表示。提供元・メールは G4 #42 未確定なのでトークンを維持し、数値実績は資料に載せていない。画像3枚を実表示し、キャプションと画面の対応を確認。
 - 次: `verify_press.py` と marketing tools の回帰テスト、画像の寸法/ハッシュ、HTMLの1ページ描画、差分整合を検証する。レビュー結果は mkt-review に相当する独立確認1回を依頼する。
+- 提出: 差分を commit `da7d4e6` として作成し、PR #117 の既存ブランチへ push。local HEAD と origin branch SHA は一致、tracked/untracked の残差分なし。PR CI 6 job は push 直後のため pending（成功未確定）。
+- レビュー/描画境界: mkt-review 観点の独立 read-only レビューを1回依頼中。ローカル環境に Chromium / PDF renderer がないため、A4 1ページの実描画確認は未実施。PR #117 の再レビューを依頼する。
