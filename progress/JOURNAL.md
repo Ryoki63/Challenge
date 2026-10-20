@@ -612,3 +612,7 @@
 - 提出準備: 指定ブランチへcommit/pushしPRを作成する。mainへ直接pushせず、PRのマージはレビュー役職へ委ねる。push後CIは提出SHAで確認し、既存runの緑で代替しない。
 - 23:24 提出: 実装コミットf3311d9を指定ブランチへpushしPR #129を作成。mainへの直接push・マージは行っていない。提出SHAのlien-ci run 39438487582は6ジョブsuccess、lien-ios run 39438492922は実行中。最終CI結果はPR #129へ追記し、実行中を成功とは扱わない。
 - 結果（文書・レビュー）: Issue #106の4受入条件を満たす単一実行シートと導線、eng-review PASS記録をPR #129へ提出済み。署名・TestFlight到達・招待受信は今回の実行対象外。公開期限は変更せず、初回署名とApple処理待ちのリスクを残検証として明記。PRはOPENのままレビュー役職へ引き継ぐ。
+- 23:42 CI障害: lien-ios run 39438492922の初回はSwiftPM依存取得中にGitHub:443接続不能およびRevenueCat cloneのcurl 56 timeout/early EOFで失敗（exit 74）。アプリのbuild/testには到達しておらず、完了ゲート未達。無関係なworkflow/依存定義は変更せず、同runの失敗ジョブを1回だけ再実行した。再失敗時は3回目を行わず未完了として返す。
+- 23:50 CI節目: attempt 2はSwiftPM依存解決を23:45 JSTに通過し、初回の接続障害箇所は回復。iPhone 17シミュレータ起動中でbuild/testはまだ未到達。結果を待ち、依存解決成功だけでCI全体PASSとは扱わない。
+- 2026-10-21 00:03 CI最終: attempt 2は無署名build/testがsuccess、1221件・0 failures・TEST SUCCEEDEDをログで確認。しかしジョブ全体は20分15秒で上限超過、API conclusion=cancelled。CI全体successではないため完了扱いにしない。同操作の3回目は行わない。
+- 結果（最終判定）: failed。文書4受入条件・eng-review・ローカル130件・CIの無署名1221件はPASSだが、提出実装SHAのlien-ios全体緑ゲートは未達。PR #129はOPEN・未マージ、Issue #106もOPENを維持。CI実行時間の復旧と再検証を引き継ぎ、今回はworkflowやアプリを変更しない。secret/Appleアップロード/招待/本番変更なし。

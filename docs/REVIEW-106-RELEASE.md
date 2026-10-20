@@ -34,3 +34,10 @@
 - 既存`lien-release` run `38333546970`（別SHA）は無署名archive成功、signed archiveとuploadはskipped。**初回クラウド署名成功の証跡ではない**。
 - 本番dispatch・Secrets取得/登録・Apple設定/アップロード・招待/配布は行っていない。Appleの処理時間、1時間での到達、実機通知、招待受信の実測は、オーナー承認後にこの実行シートを使って確認する。
 - ロールバック: 文書はPR経由のrevert。DB migrationなし、本番データ変更なし。10/24機能凍結・10/27審査提出・10/31公開の期限や仕様は変更しない。署名の初回検証とApple処理待ちはスケジュールリスクとして残る。
+
+## 提出後CIの最終結果（2026-10-21 00:03 JST）
+
+- 実装SHA `f3311d933323951db57a048e45fc41d582b948fa` の`lien-ci` run `39438487582`は6ジョブsuccess。JOURNALのみ追記したSHA `110582a2259c23ca3e2445daee2a2de4b2725c6e` のrun `39438842365`も6ジョブsuccess。
+- 同実装SHAの`lien-ios` run `39438492922`初回はSwiftPM依存取得でGitHub:443接続不能・RevenueCat clone timeout/early EOF（exit 74）。1回だけ失敗ジョブを再実行した。
+- attempt 2は依存解決・シミュレータ起動・無署名build/testがsuccess。ログは **1221 tests / 0 failures / TEST SUCCEEDED**。ただしジョブ全体は20分制限を超過し、APIの最終conclusionは **cancelled**（20分15秒）。全ステップのsuccess表示をジョブ全体のsuccessへ読み替えない。
+- **文書受入とeng-reviewはPASS、CI全体の緑ゲートは未達のためタスク最終判定はfailed。PR #129は未マージ、Issue #106はOPENを維持する。** 同操作の3回目は行わず、CI実行時間の調査・復旧後の再検証を別の作業として引き継ぐ。今回workflow・アプリ・依存定義は変更していない。
