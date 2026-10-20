@@ -381,6 +381,19 @@
 - CI: PR #101 の `lien-ci` 全5ジョブ(deno test / e2e / ops / plant assets / store metadata)が緑
 - 追記: 表記の定義(ASC / DL / D1・D7・D30)を `0db7a0d` で追加。最終 CI も全5ジョブ緑
 
+## 2026-10-20 14:25 (mkt-exec) — #75 MK2 X 開発ストーリー10本+公開日告知セット(下書き)
+- 着手: worktree `Challenge-75`(ブランチ `consilium/75-mk2-x-10`)。Issue #75 の受入条件は「marketing/x/ に日付つき投稿案(日次10本+公開日・翌日・1週間後)」「各投稿に本文140字目安・添付画像・根拠・リンク先」「約束はひとつだけ/罰を使わない原則」「mkt-lead 承認+mkt-review レビュー済みのものに status:ready 相当」「日付を断定しない」
+- 前提確認: 公開目標 10/31・審査提出 10/27 は決定済みだが、App Store の公開日は審査結果に依存するため、本文では日付を断定せず「近日公開/公開しました(公開確認後)」で書く。投稿・外部送信は本タスクの範囲外(下書きのみ)
+- 置き場所: リポジトリ直下に `marketing/` は無く、Lien のマーケ資産は `products/lien/marketing/`(既存の review-notes 等も `marketing/...` と略記)。Issue の `marketing/x/` はこの配下と解釈し、`products/lien/marketing/x/` に置く
+- 根拠の範囲: CONCEPT §2/§5/§7、REQUIREMENTS §0/§3.2〜§3.13/§4/§7、GROWTH §4。v1.0 に無い機能(課金・アルバム無制限・Apple連携)は書かない。競合名(Pairy)はストア方針(TASKPLAN §9.4)に合わせて出さない
+- 成果物: `products/lien/marketing/x/` に投稿案13本（10/21〜10/30 の日次10本 + 10/31 公開日 + 11/01 公開翌日 + 11/07 1週間後）。各ファイルに本文（140字以内）・添付画像・代替テキスト・根拠（docs の節/実装パス）・リンク先・数値の根拠・投稿メモ・承認チェック
+- 判断: 10/21〜10/31 の11日間を「日次10本（10/21〜10/30）+ 10/31 公開日告知」で埋めた（10/31 を日次に数えると11本になり、受入条件の「日次10本 + 公開日」と重複するため）。公開日は審査結果に依存するので、本文では日付を断定せず「近日公開/公開しました（公開確認後）」の2文面を用意
+- 判断: 実機スクリーンショットが無い（`screenshots/` は旧画風の SVG 下絵のみ）ため、UI を見せる7本は「指定:」にして撮影条件（Frame 番号）を明記。既存アート6点はそのまま投稿できる形でパスを指定。**旧画風の下絵は使わない**
+- 判断: 「status: ready 相当の印」は mkt-exec では付けない（役職分離）。`review.md` に承認台帳（mkt-lead / mkt-review の2欄）を用意し、両方 ok になるまで `status: ready` にできないよう検査で固定した
+- 追加: `x/tools/check_posts.py`（13本の静的検査: 140字・禁止語8語+誇大表現・競合名・日付断定・数値の根拠・節の実在・画像の実在・承認前 ready の禁止）と `x/tools/test_check_posts.py`（35件）。`.github/workflows/lien-ci.yml` の store-metadata ジョブに2ステップ追加
+- 検証: `python3 x/tools/check_posts.py` = OK 13本 / unittest 35件 OK / 既存の `verify_metadata.py` OK・unittest 24件 OK（回帰なし）/ YAML の構文とステップ追加を確認
+- 結果: **PR #99 作成**（https://github.com/Ryoki63/Challenge/pull/99）。CI `lien-ci` run 39375076692 は全ジョブ success（store-metadata に追加した2ステップも実行され、`OK: 13 本` と unittest 35 件を確認）。`status: ready` は mkt-lead 承認 + mkt-review レビュー待ちのため付けていない（検査で固定）。issue は承認待ちとして開いたまま
+
 ## 2026-10-20 14:05 (mkt-lead) — MK1 #74 公開前後 30 日の獲得計画
 - 着手: Issue #74。worktree `Challenge-74` / ブランチ `consilium/74-mk1-30-10-21-11-30`(origin/main `fdf1ef5`)。作業前に origin の対象ブランチ・PR を確認(重複なし)
 - 置き場所の判断: Issue の完了条件は「docs/GROWTH.md か marketing/plan.md」。`docs/GROWTH.md` は**植物の成長ルール**(プロダクト仕様)で獲得計画の置き場ではないため、`marketing/plan.md` を新設する。MK2(#75)の `marketing/x/`・MK5(#78)の `marketing/measurement.md` と同じく、マーケの新しい文書はリポジトリ直下の `marketing/` に置く(既存アセットは `products/lien/marketing/`)
