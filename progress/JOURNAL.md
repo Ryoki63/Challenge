@@ -792,3 +792,14 @@
 - 通知: https://github.com/Ryoki63/Challenge/issues/135#issuecomment-6296566395 に承認待ちコメントを投稿し、`needs-approval,human-gate` の付与を確認。botによるモバイル通知の到達は未検証。
 - 検証: `git diff --check` PASS。全要件の実装・Androidテスト件数・型チェック・lint・build・emulator/instrumentation・独立コードレビュー・本タスクCIは未実施（依存ゲートで実装前に停止。テスト件数は null、0件成功ではない）。通常の監査ノート追記のみのため、ノートに独立レビューや無関係なテストは追加しない。
 - 結果: BLOCKED。#135 の実装は未完了、PR未作成、Issue未close、mainへのpush/マージなし。監査記録のみ指定ブランチにcommit/pushして引き渡す。再開条件は #121 完了・設計/雛形PRマージの確認、またはeng-leadによる正式な契約改定。
+
+## 2026-10-21 03:24 JST — #135 オーナー返信後の着手条件照合（eng-exec）
+- 着手: 指定 worktree / `consilium/135-t-and-2-android-dto-http-snaps` のみで再開可否を照合。開始時 tracked/untracked 差分なし、HEAD `5b9fea276973fd36883eaa46a1b0d32855ba161b`。`git pull --ff-only origin consilium/135-t-and-2-android-dto-http-snaps` は Already up to date。公開済み履歴の改変・main への push は行わない。
+- オーナー返信: #135 の https://github.com/Ryoki63/Challenge/issues/135#issuecomment-6297757238 （2026-10-21 03:07:49 JST）は「即時実装の指示ではありません」「11/14 開始計画を維持」「日程・依存・排他担当が揃った時点で再投入」「通常の依存待ちは本人承認待ちではなく待機」と明記。再質問・承認待ち通知の再送はしない。
+- 依存の更新: PR #145 は 2026-10-21 02:11:31 JST に MERGED、merge SHA `7991bc55088b9ccff9b335410a88f726910f8b04`。head `6faffaac20e71e7554dc5d63885225589ac6181a` の lien-android CI run `39463200170`（Android debug build + unit tests + lint）は SUCCESS、lien-ci run `39463164715` の6ジョブも SUCCESS。前回の「未マージ・CI失敗」は当時の観測であり、現在の状態とは異なる。これらは依存PRの結果であり #135 のテスト・ビルド結果ではない。
+- 未達ゲート: #121 は OPEN / status:review。PR #145 の GitHub review submissions は空で、独立レビューの最終受入れはこの観測だけでは確認できない。eng-lead / orchestrator が成果物・レビュー・CI・他の依存条件を照合する。#135 の assignee は空で排他担当も未確定。`docs/android/PLAN-ANDROID.md` §1/§3.1 の実装開始 2026-11-14 は本日 2026-10-21 より未来のため、PR マージ済みだけを根拠に前倒ししない。
+- 待機分類: 2026-10-21 03:22 JST の #134〜#144 全11件の一覧を照合。#134/#135 は status:in-progress / assignee 空、#136〜#138 と #140〜#144 の8件は human-gate / needs-approval / status:waiting、#139 は status:blocked。共通の11/14開始制約に加え、個別契約の依存条件・担当確認が必要な実装後続群として引き渡す。各件の固有ゲートまで一律解除せず、他Issueのラベル・担当・statusを本作業者が変更しない。通常依存待ちと固有の人間ゲートの再分類は orchestrator に一括で依頼し、同型の承認通知を重複送信しない。
+- 範囲: Android DTO/HTTP/snapshot・テストの実装には着手しない。設計・計画・契約正本・iOS・共有DB・認証情報を変更せず、外部接続・ストア操作なし。#135 は既に human-gate / needs-approval が外れており、追加の本人判断は不要。status:* は orchestrator 管理のため作業者は変更しない。
+- 引継ぎ記録: https://github.com/Ryoki63/Challenge/issues/135#issuecomment-6298070224 に日程・依存・担当の未達と全11件の分類を1コメントで記録。新しい承認依頼は出していない。
+- 検証: `git diff --check` PASS。`git diff --name-only origin/main...HEAD` と作業差分は `progress/JOURNAL.md` のみ。Android要件の実装は未達、テスト件数・本タスクCI/SHAは null（実装前の待機のため未実施）。型チェック/lint/build/emulator/instrumentation と独立コードレビューは今回の監査ノート差分には対象外であり、#135の受入条件を満たしたという意味ではない。秘密・個人情報・実装コードの追加なし。
+- 結果: 通常の依存・日程・排他担当待機。#135 は未完了のまま開いておき、追加のオーナー判断は求めない。監査追記のみを指定ブランチのdraft PR提出対象とし、mainへの直接push/自己マージや依存ブランチの取り込みは行わない。eng-lead / orchestrator の照合と開始日以降の再投入が残作業。
