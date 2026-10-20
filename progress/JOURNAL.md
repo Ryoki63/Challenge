@@ -357,6 +357,20 @@
 - 通知: #79 に承認待ちコメント（6284552555）を投稿し、`needs-approval,human-gate` を付与。readback で OPEN のままと bot の通知コメントを確認（モバイル端末への配達は未確認）。`status:*` は変更していない。
 - 結果: **BLOCKED**。指定時刻の投稿・URL/キャプチャ・24時間後反応は未達。未承認投稿をしない条件は遵守。承認・アカウント引継ぎ待ちの実行ログのみ提出し、原稿や承認台帳は変更せず、Issue は close しない。
 
+## 2026-10-20 14:38 (mkt-exec) — MK4 #77 先行ペア 5〜10 組の募集文と受け入れ手順
+- 着手: 公開日(10/31 目標)に使い始めてもらうペアを 5〜10 組集めるための**下書き**を作る。外部 TestFlight は省略するため、公開後の初期ユーザーとして招く。送信・投稿は一切しない(mkt-lead 承認 → mkt-review レビュー → computer-operator/人間)
+- 確認した前提: issue #77 本文 / #42(G4)は**承認待ちのまま**= `SupportLinks.contactEmail` は空(`products/lien/ios/Lien/Core/SupportLinks.swift:25`) / G0 #38 未了= App Store URL 未確定 / TASKPLAN §9.2 の 10/31 公開・10/27 提出・10/24 凍結 / REQUIREMENTS §0・§3・§7 / CONCEPT §7 / GROWTH §10.5(聞き取りは3日目と10日目) / KPI §0(公開リポジトリにペア ID・ハンドルを書かない)
+- 方針: 連絡先とストア URL は値を推測せず `<CONTACT_EMAIL>` `<APP_STORE_URL>` のトークンで残す(G4・G0 の確定後に1箇所ずつ置換)。X 本文には日付を書かない(公開日は審査結果で動く)
+- 成果物の置き場: `products/lien/marketing/early-pairs/`
+- 成果: `products/lien/marketing/early-pairs/` に 4 本 — ①`README.md`(前提・募集枠・スケジュール案・文面原則・承認台帳・主張と根拠)②`x-post.md`(X の募集 4 本: 本命/物語/スレッド補足 2 本。140 字・日付なし)③`acquaintance.md`(知人向け 3 種)④`acceptance.md`(受付→確定→公開日の案内→症状別の困りごと→3 問→お礼。問い合わせ先は `<CONTACT_EMAIL>`)⑤`tracker.md`(X の反応・P01〜P10・集計・週次報告の書き方。個人情報を書かない欄設計)
+- 判断: **contactEmail は推測で埋めない**。G4(#42)が承認待ちで `SupportLinks.contactEmail` が空なので、`<CONTACT_EMAIL>` のトークンで残し「G4 後に1箇所置換・空のまま送らない」を手順の先頭に置いた。ストア URL も `<APP_STORE_URL>`(G0 #38 後)。G4 の値は専用アドレスを作るのが推奨(私用アドレスをストアと公開リポジトリに出さない)
+- 判断: X の本文に日付を書かない(#75 と同じ原則)。公開日は審査結果で動くため、日付は 1 対 1 の DM と案内文でだけ伝える。知人向けは 1 対 1 なので「10月31日に公開する予定」と書いてよい
+- 判断: フィードバックは Day 3 の 3 問に集約(GROWTH §10.5 の 3 日目・10 日目のうち、10 日目はお礼と任意のひとことにした)。質問を 4 問に増やさない
+- 追加(検査): `products/lien/scripts/ops/early_pairs_static_test.ts` を新設。X 本文の 140 字・日付断定・禁止語・v1.0 に無い機能・競合名、連絡先トークンの存在、メールアドレスらしき文字列の不在、Day 3 が 3 問であること、P01〜P10 の行、相対リンクの実在を CI で止める。禁止語・日付・未実装機能の各検査は、わざと文面を壊して赤になることを確認した
+- 検証: `deno test --allow-read products/lien/scripts/ops/` = **84 passed / 0 failed**(既存 77 + 新規 7)。`products/lien/marketing` の `verify_metadata.py` OK・単体テスト **24 passed**。`git diff --check` OK。`deno fmt --check` OK
+- 残り: mkt-lead 承認 → mkt-review(景表法・誇大表現・体験していない機能)→ 10/21 の承認後に知人連絡(10/22)・X 投稿(10/23)。G4 で contactEmail が決まったら置換、G0 後にストア URL を確定
+- 結果: PR を作成(レビュー待ち)。送信・投稿はしていない。Issue は閉じない
+
 ## 2026-10-20 14:40 (mkt-exec) — MK5 #78 計測設計(UTM・App Analytics・週次 SQL)
 - 着手: worktree `Challenge-78`。issue #78 の完了条件(チャネル別 UTM 命名規則 / App Analytics の指標一覧 / KPI.md の SQL と組み合わせた週次の見方 / SDK を入れない代替案)を、`products/lien/marketing/measurement.md` にまとめる。D6(分析 SDK なし)・#30 の App Privacy と整合させる
 - 方針: 標準 UTM は App Store に渡らないため、DL のチャネル attribution は Apple のキャンペーンリンク(`pt`/`ct`/`mt`)を正とし、UTM は将来の Web 計測用の予約として同じ命名を定義する。アプリ側の変更・SDK・計測専用テーブルは足さない
