@@ -1,0 +1,86 @@
+name: lien-android
+
+on:
+  push:
+    paths:
+      - "products/lien/android/**"
+      - ".github/workflows/lien-android.yml"
+  pull_request:
+    paths:
+      - "products/lien/android/**"
+      - ".github/workflows/lien-android.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: lien-android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Android debug build + unit tests + lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      HOME: ${{ github.workspace }}/products/lien/android/.local/home
+      GRADLE_USER_HOME: ${{ github.workspace }}/products/lien/android/.local/gradle
+      ANDROID_USER_HOME: ${{ github.workspace }}/products/lien/android/.local/android-user
+      XDG_CACHE_HOME: ${{ github.workspace }}/products/lien/android/.local/cache
+      TMPDIR: ${{ github.workspace }}/products/lien/android/.local/tmp
+      RUNNER_TOOL_CACHE: ${{ github.workspace }}/products/lien/android/.local/tools
+      JAVA_TOOL_OPTIONS: -Duser.home=${{ github.workspace }}/products/lien/android/.local/home -Djava.io.tmpdir=${{ github.workspace }}/products/lien/android/.local/tmp
+    defaults:
+      run:
+        shell: bash
+        working-directory: products/lien/android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Prepare isolated tool directories
+        run: mkdir -p "$HOME" "$GRADLE_USER_HOME" "$ANDROID_USER_HOME" "$XDG_CACHE_HOME" "$TMPDIR" "$RUNNER_TOOL_CACHE"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "17.0.18+8"
+          overwrite-settings: false
+
+      - name: Use only the runner's preinstalled Android SDK
+        run: |
+          set -euo pipefail
+          source_sdk="${ANDROID_HOME:?Runner Android SDK is required}"
+          test -f "$source_sdk/platforms/android-36/android.jar"
+          test -x "$source_sdk/build-tools/35.0.0/aapt2"
+          test -f "$source_sdk/licenses/android-sdk-license"
+          mkdir -p .local/sdk/platforms .local/sdk/build-tools
+          cp -a "$source_sdk/platforms/android-36" .local/sdk/platforms/
+          cp -a "$source_sdk/build-tools/35.0.0" .local/sdk/build-tools/
+          cp -a "$source_sdk/licenses" .local/sdk/
+          echo "ANDROID_HOME=$PWD/.local/sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$PWD/.local/sdk" >> "$GITHUB_ENV"
+
+      - name: Verify official Gradle wrapper
+        run: |
+          echo "81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f  gradle/wrapper/gradle-wrapper.jar" | sha256sum --check --strict
+
+      - name: Assemble debug APK, run unit tests, and lint
+        run: ./gradlew --no-daemon --console=plain assembleDebug testDebugUnitTest lintDebug
+
+      - name: Upload debug APK and validation reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lien-android-debug-and-reports
+          path: |
+            products/lien/android/app/build/outputs/apk/debug/*.apk
+            products/lien/android/app/build/test-results/testDebugUnitTest/
+            products/lien/android/app/build/reports/tests/testDebugUnitTest/
+            products/lien/android/app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
+          retention-days: 7

@@ -597,3 +597,13 @@
 - 発見: T33 でペイウォールが main に入った。`REVENUECAT_API_KEY` が公開ビルドに入ると、商品設定（T37 / G6・〜11/1）より先に「購入できないペイウォール」が出て、10/31 の「いまは全部、無料で使えます」と矛盾する。review.md §5-7 に、公開ビルドのキーを G4 で確認するよう記録（マーケ側では直せない）
 - 検証: `check_posts.py` OK（13本 + branding）/ unittest **52件** OK / `verify_metadata.py` OK・unittest 24件 OK（回帰なし）
 - 結果: 追補の PR を作成（マージしない）。`status: ready` は mkt-review 待ちのため付けない
+
+## 2026-10-21 00:46 — #121 Android 技術選定・設計・空アプリ (eng-lead)
+- 着手: 指定 worktree / consilium/121-and-eng-android-kotlin-compose で開始。tracked/untracked とも開始時 clean。Issue は OPEN、assignee なし、HQ の status:in-progress。承認待ち一覧に #121 はない。他タスクは今回再開しない。
+- 同期: 指定ブランチはまだ remote にないため pull は remote ref 不在で停止。origin/main を fetch し、未公開の指定ブランチが同一 HEAD であることを確認した (rebase: up to date)。main への書込・既存公開履歴の変更はしない。
+- 方針: REQUIREMENTS → DESIGN → contracts/ と既存実装を照合し、Android 固有ディレクトリ・設計書・専用 CI だけ追加。iOS / Supabase / 契約正本は変更しない。比較と見積り、後続 Issue の依存・触る範囲・ロールバックを明記する。ビルドと関連検査、独立レビュー1回を経て PR を提出し、マージ・Issue close は行わない。
+- 環境: Java runtime / Android SDK / Gradle は初期 PATH にない。必要な検証用ツールとキャッシュはこの worktree 内の gitignored 領域だけに置き、署名鍵・実認証情報・本番接続は扱わない。
+- 00:54 設計節目: Kotlin+Compose を推奨、Flutter/KMP と17–25人日（計画見積り）を比較。Supabase匿名/RLS・全共有fixture・Glance・FCM・App Links の境界を設計書へ追加。v1.0 は匿名のみのまま、任意連携は将来設計。APNsの既存push_tokenだけを条件とする10経路の変更が必要で、FCM追加だけでは配送されないことを確認。サーバー改修は別Issue/critical_reviewへ分離する。
+- 00:54 並列作業: Android雛形/専用CIの限定workerを1名起動。親は設計/Issue分解を担当（書込範囲非重複）。新規SDK契約への同意は行わず、必要なら既設SDKを持つCIでビルドを検証する。既存mainの直近lien-ci=39427686022、lien-ios=39424980235はsuccess（別SHAなので今回の変更の検証とは区別）。
+- 01:02 タスク契約: T-AND-1〜11 を #134〜#144 として起票し、依存・受入条件・変更許可範囲・ロールバック・人日を本文に記載。共有サーバーを変える #138/#139 に difficulty:high を付け、iOS優先とcritical_reviewを明記。BACKLOGに実Issueリンクを追記した。#121のassigneeは自分に設定済み。
+- 01:02 検査: contracts/tools/generate.ts --check は22 fixture一致、contracts/tools の Deno test は3件PASS。Android workflowの公式Actions固定SHAは各リリースtagと一致した。Androidのコンパイル・test・lintはまだ結果未確定。設計/雛形/CIを1名の独立レビュワーが確認中。
