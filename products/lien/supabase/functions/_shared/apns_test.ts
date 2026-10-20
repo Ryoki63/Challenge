@@ -218,6 +218,7 @@ Deno.test("loadApnsConfigFromEnv: APNS_ENV が不正値なら throw(設定ミス
 Deno.test("buildVisiblePushPayload: §4 の形(mutable-content: 1, lien.type, snapshot同梱)", () => {
   const snapshot = buildSoloSnapshot({
     updatedAtIso: "2026-06-10T03:00:00.000Z",
+    todayLocal: "2026-06-10",
     todayMeDone: true,
     myPromise: { title: "筋トレ", emoji: "💪" },
   });
