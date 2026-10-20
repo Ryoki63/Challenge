@@ -347,3 +347,15 @@
 - 検証: 4スタイルの `gen.py` を一時ディレクトリで再実行し、追跡済み PNG と SHA-256 完全一致(決定論)。コンタクトシートは 1264×288(8倍)。#40 の raw リンクは HTTP 200。origin に対象ブランチ・既存 PR は無し(重複作業なし)
 - 判断: v2 の再制作・#40 への再提出はしない(差し戻し済みの案の再提出は混乱と退行になる)。再発防止として `v2_drafts/README.md` に経緯・受入証拠・再生成手順を記録
 - 結果: PR を作成(レビュー待ち)。#49 は「フェーズ1完了・v4 で置換済み」として、close の判断をレビュー役職/人間に委ねる
+
+## 2026-10-20 13:05 (eng-exec) — #72 B5: snapshot に dateLocal を載せる(0:00〜1:00 の完了不明扱いの解消)
+- 着手: worktree `Challenge-72`(origin/main `fdf1ef5`、作業前に対象ブランチ・PR が無いことを確認)。Issue の受入条件5つと、DESIGN §3.4/§4.2・REQUIREMENTS §3.12・README §12 を読んだ
+- 判断(TASKPLAN §9 の直列): snapshot の形を変える順は GS → T19 → T33 → T35。**#72 は T19 の直後・T33 の前**に入れる。v1.0 の通知の修正で、キーの追加だけ・migration 無し。T33 は v1.1 の別ブランチ、T35 は v1.2 以降なので、後ろに置くと v1.0 に間に合わない
+- サーバー: `_shared/snapshot.ts` の `PairSnapshot` に `dateLocal`(組み立てに使った「今日」)を追加。`buildPairSnapshot` は `todayLocal` をそのまま、`buildSoloSnapshot` は入力に `todayLocal` を足して載せる(`loadSnapshotForUser` が解決済みの「今日」を渡す)。既存のキーは変えない(schemaVersion は 1 のまま)
+- クライアント: `PairSnapshot.dateLocal`(省略可 `String?`。デコードで "YYYY-MM-DD" だけ通し、崩れた値は nil)。`snapshotDay(calendar:)` / `daysSinceSnapshotDay(now:calendar:)` を足し、`reflectsToday` と `completionOnItsOwnDay` と `StreakRiskPlan.target` が**完了の日**を `dateLocal` で決める。キーが無い古いサーバーの snapshot だけ従来の時刻判定(1:00 まで不明)に落ちる
+- 効果: 0:00〜1:00 に自分でチェックインした人の、その日のリマインドがその場で取り消される(`staleIDsForToday`)。前の日の日付で組み立てられた snapshot(キューで 0:07 に届いた 23:58 のチェックイン)は、今日の完了として読まない
+- 契約: `contracts/*.json` を再生成(15 ファイルに `dateLocal` の1行だけ。`--check` 一致)。`contracts/README.md` に経緯を追記
+- 検証: deno `397 passed`(新規4)/ contracts `--check` 22 件一致 + tools 3 passed / e2e unit 65 passed / ops 77 passed / iOS `check.sh test` = **84 classes・1085 tests 0 failed** / `check.sh views` 112 ファイル OK / `check.sh widget` 18 ファイル OK
+- **main が赤かった(2件。この PR で直した/報告する)**: ①`HomeViewModel.presentShareImage()` と `HomeView` の `if viewModel.canShareRecord {` の閉じ括弧が #85(T22)で落ちており、**main は iOS ビルドが通らない**(lien-ios の main の run が failure。`HomeView.swift:513/526/609`・`HomeViewModel.swift:282/389/399/410`)。→ この PR で括弧2つを戻した(挙動の変更なし)。②`StringsReviewTests` が 44 件赤 — #83(T18 履歴)と #85(T22 シェア)が `docs/STRINGS-REVIEW.md` を更新していない(43 単位が未記載)。→ 同じ判定基準で追記レビューし、§7.20〜§7.22 と集計(297 → 340 件)を追加した(文言は変えていない)
+- 残: レビュー(eng-review)。デプロイは関数を一括で(DESIGN §3.4 の互換性。アプリの解釈より先にサーバーを出さない — 順序はどちらでも壊れないが、まとめて出す)
+- 結果: PR を作成(マージしない)
