@@ -684,8 +684,8 @@ function baseInput() {
   };
 }
 
-Deno.test("SNAPSHOT_KEYS は 21 個", () => {
-  assertEquals(SNAPSHOT_KEYS.length, 21);
+Deno.test("SNAPSHOT_KEYS は 22 個", () => {
+  assertEquals(SNAPSHOT_KEYS.length, 22);
 });
 
 Deno.test("buildPairSnapshot: キー集合が §3.4 と一字一句一致する", () => {
