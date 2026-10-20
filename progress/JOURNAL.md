@@ -470,3 +470,11 @@
 - 画像12枚 + 一覧は b5265f9 の版と SHA-256 で**完全一致**(main の課金導線はスクショでは nil のため、画面の見た目は変わらない)。manifest と README の来歴だけ更新
 - main が赤だった2件を補修(どちらもテストの期待値のみ): deno 型検査は #97 の `todayLocal` 必須化に `snapshot_test.ts` の pairPlan ケースが未追随、`SNAPSHOT_KEYS` は #96 の `pairPlan` 追加で22個なのに期待値21
 - 検証: `verify_screenshots.py` OK / unittest 36 OK / `lien-ci` #39392331252 success / `lien-ios` #39389661638(attempt 2) success
+
+## 2026-10-20 15:40 (mkt-exec) — #75 追補2: main 取り込み（MK7 の実画面・T33 の課金）への追随
+- 着手: オーナー返信を受けた追補の続き。origin/main は #96（T33 課金）・#100（MK3）・#104（MK7 スクショ）まで進んでいた。**PR #99 は squash で main に入っていた**ため、分岐点が無く rebase すると同じ記録を二重に積む。履歴を書き換えないよう、`git merge origin/main` で取り込み、衝突は x/ 配下を自分の側（承認・ブランディング入り）、`.github/workflows/lien-ci.yml` を main の側（pages-site と MK7 の検査を含む）で解いた
+- 判断: MK7 の実画面6枚を使い、`指定:` だった5本（10-23・10-25・10-31・11-01・11-07）を差し替えた。**代替テキストは実際の画像（contact sheet）を見て書き直した**（本文は変えていない）。残る指定は 10-24（チェックイン完了）と 10-26（ロック画面の通知）の2本
+- 判断: 画像の選択は mkt-exec の裁量（役職カード「スクリーンショットのキャプションと訴求順」）。mkt-lead の承認は本文・リンク方針・投稿順に対するものとして review.md §7 の範囲を書き直した
+- 発見: T33 でペイウォールが main に入った。`REVENUECAT_API_KEY` が公開ビルドに入ると、商品設定（T37 / G6・〜11/1）より先に「購入できないペイウォール」が出て、10/31 の「いまは全部、無料で使えます」と矛盾する。review.md §5-7 に、公開ビルドのキーを G4 で確認するよう記録（マーケ側では直せない）
+- 検証: `check_posts.py` OK（13本 + branding）/ unittest **52件** OK / `verify_metadata.py` OK・unittest 24件 OK（回帰なし）
+- 結果: 追補の PR を作成（マージしない）。`status: ready` は mkt-review 待ちのため付けない
