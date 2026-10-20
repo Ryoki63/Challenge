@@ -319,6 +319,35 @@
 - 残: 初回同期失敗時に `.promiseSetup` を出す画面遷移は文言では決められないため、`docs/STRINGS-REVIEW.md` §6.1 に判断材料と推奨案を残した(eng-lead / T30)。実機 VoiceOver は T20
 - 結果: PR #86 を作成(レビュー待ち。マージはしない)
 
+## 2026-10-20 12:25 (HQ/eng-exec — T30 審査チェックリスト消化 / issue #30) — 文書側を確定・PR 作成
+- 着手: worktree `Challenge-30`(origin/main `35bad0d`)。Issue #30 の残り(REQUIREMENTS §8 の文書・App Privacy・年齢レーティング・プライバシーマニフェスト・審査用デモ運用)を実施。iOS の実機/TestFlight 確認は G0(#38)後で、この Mac には Xcode が無い(`xcodebuild` は CommandLineTools)ため、実ビルドは CI と 10/23 の内部 TestFlight に委ねる
+- 変更(文書): `marketing/privacy-policy.md`・`legal/privacy.html` から「Sign in with Apple の識別子」「利用状況(自動取得)」の行を削除し、D3(v1.0 は SIWA なし)・D6(分析 SDK・計測テーブルなし。アプリは計測のために何も送らない)を明記。§8 を「v1.0.1 以降」に。`legal/CHECKLIST-G4.md` の計測手段の未決定項目を D6 の確認に置き換え、SIWA の確認を追加
+- 変更(review-notes): §1.3 を匿名認証の実態に合わせた**2組のデモ運用**に確定(相手役のニックネーム+提出日に発行する招待コード。コードはリポジトリに置かず ASC の Notes for Review へ)。§2.1 を `PrivacyInfo.xcprivacy` の5型(Name / Photos / Other User Content / User ID / Device ID)に一致。§2.2 に年齢レーティングの UGC 設問(4+/9+ の分岐、健康・ウェルネスは要確認)、§2.7 にプライバシーマニフェストの台帳を追加。§1.1・§1.4・§1.5 にコードで一致を確認した証跡を追記
+- 追加(道具): `products/lien/scripts/review-demo/`(partner.sh / partner.ts / partner_lib.ts / partner_lib_test.ts / README.md)。公開 anon キーだけを使い、セッションはリポジトリ外の 0600 ファイル。create / new-invite / checkin(--photo)/ nudge / status / delete を用意
+- 追加(テスト): `products/lien/scripts/ops/marketing_docs_static_test.ts` を新設し、D6・D3 の記載漏れ、§2.1 とマニフェストの不一致、§1.3 の TBD 残り、G4 の未決定項目を CI で止める。`review-demo` の単体テストを lien-ci の e2e-tests ジョブに追加
+- 変更(仕様・計画): REQUIREMENTS §8 に 2026-10-20 の反映注記と各項目の追記(チェックボックスは実ビルド確認まで `[ ]` のまま)。TASKPLAN §9.4 の T30 行と #58 引き継ぎ2・3 に完了を記録
+- 検証(ローカル): supabase functions `deno test` 393 passed / 契約フィクスチャ 22 件一致 / ops `deno test --allow-read` 76 passed(新規8件を含む)/ e2e unit 65 passed + `deno check` / review-demo 17 passed + `deno check` / store metadata OK / `git diff --check` OK / 秘密の混入なし
+- 残り: G0 承認後の内部 TestFlight(10/23)で §1.1・§1.4・§1.5 の手順を実ビルドで再現 → §8 のチェックを埋める。提出日(10/27)に相手役の招待コードを2つ発行して ASC の Notes for Review に記入。Support URL/Privacy URL の Pages 公開と連絡先は G4(#42)
+- 補記(2026-10-20 12:55): この記録は PR #88 のマージ解決(7fba989)で `progress/JOURNAL.md` から落ちていたため、追記として復元した。内容はコミット `08191a1` の記録のまま(検証の ops は当時 76。その後、マニフェストのトラッキング検査を1件足して 77 になり、CI で確認済み)
+
+## 2026-10-20 12:42 (eng-exec) — T32 #32 ASO 初期設定(キーワード・説明文)の本編
+- 着手: 2026-10-12 の T32準備(store_metadata/ja の確定値化+verify_metadata.py+CI ジョブ)の続き。完了条件「ASC にキーワード・説明文設定完了」のうち、リポジトリ側で確定できる部分を終わらせ、残りを G4 後の ASC 投入だけにする
+- 前提の変化: 2026-10-12 の確定値は「次の需要の山=1月の新年需要」に合わせていたが、10-20 のオーナー決定で公開 10/31・審査提出 10/27 に前倒しした。キーワードはバージョン提出と同時にしか変更できないため、季節外れの「新年」「正月」で初回の索引枠を使うと11〜12月は戻せない → 通年訴求に再調整(退避値は alternatives.md §8.3)
+- 変更: keywords 81→99字(新年/正月を外し、朝活・早起き・筋トレ・勉強・ダイエット・遠距離を追加)/ promotional_text を季節非依存に(「広告なし」は v1.0 の事実)/ description の末尾節を「◆ 思い立った日が、はじまりの日」に、ウィジェット節を「自分と相手の今日の○×」に(REQUIREMENTS §3.10 との一致)
+- 検査の追加: issue #32 の「検証」が「表示名との語重複なし」を verify_metadata.py で検査すると書いていたが実装されていなかった。表示名・サブタイトルとの重複/キーワード同士の包含重複/Pairy 語の不在 を追加。単体テスト `tools/test_verify_metadata.py` 24件(赤になる例を固定)を新設し、CI の store-metadata ジョブで実行
+- Pairy 語: Issue の表題は「Pairy 関連語」だが、TASKPLAN §9.4 の T32「Pairy 語は全廃」が後。全廃のまま(機械検査で担保)。戻すなら G4 でリスク承認
+- 成果: `store_metadata/ASC-ENTRY.md`(ASC の画面→ファイルの対応・貼り付け手順・入力後の証跡チェック)。残るのは G0 の Apple 承認 → ASC アプリレコード → G4 承認 → このシートどおりの投入
+- 判明: issue の進め方コメント手順7は「App 情報に keywords」としているが、キーワード欄はバージョンページ側。手順書は実画面の構成に合わせ、ずれを ASC-ENTRY.md に注記した
+- 未解決: 表示名「ふたりの約束」とサブタイトル「約束はひとつだけ」の「約束」重複(§2 の不採用理由と矛盾)。推奨は現状維持、代替案つきで alternatives.md §8.5 に記載
+- 結果: 検証(verify_metadata.py / unittest 24件)緑。PR を作成し、ASC 投入は G4 の人間判断待ちとして issue は閉じない
+
+## 2026-10-20 12:56 (eng-exec) — #49 T09v2 の状況確認: フェーズ1は提出済み・v4 採用で置換済み
+- 着手: HQ が #49 を status:in-progress で再ディスパッチ(12:55)。作業前に origin/main・対象ブランチ・PR・既存成果物を確認
+- 判明: #49 のフェーズ1は **2026-06-10 に完了済み**(commit 96ebfe9)。4スタイル(a〜d)と成長カーブ案を `v2_drafts/` に制作し、#40 に画像付きで提出済み(comment 4672531055)。その後 2026-06-11 に v2 は不採用、v3 を経て 2026-10-12 に v4「タネの子」が「全部推奨で」承認(comment 6121307014)。取込は #56/#57、成長ルールは #54 でいずれも closed
+- 検証: 4スタイルの `gen.py` を一時ディレクトリで再実行し、追跡済み PNG と SHA-256 完全一致(決定論)。コンタクトシートは 1264×288(8倍)。#40 の raw リンクは HTTP 200。origin に対象ブランチ・既存 PR は無し(重複作業なし)
+- 判断: v2 の再制作・#40 への再提出はしない(差し戻し済みの案の再提出は混乱と退行になる)。再発防止として `v2_drafts/README.md` に経緯・受入証拠・再生成手順を記録
+- 結果: PR を作成(レビュー待ち)。#49 は「フェーズ1完了・v4 で置換済み」として、close の判断をレビュー役職/人間に委ねる
+
 ## 2026-10-20 13:18 (eng-exec) — T33 #33 RevenueCat組込 + ペイウォール(3文脈)
 - 着手: G6(#44)/T37 前でも実装・CI 検証できる範囲を実装する。実際の課金設定(RevenueCat アカウント・商品・価格・特商法・ストア申請)は行わない。
 - サーバー: `_shared/premium.ts` に `derivePairPlan` を抽出(grant-tickets から再エクスポート)。`snapshot.pairPlan`(free/premium)をメンバーの `users.premium_until` から導出し、`USER_COLUMNS`/`PARTNER_SELECT` に premium_until を追加。RevenueCat Webhook(`revenuecat-webhook`。Authorization の定数時間比較、期限は延ばす方向だけ・EXPIRATION は現在の期限以下だけ失効)を追加。contract fixtures 22 件再生成。

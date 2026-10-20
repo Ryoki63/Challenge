@@ -139,7 +139,7 @@ jobs:
           test "$count" -eq 35  # ルート1 + imageset 34
 
   store-metadata:
-    name: store metadata (verify character limits + banned words)
+    name: store metadata (limits + banned words + keyword overlap + Pairy ban)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -148,5 +148,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: "Verify store_metadata/ja (T32準備: 文字数制限 + 罰なし原則)"
+      - name: "Verify store_metadata/ja (T32: 文字数制限 + 罰なし原則 + keywords の重複/表示名との重複 + Pairy 語の不在)"
         run: python3 tools/verify_metadata.py
+
+      - name: "Test verify_metadata.py (検査ロジックの単体テスト)"
+        run: python3 -m unittest discover -s tools -p "test_*.py" -v
