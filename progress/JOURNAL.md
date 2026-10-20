@@ -371,6 +371,16 @@
 - 残り: mkt-lead 承認 → mkt-review(景表法・誇大表現・体験していない機能)→ 10/21 の承認後に知人連絡(10/22)・X 投稿(10/23)。G4 で contactEmail が決まったら置換、G0 後にストア URL を確定
 - 結果: PR を作成(レビュー待ち)。送信・投稿はしていない。Issue は閉じない
 
+## 2026-10-20 14:40 (mkt-exec) — MK5 #78 計測設計(UTM・App Analytics・週次 SQL)
+- 着手: worktree `Challenge-78`。issue #78 の完了条件(チャネル別 UTM 命名規則 / App Analytics の指標一覧 / KPI.md の SQL と組み合わせた週次の見方 / SDK を入れない代替案)を、`products/lien/marketing/measurement.md` にまとめる。D6(分析 SDK なし)・#30 の App Privacy と整合させる
+- 方針: 標準 UTM は App Store に渡らないため、DL のチャネル attribution は Apple のキャンペーンリンク(`pt`/`ct`/`mt`)を正とし、UTM は将来の Web 計測用の予約として同じ命名を定義する。アプリ側の変更・SDK・計測専用テーブルは足さない
+- 成果: `products/lien/marketing/measurement.md` を作成。§2 にチャネル別の `ct` 命名規則(X / ティザー / 紹介)と UTM 対応、§3 に ASC Analytics の指標一覧としきい値、§4 に KPI.md と組み合わせた週次シート・分母一覧・補助 SQL、§5/§6 に SDK を入れない代替案と #30 の App Privacy との整合を書いた。docs/KPI.md §2.8 と docs/STRUCTURE.md からリンクを追加
+- 判断: 標準 UTM は App Store の campaign 計測に使われないため、`ct` を正とし、UTM は将来の Web 計測用の対応表にした。公開日(10/31)は ASC の Campaigns が出る前で `ct` を発行できないため「タグなし」とし、0 ではなく null で記録する運用にした
+- 検証: 相対リンク7件の解決 OK / `ct` 例11件が `[a-z0-9_]`・30文字以内 / `pglast` で KPI.md の SQL に補助 SQL を差し替えた全文を構文解析 OK(2 statements)/ marketing tools の unittest 24件 OK / `git diff --check` OK
+- 結果: コミット `322cc4d` を push し、PR #101 を作成(https://github.com/Ryoki63/Challenge/pull/101)。マージはせず、mkt-review の判断待ち
+- CI: PR #101 の `lien-ci` 全5ジョブ(deno test / e2e / ops / plant assets / store metadata)が緑
+- 追記: 表記の定義(ASC / DL / D1・D7・D30)を `0db7a0d` で追加。最終 CI も全5ジョブ緑
+
 ## 2026-10-20 14:05 (mkt-lead) — MK1 #74 公開前後 30 日の獲得計画
 - 着手: Issue #74。worktree `Challenge-74` / ブランチ `consilium/74-mk1-30-10-21-11-30`(origin/main `fdf1ef5`)。作業前に origin の対象ブランチ・PR を確認(重複なし)
 - 置き場所の判断: Issue の完了条件は「docs/GROWTH.md か marketing/plan.md」。`docs/GROWTH.md` は**植物の成長ルール**(プロダクト仕様)で獲得計画の置き場ではないため、`marketing/plan.md` を新設する。MK2(#75)の `marketing/x/`・MK5(#78)の `marketing/measurement.md` と同じく、マーケの新しい文書はリポジトリ直下の `marketing/` に置く(既存アセットは `products/lien/marketing/`)
