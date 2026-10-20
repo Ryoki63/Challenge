@@ -18,6 +18,11 @@
 
 ## 公開先
 
+**2026-10-20 オーナー承認済み**: #76 の返信
+https://github.com/Ryoki63/Challenge/issues/76#issuecomment-6287900053 で推奨案を採用。
+公開先の再承認は不要。承認は未提供の法務情報や X ハンドルを補うものではない。
+再開時点の受入確認と未達項目は [PUBLISH-STATUS.md](PUBLISH-STATUS.md) を参照。
+
 アプリの `ios/Lien/Core/SupportLinks.swift` の `webBaseURL` と同じ土台にする(審査で開く URL の正本)。
 
 - ティザー: https://ryoki63.github.io/Challenge/
@@ -48,7 +53,8 @@ python3 -m unittest discover -s tools -p "test_*.py" -v
 
 ## 公開の前に(人間の作業)
 
-`python3 tools/build_site.py --check-publishable` が次の3つを見る。1つでも欠けると配信しない。
+公開前に次を揃える。`--check-publishable` は1・2を検査するが、Pages の有効化や
+文言レビュー完了を検査するものではない。生成成功・検査成功と公開成功を区別する。
 
 1. **G4(#42)のプレースホルダを埋める** — `marketing/privacy-policy.md` / `terms.md` の
    `【要記入: G4: …】` 4項目(制定日・事業者名・連絡先メール・管轄裁判所)。
@@ -57,6 +63,8 @@ python3 -m unittest discover -s tools -p "test_*.py" -v
    未設定のあいだ、ティザーに X のリンクは出ない(実在しないアカウントを指さないため)
 3. **GitHub Pages を有効にする** — リポジトリの Settings > Pages > Build and deployment >
    Source を **「GitHub Actions」** にする(初回だけ)
+4. **mkt-review の文言レビュー** — 対象と判定を記録する。マージや制作者の自己点検を
+   レビュー済みの証拠にしない。公開を妨げる未解決指摘があれば配信しない
 
 そのうえで Actions の `lien-pages` を手で実行する(`workflow_dispatch`)。
 G4 が済んだら `.github/workflows/lien-pages.yml` の `on:` に push のパス条件を足せば自動配信になる。

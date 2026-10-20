@@ -2,6 +2,9 @@
 
 対象: issue #42(G4 ストア素材承認)。以下をすべて確認・記入してから公開する。
 
+2026-10-20 の承認返信はストア文言の旧候補に対するもの。法務項目の記入・最終承認は含まれない。
+承認範囲・現行案との差分・未記入4項目は [G4-REVIEW.md](../G4-REVIEW.md) を参照。このチェックリストの確認済み扱いにはしない。
+
 ## 1. プレースホルダの記入(4ファイル全てで統一して置換する)
 
 検索キーワード: `【要記入: G4` (このチェックリスト以外でヒット0件になれば置換完了)
@@ -28,7 +31,7 @@
 
 ## 3. 公開作業
 
-- [ ] GitHub Pages の公開URLを確定する。**#76(MK3)で配備の仕組みを作った**ので、URL はアプリの `SupportLinks.webBaseURL` に合わせて次の2つ(リポジトリは `Ryoki63/Challenge`)
+- [x] GitHub Pages の公開URLを確定する。2026-10-20 の #76 オーナー返信(issuecomment-6287900053)で推奨案を採用。**公開自体は未実施**。URL はアプリの `SupportLinks.webBaseURL` に合わせて次の2つ(リポジトリは `Ryoki63/Challenge`)
       - `https://ryoki63.github.io/Challenge/lien/legal/privacy.html`
       - `https://ryoki63.github.io/Challenge/lien/legal/terms.html`
       - ティザーが `https://ryoki63.github.io/Challenge/`、招待が `.../lien/i/`。配信するのは `products/lien/web/site/` だけ
