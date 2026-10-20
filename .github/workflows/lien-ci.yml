@@ -86,6 +86,15 @@ jobs:
       - name: Type check the e2e runner
         run: deno check products/lien/scripts/e2e/e2e.ts
 
+      # 審査用デモの相手役(issue #30 / T30)の単体テストと型検査。partner.ts 本体は本番に匿名ユーザーを作る
+      # 手動実行専用なので、CI ではネットワークを付けず、純粋な部分(引数・JST の日付・状態ファイル・招待コードの形)
+      # だけを確かめる(partner_lib_test.ts は fetch を import しない)
+      - name: Run review-demo unit tests
+        run: deno test products/lien/scripts/review-demo/
+
+      - name: Type check the review-demo partner CLI
+        run: deno check products/lien/scripts/review-demo/partner.ts
+
   plant-assets:
     name: plant layers (generate + verify)
     runs-on: ubuntu-latest
