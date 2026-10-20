@@ -10,7 +10,7 @@
        index.html … 公開前ティザー(1行説明・スクリーンショット3枚・X・近日公開・法務リンク)
        lien/legal/{privacy,terms}.html
        lien/i/index.html … 招待ページ(T11 の既存ページをそのまま複製)
-       assets/ … CSS とスクリーンショット3枚(SVG)
+       assets/ … CSS と実画面のスクリーンショット3枚(PNG)
   3. `products/lien/web/site.json` の値(baseUrl / xUrl / appStoreUrl / status)を読む。
      未確定の値は null のままにしておくと、配信物には出ない(`--check-publishable` が止める)。
 
@@ -43,7 +43,7 @@ MARKETING_DIR = os.path.join(PRODUCT_DIR, "marketing")
 LEGAL_OUT_DIR = os.path.join(MARKETING_DIR, "legal")
 SITE_OUT_DIR = os.path.join(WEB_DIR, "site")
 STORE_METADATA_DIR = os.path.join(MARKETING_DIR, "store_metadata", "ja")
-PLANT_DIR = os.path.join(PRODUCT_DIR, "assets", "plant", "v4_drafts", "composed")
+SCREENSHOT_DIR = os.path.join(MARKETING_DIR, "screenshots", "6.7in")
 INVITE_SRC = os.path.join(WEB_DIR, "invite", "index.html")
 CONFIG_PATH = os.path.join(WEB_DIR, "site.json")
 
@@ -54,34 +54,7 @@ LEGAL_PAGES = (
     ("terms.md", "terms.html", "Lien 利用規約", "利用規約"),
 )
 
-# ティザーのスクリーンショット。デモデータは marketing/screenshots/plan.md §2 と揃える
-# (自分=あおい / 相手=ゆうき / 約束=筋トレ💪・ランニング🏃 / ふたりの記録=23日)
-DEMO_ME = "あおい"
-DEMO_PARTNER = "ゆうき"
-DEMO_ME_PROMISE = "筋トレ"
-DEMO_ME_EMOJI = "💪"
-DEMO_PARTNER_PROMISE = "ランニング"
-DEMO_PARTNER_EMOJI = "🏃"
-DEMO_STREAK = 23
-
-# スクリーンショットの下絵に使う v4 の合成済み SVG(240x320 の立ち絵)
-PLANT_FILES = {
-    "both": "state_s3_both.svg",  # ふたり達成(葉がそろってひらいている)
-    "me": "state_s3_me.svg",  # 自分だけ完了
-    "none": "state_s3_none.svg",  # まだ誰も
-}
-
-# アプリの色(share 画像と同じブランド色 — LienColors.share*)
-BG_TOP = "#FBF7EC"
-BG_BOTTOM = "#E4F1DE"
-INK = "#2B3A32"
 ACCENT = "#3D6B52"
-GLOW = "#F7D98C"
-PAPER = "#FFFFFF"
-LINE = "#E4E1D8"
-MUTED = "#7B837C"
-DONE = "#3F9B62"
-PENDING = "#B9BDB8"
 
 # 法務ページの体裁(既存の見た目をそのまま保つ。明暗どちらでも読める)
 LEGAL_CSS = """\
@@ -350,126 +323,14 @@ def build_legal_pages(base_url=""):
 
 
 # --------------------------------------------------------------------------
-# スクリーンショット(v4 の立ち絵を埋め込んだ自己完結 SVG)
+# スクリーンショット(実画面を描画した MK7 の PNG)
 # --------------------------------------------------------------------------
 
 
-def load_plant_svg(kind):
-    """v4 の合成済み SVG を読み、id を衝突しない名前に付け替えて返す。"""
-    path = os.path.join(PLANT_DIR, PLANT_FILES[kind])
-    with open(path, encoding="utf-8") as handle:
-        raw = handle.read()
-    prefix = f"plant-{kind}-"
-    raw = re.sub(r'id="([^"]+)"', lambda m: f'id="{prefix}{m.group(1)}"', raw)
-    raw = re.sub(r"url\(#([^)]+)\)", lambda m: f"url(#{prefix}{m.group(1)})", raw)
-    inner = raw.split(">", 1)[1].rsplit("</svg>", 1)[0]
-    return inner
-
-
-def text(x, y, content, size, fill=INK, weight="600", anchor="start", opacity="1"):
-    return (
-        f'<text x="{x}" y="{y}" font-family="-apple-system, BlinkMacSystemFont, \'Hiragino Sans\', \'Noto Sans JP\', sans-serif" '
-        f'font-size="{size}" font-weight="{weight}" fill="{fill}" text-anchor="{anchor}" opacity="{opacity}">{html.escape(content)}</text>'
-    )
-
-
-def phone_frame(inner, caption):
-    """縦長の画面(660x1430)に、角丸の枠とキャプションを付ける。"""
-    return (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        "<!-- Lien ティザー用スクリーンショット(issue #76)。v1.0 の実装にある画面だけを描く。\n"
-        "     実機キャプチャへの差し替えは #80(MK7)で行う。手で編集せず tools/build_site.py から生成する -->\n"
-        '<svg xmlns="http://www.w3.org/2000/svg" width="660" height="1430" viewBox="0 0 660 1430">\n'
-        "  <defs>\n"
-        '    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">\n'
-        f'      <stop offset="0" stop-color="{BG_TOP}"/>\n'
-        f'      <stop offset="1" stop-color="{BG_BOTTOM}"/>\n'
-        "    </linearGradient>\n"
-        "  </defs>\n"
-        f'  <rect x="0" y="0" width="660" height="1430" rx="54" fill="url(#screen)"/>\n'
-        f"{inner}"
-        f"{text(330, 1372, caption, 26, MUTED, weight='500', anchor='middle')}\n"
-        "</svg>\n"
-    )
-
-
-def check_row(y, name, emoji, promise, done):
-    """「名前 / 絵文字+約束 / 状態」の1行(HomeView の todaySection と同じ並び)。"""
-    mark = "✓" if done else "—"
-    mark_color = DONE if done else PENDING
-    return (
-        f'  <rect x="70" y="{y}" width="520" height="96" rx="24" fill="{PAPER}" stroke="{LINE}"/>\n'
-        f"{text(100, y + 60, name, 30, INK)}\n"
-        f"{text(250, y + 62, f'{emoji} {promise}', 30, INK, weight='500')}\n"
-        f'  <circle cx="520" cy="{y + 48}" r="26" fill="{mark_color}" opacity="0.14"/>\n'
-        f"{text(520, y + 59, mark, 30, mark_color, weight='700', anchor='middle')}\n"
-    )
-
-
-def build_screenshot_home():
-    plant = load_plant_svg("both")
-    inner = [
-        f"{text(70, 120, 'ふたりの記録', 26, MUTED, weight='600')}\n",
-        f"{text(70, 196, f'🔥 {DEMO_STREAK}日', 52, INK, weight='700')}\n",
-        f"{text(70, 240, '最高記録 23日', 22, MUTED, weight='500')}\n",
-        f'  <g transform="translate(210, 270) scale(1.0)">\n{plant}\n  </g>\n',
-        f"{text(70, 660, 'ふたりの今日', 28, INK, weight='700')}\n",
-        check_row(686, DEMO_ME, DEMO_ME_EMOJI, DEMO_ME_PROMISE, True),
-        check_row(796, DEMO_PARTNER, DEMO_PARTNER_EMOJI, DEMO_PARTNER_PROMISE, True),
-        f"{text(330, 960, 'ふたり達成!', 34, ACCENT, weight='700', anchor='middle')}\n",
-        f'  <rect x="70" y="1030" width="520" height="92" rx="46" fill="{ACCENT}"/>\n',
-        f"{text(330, 1088, '今日のぶんは完了', 32, PAPER, weight='700', anchor='middle')}\n",
-    ]
-    return phone_frame("".join(inner), "約束はひとつだけ。ふたりで続ける毎日")
-
-
-def build_screenshot_widget():
-    plant = load_plant_svg("both")
-    inner = [
-        f"{text(70, 110, '9:41', 34, INK, weight='700')}\n",
-        f"{text(590, 110, 'ホーム画面', 24, MUTED, weight='500', anchor='end')}\n",
-        # ホーム画面のウィジェット。相手の今日の状態・記録・植物だけを出す(写真は出さない — v1.0)
-        f'  <rect x="70" y="190" width="520" height="286" rx="40" fill="{PAPER}" stroke="{LINE}"/>\n',
-        f'  <g transform="translate(96, 220) scale(0.78)">\n{plant}\n  </g>\n',
-        f"{text(310, 256, f'🔥 {DEMO_STREAK}日', 34, INK, weight='700')}\n",
-        f"{text(310, 310, f'{DEMO_ME}  ✓', 26, DONE, weight='600')}\n",
-        f"{text(310, 352, f'{DEMO_PARTNER}  ✓', 26, DONE, weight='600')}\n",
-        f"{text(310, 406, 'ふたりの記録', 22, MUTED, weight='500')}\n",
-        # ロック画面のウィジェット(T17a)。円形=相手の今日 / インライン=ふたりの記録
-        f"{text(70, 550, 'ロック画面', 24, MUTED, weight='600')}\n",
-        f'  <rect x="70" y="570" width="520" height="270" rx="40" fill="{ACCENT}" opacity="0.06"/>\n',
-        f'  <circle cx="180" cy="690" r="64" fill="{PAPER}" stroke="{LINE}"/>\n',
-        f'  <g transform="translate(140, 640) scale(0.32)">\n{plant}\n  </g>\n',
-        f'  <rect x="280" y="656" width="290" height="66" rx="33" fill="{PAPER}" stroke="{LINE}"/>\n',
-        f"{text(348, 698, f'ふたりの記録 {DEMO_STREAK}日', 24, INK, weight='600')}\n",
-        f"{text(70, 930, 'ホーム画面のウィジェットに、', 30, INK, weight='600')}\n",
-        f"{text(70, 980, '相手の今日と、ふたりの記録。', 30, INK, weight='600')}\n",
-        f"{text(70, 1054, 'アプリを開かなくても、ふたりの様子がわかります。', 24, MUTED, weight='500')}\n",
-    ]
-    return phone_frame("".join(inner), "相手の今日が、ホーム画面でわかる")
-
-
-def build_screenshot_checkin():
-    plant = load_plant_svg("both")
-    inner = [
-        f"{text(70, 120, 'きょうの約束', 26, MUTED, weight='600')}\n",
-        f"{text(70, 190, f'{DEMO_ME_EMOJI} {DEMO_ME_PROMISE}', 46, INK, weight='700')}\n",
-        f'  <g transform="translate(210, 250) scale(1.0)">\n{plant}\n  </g>\n',
-        f'  <circle cx="330" cy="690" r="96" fill="{DONE}" opacity="0.12"/>\n',
-        f"{text(330, 712, '✓', 84, DONE, weight='700', anchor='middle')}\n",
-        f"{text(330, 840, '今日のぶんは完了', 36, INK, weight='700', anchor='middle')}\n",
-        f"{text(330, 892, f'{DEMO_PARTNER}が待ってるよ', 26, MUTED, weight='500', anchor='middle')}\n",
-        f'  <rect x="180" y="980" width="300" height="76" rx="38" fill="{PAPER}" stroke="{LINE}"/>\n',
-        f"{text(330, 1028, f'🔥 ふたりの記録 {DEMO_STREAK}日', 26, INK, weight='600', anchor='middle')}\n",
-        f"{text(330, 1160, '1日1タップで、ふたりの記録がのびていきます。', 24, MUTED, weight='500', anchor='middle')}\n",
-    ]
-    return phone_frame("".join(inner), "チェックインは、1日1タップ")
-
-
 SCREENSHOTS = (
-    ("shot-1-home.svg", build_screenshot_home),
-    ("shot-2-widget.svg", build_screenshot_widget),
-    ("shot-3-checkin.svg", build_screenshot_checkin),
+    ("shot-1-home.png", "01_home_both.png", "ホームの実画面。ふたり達成とふたりの記録。デモデータ"),
+    ("shot-2-waiting.png", "02_home_waiting.png", "ホームの実画面。相手だけチェックインした状態。デモデータ"),
+    ("shot-3-history.png", "04_history.png", "カレンダー履歴の実画面。ふたりの達成状況。デモデータ"),
 )
 
 
@@ -555,13 +416,14 @@ footer a { color: var(--accent); }
 
 
 def read_store_copy():
-    """ストア文言の確定値(T32。mkt-lead 承認・mkt-review レビュー済みの正本)を読む。"""
-    values = {}
-    for key in ("subtitle", "promotional_text"):
-        path = os.path.join(STORE_METADATA_DIR, f"{key}.txt")
-        with open(path, encoding="utf-8") as handle:
-            values[key] = handle.read().strip()
-    return values
+    """ストアのサブタイトルと、REQUIREMENTS §3.3・3.4・3.10 に基づく紹介文を返す。"""
+    path = os.path.join(STORE_METADATA_DIR, "subtitle.txt")
+    with open(path, encoding="utf-8") as handle:
+        subtitle = handle.read().strip()
+    return {
+        "subtitle": subtitle,
+        "promotional_text": "それぞれが決めた約束を、1日1タップでチェックイン。ホーム画面やウィジェットで、ふたりの今日がわかります。",
+    }
 
 
 def render_index(config, copy):
@@ -569,12 +431,8 @@ def render_index(config, copy):
     base = config["baseUrl"]
     status_label = config.get("statusLabel") or "近日公開"
     screenshots = "".join(
-        f'    <li><img src="assets/{name}" alt="{html.escape(alt)}" width="660" height="1430" loading="lazy"></li>\n'
-        for name, alt in (
-            ("shot-1-home.svg", "ホーム画面。ふたりの記録と、ふたりの今日の状態、育っていく植物"),
-            ("shot-2-widget.svg", "ホーム画面のウィジェットに、相手の今日とふたりの記録が出ている様子"),
-            ("shot-3-checkin.svg", "チェックインを終えた画面。「今日のぶんは完了」と表示されている"),
-        )
+        f'    <li><img src="assets/{name}" alt="{html.escape(alt)}" width="1290" height="2796" loading="lazy"></li>\n'
+        for name, source, alt in SCREENSHOTS
     )
 
     # X へのリンクは @ハンドルが確定してから出す(site.json の xUrl)。未確定のあいだは何も出さない
@@ -636,16 +494,17 @@ def render_index(config, copy):
 <section>
   <h2>どんなアプリ?</h2>
   <ul class="points">
-    <li><strong>約束は、ひとつだけ</strong><span>ふたりで決めるのは、毎日つづけたいこと1つだけ。タイムラインも、いいね数も、ランキングもありません。</span></li>
+    <li><strong>約束は、ひとりひとつだけ</strong><span>それぞれが、毎日つづけたい約束を1つ決めます。タイムラインも、いいね数も、ランキングもありません。</span></li>
     <li><strong>チェックインは、1日1タップ</strong><span>やった日は1タップでチェックイン。写真をそえてもOKです。</span></li>
     <li><strong>相手の今日が、ウィジェットでわかる</strong><span>ホーム画面に、自分と相手の今日の○×、ストリーク、植物が出ます。</span></li>
-    <li><strong>できない日があっても、だいじょうぶ</strong><span>お休みチケットが自動でふたりの記録をまもります。植物はずっと元気なまま、また明日いっしょに育てられます。</span></li>
+    <li><strong>できない日には、お休みチケット</strong><span>毎月2枚のペア共有チケット。残りがある日は自動で使い、ふたりの記録をまもります。残りがない日は今日から再スタート。最高記録は残ります。</span></li>
     <li><strong>広告も、トラッキングもありません</strong><span>ふたりの毎日に、静かに寄りそうアプリです。</span></li>
   </ul>
 </section>
 
 <section>
   <h2>画面</h2>
+  <p class="lead">開発中の実画面を使った紹介画像です。名前・約束・日数はデモデータです。</p>
   <ul class="shots">
 {screenshots}  </ul>
 </section>
@@ -722,8 +581,9 @@ def build_all(config):
     outputs[os.path.join(SITE_OUT_DIR, "index.html")] = render_index(config, copy)
     outputs[os.path.join(SITE_OUT_DIR, "assets", "site.css")] = SITE_CSS
     outputs[os.path.join(SITE_OUT_DIR, "assets", "icon.svg")] = render_icon_svg()
-    for name, builder in SCREENSHOTS:
-        outputs[os.path.join(SITE_OUT_DIR, "assets", name)] = builder()
+    for name, source, alt in SCREENSHOTS:
+        with open(os.path.join(SCREENSHOT_DIR, source), "rb") as handle:
+            outputs[os.path.join(SITE_OUT_DIR, "assets", name)] = handle.read()
     icon_png = build_icon_png()
     if icon_png is not None:
         outputs[os.path.join(SITE_OUT_DIR, "assets", "icon-1024.png")] = icon_png
