@@ -362,3 +362,50 @@ v1.0 のウィジェットは1つ(kind `LienWidget`)で、4つのファミリー
   4. **日付またぎ**: 0:00 に2枚とも葉をたたむ / 2 日以上アプリを開かず push も受け取らなかったあと、前の日の「ふたりそろった」が出ない
   5. **再起動後**: 夜間の自動更新などで再起動したあと、最初のアンロックの前後で「アプリを開いてはじめよう」が残らない(2 分後の読み直し)
   6. 反映 60 秒以内(相手のチェックイン → NSE → ウィジェット。T07 から続く M0 の確認)/ StandBy・Smart Stack での見え方 / VoiceOver の読み上げ / 文字を大きくした設定 / iPhone SE の大きさ
+
+
+## 14. カレンダー履歴(issue #18 T18)
+
+ホームのカレンダーのボタン(ペア成立後だけ)から開く。1か月を7列で表示し、日ごとに
+**ふたり達成(2つの点)/ じぶんだけ(左の点)/ あいてだけ(右の点)/ お休み(細いカプセル)** を出す。
+確定済みの日に `streak_days` の行が無い日(途切れ)は、**無彩色の小さな点だけ**にして、
+「途切れ」「失敗」などの言葉・赤色は使わない(REVIEW-2026-10-12 §4.2)。
+
+### 構成
+
+| 何 | どこ |
+|---|---|
+| モデル(`DayMark` / `HistoryDay` / `MonthHistoryData` / `HistoryMonth` / date_local 変換) | `Lien/Core/Models/HistoryModels.swift` |
+| **判定の純粋関数**(月グリッド・週頭パディング・確定/プレビューの優先順位) | `Lien/Core/HistoryCalendarBuilder.swift` |
+| データ取得(`HistoryRepository`。Live = PostgREST 直読み / Stub = サンプル) | `Lien/Core/Repositories/HistoryRepository.swift` |
+| 月の移動・読み込み・失敗/再試行・古い応答の破棄 | `Lien/Features/History/HistoryViewModel.swift` |
+| 画面(7列グリッド・凡例・今日のリング・VoiceOver) | `Lien/Features/History/HistoryView.swift` |
+
+### データと意味論
+
+- Live は **`pairs`**(id / started_on / status)→ **`checkins`**(その月の自分の行と現役ペアの相手の行)→
+  **`streak_days`**(その月の確定行)を PostgREST で直接読む。新しい Edge Function は増やさない。
+  読める範囲は既存の RLS(`pairs_select_member` / `checkins_select_pair` / `streak_days_select_member`)のまま
+- **昨日までは `streak_days` の行だけを信じる**(server の close-day = `_shared/streak.ts` と同じ意味論):
+  `both` → ふたり達成 / `ticket` → お休み / 行なし → 途切れ(noRecord)。チェックインの有無から行を推測しない
+- **今日**は close-day の確定前なので、チェックイン状況をプレビューする(両者 = ふたり達成 / 片方 = じぶん・あいて / なし = todayPending)
+- **0:00〜1:00 の昨日**だけ、行が無く両者チェックイン済みなら「ふたり達成」を先に見せる(DESIGN §5.4 の仮判定。
+  1:00 を過ぎたら行だけを信じる)。片方だけの日はチケット残数が分からないため先取りしない
+- ペア成立日より前は beforePair(判定対象外)、未来は future。「今日」は `Calendar.lienHistory`(Asia/Tokyo)で決める
+- 月移動は **ペア成立月〜当月** にクランプする。古い取得が後から返っても、表示中の月を上書きしない
+- 読み込み失敗は責めない文言+「もう一度」。ペアが無いときは空状態
+
+### 検証
+
+- `HistoryCalendarBuilderTests`(20件): 月の長さ(28/29/30/31日)・週頭パディング・DESIGN §5.4 の例3件・
+  both/ticket/noRecord・今日の4状態・成立前/未来・0:00〜1:00 の昨日・Asia/Tokyo の日付境界
+- `HistoryViewModelTests`(7件): 当月の初期表示・成立月/当月のクランプ・失敗と再試行・
+  月を続けて切り替えたときの古い応答の破棄・JST の月初
+- `HistoryRepositoryTests`(9件): 3テーブルのクエリ(月の範囲・pair_id・select)と認証ヘッダ・
+  自分/相手の振り分け・未知の kind・現役ペアの優先・ペアなし・401/403/5xx/通信断/壊れた JSON/未サインイン
+- `StringsReviewTests`: `Strings.History` の全文言をカタログに追加(罰・恥系の禁止ワードなし)
+- 手元の macOS 下見: `scripts/macos-check/check.sh all` で **1022 tests passed / 0 failed**、
+  views(107ファイル)・widget(18ファイル)の型検査も通過
+- **実機/シミュレータでの見た目は CI(lien-ios)と T20 で確認する**(このタスクでは実サーバー・実機の操作は行っていない)
+- 既知の制限: ペア解消後はホームの導線を出さない(相手の行は RLS で読めないため。自分の履歴の専用導線は別タスク)。
+  チケットで守られた日は、凡例どおり「お休み」の印だけで、どちらがチェックインしたかは出さない(issue #18 の実装計画の `DayMark` に合わせる)

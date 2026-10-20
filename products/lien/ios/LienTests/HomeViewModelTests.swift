@@ -47,7 +47,8 @@ final class HomeViewModelTests: XCTestCase {
         todayPartnerDone: Bool = false,
         partnerName: String? = "ゆうき",
         plantStage: Int = 3,
-        plantMood: PlantMood = .normal
+        plantMood: PlantMood = .normal,
+        ticketBalance: Int? = nil
     ) -> PairSnapshot {
         PairSnapshot(
             schemaVersion: PairSnapshot.currentSchemaVersion,
@@ -65,7 +66,8 @@ final class HomeViewModelTests: XCTestCase {
             plantStage: plantStage,
             plantMood: plantMood,
             plantName: "みどり",
-            hasPartnerPhotoToday: false
+            hasPartnerPhotoToday: false,
+            ticketBalance: ticketBalance
         )
     }
 
@@ -190,6 +192,59 @@ final class HomeViewModelTests: XCTestCase {
         XCTAssertNil(vm.partnerWaitingText)
         XCTAssertFalse(vm.showsBothDoneCelebration)
         XCTAssertTrue(vm.canCheckin, "招待待ちでもチェックインは可能(§3.2)")
+    }
+
+    // MARK: チケット残数バッジ(§3.6 / T19a #19)
+
+    func testTicketBalanceShowsThePairedBalance() {
+        let (store, tempDir) = makeTempStore()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        try? store.saveSnapshot(makeSnapshot(ticketBalance: 2))
+        let (vm, _, _) = makeViewModel(store: store)
+        vm.load()
+
+        XCTAssertEqual(vm.ticketBalance, 2, "ペアの残数をそのまま出す(受信者視点で反転しない)")
+    }
+
+    func testTicketBalanceShowsZeroInsteadOfHidingTheBadge() {
+        let (store, tempDir) = makeTempStore()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        try? store.saveSnapshot(makeSnapshot(ticketBalance: 0))
+        let (vm, _, _) = makeViewModel(store: store)
+        vm.load()
+
+        XCTAssertEqual(vm.ticketBalance, 0, "0枚でもバッジを出す(罰なし — REQUIREMENTS §3.5)")
+        XCTAssertNotNil(vm.ticketBalance, "0 を nil(=バッジを出さない)にしない")
+    }
+
+    func testTicketBalanceIsHiddenWhenMissingSoloOrInvalid() {
+        let (store, tempDir) = makeTempStore()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let (vm, _, _) = makeViewModel(store: store)
+
+        // キーが無い古い snapshot
+        try? store.saveSnapshot(makeSnapshot(ticketBalance: nil))
+        vm.load()
+        XCTAssertNil(vm.ticketBalance)
+
+        // ソロ(ペア共有の在庫を持たない)。サーバーが誤って値を返しても出さない
+        try? store.saveSnapshot(makeSnapshot(pairId: nil, ticketBalance: 2))
+        vm.load()
+        XCTAssertNil(vm.ticketBalance)
+
+        // 契約は 0 以上。負の値は表示しない(誤った「-1枚」を出さない)
+        try? store.saveSnapshot(makeSnapshot(ticketBalance: -1))
+        vm.load()
+        XCTAssertNil(vm.ticketBalance)
+    }
+
+    func testTicketBalanceIsHiddenWithoutASnapshot() {
+        let (store, tempDir) = makeTempStore()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let (vm, _, _) = makeViewModel(store: store)
+        vm.load()
+
+        XCTAssertNil(vm.ticketBalance, "空状態ではバッジを出さない")
     }
 
     // MARK: 表示原則(§3.10)

@@ -7,9 +7,10 @@
 //   1. 吹き出しの余白   : 最大2行の吹き出しが、文字を大きくしても、ホームの ScrollView の上端(= 内容の上の余白 24pt の上)に
 //                        食い込んで切れない。上の端の数行が台紙のままであること
 //   2. 相手の写真のカード: 縦長の写真でも、枠は写真と同じ大きさで(外枠だけが幅いっぱいにならない)、四隅が角丸で透明になる
+//   3. チケット残数バッジ: 0枚でもバッジが描ける(消えない)。文字を大きくしても白紙にならない(T19a #19)
 //
 // 描いた画像は、PlantRenderTests と同じく XCTAttachment と ios/build/plant-render/ に保存する(lien-ios の artifact「plant-render-sheets」)。
-// 保存名は photo_ / bubble_ で始まる(PlantRenderTests の plant_ と区別)。
+// 保存名は photo_ / bubble_ / ticket_ で始まる(PlantRenderTests の plant_ と区別)。
 
 import ImageIO
 import SwiftUI
@@ -160,6 +161,52 @@ final class PartnerPhotoCardRenderTests: XCTestCase {
         .background(Color(white: 0.8))
         let (image, _) = try renderPixels(sheet, scale: 2)
         HomeRenderOutput.save("photo_01_partner_photo_cards", image, to: self)
+    }
+}
+
+// MARK: - 3. お休みチケットの残数バッジ(T19a #19)
+
+@MainActor
+final class TicketBalanceBadgeRenderTests: XCTestCase {
+    /// 0枚でもバッジを出す(罰なし — REQUIREMENTS §3.5)。文字を大きくしても、何かが描けていること
+    func testTheZeroBadgeStillDrawsAtAccessibilitySizes() throws {
+        let background: (r: UInt8, g: UInt8, b: UInt8) = (255, 255, 255)
+        for size in [DynamicTypeSize.large, .accessibility5] {
+            // 台紙を白で塗る(バッジの外側も白。透明のままだと「何か描けている」を判定できない)
+            let view = ZStack {
+                Color.white
+                TicketBalanceBadge(balance: 0)
+                    .padding(LienSpacing.m)
+            }
+            .frame(width: 360, height: 220)
+            .environment(\.dynamicTypeSize, size)
+            .environment(\.colorScheme, .light)
+            let (image, pixels) = try renderPixels(view, scale: 2)
+            let name = "ticket_zero_\(size)"
+            HomeRenderOutput.save(name, image, to: self)
+            XCTAssertNotNil(
+                pixels.firstRowDiffering(from: background),
+                "\(name): 0枚のバッジが描けていない(白紙)"
+            )
+        }
+    }
+
+    /// 目で見る一覧(0 / 1 / 2 / 5枚)。0枚が消えていないことを artifact でも確かめられる
+    func testRenderTheBalancesForALookInTheArtifact() throws {
+        let sheet = VStack(alignment: .leading, spacing: LienSpacing.s) {
+            ForEach([0, 1, 2, 5], id: \.self) { balance in
+                HStack(spacing: LienSpacing.s) {
+                    TicketBalanceBadge(balance: balance)
+                    Text("balance=\(balance)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(LienSpacing.m)
+        .background(Color.white)
+        let (image, _) = try renderPixels(sheet, scale: 2)
+        HomeRenderOutput.save("ticket_01_balances", image, to: self)
     }
 }
 

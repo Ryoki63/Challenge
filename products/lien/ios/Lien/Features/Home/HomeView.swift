@@ -1,7 +1,8 @@
 // HomeView.swift — ホーム画面(T13+T14 / REQUIREMENTS §3.4, §3.5, §3.9, §3.10 / §6)
 //
 // 構成: 植物(SVG レイヤーの重ね合わせ+葉の下の約束の絵文字+名前+ゲージの文+今日のひとこと — PlantHeroView)/ ストリーク /
-//       ふたりの今日(自分・相手チップ+相手の今日の写真)/ チェックインフロー(CheckinFlowView — 1タップ完了+写真添付+当日取消)。
+//       お休みチケットの残数バッジ(T19a #19。0枚でも出す — REQUIREMENTS §3.6)/ ふたりの今日(自分・相手チップ+相手の今日の写真)/
+//       チェックインフロー(CheckinFlowView — 1タップ完了+写真添付+当日取消)。
 // 植物の全画面の演出(段階アップ・おかえり — PlantCelebrationView)は、ホームの上に重ねるオーバーレイ(PB #57)。
 // 名前を付ける・変えるシート(PlantNameSheet)はホームから開く。
 // 相手の今日の写真(PV #59)は、相手が写真を添えた日だけ出る(PartnerPhotoView.swift)。写真が無い日・
@@ -19,6 +20,7 @@ import SwiftUI
 @MainActor
 struct HomeView: View {
     @State private var viewModel: HomeViewModel
+    @State private var showsHistory = false
     @Environment(\.scenePhase) private var scenePhase
 
     /// AppModel が snapshot を同期・保存するたびに増える値。変化したら App Group から読み直す
@@ -28,17 +30,21 @@ struct HomeView: View {
     /// 相手のコンテンツ(ニックネーム・約束の文・植物の名前)の長押しメニュー(通報・ブロック)と、その確認の表示。
     /// nil(Stub 構成・プレビュー)なら付けない(写真の長押しは PartnerPhotoModel.actions — T23 #23)
     private let moderation: ModerationViewModel?
+    /// カレンダー履歴(T18 #18)。nil なら導線を出さない(プレビュー・履歴を使わない組み立て)
+    private let historyRepository: HistoryRepository?
 
     init(
         viewModel: HomeViewModel,
         reloadToken: Int = 0,
         onInvite: (() -> Void)? = nil,
-        moderation: ModerationViewModel? = nil
+        moderation: ModerationViewModel? = nil,
+        historyRepository: HistoryRepository? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.reloadToken = reloadToken
         self.onInvite = onInvite
         self.moderation = moderation
+        self.historyRepository = historyRepository
     }
 
     /// プレビュー・簡易構成用(本番の依存は RootView が HomeViewModel として渡す)
@@ -83,6 +89,25 @@ struct HomeView: View {
         }
         // 通報の確認・メールを開けなかったときのアラート・ブロック(ペア解消)の説明シート(T23 #23)
         .moderationPresentation(moderation)
+        // カレンダー履歴(T18 #18)。ペア成立後のホームからのみ開ける
+        .toolbar {
+            if historyRepository != nil, viewModel.snapshot?.pairId != nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showsHistory = true
+                    } label: {
+                        Image(systemName: "calendar")
+                    }
+                    .accessibilityLabel(Strings.History.openButtonLabel)
+                }
+            }
+        }
+        // カレンダー履歴(T18 #18)。シートは名前付けと重ならないよう、ホームの NavigationStack に push する
+        .navigationDestination(isPresented: $showsHistory) {
+            if let historyRepository {
+                HistoryView(repository: historyRepository)
+            }
+        }
         .onAppear {
             viewModel.load()
             viewModel.plantExperience.homeDidAppear()
@@ -233,6 +258,9 @@ private struct SnapshotContent: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(LienColors.shareAccent)
+            // お休みチケットの残数バッジ(§3.6 / T19a #19)。0枚でも出す。nil(ソロ・キー欠落)は出さない
+            if let ticketBalance = viewModel.ticketBalance {
+                TicketBalanceBadge(balance: ticketBalance)
             }
 
             TodayArea(viewModel: viewModel, snapshot: snapshot, moderation: moderation)
@@ -505,7 +533,8 @@ extension PairSnapshot {
         plantGrownDays: Int? = 11,
         plantStageFloor: Int? = 7,
         plantNextStageAt: Int? = 14,
-        plantMood: PlantMood = .fidget
+        plantMood: PlantMood = .fidget,
+        ticketBalance: Int? = 2
     ) -> PairSnapshot {
         PairSnapshot(
             schemaVersion: PairSnapshot.currentSchemaVersion,
@@ -526,7 +555,8 @@ extension PairSnapshot {
             plantNextStageAt: plantNextStageAt,
             plantMood: plantMood,
             plantName: "みどり",
-            hasPartnerPhotoToday: false
+            hasPartnerPhotoToday: false,
+            ticketBalance: ticketBalance
         )
     }
 }
@@ -549,13 +579,21 @@ extension PairSnapshot {
     )
 }
 
+#Preview("チケット0枚(バッジは出したまま)") {
+    HomeView(
+        store: AppGroupStore.preview(snapshot: PairSnapshot.previewValue(ticketBalance: 0)),
+        checkinService: LocalEchoCheckinService()
+    )
+}
+
 #Preview("ソロ(土の中で眠るタネの子)") {
     HomeView(
         store: AppGroupStore.preview(snapshot: PairSnapshot.previewValue(
             pairId: nil,
             todayPartnerDone: false,
             plantStage: 0,
-            plantMood: .normal
+            plantMood: .normal,
+            ticketBalance: nil
         )),
         checkinService: LocalEchoCheckinService()
     )

@@ -63,7 +63,9 @@ struct RootView: View {
                         ),
                         reloadToken: model.snapshotRevision,
                         onInvite: model.phase == .solo ? { model.presentPairing() } : nil,
-                        moderation: model.moderation
+                        moderation: model.moderation,
+                        // カレンダー履歴(T18 #18)。ペア成立後のホームに導線を出す
+                        historyRepository: model.services.history
                     )
                     .toolbar { settingsButton }
                 }
