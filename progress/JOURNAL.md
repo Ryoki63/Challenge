@@ -637,3 +637,6 @@
 - 指示: 既存 PR の同じブランチを維持し、レビューの3 blocker（DECISION-AND-002 の Supabase 月数、A 案の iOS 保護期間重複、G12 日本向け URL）を修正して再提出する。新規 PR は作らない。
 - 修正: DECISION-AND-002 の Supabase 閾値を 4 か月（31,550 円）/3 か月（27,800 円）に訂正。A の Play 登録・支払・本人確認・端末確認とテスター打診を iOS 保護期間後の 11/1〜11/5 に移し、11/5 を越えた場合の D3・後続ゲート再計算、テスト日数を圧縮せずずらす規則を追記。PLAN、両判断カード、DEPENDENCIES、README の A 日程を同期。G12 を日本指定の公式 URL に統一。
 - 根拠確認: Google Play Console の公式日本向けページを開き、Sole proprietor は Opening/Closing Notification of a Private Business で organization として確認可能との記載を確認（行 67）。
+- 検証: PyYAML で DECISION-AND-001/002 を parse。日本指定 G12 URL の3文書一致と旧URL不在、A の 11/1〜11/5 同期、予算算術（3か月 27,800 円 / 4か月 31,550 円）、遅延時にテストを圧縮しない記述を確認。Google 公式日本ページで個人事業主条項を確認。独立レビューは3指摘すべて PASS、新規矛盾なし。`git diff --check` OK。
+- 提出: commit `964cc6e` を既存 branch に push。既存 PR #131 を更新（新規 PR なし）。CI run `39461555659` は 6/6 jobs success。ローカル HEAD と origin branch は `964cc6eb3b7245ed9e4277563f70f0f17ec27222` で一致。
+- 結果: PR #131 は OPEN のまま。レビュー反映まで完了し、マージ・Issue close は行っていない。アカウント選択 A/B/C と予算会計は owner 判断待ち。Play 登録・支払い・D-U-N-S 申請・ストア申請は未実施。
