@@ -1,6 +1,7 @@
 # Lien — 計測設計(UTM・App Store Analytics・週次 SQL)
 
 - 作成日: 2026-10-20(issue #78 / MK5)
+- 表記: App Store Connect を「ASC」、ASC の Analytics(旧 App Analytics)を「ASC Analytics」と書く。「DL」= ダウンロード。D1 / D7 / D30 は [docs/KPI.md](../../../docs/KPI.md) §4 の「両者継続」を指す
 - 正本: 指標の定義と SQL は [docs/KPI.md](../../../docs/KPI.md)。本書は「チャネル」と「週次」の読み方を足す。数え方が食い違ったら KPI.md を正とし、本書を直す
 - 前提: **D6** — v1.0 は分析 SDK を入れず、機能のために既にある Supabase のテーブルを SQL で集計する([REQUIREMENTS.md](../../../docs/REQUIREMENTS.md) §7)。App Privacy の申告は #30 の [review-notes.md](review-notes.md) §2.1 と `PrivacyInfo.xcprivacy` に合わせ、**本書のためにアプリ側は何も変えない**
 
