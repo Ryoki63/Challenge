@@ -476,3 +476,5 @@
 - 発見・修正: `verify_metadata.py --print` の見出しだけが「App 情報 > キーワード」のままだった。既存の ASC-ENTRY に合わせ「バージョン情報 > キーワード」へ修正し、回帰テスト1件を追加。承認済み `ja/*.txt` は main と差分なし。
 - ローカル検証: marketing で `PYTHONDONTWRITEBYTECODE=1 python3 tools/verify_metadata.py --print` = OK / keywords 99/100字、`python3 -m unittest discover -s tools -p 'test_*.py' -v` = 37件 PASS(メタデータ25件・スクショ12件)、`python3 tools/verify_screenshots.py` = 各6枚 OK。変更 Python 2ファイルは AST 構文検査 PASS、`git diff --check` PASS。
 - 適用外: iOS/バックエンド変更なしのため iOS ビルド・型チェックは対象外。Python の専用型チェック/lint/build 設定はなく、関連テスト・AST・CLI 実行・差分検査で確認。独立レビュー1回を依頼済み(結果待ち)。ASC の受入条件は未達のためタスク全体を done にしない。
+- 独立レビュー: 重大指摘なし。残リスク「G4 対象素材」を追加の受入条件と誤解しうる点だけ、ASC-ENTRY §3 に「G4 全体の close / スクショ完成はキーワード・説明文保存の追加受入条件にしない」と明記。再レビューが必要な重大未解決事項なし。
+- 提出: PR #113 を作成(未マージ)。`lien-ci` #39419045074 は6ジョブすべて success。main 同期によって自動起動した `lien-ios` #39419044975 は実行中のためビルド完了とはまだ扱わない。
