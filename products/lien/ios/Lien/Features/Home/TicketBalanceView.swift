@@ -12,8 +12,24 @@ import SwiftUI
 @MainActor
 struct TicketBalanceBadge: View {
     let balance: Int
+    /// 0枚のときだけ、タップでペイウォール(T33 / REQUIREMENTS §3.14)を開く。
+    /// nil(0枚より多い・導線を出さない組み立て)なら、ただのバッジ
+    var onTap: (() -> Void)? = nil
 
     var body: some View {
+        if let onTap {
+            Button(action: onTap) {
+                content
+            }
+            .buttonStyle(.plain)
+            // タップで何が起きるかを VoiceOver でも分かるようにする(押し売りしない。閉じるボタンはペイウォール側にある)
+            .accessibilityHint(Strings.Paywall.ticketEmptyHeadline)
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         Label(Strings.Tickets.balance(balance), systemImage: "ticket.fill")
             .font(.footnote.weight(.semibold))
             .foregroundStyle(.secondary)

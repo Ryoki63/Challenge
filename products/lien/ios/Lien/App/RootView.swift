@@ -65,7 +65,9 @@ struct RootView: View {
                         onInvite: model.phase == .solo ? { model.presentPairing() } : nil,
                         moderation: model.moderation,
                         // カレンダー履歴(T18 #18)。ペア成立後のホームに導線を出す
-                        historyRepository: model.services.history
+                        historyRepository: model.services.history,
+                        // ペイウォール(T33)。API キーが無いビルドは「いまは購入できません」を出す
+                        paywall: model.paywall
                     )
                     .toolbar { settingsButton }
                 }

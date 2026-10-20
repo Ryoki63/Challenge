@@ -30,7 +30,7 @@ function makeRepo(db: SupabaseClient): SnapshotRepo {
     async getUser(userId: string): Promise<SnapshotUserRow | null> {
       const { data, error } = await db
         .from("users")
-        .select("id, nickname, timezone, push_token")
+        .select("id, nickname, timezone, push_token, premium_until")
         .eq("id", userId)
         .maybeSingle();
       if (error) throw error;
@@ -40,6 +40,7 @@ function makeRepo(db: SupabaseClient): SnapshotRepo {
         nickname: data.nickname ?? "",
         timezone: data.timezone ?? "Asia/Tokyo",
         pushToken: data.push_token ?? null,
+        premiumUntil: data.premium_until ?? null,
       };
     },
 
@@ -68,7 +69,7 @@ function makeRepo(db: SupabaseClient): SnapshotRepo {
       const pair = membership.pairs as unknown as PairDbRow;
       const { data: partnerRow, error: e2 } = await db
         .from("pair_members")
-        .select("user_id, users!inner(id, nickname, timezone, push_token)")
+        .select("user_id, users!inner(id, nickname, timezone, push_token, premium_until)")
         .eq("pair_id", membership.pair_id)
         .neq("user_id", userId)
         .maybeSingle();
@@ -79,12 +80,14 @@ function makeRepo(db: SupabaseClient): SnapshotRepo {
         nickname: string | null;
         timezone: string | null;
         push_token: string | null;
+        premium_until: string | null;
       };
       return toSnapshotPair(pair, {
         id: partner.id,
         nickname: partner.nickname ?? "",
         timezone: partner.timezone ?? "Asia/Tokyo",
         pushToken: partner.push_token ?? null,
+        premiumUntil: partner.premium_until ?? null,
       });
     },
 

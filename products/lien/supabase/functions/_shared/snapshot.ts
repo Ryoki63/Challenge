@@ -12,7 +12,13 @@
 //         ない日が昨日まで2日以上続く)。枯れない・後退しない
 //   - お休みチケットの残数(2026-10-13・issue #19 / REQUIREMENTS §3.6): ticketBalance = pairs.ticket_balance
 //       (ペア共有の残数。ホームのバッジ用)。ソロは null(ペアが無いので持ち主がいない)。キーは省略せず null で出す
+//   - ペアのプラン(2026-10-20・T33 / REQUIREMENTS §3.14): pairPlan = メンバーの users.premium_until から導出
+//       (どちらかが未来なら premium。ソロは free。キーは省略せず必ず出す)
 //   - ストリーク導出: docs/DESIGN.md §5.4(確定は close-day。表示はプレビュー値)
+//   - 組み立てに使った「今日」(dateLocal。2026-10-20・issue #72): サーバーは checkin / checkin-cancel / nudge の
+//     snapshot を、クライアントが送った日付を「今日」として組み立てる(翌日の 1:00 まで有効 — resolveTodayLocal)。
+//     そのため「その snapshot の完了フラグがどの日のものか」は updatedAt からは決まらない。dateLocal に
+//     **組み立てに使った「今日」**をそのまま載せ、クライアントが完了をその日付で解釈できるようにする
 //
 // 設計:
 //   - snapshot は**受信者視点**でサーバーが組み立てる(me/partner をクライアントで反転しない — §3.4)
@@ -28,6 +34,7 @@ import {
   previewStreak,
   type StreakDayRecord,
 } from "./streak.ts";
+import { derivePairPlan, type PairPlan } from "./premium.ts";
 
 export const SNAPSHOT_SCHEMA_VERSION = 1;
 export const DEFAULT_TIMEZONE = "Asia/Tokyo";
@@ -45,6 +52,14 @@ export interface PairSnapshot {
   pairId: string | null;
   /** ISO8601 */
   updatedAt: string;
+  /**
+   * この snapshot を組み立てるのに使った「今日」(date_local "YYYY-MM-DD")。`todayMeDone` / `todayPartnerDone` は
+   * **この日の**完了(issue #72)。checkin / checkin-cancel / nudge はクライアントが送った日付を「今日」として
+   * 組み立てる(翌日の 1:00 まで有効 — CLOSE_DAY_SETTLE_HOUR)ので、`updatedAt` の日付とは 1 日ずれることがある。
+   * クライアントはこの日付で完了を解釈する(0:00〜1:00 の「不明」扱いをしない)。古いサーバーはこのキーを
+   * 出さない(アプリは無いキーを nil として扱い、updatedAt から保守的に判定する — DESIGN §3.4 の互換性)
+   */
+  dateLocal: string;
   streakCurrent: number;
   streakBest: number;
   todayMeDone: boolean;
@@ -72,6 +87,15 @@ export interface PairSnapshot {
    * (アプリは無いキーを nil として扱う — DESIGN §3.4 の互換性)
    */
   ticketBalance: number | null;
+  /**
+   * ペアのプラン(REQUIREMENTS §3.14 / §5)。メンバーの users.premium_until から導出する
+   * (plan カラムは持たない)。ソロは "free"。キーは省略せず必ず出す。
+   *
+   * アプリは「自分の購読 ∪ pairPlan === "premium"」でプレミアムを判定し、
+   * 自分の購読が無いのに pairPlan が premium なら「相手がすでにプレミアムなのでこのペアは適用済み」と
+   * 表示して、誤課金を防ぐ(REQUIREMENTS §3.14)。古いサーバーはこのキーを出さない(アプリは free として扱う)
+   */
+  pairPlan: PairPlan;
 }
 
 // ---- 植物の導出(REQUIREMENTS §3.9 / GROWTH §3) ----
@@ -364,6 +388,11 @@ export interface BuildPairSnapshotInput {
   hasPartnerPhotoToday: boolean;
   /** pairs.ticket_balance(省略 = 読んでいない → snapshot では null) */
   ticketBalance?: number | null;
+  /**
+   * ペアのプラン。省略 = メンバーの premium_until を読んでいない → "free"。
+   * loadSnapshotForUser は user / partner の premiumUntil から導出して渡す(T33)
+   */
+  pairPlan?: PairPlan;
 }
 
 /**
@@ -396,6 +425,7 @@ export function buildPairSnapshot(input: BuildPairSnapshotInput): PairSnapshot {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     pairId: input.pairId,
     updatedAt: input.updatedAtIso,
+    dateLocal: input.todayLocal,
     streakCurrent,
     streakBest: Math.max(best, streakCurrent),
     todayMeDone: input.todayMeDone,
@@ -417,23 +447,29 @@ export function buildPairSnapshot(input: BuildPairSnapshotInput): PairSnapshot {
     plantName: input.plantName,
     hasPartnerPhotoToday: input.hasPartnerPhotoToday,
     ticketBalance: normalizeTicketBalance(input.ticketBalance),
+    pairPlan: input.pairPlan ?? "free",
   };
 }
 
 /**
  * ソロ状態(ペア未成立)の snapshot。鉢は土だけ=クライアントは pairId=null で土を描画。
  * 植物の進み具合は 0 / 0 / null(ゲージを出さない — GROWTH §5.1)。お休みチケットの残数も null
- * (ペア共有の在庫なので、ペアが無ければ持ち主がいない。バッジを出さない)
+ * (ペア共有の在庫なので、ペアが無ければ持ち主がいない。バッジを出さない)。
+ * todayLocal は組み立てに使った「今日」(dateLocal。ソロでも載せる — クライアントが完了をその日付で解釈する)
  */
 export function buildSoloSnapshot(input: {
   updatedAtIso: string;
+  /** 組み立てに使った「今日」(date_local) */
+  todayLocal: string;
   todayMeDone: boolean;
   myPromise: PromiseSummary | null;
 }): PairSnapshot {
+  assertDateLocal(input.todayLocal);
   return {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     pairId: null,
     updatedAt: input.updatedAtIso,
+    dateLocal: input.todayLocal,
     streakCurrent: 0,
     streakBest: 0,
     todayMeDone: input.todayMeDone,
@@ -451,6 +487,7 @@ export function buildSoloSnapshot(input: {
     plantName: null,
     hasPartnerPhotoToday: false,
     ticketBalance: null,
+    pairPlan: "free",
   };
 }
 
@@ -541,6 +578,11 @@ export interface SnapshotUserRow {
    * snapshot の組み立て自体は使わない
    */
   pushEnv?: "sandbox" | "production" | null;
+  /**
+   * users.premium_until(ISO8601 | null)。snapshot の pairPlan の導出に使う(T33)。
+   * 省略 = 読んでいない(古い実装・テスト) → free 扱い。push の送信先としては使わない
+   */
+  premiumUntil?: string | null;
 }
 
 export interface SnapshotPromiseRow extends PromiseSummary {
@@ -595,6 +637,7 @@ export interface SnapshotRepo {
  * 未指定なら now をユーザーの timezone で date_local 化する。
  * ただし override の日がすでに確定済み(翌日の 1:00 を過ぎている)なら捨てて、本当の今日を使う
  * (resolveTodayLocal。close-day の後にキューから届いた昨日付けの checkin に、先取りの +1 を見せない)。
+ * 解決した「今日」は snapshot の **dateLocal** に載せる(クライアントはそれで完了を解釈する。issue #72)。
  * ※ ペアは国内(同一TZ)前提(REQUIREMENTS §3.4。時差ペアの厳密対応は v2+)
  */
 export async function loadSnapshotForUser(
@@ -622,6 +665,7 @@ export async function loadSnapshotForUser(
   if (!pair) {
     return buildSoloSnapshot({
       updatedAtIso,
+      todayLocal,
       todayMeDone: myCheckin !== null,
       myPromise,
     });
@@ -675,5 +719,11 @@ export async function loadSnapshotForUser(
     plantName: plant?.name ?? null,
     hasPartnerPhotoToday: partnerCheckin?.photoPath != null,
     ticketBalance: pair.ticketBalance,
+    // プレミアム判定はメンバーの premium_until から導出(REQUIREMENTS §5)。
+    // どちらかが読めていなければ free 側に倒れる(derivePairPlan)
+    pairPlan: derivePairPlan(
+      [user.premiumUntil, pair.partner.premiumUntil],
+      params.now,
+    ),
   });
 }

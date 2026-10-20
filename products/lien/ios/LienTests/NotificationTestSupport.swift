@@ -37,9 +37,13 @@ enum NotificationClock {
 // MARK: - snapshot
 
 enum NotificationSnapshots {
-    /// ペア成立中の snapshot(約束「筋トレ」💪・相手「ゆうき」)。リマインド・ストリーク危機の判断に効く項目を指定する
+    /// ペア成立中の snapshot(約束「筋トレ」💪・相手「ゆうき」)。リマインド・ストリーク危機の判断に効く項目を指定する。
+    /// `dateLocal` は、サーバーが組み立てに使った「今日」(issue #72)。省略すると **キーが無い古いサーバー**の snapshot に
+    /// なる(判定は `updatedAt` の時刻から保守的になる — `PairSnapshot.completionOnItsOwnDay`)。新しいサーバーの形を
+    /// 試すときは、その日の "yyyy-MM-dd" を渡す
     static func paired(
         updatedAt: Date,
+        dateLocal: String? = nil,
         meDone: Bool = false,
         partnerDone: Bool = false,
         streak: Int = 23,
@@ -48,6 +52,7 @@ enum NotificationSnapshots {
         emoji: String? = "💪"
     ) -> PairSnapshot {
         var snapshot = SnapshotFactory.paired(todayMeDone: meDone, todayPartnerDone: partnerDone, updatedAt: updatedAt)
+        snapshot.dateLocal = dateLocal
         snapshot.streakCurrent = streak
         snapshot.partnerName = partnerName
         snapshot.myPromiseTitle = title
@@ -56,8 +61,10 @@ enum NotificationSnapshots {
     }
 
     /// 約束あり・ペアなし
-    static func solo(updatedAt: Date, meDone: Bool = false) -> PairSnapshot {
-        SnapshotFactory.solo(todayMeDone: meDone, updatedAt: updatedAt)
+    static func solo(updatedAt: Date, dateLocal: String? = nil, meDone: Bool = false) -> PairSnapshot {
+        var snapshot = SnapshotFactory.solo(todayMeDone: meDone, updatedAt: updatedAt)
+        snapshot.dateLocal = dateLocal
+        return snapshot
     }
 }
 

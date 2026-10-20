@@ -86,6 +86,13 @@ deno test --allow-read products/lien/contracts/tools/
 - 写真の実体の削除(#68、2026-10-13): `checkin-cancel` は応答の形を変えずに、取消のとき Storage の写真(原寸 + サムネ)も消す。
   取消のあと、その写真の署名付き URL は作れない(HTTP 400 `{"statusCode":"404","error":"not_found"}` = `storage-sign.not-found.json`)。
   署名付きアップロードは、上限 6 MiB・`image/jpeg` だけ(超えると **HTTP 400** + 本文の `statusCode` 413 / 415)。DESIGN §5.2
+- 組み立てに使った「今日」(#72、2026-10-20)で snapshot に `dateLocal`(date_local "YYYY-MM-DD")が足された。
+  `todayMeDone` / `todayPartnerDone` が**どの日の完了か**を、`updatedAt`(組み立てた時刻)ではなくこのキーで示す。
+  checkin / checkin-cancel / nudge はクライアントが送った `dateLocal` を「今日」として組み立てる(その日が確定する
+  翌日の 1:00 まで有効 — `resolveTodayLocal`)ので、**0:00〜1:00 の snapshot は `updatedAt` と `dateLocal` の日付が
+  1 日ずれる**(それが正しい)。このフィクスチャの固定入力は JST 2026-06-11 17:30(確定後)なので、どの snapshot も
+  `"2026-06-11"`。iOS の `PairSnapshot` は省略可(`String?`。キーが無い古いサーバーは nil = `updatedAt` から保守的に判定)
+  で受け、`ContractFixtureTests` が値まで検査する
 - 認証サーバー(Supabase Auth)の不調(通信の失敗・5xx)は、`snapshot` / `pair-dissolve` / `delete-account` が **503 `auth_unavailable`** で返す
   (確定した拒否 = 期限切れ・ユーザーが居ない、は 401 `unauthorized` のまま。`_shared/auth_errors.ts`)。iOS はこのコードを専用の case にせず、
   一般のサーバー失敗(`.server`)として扱う — セッションの見張り(`SessionHealthMonitor`)が数えないため、「ログイン状態を確認できません」の誤検知にならない
