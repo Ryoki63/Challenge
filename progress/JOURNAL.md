@@ -783,3 +783,13 @@
 - 検証: Python unittest **15件 PASS**（RS256 の実署名を openssl で検証、track body、AAB 検査、失敗時 cleanup、commit 順）。ローカル HTTP サーバーで OAuth→edit→bundle upload→track→commit の5呼び出し、dry-run の4呼び出し（edit 削除込み）を確認。workflow YAML parse OK、`bash -n` 12ブロック OK、`git diff --check` OK、docs の外部リンク 18件 HTTP 200、ローカルリンク欠落なし。
 - 残課題: Android 雛形は #121 / #145 が未マージのため、本ブランチでは build/publish を detect job でスキップ（PR の CI は scripts job のみ）。`versionCode` を CI 実行番号から反映する実装、最終 `applicationId`、課金/通報/写真権限などデータセーフティ §6 の未確定項目は引き渡し。
 - 結果: 変更を commit / push し、PR を作成する（マージ・Play 登録・ストア申請・アップロードは行わない）。
+
+## 2026-10-21 02:07 (eng-exec) — #136 Android 最小UI・着手前ゲート確認
+- 着手: 指定 worktree / ブランチ `consilium/136-t-and-3-android-ui` で契約の依存条件を確認。開始時 tracked/untracked 差分なし。`git pull --rebase origin main` は Already up to date、確認時の main は `d300f7da193b33f79955e38bab0fcbe8226e9d38`。実装にはまだ着手していない。
+- 依存ゲート: GitHub API による #134 / #135 / #120 / #122 の状態はすべて OPEN、`closedAt: null`。追加で参照される QA 判断 #123 も OPEN。契約の「完了・マージ確認後のみ着手」を満たさないため、未確定の製品・UX・QA判断や先行タスクの実装を代替しない。
+- 事前確認: 指定ブランチのリモート ref と既存 PR は見つからず、重複する PR は作成していない。Issue #136 の assignees は空であり、実装の排他割当も未確認。契約に示す Android アーキテクチャ文書は、この main のファイル一覧には存在しない。
+- 照合: #120 の関連 PR #132 と #123 の関連 PR #146 は MERGED だが、両 Issue は OPEN のまま。PR マージを Issue 完了と読み替えない。Android 雛形・設計 PR #145 は OPEN / `mergedAt: null`。`test -e` による確認では `products/lien/android` / 同 `gradlew` / `docs/android/ARCHITECTURE-ANDROID.md` がすべて ABSENT。
+- 【承認待ち】: #136 にブロック理由と A（推奨: 依存完了・マージと排他割当確認後の再投入）/ B（iOS公開優先で保留）の判断1点をコメントし、`needs-approval,human-gate` を付与。コメント: https://github.com/Ryoki63/Challenge/issues/136#issuecomment-6296590696 。既存 #134 の最新非botコメントもエージェントマーカー付きの承認待ちであり、人間の返信ではない。
+- 検証: `git diff --check` PASS。依存状態・関連 PR・対象ファイル有無を直接確認。テスト件数 / Android build / lint / emulator / instrumentation / CI は null（実装着手条件未達で対象ディレクトリも未マージのため未実行）。独立レビューは対象外（監査ログ追記のみでコード・製品仕様・業務判断の変更なし）。
+- 結果: BLOCKED。実装要件は未達、UIコード・iOS・共有DB・契約フィクスチャ・secret は変更していない。監査ログだけを指定ブランチへ commit/push する。実装PRの提出・自己マージ・Issue close・status:* の更新は行わず、依存ゲート充足後の再投入を待つ。
+- 完了チェック: [未達] 全実装要件（依存未完了のため未着手） [PASS] 事前ゲートの直接確認・差分検査 [対象外] テスト/型/lint/build/動作検証（監査追記のみ。アプリ合格とは扱わない） [未達] 実装PR・独立コードレビュー（未提出/未実施）。
