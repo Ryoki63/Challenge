@@ -245,6 +245,36 @@ enum StringsCatalog {
             add("PartnerPhoto.viewerLabel(\(name))", Strings.PartnerPhoto.viewerLabel(name))
         }
 
+        // Share(シェア画像 — REQUIREMENTS §3.13 / T22)
+        add("Share.title", Strings.Share.title)
+        add("Share.createButton", Strings.Share.createButton)
+        add("Share.subtitle", Strings.Share.subtitle)
+        add("Share.formatPickerLabel", Strings.Share.formatPickerLabel)
+        add("Share.formatStory", Strings.Share.formatStory)
+        add("Share.formatSquare", Strings.Share.formatSquare)
+        add("Share.loading", Strings.Share.loading)
+        add("Share.shareButton", Strings.Share.shareButton)
+        add("Share.closeButton", Strings.Share.closeButton)
+        add("Share.retry", Strings.Share.retry)
+        add("Share.unavailableMessage", Strings.Share.unavailableMessage)
+        add("Share.errorMessage", Strings.Share.errorMessage)
+        add("Share.privacyNote", Strings.Share.privacyNote)
+        add("Share.streakCaption", Strings.Share.streakCaption)
+        add("Share.dayUnit", Strings.Share.dayUnit)
+        add("Share.meFallbackName", Strings.Share.meFallbackName)
+        add("Share.partnerFallbackName", Strings.Share.partnerFallbackName)
+        add("Share.milestoneBody", Strings.Share.milestoneBody)
+        for name in representativeNames {
+            add("Share.names(\(name), \(name))", Strings.Share.names(name, name))
+            add("Share.previewLabel(\(name), \(name), 30)", Strings.Share.previewLabel(name, name, 30))
+        }
+        for date in representativeDates {
+            add("Share.startedOn(\(date))", Strings.Share.startedOn(date))
+        }
+        for days in representativeDays {
+            add("Share.milestoneTitle(\(days))", Strings.Share.milestoneTitle(days))
+            add("Share.sharePreviewTitle(\(days))", Strings.Share.sharePreviewTitle(days))
+        }
 
         // Onboarding(規約への同意 — T23 #23)
         add("Onboarding.consentLabel", Strings.Onboarding.consentLabel)
