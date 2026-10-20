@@ -8,9 +8,11 @@ CI(`store-metadata` ジョブ)とローカルの両方で実行する:
 (文字数超過・禁止語・キーワードの重複・表示名との重複・Pairy 語)を固定する。
 """
 
+import io
 import os
 import sys
 import unittest
+from contextlib import redirect_stdout
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -122,6 +124,15 @@ class CollectErrorsTest(unittest.TestCase):
         self.assertEqual(
             vm.collect_errors(valid_fields(**{"description.txt": "ペアリングの手順です。"})), []
         )
+
+
+class PrintValuesTest(unittest.TestCase):
+    def test_keywords_target_the_version_page(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            vm.print_values(valid_fields())
+        self.assertIn("バージョン情報 > キーワード (keywords.txt,", output.getvalue())
+        self.assertNotIn("App 情報 > キーワード", output.getvalue())
 
 
 class RepositoryMetadataTest(unittest.TestCase):

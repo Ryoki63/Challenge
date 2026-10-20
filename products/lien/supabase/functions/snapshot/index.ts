@@ -15,6 +15,7 @@ import {
   toSnapshotPair,
 } from "../_shared/pair_rows.ts";
 import { handleSnapshot } from "./core.ts";
+import { snapshotResponse } from "./response.ts";
 import type {
   SnapshotCheckinRow,
   SnapshotPairRow,
@@ -172,6 +173,13 @@ Deno.serve(async (req: Request) => {
       { repo: makeRepo(adminClient) },
       { userId: authData.user.id },
     );
+    if (result.status === 200) {
+      return await snapshotResponse(
+        authData.user.id,
+        result.body.snapshot,
+        req.headers.get("If-None-Match"),
+      );
+    }
     return json(result.status, result.body);
   } catch (e) {
     console.error("snapshot: 予期しないエラー:", e);
