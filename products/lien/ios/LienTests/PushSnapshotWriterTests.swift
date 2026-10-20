@@ -13,6 +13,7 @@ final class PushSnapshotWriterTests: XCTestCase {
         var reloadCount = 0
         let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { reloadCount += 1 })
         let snapshot = SnapshotFactory.paired(todayPartnerDone: true)
+        try temp.store.saveSnapshot(.emptySolo(updatedAt: snapshot.updatedAt.addingTimeInterval(-1)))
         XCTAssertEqual(try writer.receive(payload(snapshot)), snapshot)
         XCTAssertEqual(temp.store.loadSnapshot(), snapshot)
         XCTAssertEqual(try writer.receive(payload(snapshot)), snapshot)
@@ -87,6 +88,7 @@ final class PushSnapshotWriterTests: XCTestCase {
         XCTAssertThrowsError(try writer.receive(payload(snapshot)))
         XCTAssertEqual(reloadCount, 0)
         try FileManager.default.removeItem(at: temp.directory)
+        try temp.store.saveSnapshot(.emptySolo(updatedAt: snapshot.updatedAt.addingTimeInterval(-1)))
         XCTAssertEqual(try writer.receive(payload(snapshot)), snapshot)
         _ = try writer.receive(payload(snapshot))
         XCTAssertEqual(temp.store.loadSnapshot(), snapshot)
@@ -103,6 +105,22 @@ final class PushSnapshotWriterTests: XCTestCase {
         try other.saveSnapshot(changed)
         XCTAssertFalse(try temp.store.applySnapshot(before, ifUnchangedSince: before))
         XCTAssertEqual(temp.store.loadSnapshot(), changed)
+    }
+
+    func testPushCannotRestoreErasedAccountOrInitializeMissingSession() throws {
+        let temp = TempStore()
+        defer { temp.cleanup() }
+        var reloadCount = 0
+        let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { reloadCount += 1 })
+        let snapshot = SnapshotFactory.paired()
+        XCTAssertNil(try writer.receive(payload(snapshot)))
+        try temp.store.saveSnapshot(snapshot)
+        temp.store.eraseAll()
+        var delayed = snapshot
+        delayed.updatedAt = delayed.updatedAt.addingTimeInterval(5)
+        XCTAssertNil(try writer.receive(payload(delayed)))
+        XCTAssertNil(temp.store.loadSnapshot())
+        XCTAssertEqual(reloadCount, 0)
     }
 
     func testTimeoutAndCompletionCanClaimDeliveryOnlyOnce() {

@@ -429,4 +429,5 @@ python3 -m unittest discover -s products/lien/ios/scripts -p 'test_*.py' -v
 ```
 
 - iOS/NSE の実ビルドと XCTest は `lien-ios` CI を正本とする。macos-check は UIKit/NSE 本体を動かさない補助検査。
+- 304でも確認時刻を保存して遅延pushより新しい状態を維持する。共有snapshotが消去済み/未初期化ならNSEは復元せず、認証済みのアプリ同期だけが初期化する。
 - 残: APNs → NSE → ウィジェットの実機 p50≦60秒は G1 / T20。NSE 自体が起動されない場合・保存できない場合は次回起動/前面復帰で補完する。写真サムネ DL(T17b)、OS による push 配送/WidgetKit 更新の保証、バックエンドの本番反映は本タスクの検証済み事項に含めない。

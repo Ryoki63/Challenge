@@ -98,15 +98,15 @@ struct AppGroupStore {
 
     func applyPushSnapshot(_ snapshot: PairSnapshot) throws -> (snapshot: PairSnapshot?, changed: Bool) {
         try coordinateSnapshotWrite {
-            let previous = loadSnapshot()
+            guard let previous = loadSnapshot() else { return (nil, false) }
             if FileManager.default.fileExists(atPath: pendingOpsFileURL.path) {
                 guard let data = try? Data(contentsOf: pendingOpsFileURL),
                       let pending = try? JSONSerialization.jsonObject(with: data) as? [Any],
                       pending.isEmpty else { return (previous, false) }
             }
-            if let previous, previous.updatedAt >= snapshot.updatedAt { return (previous, false) }
+            if previous.updatedAt >= snapshot.updatedAt { return (previous, false) }
             var normalized = snapshot
-            normalized.updatedAt = previous?.updatedAt ?? snapshot.updatedAt
+            normalized.updatedAt = previous.updatedAt
             try writeAtomically(PairSnapshot.makeJSONEncoder().encode(snapshot), to: snapshotFileURL)
             return (snapshot, normalized != previous)
         }
@@ -199,9 +199,16 @@ struct AppGroupStore {
     /// 端末に置いた記録をすべて消す(snapshot・未送信キュー・相手の写真のサムネ・ローカル通知の設定)。
     /// ウィジェットは次の reload で空の表示になる(呼び出し側が reload する)。ファイルが無くても成功する
     func eraseAll(fileManager: FileManager = .default) {
-        for url in [snapshotFileURL, pendingOpsFileURL, photoThumbFileURL, notificationPrefsFileURL,
-                    containerURL.appendingPathComponent(Self.snapshotSyncFileName)] {
-            try? fileManager.removeItem(at: url) // 無いファイルの削除エラーは無視する
+        let eraseFiles = {
+            for url in [snapshotFileURL, pendingOpsFileURL, photoThumbFileURL, notificationPrefsFileURL,
+                        containerURL.appendingPathComponent(Self.snapshotSyncFileName)] {
+                try? fileManager.removeItem(at: url) // 無いファイルの削除エラーは無視する
+            }
+        }
+        do {
+            try coordinateSnapshotWrite(eraseFiles)
+        } catch {
+            eraseFiles()
         }
     }
 

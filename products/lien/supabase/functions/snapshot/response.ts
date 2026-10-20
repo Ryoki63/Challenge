@@ -23,6 +23,7 @@ export async function snapshotResponse(
     "cache-control": "private, no-store",
     "etag": etag,
     "vary": "Authorization",
+    "x-lien-snapshot-confirmed-at": String(Date.parse(snapshot.updatedAt)),
   };
   if (ifNoneMatch === etag) return new Response(null, { status: 304, headers });
   return new Response(JSON.stringify({ snapshot }), { status: 200, headers });

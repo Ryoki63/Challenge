@@ -173,9 +173,11 @@ final class EdgeFunctionSnapshotClientTests: XCTestCase {
 
     func testConditionalFetchSendsCheckpointAndAccepts304() async throws {
         let client = makeClient()
+        StubURLProtocol.responseHeaders = ["X-Lien-Snapshot-Confirmed-At": "10000"]
         reply(304, "")
         let result = try await client.fetchChanges(etag: "revision-1")
-        guard case .unchanged = result else { return XCTFail("304 は変更なし") }
+        guard case .unchanged(let confirmedAt) = result else { return XCTFail("304 は変更なし") }
+        XCTAssertEqual(confirmedAt, Date(timeIntervalSince1970: 10))
         let request = try XCTUnwrap(StubURLProtocol.captured.first)
         XCTAssertEqual(request.header("If-None-Match"), "revision-1")
         XCTAssertEqual(request.request.cachePolicy, .reloadIgnoringLocalCacheData)
@@ -189,6 +191,17 @@ final class EdgeFunctionSnapshotClientTests: XCTestCase {
             XCTFail("初回取得の304で成功してしまった")
         } catch {
             XCTAssertEqual(error as? SnapshotClientError, .server(code: "http_304"))
+        }
+    }
+
+    func test304WithoutServerConfirmationTimeIsRejected() async throws {
+        let client = makeClient()
+        reply(304, "")
+        do {
+            _ = try await client.fetchChanges(etag: "revision-1")
+            XCTFail("確認時刻のない304は順序を保証できない")
+        } catch {
+            XCTAssertEqual(error as? SnapshotClientError, .server(code: "invalid_response"))
         }
     }
 

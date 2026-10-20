@@ -99,9 +99,11 @@ final class SnapshotSynchronizer {
         case .snapshot(let snapshot, let etag):
             fetched = snapshot
             nextEtag = etag
-        case .unchanged:
-            guard let before, etag != nil else { return .failed(.server) }
-            return .applied(before)
+        case .unchanged(let confirmedAt):
+            guard var confirmed = before, let etag else { return .failed(.server) }
+            confirmed.updatedAt = max(confirmed.updatedAt, confirmedAt)
+            fetched = confirmed
+            nextEtag = etag
         }
 
         if let store {

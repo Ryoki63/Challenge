@@ -32,6 +32,10 @@ Deno.test("snapshot conditional GET: unchanged state returns bodyless 304 despit
     updatedAt: "2026-10-20T10:01:00Z",
   }, initial.headers.get("etag"));
   assert(result.status === 304);
+  assert(
+    result.headers.get("x-lien-snapshot-confirmed-at") ===
+      String(Date.parse("2026-10-20T10:01:00Z")),
+  );
   assert(await result.text() === "");
 });
 

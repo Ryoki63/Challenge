@@ -14,12 +14,31 @@ private final class ConditionalSnapshotClient: SnapshotClient {
         requests.append(etag)
         onFetch?()
         if failFirst, requests.count == 1 { throw SnapshotClientError.network }
-        return etag == revision ? .unchanged : .snapshot(snapshot, etag: revision)
+        return etag == revision ? .unchanged(confirmedAt: snapshot.updatedAt) : .snapshot(snapshot, etag: revision)
     }
 }
 
 @MainActor
 final class SnapshotRecoveryTests: XCTestCase {
+    func testUnchangedResponsePreventsDelayedIntermediatePushRollback() async throws {
+        let temp = TempStore()
+        defer { temp.cleanup() }
+        let client = ConditionalSnapshotClient()
+        let reloads = ReloadCounter()
+        let sync = SnapshotSynchronizer(client: client, store: temp.store, reloadWidgets: { reloads.value += 1 })
+        _ = await sync.sync()
+        var delayed = client.snapshot
+        delayed.todayPartnerDone = false
+        delayed.updatedAt = delayed.updatedAt.addingTimeInterval(5)
+        client.snapshot.updatedAt = client.snapshot.updatedAt.addingTimeInterval(10)
+        _ = await sync.sync()
+        let object = try JSONSerialization.jsonObject(with: PairSnapshot.makeJSONEncoder().encode(delayed))
+        _ = try PushSnapshotWriter(store: temp.store, reloadWidgets: { reloads.value += 1 }).receive(["lien": ["snapshot": object]])
+        XCTAssertEqual(temp.store.loadSnapshot(), client.snapshot)
+        XCTAssertEqual(SnapshotCheckpoint.load(from: temp.store)?.snapshot, client.snapshot)
+        XCTAssertEqual(reloads.value, 1)
+    }
+
     func testRelaunchRepairsMissedPushFromPreviousCheckpoint() async throws {
         let temp = TempStore()
         defer { temp.cleanup() }

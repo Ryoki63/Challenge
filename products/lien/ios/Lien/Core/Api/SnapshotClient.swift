@@ -44,7 +44,7 @@ protocol SnapshotClient: AnyObject {
 
 enum SnapshotChanges {
     case snapshot(PairSnapshot, etag: String?)
-    case unchanged
+    case unchanged(confirmedAt: Date)
 }
 
 extension SnapshotClient {
@@ -92,7 +92,13 @@ final class EdgeFunctionSnapshotClient: SnapshotClient {
         } catch {
             throw SnapshotClientError.network
         }
-        if result.response.statusCode == 304, etag != nil { return .unchanged }
+        if result.response.statusCode == 304, etag != nil {
+            guard let header = result.response.value(forHTTPHeaderField: "X-Lien-Snapshot-Confirmed-At"),
+                  let milliseconds = Double(header), milliseconds.isFinite else {
+                throw SnapshotClientError.server(code: "invalid_response")
+            }
+            return .unchanged(confirmedAt: Date(timeIntervalSince1970: milliseconds / 1000))
+        }
         guard result.response.statusCode == 200 else {
             if let code = EdgeFunctionTransport.errorCode(in: result.data) {
                 throw SnapshotClientError(serverCode: code)
