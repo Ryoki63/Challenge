@@ -66,7 +66,7 @@ cd products/lien/marketing && python3 tools/verify_press.py
 | 3 | [`03_widget.png`](screenshots/03_widget.png) | ウィジェット（中・小）の実描画 | ウィジェット |
 
 - 3 枚とも 1290×2796（6.7インチ）の PNG。元の `../screenshots/6.7in/` と SHA-256 が一致する。
-- 画像は本物の SwiftUI View を CI のシミュレータで描いたもの。手描きのモックや実在しない画面は入っておらず、画面内の記録は固定のデモデータ（実在の利用者の記録ではない）（`../screenshots/README.md` §2）。
+- 画像は本物の SwiftUI View を CI のシミュレータで描いたもの。手描きのモックや実在しない画面は入っておらず、画面内の記録は固定のデモデータで、実在の利用者の記録ではない（[`../screenshots/README.md`](../screenshots/README.md) §2）。
 - 画面の文言は `../screenshots/captions.json` が正本。画像を差し替えるときは MK7 の手順で作り直す。
 
 ## 6. mkt-review に見てほしいこと
