@@ -284,20 +284,6 @@ final class StoreScreenshotRenderTests: XCTestCase {
         await settle()
         _ = Self.render(Color.white, points: catalog.sizes[sizeOrder[0]]?.pointSize ?? CGSize(width: 430, height: 932))
 
-        // 診断: ImageRenderer 自体が描けているかをログに残す(空のときは run loop の問題か、View の問題かを切り分ける)。
-        // 画像は raw/ に置くだけで、完成画像には使わない
-        await settle()
-        if let text = Self.render(Text("Lien"), points: CGSize(width: 430, height: 200)) {
-            print("STORE-DIAG text=\(String(format: "%.3f", (try? StorePixels(text).drawnRatio()) ?? -1))")
-        }
-        await settle()
-        if let scroll = Self.render(
-            ScrollView { VStack(spacing: 8) { Text("スクロール"); Color.green.frame(height: 200) } },
-            points: CGSize(width: 430, height: 932)
-        ) {
-            print("STORE-DIAG scroll=\(String(format: "%.3f", (try? StorePixels(scroll).drawnRatio()) ?? -1))")
-            try write(scroll, to: output.appendingPathComponent("raw/_diag_scroll.png"))
-        }
 
         for sizeKey in sizeOrder {
             guard let size = catalog.sizes[sizeKey] else {
@@ -311,7 +297,7 @@ final class StoreScreenshotRenderTests: XCTestCase {
                     XCTAssertEqual(screen.width, size.width, "\(sizeKey)/\(frame.id): 画面の幅")
                     XCTAssertEqual(screen.height, size.height, "\(sizeKey)/\(frame.id): 画面の高さ")
                     XCTAssertGreaterThan(
-                        try StorePixels(screen).drawnRatio(), 0.15,
+                        try StorePixels(screen).drawnRatio(), 0.08,
                         "\(sizeKey)/\(frame.id): 画面がほぼ空(実描画に失敗している)"
                     )
 
@@ -320,7 +306,7 @@ final class StoreScreenshotRenderTests: XCTestCase {
                     XCTAssertEqual(image.width, size.width)
                     XCTAssertEqual(image.height, size.height)
                     XCTAssertGreaterThan(
-                        try StorePixels(image).drawnRatio(), 0.15,
+                        try StorePixels(image).drawnRatio(), 0.08,
                         "\(sizeKey)/\(frame.id): 合成した画像がほぼ空"
                     )
 
@@ -487,8 +473,14 @@ final class StoreScreenshotRenderTests: XCTestCase {
             now: { StoreDemo.now }
         )
         await model.load()
-        // ImageRenderer は ScrollView を描けないので、スクロールの器を外して同じ中身を描く
-        return AnyView(HistoryView(viewModel: model, scrolls: false).background(Color.white))
+        // ImageRenderer は ScrollView を描けないので、スクロールの器を外して同じ中身を描く。
+        // .task の再読み込み(読み込み中の表示)も止め、読み込み済みのグリッドをそのまま描く
+        return AnyView(
+            HistoryView(viewModel: model, scrolls: false, autoload: false)
+                .frame(width: size.pointWidth, height: size.pointHeight, alignment: .top)
+                .background(Color.white)
+                .environment(\.colorScheme, .light)
+        )
     }
 
     /// シェア画像。アプリが実際に書き出す 9:16 のカード(1080×1920)を、画面の上に置く

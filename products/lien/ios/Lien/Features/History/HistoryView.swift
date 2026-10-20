@@ -15,6 +15,8 @@ struct HistoryView: View {
     @State private var viewModel: HistoryViewModel
     /// スクロールできる器を付けるか(ストア用スクリーンショットでは false)
     private var scrolls = true
+    /// 表示したときに読み込むか(ストア用スクリーンショットでは、読み込み済みの状態をそのまま描くので false)
+    private var autoload = true
 
     private static let columnCount = 7
 
@@ -33,9 +35,10 @@ struct HistoryView: View {
     /// テスト・プレビュー用(状態を組み立て済みの ViewModel を渡す)。
     /// scrolls = false は、ストア用スクリーンショットの実描画用(ImageRenderer は ScrollView を描けない — issue #80)。
     /// 画面の中身は同じで、スクロールできる器を付けるかどうかだけが変わる
-    init(viewModel: HistoryViewModel, scrolls: Bool = true) {
+    init(viewModel: HistoryViewModel, scrolls: Bool = true, autoload: Bool = true) {
         _viewModel = State(initialValue: viewModel)
         self.scrolls = scrolls
+        self.autoload = autoload
     }
 
     var body: some View {
@@ -50,7 +53,11 @@ struct HistoryView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .task { await viewModel.load() }
+        .task {
+            // ストア用スクリーンショットでは、読み込み済みの状態を描く(ImageRenderer が .task を走らせ、
+            // 読み込み中の ProgressView が写るのを避ける — issue #80)
+            if autoload { await viewModel.load() }
+        }
     }
 
     /// 画面の中身(月の見出し + グリッド)。ScrollView の有無に関係なく同じ
