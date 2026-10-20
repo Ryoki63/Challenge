@@ -153,3 +153,12 @@ jobs:
 
       - name: "Test verify_metadata.py (検査ロジックの単体テスト)"
         run: python3 -m unittest discover -s tools -p "test_*.py" -v
+
+      # X の投稿案(issue #75)の静的検査。本文140字・禁止語/誇大表現・競合名・日付の断定・
+      # 根拠の節の実在・添付画像の実在・承認前の status: ready を止める。
+      # 下書きの追加・修正のたびに、レビュー前に機械で落とせるものはここで落とす
+      - name: "Verify X post drafts (issue #75: 140字 + 禁止語 + 根拠 + 承認前 ready なし)"
+        run: python3 x/tools/check_posts.py
+
+      - name: "Test check_posts.py (検査ロジックの単体テスト)"
+        run: python3 -m unittest discover -s x/tools -p "test_*.py" -v
