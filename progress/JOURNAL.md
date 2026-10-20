@@ -773,3 +773,13 @@
 - 提出(23:27): `6adf2e2` を `consilium/107-g5b` へ push し、PR #130 (https://github.com/Ryoki63/Challenge/pull/130) を作成。ローカル/リモート HEAD 一致、PR は OPEN / base main / 未マージ。`lien-ci` run 39439002890 は6ジョブすべて success (store metadata / pages / deno / ops / plant / e2e unit+type check、ネットワークE2Eではない)。
 - 結果: Issue #107 の受入条件3項目について文書を実装・検証し PR 提出まで完了。最終監査追記も別 commit で push し、その HEAD の CI は PR/Issue へ記録する。レビュー役職の判断を待つため Issue close・main マージ・status ラベルの変更・DONE 台帳の完了扱いは行わない。採証/申請/公開は未実施。
 - 完了チェック: [PASS] 受入条件3項目の文書 [PASS] 関連既存テスト64件 [PASS] 出典/リンク/表示/独立レビュー [PASS] diff 検査・残実装TODOゼロ [対象外] 型/lint/iOS build (Markdownのみ。CIの型検査成功とiOSビルドを混同しない) [対象外] 実機/ASC操作 (手順作成が契約、実行は別承認)。
+
+## 2026-10-21 01:12 (ops-lead) — #124 Google Play Console 登録・CI
+- 着手: Issue #124 を確認し、自分を assignee に設定して排他割当を確認。worktree は指定ブランチ、開始時 tracked/untracked 差分なし。`git pull --rebase origin main` は Already up to date。
+- 方針: iOS 10/31 公開を優先し、Android は登録準備・CI・内部テスト自動化まで。Play の申請/公開、契約・送金・認証情報作成は実施しない。
+- 調査: Android 実装は未マージ（eng #121 / draft PR #145 に雛形と lien-android CI あり）。本タスクは Play 登録・署名・Play API 自動化・申告回答表に限定し、Android の雛形は重複作成しない。Play API のアップロードはサービスアカウント JWT を openssl で署名し、外部 action / pip 依存を足さない方針。
+- 次の作業: `docs/android/` の3文書、`products/lien/scripts/play/` の API スクリプトと単体テスト、`.github/workflows/lien-play.yml`（build/test → 内部テストトラック）を作成する。
+- 成果: `docs/android/` に登録1枚（30分）・署名/Secrets・データセーフティ等の回答表・索引を作成。`.github/workflows/lien-play.yml` は build/test（未署名 AAB）と、手動 + Environment `play-internal` 承認時だけの内部テスト署名・アップロードを分離。`products/lien/scripts/play/publish_play.py` は標準ライブラリ + openssl の RS256 JWT で Play API を呼び、本番トラックを拒否し、失敗時は edit を削除する。
+- 検証: Python unittest **15件 PASS**（RS256 の実署名を openssl で検証、track body、AAB 検査、失敗時 cleanup、commit 順）。ローカル HTTP サーバーで OAuth→edit→bundle upload→track→commit の5呼び出し、dry-run の4呼び出し（edit 削除込み）を確認。workflow YAML parse OK、`bash -n` 12ブロック OK、`git diff --check` OK、docs の外部リンク 18件 HTTP 200、ローカルリンク欠落なし。
+- 残課題: Android 雛形は #121 / #145 が未マージのため、本ブランチでは build/publish を detect job でスキップ（PR の CI は scripts job のみ）。`versionCode` を CI 実行番号から反映する実装、最終 `applicationId`、課金/通報/写真権限などデータセーフティ §6 の未確定項目は引き渡し。
+- 結果: 変更を commit / push し、PR を作成する（マージ・Play 登録・ストア申請・アップロードは行わない）。

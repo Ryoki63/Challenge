@@ -14,3 +14,9 @@ __pycache__/
 # OS / editor
 .DS_Store
 Thumbs.db
+
+# Android signing / Play credentials (never commit these)
+*.jks
+*.keystore
+keystore.properties
+play-service-account*.json
