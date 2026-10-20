@@ -610,3 +610,11 @@
 - 検証: 26節マッピング・相対リンク4件の実在・`git diff --check` を確認。文書のみの変更のためアプリの build/test は対象外。push 後に lien-ci を確認する。
 - CI: push `9c4f04d` の lien-ci run 39446913929 は6ジョブすべて success（deno / ops / e2e / pages / plant layers / store metadata）。文書のみの変更のためアプリの build/test は対象外。
 - 結果: PR #132 を更新（未マージ・レビュー待ち）。受入条件3項目（節ごとの仕分け表・v1.0 範囲の推奨・混在ペアのデータ互換確認）を満たす成果物を提出した。Issue #120 はレビュー完了まで開いたままにする。
+
+## 2026-10-21 00:40 (product-lead) — Issue #120 再開・外部資料の再確認
+- 着手: 既存ブランチ（REQUIREMENTS-ANDROID.md・PR #132 オープン）を再点検。完了条件3項目（仕分け26節・v1.0範囲の推奨・混在ペアのデータ互換）は文書上そろうことを確認。
+- 検証: 表26行と REQUIREMENTS §0〜§10 の節が一致。相対リンク4件の実在。iOS 側の事実（招待8文字・72時間・1回限り、push_env の APNs 用、ウィジェット4ファミリ）と文書が一致。
+- 修正（断定の取り下げ）: 本セッションで公式本文を取得できなかった2点を「要再確認（hypothesis）」に改めた。①Glance の定期更新の上限（1時間に1回）②Play の 12人×14日の本文（前回は照合済みと書いていたが、今回は再確認できず）。あわせて FCM と Google Analytics の関係（§7）も未確認として残した。
+- 判断: 推奨の方向（Glance・FCM・Play Billing+RevenueCat 共用は条件付き）は変えない。確認できない条文は断定せず、実装・Play 判断の前に公式資料で確かめる前提に留めた。
+- 取得の制約: developer.android.com・support.google.com・firebase.google.com の該当ページは本セッションでは本文が切り詰められて届いた（HTTP 200 だが本文不足）。
+- 残り: PR #132 のレビュー（未マージ）。Play の条件の確定と組織アカウントの扱いは #119（AND-PMO）の判断事項。
