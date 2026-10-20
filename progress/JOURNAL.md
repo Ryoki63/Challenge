@@ -477,3 +477,6 @@
 - 証跡: ブラウザ外枠と既存タブ情報を除外し、登録パネルだけを `products/lien/marketing/x/evidence/2026-10-20-x-signup-required.png` に保存(20:02 JST)。1320×1256、SHA-256 `30b0e430525a8e19ce858e57fa28dae97525ccad243301eb8a2897159c07a7ac`。画像を目視確認し、入力欄は空、個人情報・認証情報無し。登録成功の証拠とは扱わない。
 - 検証: `PYTHONDONTWRITEBYTECODE=1 python3 products/lien/marketing/x/tools/check_posts.py` = OK 13本、`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s products/lien/marketing/x/tools -p 'test_*.py'` = 35 tests OK。原稿・承認台帳・コード・設定は未変更。型チェック・アプリ build・独立レビューは実行ログと証跡だけの変更のため対象外。
 - 【承認待ち】: オーナーに開いた Chrome の登録タブで認証・作成確定まで自身で実施してもらい、公開 @ハンドルとログイン済みタブだけを返信してもらう1件の引継ぎを依頼する。mkt-review・ready 化と担当割当の整理は orchestrator に引き継ぐ。投稿 URL・24時間後の反応は引き続き理由付き null、予約・定期実行は未登録。
+- 通知確認(20:05 JST): PR #110 を作成、commit `663a091` を作業ブランチへ push 済み。#79 に認証引継ぎコメント `6289443014` と `needs-approval,human-gate` を付与し、readback で OPEN・bot の通知コメント `6289445727` を確認。モバイル端末への通知配達自体は未確認。status ラベルは変更していない。
+- 最終検査: Python 直接検査で main に対する変更3ファイル限定、JOURNAL/logの過去本文がそのまま接頭辞として残ること、画像のハッシュ/寸法/EXIF無し、理由付き null、予約未登録を PASS。`git diff --check origin/main` PASS。20:05 時点の PR CI は6ジョブ SUCCESS、iOS build/test は IN_PROGRESS（全CI成功とは報告しない）。
+- 結果: **BLOCKED**。登録前画面の到達・証跡・ログ・PR 提出まで実施。アカウント作成・投稿・24時間反応の受入条件は未達。原稿・正式承認・アプリコードに変更無し。Issue/PR は閉じず、マージしない。
