@@ -420,6 +420,16 @@ enum Strings {
         static let emptyMessage = "ふたりの今日を準備しています"
     }
 
+    /// お休みチケット(REQUIREMENTS §3.6 / DESIGN §3.4 / T19a #19)。
+    /// v1.0 は自動消費と残数バッジまで(D3)。お休み宣言 UI は 1.0.1。
+    /// 罰・恥系の表現は使わない(§3.5。0枚でも責めない)
+    enum Tickets {
+        /// ホームの残数バッジ。0枚でも出す(罰なし — REQUIREMENTS §3.5)
+        static func balance(_ count: Int) -> String {
+            "お休みチケット 残り\(count)枚"
+        }
+    }
+
     /// チェックインフロー(写真添付+当日取消 — REQUIREMENTS §3.4 / T14)。
     /// 罰・恥系の表現は使わない(§3.5。取消も「誤タップ対応」であって責めない)
     enum Checkin {

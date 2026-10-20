@@ -203,6 +203,17 @@ final class HomeViewModel {
         return snapshot.pairId != nil
     }
 
+    /// ホームのチケット残数バッジに出す値(nil = バッジを出さない — T19a #19 / DESIGN §3.4)。
+    /// **0 はそのまま 0 を返してバッジを出す**(0枚でも罰なし — REQUIREMENTS §3.5)。
+    /// ソロ(ペア共有の在庫を持たない)・キーが無い古い snapshot・null・負の値(契約は 0 以上)は nil
+    var ticketBalance: Int? {
+        guard
+            let snapshot, snapshot.pairId != nil,
+            let balance = snapshot.ticketBalance, balance >= 0
+        else { return nil }
+        return balance
+    }
+
     /// 相手が先に完了 →「(名前)が待ってるよ」(REQUIREMENTS §3.10 表示原則)
     var partnerWaitingText: String? {
         guard
