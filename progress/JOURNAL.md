@@ -476,3 +476,7 @@
 - 検証: web の unittest **47件 PASS**、`build_site.py` **11件生成 PASS(生成物差分なし)**、`--check` **11件一致 PASS**。`--check-publishable` は **exit 1(法務4出力の未記入・xUrl未設定)**。公開不可を検知した結果であり、公開検査のPASSとは扱わない。`git diff --check origin/main` PASS。型チェック/lint/iOS build はコード変更なしのため対象外。
 - 独立レビュー1回: サブエージェントに mkt-review 観点をまとめて依頼し、**要修正/公開不可**。約束の各自1つという単位、チケット保護/記録伸長の条件、実画面と SVG の差を指摘。`web/PUBLISH-STATUS.md` に根拠と未確認境界を記録。正式な Consilium 役職評価や文言承認済みとはしない。公開情報が未提供のため停止し、未解決指摘をPASSに変えない。
 - 変更: web README と G4 チェックリストに公開先承認を反映。Pages 有効化や mkt-review は `--check-publishable` が検査しないことを明確化。`PUBLISH-STATUS.md` に Issue 本文の完了条件を逐語的に照合し、公開未達・X未達・スクショ受入留保・文言未承認を明記。
+- 【承認待ち】2026-10-20 20:25 JST: #76 に質問を1件へ集約して投稿(issuecomment-6289781172)。URLは再質問せず、残る公開用5項目の提供(推奨)か保留かを依頼。`needs-approval,human-gate` を付与。`status:*`・assignee は変更せず、Issue は開いたまま。
+- 提出: **PR #111** https://github.com/Ryoki63/Challenge/pull/111 を作成。変更を commit/push 済み、mainへの直接push・force push・マージはしない。PR作成時点のCIは lien-ci **6/6 PASS**、lien-ios は pending。iOS完了とは報告しない。
+- 最終確認: 全要件の実装=未達(公開・X・画像の受入・文言承認)、関連テスト=47件PASS、静的サイトbuild=11件成功、生成物一致=11件PASS、公開前チェック=FAIL(exit 1)、型/lint/iOS build=本変更は文書のみで対象外、直接文書検査=PASS、残TODOゼロ=未達。未達項目は PUBLISH-STATUS.md に明示。
+- 結果: **BLOCKED**。公開先承認の反映と検証・引継ぎまで実施。公開用の具体値は推測せず、法務原本・サイト設定・生成物・公開設定を変更しない。担当役職の未解決レビュー指摘と、オーナー入力後の公開作業が残る。
