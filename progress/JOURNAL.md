@@ -466,3 +466,17 @@
 - 画像12枚 + 一覧は b5265f9 の版と SHA-256 で**完全一致**(main の課金導線はスクショでは nil のため、画面の見た目は変わらない)。manifest と README の来歴だけ更新
 - main が赤だった2件を補修(どちらもテストの期待値のみ): deno 型検査は #97 の `todayLocal` 必須化に `snapshot_test.ts` の pairPlan ケースが未追随、`SNAPSHOT_KEYS` は #96 の `pairPlan` 追加で22個なのに期待値21
 - 検証: `verify_screenshots.py` OK / unittest 36 OK / `lien-ci` #39392331252 success / `lien-ios` #39389661638(attempt 2) success
+
+## 2026-10-20 21:17 — G4 #42 承認返信の反映 (eng-exec)
+- 着手: 指定 worktree / branch `consilium/42-g4` は clean。origin/main と同一 HEAD `13f0570`、同名リモート branch・既存 PR は無し。Issue の assignee は空だが、今回の Consilium 作業者タスクで直接割当済み。main は変更しない。
+- 承認根拠: オーナー `Ryoki63` の 2026-10-20 18:48 JST「それでOK!」(issuecomment-6288190684)を確認。直前の承認依頼はストア文言6ファイルと Pairy 不採用・新年訴求の2方針。スクショ・法務記入事項・独自ドメインまで承認済みとは拡張せず、現物と依頼範囲を照合する。
+- 方針: 文言の承認記録と未決項目を分離する。ストア申請・外部公開・ドメイン購入は行わず、対象資料の検証後に PR を提出する。human-gate の Issue は close しない。
+- 照合: 承認依頼時 `37e12ed` と HEAD の差分を確認。表示名・サブタイトル・リリースノートは同一 blob、キーワード・プロモーション・説明文は変更済み。#90 の通年案を旧新年案への「それでOK!」だけで承認済みにしない。旧版へ戻すと成長ルール等の不整合が戻るため、素材は維持して再確認を求める。
+- 直接確認: スクショ12枚の寸法・アルファ・manifest とキャプション一致は既存検査で OK。6.7in 一覧画像も目視確認。法務原稿の制定日・事業者表記・連絡先・裁判所は未記入、`SupportLinks.contactEmail` は空。スクショのオーナー承認、実機表示、App Privacy、リージョン、提供地域、独自ドメインの判断は確認できていない。
+- 変更: `marketing/G4-REVIEW.md` に承認コメントの日時・対象版・文言 hash・各受入項目の状態・判断依頼1件を記録。ASC 投入シートと法務チェックリストから参照し、全体承認・ASC 設定完了との混同を防止する。実装・素材・法務原文は変更しない。
+- 検証: `marketing/tools/verify_metadata.py --print` PASS(6ファイル・keywords 99/100字)、`verify_screenshots.py` PASS(12枚)、marketing unittest **36 tests / 0 failures**。web `build_site.py --check` PASS(生成物11件一致)、web unittest **47 tests / 0 failures**。
+- 公開ゲート: `web/tools/build_site.py --check-publishable` は exit 1。法務HTML4件の G4 未記入と `site.json` の `xUrl` 未設定を検出(5件)。既存ブロッカーとして保持し、再実行・回避・公開はしない。iOS の型チェック/lint/バイナリ build は実装無変更のため対象外。
+- 機械検査補足: 文書の hash/リンク照合は実際の10件すべて一致したが、検査用ワンショットの総数assertを11件とした誤りで初回 exit 1。検査対象自体を減らさず、6文言+2画像来歴+2相対リンクの計10件へ集計を直して再確認する。
+- 独立レビュー1回: G4 完了と #76 の公開ゲート(`xUrl`)を混同する1文に P2 指摘。該当文だけ修正し、#42 本文の確認・承認とサイト公開可否を明確に分離した。全体の再レビューは追加しない。
+- 検査結果: hash/相対リンク照合 **10件 PASS**、`git diff --check` PASS。全要件の確認は一部未了(現行文言・画像・法務の人間承認待ち)、関連テスト83件 PASS、HTML生成11件 PASS。型チェック/lint/iOS build は文書変更のみで対象外、公開前ゲートは既存未記入で FAIL、残TODOゼロとはしない。
+- 結果: **blocked / 承認待ち**。承認済み範囲と証拠の記録は作成済み。残る判断は1件にまとめて #42 に通知し、PR を提出する。Issue close・マージ・ストア入力・申請・公開・購入は行わない。
