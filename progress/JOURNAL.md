@@ -319,6 +319,17 @@
 - 残: 初回同期失敗時に `.promiseSetup` を出す画面遷移は文言では決められないため、`docs/STRINGS-REVIEW.md` §6.1 に判断材料と推奨案を残した(eng-lead / T30)。実機 VoiceOver は T20
 - 結果: PR #86 を作成(レビュー待ち。マージはしない)
 
+## 2026-10-20 12:25 (HQ/eng-exec — T30 審査チェックリスト消化 / issue #30) — 文書側を確定・PR 作成
+- 着手: worktree `Challenge-30`(origin/main `35bad0d`)。Issue #30 の残り(REQUIREMENTS §8 の文書・App Privacy・年齢レーティング・プライバシーマニフェスト・審査用デモ運用)を実施。iOS の実機/TestFlight 確認は G0(#38)後で、この Mac には Xcode が無い(`xcodebuild` は CommandLineTools)ため、実ビルドは CI と 10/23 の内部 TestFlight に委ねる
+- 変更(文書): `marketing/privacy-policy.md`・`legal/privacy.html` から「Sign in with Apple の識別子」「利用状況(自動取得)」の行を削除し、D3(v1.0 は SIWA なし)・D6(分析 SDK・計測テーブルなし。アプリは計測のために何も送らない)を明記。§8 を「v1.0.1 以降」に。`legal/CHECKLIST-G4.md` の計測手段の未決定項目を D6 の確認に置き換え、SIWA の確認を追加
+- 変更(review-notes): §1.3 を匿名認証の実態に合わせた**2組のデモ運用**に確定(相手役のニックネーム+提出日に発行する招待コード。コードはリポジトリに置かず ASC の Notes for Review へ)。§2.1 を `PrivacyInfo.xcprivacy` の5型(Name / Photos / Other User Content / User ID / Device ID)に一致。§2.2 に年齢レーティングの UGC 設問(4+/9+ の分岐、健康・ウェルネスは要確認)、§2.7 にプライバシーマニフェストの台帳を追加。§1.1・§1.4・§1.5 にコードで一致を確認した証跡を追記
+- 追加(道具): `products/lien/scripts/review-demo/`(partner.sh / partner.ts / partner_lib.ts / partner_lib_test.ts / README.md)。公開 anon キーだけを使い、セッションはリポジトリ外の 0600 ファイル。create / new-invite / checkin(--photo)/ nudge / status / delete を用意
+- 追加(テスト): `products/lien/scripts/ops/marketing_docs_static_test.ts` を新設し、D6・D3 の記載漏れ、§2.1 とマニフェストの不一致、§1.3 の TBD 残り、G4 の未決定項目を CI で止める。`review-demo` の単体テストを lien-ci の e2e-tests ジョブに追加
+- 変更(仕様・計画): REQUIREMENTS §8 に 2026-10-20 の反映注記と各項目の追記(チェックボックスは実ビルド確認まで `[ ]` のまま)。TASKPLAN §9.4 の T30 行と #58 引き継ぎ2・3 に完了を記録
+- 検証(ローカル): supabase functions `deno test` 393 passed / 契約フィクスチャ 22 件一致 / ops `deno test --allow-read` 76 passed(新規8件を含む)/ e2e unit 65 passed + `deno check` / review-demo 17 passed + `deno check` / store metadata OK / `git diff --check` OK / 秘密の混入なし
+- 残り: G0 承認後の内部 TestFlight(10/23)で §1.1・§1.4・§1.5 の手順を実ビルドで再現 → §8 のチェックを埋める。提出日(10/27)に相手役の招待コードを2つ発行して ASC の Notes for Review に記入。Support URL/Privacy URL の Pages 公開と連絡先は G4(#42)
+- 補記(2026-10-20 12:55): この記録は PR #88 のマージ解決(7fba989)で `progress/JOURNAL.md` から落ちていたため、追記として復元した。内容はコミット `08191a1` の記録のまま(検証の ops は当時 76。その後、マニフェストのトラッキング検査を1件足して 77 になり、CI で確認済み)
+
 ## 2026-10-20 12:56 (eng-exec) — #49 T09v2 の状況確認: フェーズ1は提出済み・v4 採用で置換済み
 - 着手: HQ が #49 を status:in-progress で再ディスパッチ(12:55)。作業前に origin/main・対象ブランチ・PR・既存成果物を確認
 - 判明: #49 のフェーズ1は **2026-06-10 に完了済み**(commit 96ebfe9)。4スタイル(a〜d)と成長カーブ案を `v2_drafts/` に制作し、#40 に画像付きで提出済み(comment 4672531055)。その後 2026-06-11 に v2 は不採用、v3 を経て 2026-10-12 に v4「タネの子」が「全部推奨で」承認(comment 6121307014)。取込は #56/#57、成長ルールは #54 でいずれも closed
