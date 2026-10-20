@@ -347,3 +347,9 @@
 - 検証: 4スタイルの `gen.py` を一時ディレクトリで再実行し、追跡済み PNG と SHA-256 完全一致(決定論)。コンタクトシートは 1264×288(8倍)。#40 の raw リンクは HTTP 200。origin に対象ブランチ・既存 PR は無し(重複作業なし)
 - 判断: v2 の再制作・#40 への再提出はしない(差し戻し済みの案の再提出は混乱と退行になる)。再発防止として `v2_drafts/README.md` に経緯・受入証拠・再生成手順を記録
 - 結果: PR を作成(レビュー待ち)。#49 は「フェーズ1完了・v4 で置換済み」として、close の判断をレビュー役職/人間に委ねる
+
+## 2026-10-20 15:48 (eng-lead) — #91 [改修 E1] 起動と初回同期の速さ・クラッシュ監視の下地
+- 着手: Issue #91(10/31 公開までに、初回起動の待ち時間と落ちにくさを測れるようにする)。ブランチ consilium/91-e1-v1-0。完了条件は 4 つ: (1) 起動→ホーム表示と初回同期の計測の仕組み+docs/PERF.md (2) 3 秒超の箇所を根拠つきで改善(前後の数値) (3) 主な失敗経路のログ(外部 SDK なし) (4) lien-ios CI 緑+シミュレータ実測と計測方法を Issue にコメント
+- 判明(前提): main の lien-ios が赤い(run 39365332784)。#85(T22)と #84(T19a)のマージで閉じ括弧が 2 つ落ち(HomeView.swift:513 / HomeViewModel.swift:282 の構文エラー)、さらに STRINGS-REVIEW.md に 43 単位の行が無く StringsReviewTests が 2 件赤い。CI を緑にしないと完了条件 4 を満たせないので、#97(#72)に入っている同じ 2 コミット(4eccca3 / 2f8e61d)を cherry-pick -x で取り込む(同一差分なので #97 が先にマージされても衝突しない)
+- 検証(ローカル): 取り込み前は check.sh test が 1067 passed / 2 failed(StringsReviewTests)。取り込み後は check.sh all が module OK・1069 passed / 0 failed・views OK・widget OK
+- 制約: この Mac は Xcode / simctl が無い(Command Line Tools のみ)。シミュレータの実測値は CI(macos-26・iPhone 17)でしか取れない。実測できない値は捏造せず null+理由で書く
