@@ -78,6 +78,8 @@ enum StringsCatalog {
     /// 名前は日本語・英字・絵文字入り、日数は 0 と大きい値を含める
     static let representativeNames = ["ゆうき", "Aki", "🌱はな"]
     static let representativeDays = [0, 1, 23, 365]
+    /// お休みチケットの残数の代表(0枚でもバッジを出す — REQUIREMENTS §3.5)
+    static let representativeTicketBalances = [0, 1, 2, 5]
     static let representativeDates = ["2026年10月20日 21:00", "Oct 20, 2026 at 9:00 PM"]
     /// 運営の連絡先として文言に入るメールアドレスの代表(メールを開けなかったときの案内)
     static let representativeAddresses = ["support@example.com"]
@@ -207,6 +209,11 @@ enum StringsCatalog {
         }
         for name in representativeNames {
             add("Home.partnerWaiting(\(name))", Strings.Home.partnerWaiting(name))
+        }
+
+        // Tickets(お休みチケットの残数バッジ — T19a #19)
+        for count in representativeTicketBalances {
+            add("Tickets.balance(\(count))", Strings.Tickets.balance(count))
         }
 
         // Checkin
@@ -503,6 +510,44 @@ enum StringsCatalog {
             for (index, line) in Strings.Plant.Whisper.stage(stage).enumerated() {
                 add("Plant.Whisper.stage(\(stage))[\(index)]", line)
             }
+        }
+
+        // History(T18 #18)
+        add("History.title", Strings.History.title)
+        add("History.openButtonLabel", Strings.History.openButtonLabel)
+        add("History.previousMonth", Strings.History.previousMonth)
+        add("History.nextMonth", Strings.History.nextMonth)
+        for (index, symbol) in Strings.History.weekdaySymbols.enumerated() {
+            add("History.weekdaySymbols[\(index)]", symbol)
+        }
+        add("History.bothDone", Strings.History.bothDone)
+        add("History.meOnly", Strings.History.meOnly)
+        add("History.partnerOnly", Strings.History.partnerOnly)
+        add("History.restTicket", Strings.History.restTicket)
+        add("History.noRecord", Strings.History.noRecord)
+        add("History.beforePair", Strings.History.beforePair)
+        add("History.future", Strings.History.future)
+        add("History.todayPending", Strings.History.todayPending)
+        add("History.loadFailed", Strings.History.loadFailed)
+        add("History.retry", Strings.History.retry)
+        add("History.empty", Strings.History.empty)
+        for year in [2025, 2026] {
+            for month in [1, 10, 12] {
+                add("History.monthTitle(\(year), \(month))", Strings.History.monthTitle(year: year, month: month))
+            }
+        }
+        for day in [1, 5, 31] {
+            add("History.dayTitle(\(day))", Strings.History.dayTitle(month: 10, day: day))
+        }
+        for mark in [
+            Strings.History.bothDone, Strings.History.meOnly, Strings.History.partnerOnly,
+            Strings.History.restTicket, Strings.History.noRecord, Strings.History.beforePair,
+            Strings.History.future, Strings.History.todayPending,
+        ] {
+            add(
+                "History.dayAccessibility(\(mark))",
+                Strings.History.dayAccessibility(Strings.History.dayTitle(month: 10, day: 5), mark)
+            )
         }
 
         return items

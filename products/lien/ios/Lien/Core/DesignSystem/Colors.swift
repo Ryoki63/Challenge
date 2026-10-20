@@ -22,4 +22,6 @@ enum LienColors {
     static let photoControl = Color.white
     /// 植物の全画面の演出(段階アップ・おかえり — PB #57)の背景。ライト / ダークの標準の背景(プレートが暗い背景でも輪郭を見せる)
     static let celebrationBackground = Color(uiColor: .systemBackground)
+    /// カレンダー履歴の達成の点(T18)。無彩色の中立表現にする(REVIEW-2026-10-12 §4.2)
+    static let historyMark = Color.primary
 }
