@@ -20,7 +20,8 @@
 //     "plantMood": "normal | happy | fidget | sad",
 //     "plantName": "みどり",
 //     "hasPartnerPhotoToday": false,
-//     "ticketBalance": 2
+//     "ticketBalance": 2,
+//     "pairPlan": "free | premium"
 //   }
 //
 // - snapshot は**受信者視点**でサーバーが組み立てる(me/partner をクライアントで反転しない — §3.4)
@@ -50,6 +51,13 @@ enum PlantMood: String, Equatable, Sendable {
     case fidget
     /// 2日連続未達成のしょんぼり
     case sad
+}
+
+/// ペアのプラン(REQUIREMENTS §3.14 / §5)。メンバーの users.premium_until からサーバーが導出する
+/// (plan カラムは持たない)。アプリは「自分の購読 ∪ pairPlan == .premium」でプレミアムを判定する
+enum PairPlan: String, Codable, Equatable, Sendable {
+    case free
+    case premium
 }
 
 extension PlantMood: Codable {
@@ -99,6 +107,9 @@ struct PairSnapshot: Equatable, Sendable {
     /// 古いキャッシュ)・null(ソロ、またはサーバーが残数を読めていない)・型違い → バッジを出さない。
     /// ペアの2人に同じ値が見える(受信者視点で反転しない)
     var ticketBalance: Int? = nil
+    /// ペアのプラン(pairPlan)。メンバーのどちらかがプレミアムなら .premium。
+    /// キーが無い(古いサーバー・古いキャッシュ)・未知の値は .free(課金していない側に倒す)
+    var pairPlan: PairPlan = .free
 }
 
 // MARK: - Codable(§3.4 のキー名と一字一句一致させる)
@@ -125,6 +136,7 @@ extension PairSnapshot: Codable {
         case plantName
         case hasPartnerPhotoToday
         case ticketBalance
+        case pairPlan
     }
 
     init(from decoder: Decoder) throws {
@@ -152,6 +164,8 @@ extension PairSnapshot: Codable {
         hasPartnerPhotoToday = try c.decodeIfPresent(Bool.self, forKey: .hasPartnerPhotoToday) ?? false
         // 残数: 省略可。無い・null・型違いは nil(バッジを出さない)。0 はそのまま 0(0枚でもバッジを出す)
         ticketBalance = try? c.decodeIfPresent(Int.self, forKey: .ticketBalance)
+        // プラン: 省略可。無い・null・未知の値・型違いは free(課金していない側に倒す)
+        pairPlan = (try? c.decodeIfPresent(PairPlan.self, forKey: .pairPlan)) ?? .free
     }
 
     func encode(to encoder: Encoder) throws {
@@ -183,6 +197,7 @@ extension PairSnapshot: Codable {
         try c.encode(hasPartnerPhotoToday, forKey: .hasPartnerPhotoToday)
         // 残数は、nil でもキーを省略せず null で書く(サーバーの形と同じ。DESIGN §3.4「キーは省略せず null で出す」)
         try c.encode(ticketBalance, forKey: .ticketBalance)
+        try c.encode(pairPlan, forKey: .pairPlan)
     }
 }
 

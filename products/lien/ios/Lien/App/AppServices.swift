@@ -54,6 +54,9 @@ struct AppServices {
     /// カレンダー履歴(T18 #18)。nil のとき(これを渡さない既存の組み立て・プレビュー)は、ホームに導線を出さない。
     /// Live は PostgREST を直接読み、Stub は決まったサンプルを返す
     var history: HistoryRepository?
+    /// 課金(RevenueCat。T33)。Live は API キーがあれば RevenueCat、無ければ利用不可。Stub はメモリ実装。
+    /// nil のとき(これを渡さない既存の組み立て・プレビュー)は、ペイウォールを開かない
+    var purchases: PurchasesClient?
 }
 
 extension AppServices {
@@ -89,7 +92,9 @@ extension AppServices {
             // サーバーの約束を持たない構成: リマインドの時刻は、約束を保存したとき(promiseSaved)に端末が覚える
             reminders: makeReminders(store: store, reminderLoader: nil),
             // サーバーが無くてもカレンダーの画面と月移動を動かせるサンプル
-            history: StubHistoryRepository()
+            history: StubHistoryRepository(),
+            // サーバーが無い開発ビルドでも、ペイウォールの見た目と流れを確かめられる
+            purchases: MockPurchasesClient()
         )
     }
 
