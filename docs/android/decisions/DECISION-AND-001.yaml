@@ -1,0 +1,167 @@
+id: DECISION-AND-001
+title: Android の Play アカウント種別とテスター確保策
+status: open
+created_at: "2026-10-20T23:55:00+09:00"
+updated_at: "2026-10-21T01:52:00+09:00"
+issue: 119
+repo: Ryoki63/Challenge
+route_class: critical_review
+decider: Ryoki63
+accountable: pmo-lead
+deadline: "2026-10-23T18:00:00+09:00"
+question: >-
+  Android の Google Play 公開を、A（個人アカウント + テスター 15〜20 人）と
+  B（組織アカウント + D-U-N-S）のどちらで進めますか。A は「テスターを募集しない」という
+  2026-10-20 22:20 のオーナー指示と両立しません。B は募集不要ですが、開業届・屋号・
+  事業用の住所/電話/ウェブサイト・D-U-N-S が必要で、法的名称・住所・電話が Play 上に公開されます。
+  PMO の推奨は B（無料 D-U-N-S）です。B の実体が用意できない場合だけ、A を
+  「公開募集はしない・知人への個別依頼だけ」に限定して例外化するか、C（保留）を選びます。
+
+context:
+  - "Google Play の個人アカウント（2023-11-13 以降に作成）は、本番アクセスの申請前に 12 人以上が 14 日間連続でクローズドテストにオプトインしている必要がある（公式）。"
+  - "Google の testing 要件の公式ページは「personal developer accounts created after November 13, 2023」を対象と明記し、組織アカウントを含む記載はない。Get started も testing と端末確認を \"(Personal accounts only)\" と表示している（2026-10-21 再確認）。"
+  - "Google Play Console の日本向け本人確認書類一覧は、個人事業主が開業届（Opening/Closing Notification of a Private Business）を提出して組織として確認できると明記している（2026-10-21 再確認）。組織名・住所・D-U-N-S は Payments プロファイルと一致が必要。"
+  - "組織アカウントには D-U-N-S 番号が必須。組織名・住所は Google Payments プロファイルと D&B で一致が必要。組織の電話・ウェブサイト・連絡先・公開用の開発者電話も必要（公式）。"
+  - "日本の TSR の D-U-N-S 新規発番は、7 営業日 15,000 円/件（税別）または 30 営業日（約 1.5 か月）なら無料。納期は受付完了の翌営業日を起算日とした TSR の営業日。"
+  - "個人事業主・任意団体でも D-U-N-S は付番対象。新規発番には屋号の確認ができる書類が必要。事業を行っていない単なる個人には付番されない。"
+  - "個人事業主は、Google Play Console の日本向け本人確認で開業届を組織書類として使える。ただし個別アカウントの審査通過は保証されず、開業届・屋号・D-U-N-S の有無と名義一致はオーナー確認が必要（null）。"
+  - "TSR は、日本の拠点の D-U-N-S 情報が D&B のシステムに反映されるまで数日〜2 か月と説明している。Google は D&B のデータを参照するため、発番後すぐに Google の確認が通るとは限らない。"
+  - "個人アカウントは法的な氏名・国・開発者メールを表示し、課金時は完全な住所も表示する。組織アカウントは法的名称・住所・開発者メール・開発者電話を表示する（公式）。"
+  - "個人 → 組織へのアカウント種別変更は可能。組織 → 個人は不可。個人アカウントで先に公開したアプリを組織へ移しても、12 人 × 14 日の要件が残るというコミュニティ報告がある（2026-03-05。公式の保証ではない）。"
+  - "2026-10-20 21:33 時点で X は 0 posts / 0 followers。early-pairs は確定 0 組で、募集は 10/22〜23 開始予定。既存の供給だけでは 12 人に届く証拠がない。"
+  - "iOS v1.0 の 10/31 公開と v1.1 の 11/12〜13 公開が最優先。Android のコードは 11/13 まで main に入れない。"
+
+options:
+  - id: A
+    label: "個人アカウント + テスター 15〜20 人（公開募集はせず、知人への個別依頼を中心）"
+    summary: >-
+      11/1〜11/5 に個人アカウントを作成し、本人確認・端末確認を終える（iOS 保護期間後）。11/14〜12/6 に実装し、
+      12/8〜12/14 の内部テストの後、12/15〜12/28 の 14 日連続クローズドテストを行う。12/29 に本番申請、
+      2027-01-06 の公開を目標にする。テスターは公開募集せず、知人・early-pairs・X のつながりへ個別に依頼する。
+    cost: "Play 25 USD（約 3,700 円 / 1 USD=150 円なら 3,750 円）。端末は借りる前提で 0 円。テスターへの金銭・商品・割引は 0 円。"
+    days_to_account: "1〜5 日（本人確認・端末確認の待ちを含む）"
+    days_to_public: "ビルド完成後 29〜32 日（内部テスト 7 日 + 14 日連続テスト + 本番審査 7 日以内 + 予備）。12/7 のビルドなら 2027-01-06、最短 12/30。"
+    pros:
+      - "現金支出が最も小さい"
+      - "アカウント有効化が 11/5 目標（確認待ち。本人確認が延びれば公開も後ろへずらす）"
+      - "法的な事業実体・事業用住所/電話/ドメインが不要"
+      - "実ユーザーのフィードバックが本番申請に使える"
+    cons:
+      - "12 人を集める不確実性がある（現在の early-pairs 0、X 0 followers）"
+      - "14 日間の途中辞退でやり直しになる"
+      - "本番アクセス審査でテストの質を問われる"
+      - "個人アカウントは法的氏名・国・メール、課金時は住所が公開される"
+      - "端末確認のため Android 10 以上の実機が必要"
+      - "「テスターを募集しない」というオーナー指示の例外が必要"
+    policy: "Google の公式要件に沿う。テスターへの金銭・商品・割引はインストール数操作と見なされうるので行わない。公開募集をしない場合は、X への募集投稿・公募を行わず、知人への個別依頼だけにする。"
+    recommendation: false
+
+  - id: B
+    label: "組織アカウント（D-U-N-S）"
+    summary: >-
+      10/23 に開業届・屋号・D-U-N-S の有無を確認し、Google Payments/D&B と一致する事業名・住所・ウェブサイトを用意して、TSR に D-U-N-S を申請する。無料 30 営業日なら
+      12/8 頃に発番。D&B の反映（数日〜2 か月）と Google の組織確認の後、組織アカウントを作成して 25 USD を支払う。
+      12 人 × 14 日は不要。12/7 のビルドで内部テスト 7 日、本番アクセス申請、審査（通常 7 日以内）を経て公開する。
+    cost: "Play 25 USD（3,750 円）+ D-U-N-S 無料（30 営業日）または 15,000 円（税別・7 営業日）+ 事業用住所・電話・ウェブサイトの実費（既存なら 0 円、新規なら未見積）。"
+    days_to_account: "30 営業日（無料。10/23 申請で 12/8 頃）+ D&B 反映 数日〜2 か月 + Google の組織確認（期間 null）"
+    days_to_public: "2026-12-23 頃〜2027-03 頃。有料 7 営業日なら早ければ 2026-12-23 頃。無料 12/8 発番・D&B 反映と Google 確認が 1 週間程度なら 2027-01-07 頃、2〜3 週間なら 2027-01-21 頃、最長 2 か月なら 2027-03 頃。"
+    pros:
+      - "12 人 × 14 日のクローズドテストが不要（公式の testing 要件は個人アカウント向け）"
+      - "テスター募集が不要で、オーナーの「募集せず」を守れる"
+      - "D-U-N-S が早く反映されれば A より早く公開できる"
+    cons:
+      - "D-U-N-S の遅延・却下リスク（無料は 30 営業日）"
+      - "D&B のシステム反映に数日〜2 か月かかりうる"
+      - "組織確認の却下リスク（書類・ウェブサイト・電話）"
+      - "法的名称・住所・開発者電話が Play 上に公開される"
+      - "個人事業主の開業・事務・税務の負担"
+      - "事業用住所/電話/ウェブサイトの新規契約費で総損失上限を超えやすい"
+      - "有料 D-U-N-S 15,000 円は現行の予算上限と両立しにくい"
+      - "組織 → 個人への変更は不可"
+    policy: "Google の公式要件に沿う。個人事業主は開業届で組織として本人確認できるが、個別アカウントの審査通過は保証されない。要件回避を目的に個人で開始して組織へ移す前提は置かない。"
+    recommendation: true
+
+  - id: C
+    label: "保留（iOS v1.1 の後に再判断）"
+    summary: >-
+      Android のアカウント作成・支払い・実装を止め、iOS v1.0（10/31）と v1.1（11/12〜13）に集中する。
+      11/13 以降に A/B を再評価する。
+    cost: "0 円（今回の期間）"
+    days_to_account: "再開後 1〜44 日以上（選択する案による）"
+    days_to_public: "再開後 3〜8 週間（B は D&B 反映次第でさらに延びる）"
+    pros:
+      - "iOS のリソースを完全に守れる"
+      - "Android の範囲・技術選定・テスターの見込みを落ち着いて決められる"
+    cons:
+      - "Android の公開が 2027-02 以降になる"
+      - "D-U-N-S の待ち時間を後ろにずらすだけ"
+      - "オーナーの「Android も進める」指示に反する"
+    policy: "問題なし（何もしない）"
+    recommendation: false
+
+recommendation:
+  option: B
+  fallback: A
+  fallback_trigger: "2026-10-23 18:00 までに、開業届・屋号・事業用住所/電話/ウェブサイトの実体が用意できない、またはオーナーが 2027 年の公開を許容しない場合。A を選ぶ場合は「公開募集はしない」の例外を明示する。"
+  rationale: >-
+    オーナーの「テスターは募集せず」を唯一守れるのが B。Google の testing 要件は個人アカウント向けと明記され、
+    組織アカウントには 12 人 × 14 日の記載がない。Google Play Console の日本向け書類一覧は、個人事業主が
+    開業届で組織として確認できると明記している。ただし B は、開業届・屋号・事業用住所/電話/ウェブサイトの実体、
+    無料 D-U-N-S の 30 営業日、D&B 反映の遅れ、2027 年の公開を引き受ける必要がある。これらが用意できない場合、
+    A を「公開募集はせず知人への個別依頼だけ」に限定して例外化するのが次の現実的な案。どちらも不可なら C。
+    B の有料 D-U-N-S（15,000 円）は、DECISION-AND-002 の会計基準が決まるまで選ばない。
+
+decision: null
+decided_at: null
+decided_by: null
+
+consequences:
+  A:
+    - "11/1〜11/5 にオーナーが Play 個人アカウントを作成・支払い・本人確認・端末確認を行う（10/24〜10/31 の iOS 保護期間後）。"
+    - "11/1 から知人へ個別に打診し、11/13 までに 12 人以上の見込みを作る。足りなければ B に切り替える。"
+    - "12/15〜12/28 の 14 日連続クローズドテスト。12/28 に 12 人未満なら本番申請しない。"
+    - "公開目標は 2027-01-06（ビルドが 12/7 に間に合う場合）。"
+  B:
+    - "10/23 に開業届・屋号・事業用住所/電話/ウェブサイトを確認し、D-U-N-S を申請する（無料 30 営業日が既定）。"
+    - "12/8 頃の発番後、D&B の反映を確認し、組織アカウントを作成して 25 USD を支払う。"
+    - "12 人 × 14 日は不要。12/7 のビルドで内部テスト 7 日→本番申請→審査。"
+    - "公開目標は有料 D-U-N-S なら 2026-12-23 頃、無料の標準は 2027-01-07 頃、D&B 反映が最長なら 2027-03 頃。"
+    - "組織の法的名称・住所・開発者電話が Play 上に公開される。"
+  C:
+    - "Android のアカウント作成・支払い・実装を停止する。"
+    - "iOS v1.1 の 11/12〜13 公開後に、A/B を再評価する。"
+
+evidence:
+  - "https://support.google.com/googleplay/android-developer/answer/14151465?hl=en"
+  - "https://support.google.com/googleplay/android-developer/answer/13634885?hl=en"
+  - "https://support.google.com/googleplay/android-developer/answer/13628312?hl=en"
+  - "https://support.google.com/googleplay/android-developer/answer/10841920?hl=en"
+  - "https://support.google.com/googleplay/android-developer/answer/14316361?hl=en"
+  - "https://support.google.com/googleplay/android-developer/answer/6112435?hl=en"
+  - "https://support.google.com/googleplay/android-developer/answer/13634888?hl=en"
+  - "https://support.google.com/googleplay/android-developer/answer/15633622?co=GENIE.CountryCode%3DJP&hl=en"
+  - "https://support.google.com/android-developer-console/answer/16501669?co=GENIE.CountryCode%3DJP&hl=en"
+  - "https://duns.tsr-net.co.jp/duns-web/index?showOther=true"
+  - "https://support.google.com/googleplay/android-developer/thread/398243168/clarification-on-14-day-12-tester-requirement-for-organization-accounts?hl=en"
+  - "https://support.google.com/googleplay/android-developer/thread/414846624/closed-testing-requirement-after-transferring-app-to-organization-account?hl=en"
+  - "https://zenn.dev/yukapero/articles/3b2bac9b576e93"
+  - "docs/android/PLAN-ANDROID.md"
+  - "products/lien/marketing/early-pairs/tracker.md"
+  - "products/lien/marketing/x/log.md"
+
+related_issues:
+  - 119
+  - 120
+  - 121
+  - 123
+  - 124
+  - 125
+  - 126
+  - 127
+
+notes:
+  - "このカードは計画・比較・推奨を記録するもので、決定ではない。status は open のまま。"
+  - "決定は Issue #119 への返信（A / B / C）で行う。秘密・認証情報・個人の連絡先は書かない。"
+  - "B を選ぶ場合も、無料 D-U-N-S を既定にする。有料 15,000 円は DECISION-AND-002 の承認後にだけ選ぶ。"
+  - "B の組織確認は、個人事業主なら開業届で可能（Google Play Console の日本向け書類一覧）。Payments の組織名・住所・D-U-N-S の一致が条件で、個別審査の通過は保証されない。"
+  - "A を選ぶ場合も、オーナーが「公開募集はしない」を選べば、X への募集投稿・公募は行わない。"
