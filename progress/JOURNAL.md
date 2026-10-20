@@ -360,3 +360,8 @@
 - 追加: `x/tools/check_posts.py`（13本の静的検査: 140字・禁止語8語+誇大表現・競合名・日付断定・数値の根拠・節の実在・画像の実在・承認前 ready の禁止）と `x/tools/test_check_posts.py`（35件）。`.github/workflows/lien-ci.yml` の store-metadata ジョブに2ステップ追加
 - 検証: `python3 x/tools/check_posts.py` = OK 13本 / unittest 35件 OK / 既存の `verify_metadata.py` OK・unittest 24件 OK（回帰なし）/ YAML の構文とステップ追加を確認
 - 結果: **PR #99 作成**（https://github.com/Ryoki63/Challenge/pull/99）。CI `lien-ci` run 39375076692 は全ジョブ success（store-metadata に追加した2ステップも実行され、`OK: 13 本` と unittest 35 件を確認）。`status: ready` は mkt-lead 承認 + mkt-review レビュー待ちのため付けていない（検査で固定）。issue は承認待ちとして開いたまま
+
+## 2026-10-20 15:10 (mkt-exec) — #75 追補: X アカウントのブランディング案
+- 着手: オーナー返信「投稿文ok!あとはアカウントのブランディング考えないと」(2026-10-20)を受けて再開。13本の文面は mkt-lead 承認として記録し、受け皿（表示名・handle・bio・アイコン・ヘッダー・固定ポスト・トーン）の設計を追加する
+- 前提: handle の空き確認はこの作業では行わない（X にログインしない）。未確認と明記し、取得はオーナーの操作にする
+- 判断: ブランディングは「10/21 08:00 の初投稿までに設定できるもの」に限定する。ヘッダー画像は未制作でも開始できるようにし、日付・URL を描かない
