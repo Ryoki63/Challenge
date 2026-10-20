@@ -480,3 +480,5 @@
 - 独立レビュー1回: G4 完了と #76 の公開ゲート(`xUrl`)を混同する1文に P2 指摘。該当文だけ修正し、#42 本文の確認・承認とサイト公開可否を明確に分離した。全体の再レビューは追加しない。
 - 検査結果: hash/相対リンク照合 **10件 PASS**、`git diff --check` PASS。全要件の確認は一部未了(現行文言・画像・法務の人間承認待ち)、関連テスト83件 PASS、HTML生成11件 PASS。型チェック/lint/iOS build は文書変更のみで対象外、公開前ゲートは既存未記入で FAIL、残TODOゼロとはしない。
 - 結果: **blocked / 承認待ち**。承認済み範囲と証拠の記録は作成済み。残る判断は1件にまとめて #42 に通知し、PR を提出する。Issue close・マージ・ストア入力・申請・公開・購入は行わない。
+- 提出: commit `9d73be5` を `origin/consilium/42-g4` へ push。PR #114 https://github.com/Ryoki63/Challenge/pull/114 を作成(main 向け・未マージ)。`lien-ci` run 39422336491 は対象 SHA `9d73be5` で **success**。iOS build の新規実行を意味しない。
+- 【承認待ち】: #42 comment-6290842503 に現行素材と法務必須値の判断を1件に集約して通知し、`needs-approval,human-gate` を付与。Issue は open を維持。hash・相対リンク・差分検査済み。提出時点で tracked worktree clean / local HEAD = remote branch を確認(この提出記録の追記は別 commit で同期する)。
