@@ -153,3 +153,21 @@ jobs:
 
       - name: "Test verify_metadata.py (検査ロジックの単体テスト)"
         run: python3 -m unittest discover -s tools -p "test_*.py" -v
+
+  pages-site:
+    name: pages site (md→html の生成物一致 + 公開前チェック)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/lien/web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # 落ちたときは `cd products/lien/web && python3 tools/build_site.py` で再生成してコミットする
+      # (privacy-policy.md / terms.md が正本。HTML を手で直さない)
+      - name: "生成物が md と一致するか(#76)"
+        run: python3 tools/build_site.py --check
+
+      - name: "ティザーと法務ページの検査(フォーム無し・スクショ3枚・禁止語・リンク切れ・SVG)"
+        run: python3 -m unittest discover -s tools -p "test_*.py" -v
