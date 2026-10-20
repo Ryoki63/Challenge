@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # deploy.sh — Lien バックエンドを Supabase へ冪等デプロイする
 #
-#   link → db push(migration)→ Edge Functions 13本 deploy
+#   link → db push(migration)→ Edge Functions 14本 deploy
 #
 # 必要なもの:
 #   - supabase CLI(https://supabase.com/docs/guides/cli)
@@ -21,7 +21,7 @@ set -euo pipefail
 # ---- 定数 ----------------------------------------------------------------
 PROJECT_REF="${PROJECT_REF:-lniheehfbtpfhglinfjm}" # G0 で作成済み(issue #38)
 LIEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" # = products/lien
-FUNCTIONS=(checkin checkin-cancel snapshot invite-create invite-accept promise-set close-day grant-tickets nudge react plant-name pair-dissolve delete-account)
+FUNCTIONS=(checkin checkin-cancel snapshot invite-create invite-accept promise-set close-day grant-tickets nudge react plant-name pair-dissolve delete-account revenuecat-webhook)
 DRY_RUN="${DRY_RUN:-false}"
 
 step() { echo ""; echo "==> $*"; }

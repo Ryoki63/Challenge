@@ -24,7 +24,8 @@
       "plantMood": "normal",
       "plantName": null,
       "hasPartnerPhotoToday": false,
-      "ticketBalance": null
+      "ticketBalance": null,
+      "pairPlan": "free"
     }
   }
 }

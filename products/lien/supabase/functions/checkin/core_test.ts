@@ -251,6 +251,7 @@ Deno.test("checkin: 初回(相手未完)— 自分用snapshot返却+相手へ可
     plantName: "みどり",
     hasPartnerPhotoToday: false,
     ticketBalance: 2,
+    pairPlan: "free",
   };
   assertEquals(result.body.snapshot, expectedMine, "自分用 snapshot");
 
@@ -649,6 +650,7 @@ Deno.test("checkin: ソロ状態 — pairId null の snapshot・push なし", as
     plantName: null,
     hasPartnerPhotoToday: false,
     ticketBalance: null,
+    pairPlan: "free",
   };
   assertEquals(result.body.snapshot, expected);
   assertEquals(sent.length, 0, "ソロは push 先がない");

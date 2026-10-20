@@ -32,12 +32,15 @@ Deno.test("USER_COLUMNS: push_token と push_env を必ず一緒に読む(送信
   const columns = columnsOf(USER_COLUMNS);
   assert(columns.includes("push_token"), "push_token を読む");
   assert(columns.includes("push_env"), "push_env を読む");
+  // 課金(T33): snapshot の pairPlan を導出するため、premium_until も一緒に読む
+  assert(columns.includes("premium_until"), "premium_until を読む");
   assertEquals(columns, [
     "id",
     "nickname",
     "timezone",
     "push_token",
     "push_env",
+    "premium_until",
   ]);
 });
 
@@ -61,6 +64,7 @@ Deno.test("toSnapshotUser: DB の行 → SnapshotUserRow(push_token と push_env
     timezone: "Asia/Tokyo",
     pushToken: "token-a",
     pushEnv: "production",
+    premiumUntil: null,
   });
   assertEquals(
     toSnapshotUser({ ...row, push_env: "sandbox" }).pushEnv,
@@ -83,6 +87,7 @@ Deno.test("toSnapshotUser: null は既定値に、想定外の push_env は null
       timezone: "Asia/Tokyo",
       pushToken: null,
       pushEnv: null,
+      premiumUntil: null,
     },
   );
   for (const bad of ["", "prod", "Production", "staging"]) {
