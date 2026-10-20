@@ -109,6 +109,9 @@ final class HomeViewModel {
     let plantExperience: PlantExperienceModel
     /// 植物の名前を付ける・変えるフォームの状態。nil のとき(名前付けの口が無い構成・プレビュー)は名前付けの導線を出さない
     let plantNaming: PlantNamingModel?
+    /// シェア画像(T22)。nil のとき(プレビュー・シェアの口が無い構成)は導線を出さない。
+    /// 節目(7/30/100/365日)の判定と「もう出したか」もこのモデルが持つ
+    let shareImage: ShareImageModel?
 
     init(
         store: AppGroupStore?,
@@ -118,6 +121,7 @@ final class HomeViewModel {
         partnerPhoto: PartnerPhotoModel? = nil,
         plantNaming: PlantNaming? = nil,
         plantMemory: PlantMemoryStoring? = nil,
+        shareImage: ShareImageModel? = nil,
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .current,
         reloadWidgets: @escaping () -> Void = { WidgetCenter.shared.reloadAllTimelines() },
@@ -126,6 +130,7 @@ final class HomeViewModel {
         self.store = store
         self.checkinService = checkinService
         self.partnerPhoto = partnerPhoto
+        self.shareImage = shareImage
         self.reloadWidgets = reloadWidgets
         self.localStateChanged = localStateChanged
         self.cancelService = checkinService as? CheckinCanceling
@@ -153,6 +158,7 @@ final class HomeViewModel {
         snapshot = store?.loadSnapshot()
         partnerPhoto?.snapshotDidChange(snapshot)
         plantExperience.snapshotDidChange(snapshot)
+        shareImage?.snapshotDidChange(snapshot)
     }
 
     // MARK: 表示分岐(REQUIREMENTS §3.9 / §3.10)
@@ -203,6 +209,15 @@ final class HomeViewModel {
         return snapshot.pairId != nil
     }
 
+    /// 「シェア画像をつくる」を出すか(任意タイミング — REQUIREMENTS §3.13)。ペア成立中で、記録が1日以上あるとき
+    var canShareRecord: Bool {
+        guard let snapshot, shareImage != nil else { return false }
+        return snapshot.pairId != nil && snapshot.streakCurrent > 0
+    }
+
+    /// ホームの「シェア画像をつくる」
+    func presentShareImage() {
+        shareImage?.presentManual()
     /// ホームのチケット残数バッジに出す値(nil = バッジを出さない — T19a #19 / DESIGN §3.4)。
     /// **0 はそのまま 0 を返してバッジを出す**(0枚でも罰なし — REQUIREMENTS §3.5)。
     /// ソロ(ペア共有の在庫を持たない)・キーが無い古い snapshot・null・負の値(契約は 0 以上)は nil
@@ -378,6 +393,7 @@ final class HomeViewModel {
         localStateChanged()
         partnerPhoto?.snapshotDidChange(updated)
         plantExperience.snapshotDidChange(updated)
+        shareImage?.snapshotDidChange(updated)
     }
 
     private func clearMessages() {

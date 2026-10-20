@@ -54,6 +54,14 @@ final class AppModel {
         account: self
     )
 
+    /// シェア画像(T22)。ホームの導線と、節目(7/30/100/365日)のお祝いが同じものを見る。
+    /// 自分のニックネームは users 行から読む(AuthServicing.fetchProfile)
+    @ObservationIgnored lazy var shareImage: ShareImageModel = ShareImageModel(
+        nameLoader: { [auth = services.auth] in
+            try await auth.fetchProfile().nickname
+        }
+    )
+
     // MARK: - 依存
 
     let services: AppServices
@@ -470,6 +478,8 @@ extension AppModel: AccountOperating {
         services.store?.eraseAll()
         // 植物の体験の記録(段階アップの演出を見せた段階・最後のチェックイン日など)も、前のアカウントのものを持ち越さない(PB #57)
         services.plantMemory?.reset()
+        // シェア画像の「もう出したか」の記録と、自分のニックネームの控えも持ち越さない(T22)
+        shareImage.reset()
         // ローカル通知の設定を消し、予約も配信済みも残さない(前のアカウントの約束のリマインドが、サインアウト後に鳴らないように — issue #16)
         await services.reminders?.reset()
 

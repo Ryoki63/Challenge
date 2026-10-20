@@ -36,7 +36,7 @@ scripts/macos-check/check.sh widget                # LienWidget(WidgetKit の拡
 ## 検査しないもの(`check.sh` の `exclude_from_module` / `EXCLUDE_TESTS`)
 
 - `AppDelegate` / `LienApp` / `RootView` / `SupabaseService` / `PushManager` / `QRCodeGenerator` / Debug の View: UIKit・UserNotifications・supabase-swift・`@main`・iOS 専用 API
-- テスト `AppServicesTests` / `ConfigTests`(`AppServices+Live` を使う)・`PlantRenderTests` / `PlantLayersTests` / `HomeRenderChecksTests` / `NotificationSettingsRenderTests` / `WidgetRenderTests`(と、その道具 `WidgetRenderSupport`)(アセットカタログ・描画・UIKit のウィンドウと色・`XCTAttachment`)・`DeviceTokenStoreTests` / `QRCodeGeneratorTests` / `SmokeTests`
+- テスト `AppServicesTests` / `ConfigTests`(`AppServices+Live` を使う)・`PlantRenderTests` / `PlantLayersTests` / `HomeRenderChecksTests` / `NotificationSettingsRenderTests` / `WidgetRenderTests`(と、その道具 `WidgetRenderSupport`)・`ShareImageRenderTests`(アセットカタログ・描画・UIKit のウィンドウと色・`XCTAttachment`)・`DeviceTokenStoreTests` / `QRCodeGeneratorTests` / `SmokeTests`
 - 描画の見た目・実機の挙動・シミュレータ上の UI・NSE のターゲット: CI と実機(T20)で見る。ウィジェットの WidgetKit の接ぎ手は `widget` で型検査できるが、動かしてはいない(実描画の一覧と画素の検査は CI の `WidgetRenderTests`)
 
 新しいファイルが UIKit などに依存するようになって `build` が落ちたら、`check.sh` の除外に足す(理由をコメントに)。

@@ -55,6 +55,8 @@ struct RootView: View {
                             // 植物の名前付け(plant-name)と、演出の「もう見せたか」の記録(PB #57)
                             plantNaming: model.services.plantNaming,
                             plantMemory: model.services.plantMemory,
+                            // シェア画像(T22)。ホームの導線と節目のお祝い
+                            shareImage: model.shareImage,
                             reloadWidgets: model.services.reloadWidgets,
                             // チェックイン・取り消しで端末の snapshot が変わったら、ローカル通知の予約を合わせる(issue #16)
                             localStateChanged: { model.localStateChanged() }

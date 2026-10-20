@@ -493,6 +493,54 @@ enum Strings {
         static let viewerMenuButton = "通報・ブロック"
     }
 
+    /// シェア画像(REQUIREMENTS §3.13 / T22)。
+    /// 載せるのは植物の現在の姿・2人のニックネーム・ストリーク日数・開始日・アプリ名だけ。
+    /// **チェックインの写真は載せない**(privacy-policy §3)ので、そのことを画面にも書く
+    enum Share {
+        static let title = "シェア画像"
+        /// ホームの任意タイミングの導線(REQUIREMENTS §3.13)
+        static let createButton = "シェア画像をつくる"
+        static let subtitle = "ふたりの記録を、画像にして残せます"
+        static let formatPickerLabel = "画像の形"
+        static let formatStory = "ストーリーズ(9:16)"
+        static let formatSquare = "正方形(1:1)"
+        static let loading = "画像をつくっています…"
+        static let shareButton = "シェアする"
+        static let closeButton = "閉じる"
+        static let retry = "もう一度ためす"
+        /// まだシェアできる記録が無い(ソロ・ストリーク 0)。導線は出さないが、念のため
+        static let unavailableMessage = "シェアできる記録がまだありません"
+        static let errorMessage = "シェア画像を準備できませんでした。通信状態を確認して、もう一度お試しください"
+        /// 写真を含めないことの案内(REQUIREMENTS §3.13)
+        static let privacyNote = "チェックインの写真は入りません"
+
+        // 画像の中の文言
+        static let streakCaption = "ふたりの記録"
+        static let dayUnit = "日"
+        static let meFallbackName = "あなた"
+        static let partnerFallbackName = "あいて"
+        static func names(_ myName: String, _ partnerName: String) -> String {
+            "\(myName) と \(partnerName)"
+        }
+        static func startedOn(_ dateText: String) -> String {
+            "\(dateText)から"
+        }
+
+        // 節目のお祝い(7/30/100/365日 — REQUIREMENTS §3.13)
+        static func milestoneTitle(_ days: Int) -> String {
+            "🎉 ふたりで\(days)日!"
+        }
+        static let milestoneBody = "この記録を、画像にして残そう"
+
+        // 共有シートの題名・VoiceOver
+        static func sharePreviewTitle(_ days: Int) -> String {
+            "\(days)日の記録"
+        }
+        static func previewLabel(_ myName: String, _ partnerName: String, _ days: Int) -> String {
+            "\(myName)と\(partnerName)の\(days)日のシェア画像"
+        }
+    }
+
     /// 設定画面(REQUIREMENTS §3.15 / T23 #23)。罰・恥系の表現は使わない(§3.5)
     enum Settings {
         static let title = "設定"
