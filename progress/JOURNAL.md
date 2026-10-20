@@ -347,3 +347,15 @@
 - 検証: 4スタイルの `gen.py` を一時ディレクトリで再実行し、追跡済み PNG と SHA-256 完全一致(決定論)。コンタクトシートは 1264×288(8倍)。#40 の raw リンクは HTTP 200。origin に対象ブランチ・既存 PR は無し(重複作業なし)
 - 判断: v2 の再制作・#40 への再提出はしない(差し戻し済みの案の再提出は混乱と退行になる)。再発防止として `v2_drafts/README.md` に経緯・受入証拠・再生成手順を記録
 - 結果: PR を作成(レビュー待ち)。#49 は「フェーズ1完了・v4 で置換済み」として、close の判断をレビュー役職/人間に委ねる
+
+## 2026-10-20 14:20 (ux-exec) — MK3 #76 公開前ティザーページと法務ページの生成・配備の仕組み
+- 着手: origin/main(fdf1ef5)から `consilium/76-mk3-github-pages`。まず Issue 本文と関連(#79・#80・#42・TASKPLAN §9.2)・`SupportLinks.swift`・`marketing/store_metadata/ja` を確認
+- 前提の確認: **Issue 本文が「配備先の repo と URL は eng-lead が決め、この Issue に書く」としているが、#76 にそのコメントが無い**。一方でアプリの `SupportLinks.webBaseURL` は `https://ryoki63.github.io/Challenge`、法務は `.../lien/legal/{terms,privacy}.html` を指しており(DESIGN §7・web/invite のコメントも同じ)、配信パスは実装側で既に一意。この土台に合わせて作り、URL の正式決定と初回の Pages 有効化(Settings > Pages > Source = GitHub Actions)は人間に残した
+- **X の @ハンドルは repo のどこにも無い**(#79 が「オーナーが最初にこの Issue へ書く」としている)。実在しないアカウントを指さないため `site.json` の `xUrl` を null にし、未設定のあいだはリンクを出さない。設定すると出ることはテストで固定
+- 変更: `products/lien/web/tools/build_site.py`(md→html の生成器。Markdown パーサも自前、依存ゼロ)/ `site.json` / `web/site/`(配信物)/ `tools/test_build_site.py`(47件)/ `.github/workflows/lien-pages.yml`(Actions 配備。いまは workflow_dispatch のみ)/ `lien-ci.yml` に `pages-site` ジョブ / `web/README.md` / CHECKLIST-G4 §3・§4 / 構成図3か所
+- 生成の検証: 生成した `marketing/legal/{privacy,terms}.html` の `<main>` 本文が、手で保守していた既存 HTML と**バイト一致**(差分は戻りリンクと、terms に無かった表の CSS だけ)。md が正本であることを壊さずに置き換えられた
+- 公開の門: `--check-publishable` が (1) G4 の `【要記入: G4: …】` が残っていたら (2) `xUrl` が未設定なら 配備を止める。プレースホルダ付きの法務ページが公開される事故を機械で防ぐ
+- 画面: ティザーは 1行説明(= 確定済み `subtitle.txt`)・スクリーンショット3枚・「近日公開」・法務リンク・サポート欄。**フォーム・メール収集・外部スクリプト・外部フォントなし**。訴求は `description.txt` / `promotional_text.txt` の確定値から取り、罰・恥系(禁止語)を含まないことをテストで検査
+- スクショ: 旧 SVG(`marketing/screenshots/`)は旧画風(ドット絵)で、v1.0 に無い「ウィジェットの相手写真」「写真→相手のウィジェット」を含むため使わなかった。v4 の合成済み立ち絵(`assets/plant/v4_drafts/composed/`)を埋め込んだ自己完結 SVG を3枚生成(ホーム/ウィジェット/チェックイン完了)。文言は `Strings.swift` と `screenshots/plan.md` §2 のデモデータに合わせた。実機キャプチャへの差し替えは #80
+- 検証: `python3 -m unittest discover -s tools -p "test_*.py"` 47件 OK / `build_site.py --check` OK / `--check-publishable` は想定どおり NG(G4 未記入・xUrl 未設定)。headless Chrome で index と3枚を描画して目視確認
+- 結果: PR を作成。**公開そのものは未了**(G4 の4項目・X の @ハンドル・Pages の有効化が人間の作業)。issue は閉じない
