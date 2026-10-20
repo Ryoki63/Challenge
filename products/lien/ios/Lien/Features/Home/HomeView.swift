@@ -19,6 +19,7 @@ import SwiftUI
 @MainActor
 struct HomeView: View {
     @State private var viewModel: HomeViewModel
+    @State private var showsHistory = false
     @Environment(\.scenePhase) private var scenePhase
 
     /// AppModel が snapshot を同期・保存するたびに増える値。変化したら App Group から読み直す
@@ -28,17 +29,21 @@ struct HomeView: View {
     /// 相手のコンテンツ(ニックネーム・約束の文・植物の名前)の長押しメニュー(通報・ブロック)と、その確認の表示。
     /// nil(Stub 構成・プレビュー)なら付けない(写真の長押しは PartnerPhotoModel.actions — T23 #23)
     private let moderation: ModerationViewModel?
+    /// カレンダー履歴(T18 #18)。nil なら導線を出さない(プレビュー・履歴を使わない組み立て)
+    private let historyRepository: HistoryRepository?
 
     init(
         viewModel: HomeViewModel,
         reloadToken: Int = 0,
         onInvite: (() -> Void)? = nil,
-        moderation: ModerationViewModel? = nil
+        moderation: ModerationViewModel? = nil,
+        historyRepository: HistoryRepository? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.reloadToken = reloadToken
         self.onInvite = onInvite
         self.moderation = moderation
+        self.historyRepository = historyRepository
     }
 
     /// プレビュー・簡易構成用(本番の依存は RootView が HomeViewModel として渡す)
@@ -77,6 +82,25 @@ struct HomeView: View {
         }
         // 通報の確認・メールを開けなかったときのアラート・ブロック(ペア解消)の説明シート(T23 #23)
         .moderationPresentation(moderation)
+        // カレンダー履歴(T18 #18)。ペア成立後のホームからのみ開ける
+        .toolbar {
+            if historyRepository != nil, viewModel.snapshot?.pairId != nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showsHistory = true
+                    } label: {
+                        Image(systemName: "calendar")
+                    }
+                    .accessibilityLabel(Strings.History.openButtonLabel)
+                }
+            }
+        }
+        // カレンダー履歴(T18 #18)。シートは名前付けと重ならないよう、ホームの NavigationStack に push する
+        .navigationDestination(isPresented: $showsHistory) {
+            if let historyRepository {
+                HistoryView(repository: historyRepository)
+            }
+        }
         .onAppear {
             viewModel.load()
             viewModel.plantExperience.homeDidAppear()
