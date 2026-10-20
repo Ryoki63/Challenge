@@ -46,6 +46,7 @@ final class ContractFixtureTests: XCTestCase {
         XCTAssertEqual(snapshot.plantMood, .fidget)
         XCTAssertEqual(snapshot.plantName, "みどり")
         XCTAssertTrue(snapshot.hasPartnerPhotoToday)
+        XCTAssertEqual(snapshot.ticketBalance, 2, "ペアの残数(サーバーの pairs.ticket_balance)")
         XCTAssertEqual(AppRouter.phase(hasSession: true, snapshot: snapshot), .paired)
     }
 
@@ -61,6 +62,7 @@ final class ContractFixtureTests: XCTestCase {
         XCTAssertNil(GrowthGauge.text(for: snapshot))
         XCTAssertNil(snapshot.partnerName)
         XCTAssertEqual(snapshot.myPromiseTitle, "筋トレ")
+        XCTAssertNil(snapshot.ticketBalance, "ソロは null(ペア共有の在庫を持たない — DESIGN §3.4)")
         XCTAssertEqual(AppRouter.phase(hasSession: true, snapshot: snapshot), .solo)
     }
 
@@ -69,6 +71,7 @@ final class ContractFixtureTests: XCTestCase {
         let snapshot = try ContractFixtures.decode(SnapshotResponse.self, from: "snapshot.empty").snapshot
         XCTAssertNil(snapshot.pairId)
         XCTAssertNil(snapshot.myPromiseTitle)
+        XCTAssertNil(snapshot.ticketBalance)
         XCTAssertEqual(AppRouter.phase(hasSession: true, snapshot: snapshot), .promiseSetup)
         XCTAssertEqual(snapshot, PairSnapshot.emptySolo(updatedAt: fixedDate), "スタブ構成の空 snapshot と同じ形")
     }
@@ -114,6 +117,39 @@ final class ContractFixtureTests: XCTestCase {
         XCTAssertEqual(both.plantStageFloor, 7)
         XCTAssertEqual(both.plantNextStageAt, 14)
         XCTAssertEqual(GrowthGauge.text(for: both), "ふたりそろって あと7回で よりそい", "段階に入った直後(0回)は『0回そろったよ』と言わない")
+    }
+
+    func testTicketBalanceFixturesMatchTheServerContract() throws {
+        // ペアの snapshot は 2、ソロ・解消後は null(キーは省略しない — DESIGN §3.4)。アプリは値まで読める
+        let paired = try ContractFixtures.decode(SnapshotResponse.self, from: "snapshot.paired").snapshot
+        XCTAssertEqual(paired.ticketBalance, 2)
+        let solo = try ContractFixtures.decode(SnapshotResponse.self, from: "snapshot.solo").snapshot
+        XCTAssertNil(solo.ticketBalance)
+        let empty = try ContractFixtures.decode(SnapshotResponse.self, from: "snapshot.empty").snapshot
+        XCTAssertNil(empty.ticketBalance)
+
+        // snapshot を返すほかの応答も同じ契約
+        XCTAssertEqual(
+            try ContractFixtures.decode(CheckinResponse.self, from: "checkin.paired").snapshot.ticketBalance, 2
+        )
+        XCTAssertNil(try ContractFixtures.decode(CheckinResponse.self, from: "checkin.solo").snapshot.ticketBalance)
+        XCTAssertEqual(
+            try ContractFixtures.decode(CheckinCancelResponse.self, from: "checkin-cancel.ok").snapshot.ticketBalance, 2
+        )
+        XCTAssertEqual(
+            try ContractFixtures.decode(InviteAcceptResponse.self, from: "invite-accept.ok").snapshot.ticketBalance, 2
+        )
+        XCTAssertEqual(try ContractFixtures.decode(NudgeResponse.self, from: "nudge.ok").snapshot.ticketBalance, 2)
+        XCTAssertEqual(
+            try ContractFixtures.decode(PlantNameResponse.self, from: "plant-name.ok").snapshot.ticketBalance, 2
+        )
+        XCTAssertNil(
+            try ContractFixtures.decode(PairDissolveResponse.self, from: "pair-dissolve.ok").snapshot.ticketBalance
+        )
+
+        // push に同梱される snapshot(NSE が App Group に書く形)も同じ値
+        XCTAssertEqual(try embeddedSnapshot(in: "push.visible").ticketBalance, 2)
+        XCTAssertNil(try embeddedSnapshot(in: "push.pair-dissolved").ticketBalance)
     }
 
     // MARK: POST /plant-name
@@ -273,6 +309,11 @@ final class ContractFixtureTests: XCTestCase {
         return try JSONSerialization.data(withJSONObject: snapshotObject)
     }
 
+    /// 同梱 snapshot を、NSE と同じデコーダで読む
+    private func embeddedSnapshot(in fixture: String) throws -> PairSnapshot {
+        try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: embeddedSnapshotData(in: fixture))
+    }
+
     func testVisiblePushPayloadFeedsTheNotificationServiceExtension() throws {
         let userInfo = try ContractFixtures.object("push.visible")
         let aps = try XCTUnwrap(userInfo["aps"] as? [String: Any])
@@ -287,6 +328,7 @@ final class ContractFixtureTests: XCTestCase {
         let saved = try temp.store.saveSnapshotData(embeddedSnapshotData(in: "push.visible"))
         XCTAssertEqual(saved.partnerName, "あきら", "同梱 snapshot は受信者(相手)視点")
         XCTAssertEqual(saved.myPromiseTitle, "ランニング")
+        XCTAssertEqual(saved.ticketBalance, 2, "通知の snapshot も残数を持つ(消費後の値)")
         XCTAssertEqual(temp.store.loadSnapshot(), saved)
     }
 
@@ -303,6 +345,7 @@ final class ContractFixtureTests: XCTestCase {
         let saved = try temp.store.saveSnapshotData(embeddedSnapshotData(in: "push.silent"))
         XCTAssertTrue(saved.todayMeDone)
         XCTAssertFalse(saved.todayPartnerDone)
+        XCTAssertEqual(saved.ticketBalance, 2)
     }
 
     // MARK: スタンプの語彙(messages.ts ⇔ NudgeReactService.swift)
