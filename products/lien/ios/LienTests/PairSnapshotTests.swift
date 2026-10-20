@@ -1,6 +1,7 @@
 // PairSnapshotTests.swift — App Group 共有契約(DESIGN §3.4)のデコード/エンコード検証(T07)
 // 成長ルール v2 の新キー3つ(plantGrownDays / plantStageFloor / plantNextStageAt)は省略可: 無いとき nil(ゲージを出さない)、
-// あるときは値を読み、書き出して読み戻しても一致する(PB #57)
+// あるときは値を読み、書き出して読み戻しても一致する(PB #57)。
+// お休みチケットの残数(ticketBalance)も省略可: 無い・null・型違いは nil(バッジを出さない)、0 は 0 のまま保持する(T19a #19)
 
 import XCTest
 @testable import Lien
@@ -55,6 +56,7 @@ final class PairSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.plantMood, .normal)
         XCTAssertEqual(snapshot.plantName, "みどり")
         XCTAssertFalse(snapshot.hasPartnerPhotoToday)
+        XCTAssertNil(snapshot.ticketBalance, "キーが無い例(古いサーバー)は nil")
     }
 
     // MARK: - 防御的デコード(境界の耐性)
@@ -128,6 +130,7 @@ final class PairSnapshotTests: XCTestCase {
         XCTAssertNil(snapshot.plantNextStageAt)
         XCTAssertEqual(snapshot.plantMood, .normal)
         XCTAssertFalse(snapshot.hasPartnerPhotoToday)
+        XCTAssertNil(snapshot.ticketBalance, "残数も 0 で埋めない(誤った「0枚」を出さない)")
     }
 
     func testDecodeFailsWithoutUpdatedAt() {
@@ -242,6 +245,75 @@ final class PairSnapshotTests: XCTestCase {
         XCTAssertNil(snapshot.plantGrownDays)
         XCTAssertNil(snapshot.plantStageFloor)
         XCTAssertNil(snapshot.plantNextStageAt)
+        XCTAssertNil(snapshot.ticketBalance, "残数も引数の既定値が nil(これまでの組み立て方がそのまま通る)")
+    }
+
+    // MARK: - お休みチケットの残数(省略可 — T19a #19 / DESIGN §3.4)
+
+    /// 残数つきの JSON(ペアの snapshot: 2枚)
+    private var withTicketBalanceJSON: String {
+        designExampleJSON.replacingOccurrences(
+            of: "\"hasPartnerPhotoToday\": false",
+            with: "\"hasPartnerPhotoToday\": false, \"ticketBalance\": 2"
+        )
+    }
+
+    func testDecodeWithoutTicketBalanceLeavesItNil() throws {
+        // キーが無い古いサーバー・古いキャッシュ: バッジを出さない(0 で埋めない — 誤った「0枚」を見せない)
+        let snapshot = try decode(designExampleJSON)
+        XCTAssertNil(snapshot.ticketBalance)
+    }
+
+    func testDecodeTicketBalanceKeepsZeroAsAValue() throws {
+        // 0 は有効な残数(0枚でもバッジを出す — REQUIREMENTS §3.5)。nil と区別する
+        for (raw, expected) in [("2", 2), ("0", 0), ("5", 5)] {
+            let json = designExampleJSON.replacingOccurrences(
+                of: "\"hasPartnerPhotoToday\": false",
+                with: "\"hasPartnerPhotoToday\": false, \"ticketBalance\": \(raw)"
+            )
+            let snapshot = try decode(json)
+            XCTAssertEqual(snapshot.ticketBalance, expected, "ticketBalance = \(raw)")
+            XCTAssertNotNil(snapshot.ticketBalance, "0 も nil にしない")
+        }
+    }
+
+    func testDecodeNullTicketBalanceAsNil() throws {
+        // ソロ・サーバーが残数を読めていないときは null(キーは省略しない — DESIGN §3.4)。バッジを出さない
+        let json = designExampleJSON.replacingOccurrences(
+            of: "\"hasPartnerPhotoToday\": false",
+            with: "\"hasPartnerPhotoToday\": false, \"ticketBalance\": null"
+        )
+        XCTAssertNil(try decode(json).ticketBalance)
+    }
+
+    func testWrongTypedTicketBalanceIsIgnoredWithoutBreakingTheSnapshot() throws {
+        // 表示だけのキー: 型が違っても、snapshot 全体(チェックイン状態など)を壊さず nil として扱う
+        let json = designExampleJSON.replacingOccurrences(
+            of: "\"hasPartnerPhotoToday\": false",
+            with: "\"hasPartnerPhotoToday\": false, \"ticketBalance\": \"two\""
+        )
+        let snapshot = try decode(json)
+        XCTAssertNil(snapshot.ticketBalance)
+        XCTAssertEqual(snapshot.streakCurrent, 23)
+        XCTAssertTrue(snapshot.todayMeDone)
+    }
+
+    func testEncodeDecodeRoundTripWithTicketBalance() throws {
+        let original = try decode(withTicketBalanceJSON)
+        let data = try PairSnapshot.makeJSONEncoder().encode(original)
+        let decoded = try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: data)
+        XCTAssertEqual(decoded, original)
+        XCTAssertEqual(decoded.ticketBalance, 2)
+    }
+
+    func testEncodeWritesAnExplicitNullTicketBalance() throws {
+        // サーバーの形(DESIGN §3.4「キーは省略せず null で出す」)と同じに書く。ソロ・欠落でもキーを残す
+        let snapshot = try decode(designExampleJSON)
+        let data = try PairSnapshot.makeJSONEncoder().encode(snapshot)
+        let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+        XCTAssertTrue(text.contains("\"ticketBalance\":null"), text)
+        let decoded = try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: data)
+        XCTAssertNil(decoded.ticketBalance)
     }
 
     // MARK: - エンコード(往復)
@@ -291,5 +363,14 @@ final class PairSnapshotTests: XCTestCase {
         XCTAssertEqual(reset.plantGrownDays, 9)
         XCTAssertEqual(reset.plantStageFloor, 7)
         XCTAssertEqual(reset.plantNextStageAt, 14)
+    }
+
+    func testResettingForNewDayKeepsTheTicketBalance() throws {
+        // チケットは翌日も同じ残数(0:10 の自動消費はサーバーが snapshot で知らせる)
+        var snapshot = try decode(designExampleJSON)
+        snapshot.ticketBalance = 1
+        XCTAssertEqual(snapshot.resettingForNewDay().ticketBalance, 1)
+        snapshot.ticketBalance = 0
+        XCTAssertEqual(snapshot.resettingForNewDay().ticketBalance, 0, "0 を nil に落とさない")
     }
 }
