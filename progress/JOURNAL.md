@@ -797,3 +797,13 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 04:07 — #151 reactions SELECT の別ペア情報漏えい修正
+- 着手: 指定 worktree / consilium/151-sec-reactions-rls で開始。開始時 clean、同名 remote branch・既存 PR なし。origin/main と pull --rebase で同期（Already up to date）。main への直接 push・マージ・本番操作はしない。
+- 契約確認: Issue #151 は OPEN / status:in-progress、開始時 assignee なし。受入は別ペア行の遮断・現役ペア内の対照維持・合成データのみ。承認待ち一覧に #151 はない。他 Issue は対象外。
+- 調査節目: reactions_select_pair が from_user のみ参照する原因を確認。一方、本文にある supabase/tests/auth_boundaries.test.ts は現在の checkout に存在しないため、履歴・既存検証構成を確認し、受入を満たす合成 PGlite テストを用意する。
+- 04:17 設計・実装: 初期 migration は変更せず、0009 で既存 SELECT policy を ALTER。「本人が送信 OR RLS で読める checkins が存在」のみ許可する。checkins→security definer helper→pair_members/pairs の一方向参照で reactions に戻らないため、helper の追加や RLS 判定の複製は不要。DESIGN §5.2 とテスト手順にも範囲を明記。
+- 04:17 検証節目: PGlite 0.5.10 / pgcrypto で実 0001 を適用。合成 AB/DE→CD の再現データで旧 policy の漏えいを確認し、0009 適用後の遮断・現役相手の対照・成立日前・送信者本人・受信チェックイン本人・別ペア・解消後の7 step が PASS（1 test）。実 authenticated / BYPASSRLS=false を毎照会前に確認。本番接続・実 JWT・secret 読み書きなし。初回の実行設定と fixture の NOT NULL 欠落は修正済みで、型検査や権限を緩める回避はしていない。
+- 04:17 次の検証: 関連サーバーテスト・契約検査・新規テストの型/lint/format と独立レビュー1回を実施し、指定ブランチを push して CI / PR で提出する。
+- 04:13 記録訂正: 直前3行の「04:17」は転記誤り。実時刻は04:11前後（実装と初回PASS）〜04:12（関連検査完了）。内容の事実は維持し、この行で訂正する。
+- 04:13 関連検証結果: Edge Functions 419件、契約テスト3件、ops静的検査84件、RLS 1件/7step が全PASS。契約fixture22件一致。新規テストの deno check / lint / fmt --check と git diff --check もPASS。独立レビュー1名は評価中。型抑止・skipは追加していない。SQL migration適用が今回のDBビルド検証であり、iOS/Androidは変更なしのためビルド対象外。

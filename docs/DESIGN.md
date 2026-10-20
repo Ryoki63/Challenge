@@ -361,6 +361,7 @@ v1.0 の端末ローカル通知は **リマインド** と **夜 9 時のスト
   - users: 自分の行のみ select / update
   - pairs, plants, streak_days, ticket_ledger: メンバーのみ select。書き込みは Function のみ
   - checkins, nudges, reactions: メンバーのみ select。書き込みは Function のみ
+    - reactions の直接 SELECT は「本人が送った行、または本人が SELECT できる checkins に付いた行」に限定する（issue #151・migration 0009）。checkins の RLS（本人分、または現役ペアかつ成立日以降）を EXISTS でそのまま適用し、送り手が現役相手というだけで別ペア宛の行を読ませない。checkins のポリシーは reactions を参照しないため再帰せず、新たな security definer helper は不要。
   - 写真(Storage): パスは **`pairs/<pair_id>/<date_local>/<user_id>/photo.jpg`**(サムネは同じ区画の `photo_thumb.jpg`)。**本人単位**(2026-10-12 決定・issue #52。旧 `pairs/<pair_id>/<date_local>/photo.jpg` はペア×日付単位で、同じ日に2人目が付けると上書きできた)
     - 読み取り(select): 現役ペアのメンバーのみ。署名付きURLで配布 — **v1.0 はクライアントが利用者の JWT で、RLS の範囲内で作る(新しい関数は増やさない。PV #59。§3.3「相手の今日の写真」)**。`pairs/<pair_id>/` 配下なら新旧どちらの形式でも読める(既存の旧パスの写真は読めるまま)
     - 書き込み(insert / update): 現役ペアのメンバーで、かつ**パスの `<user_id>` 区画が `auth.uid()` と一致**するときだけ(migration 0004 の `is_valid_own_photo_upload`)。他人の区画・旧形式のパスへは書けない。delete はクライアントに許さない
