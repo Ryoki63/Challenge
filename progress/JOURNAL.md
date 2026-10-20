@@ -758,3 +758,18 @@
 - 23:50 CI節目: attempt 2はSwiftPM依存解決を23:45 JSTに通過し、初回の接続障害箇所は回復。iPhone 17シミュレータ起動中でbuild/testはまだ未到達。結果を待ち、依存解決成功だけでCI全体PASSとは扱わない。
 - 2026-10-21 00:03 CI最終: attempt 2は無署名build/testがsuccess、1221件・0 failures・TEST SUCCEEDEDをログで確認。しかしジョブ全体は20分15秒で上限超過、API conclusion=cancelled。CI全体successではないため完了扱いにしない。同操作の3回目は行わない。
 - 結果（最終判定）: failed。文書4受入条件・eng-review・ローカル130件・CIの無署名1221件はPASSだが、提出実装SHAのlien-ios全体緑ゲートは未達。PR #129はOPEN・未マージ、Issue #106もOPENを維持。CI実行時間の復旧と再検証を引き継ぎ、今回はworkflowやアプリを変更しない。secret/Appleアップロード/招待/本番変更なし。
+
+## 2026-10-20 23:01 (eng-exec) — G5b #107 審査リジェクト一次返信・証拠ガイド
+- 着手: 指定 worktree と `consilium/107-g5b` を確認。作業前差分なし、対象リモートブランチ・既存 PR なし。認証本人 `Ryoki63` を Issue #107 の assignee に設定し再取得した。
+- 同期: `git fetch origin main` と `git merge --ff-only origin/main` は Already up to date。履歴の書き換え・main 直接 push・他 worktree の操作は行わない。
+- 範囲: 5 種の却下理由別の返信型と証拠、デモ情報・審査導線の1枚索引、再提出チェックリストを作る。認証情報は読まず複製せず、ストアへの返信・申請・本番変更は行わない。
+- 確認計画: 既存 `review-notes.md` と確定仕様・実装を照合 → Apple 公式ガイドライン確認 → 文書作成 → リンク・必須項目・出典の直接検査と必要な資料レビュー → 指定ブランチへ commit/push、PR 提出。承認待ち一覧は確認済みだが、割り当て外 Issue の再開・状態変更はしない。
+- 節目(23:10): Apple 公式 Guidelines と ASC 返信/再提出ヘルプを照合。5条項の返信型・スクショ/動画/手順、デモ正本への1枚索引、再提出チェックリストを作成した。通知拒否/PhotosPicker、匿名認証、通報=メール下書き、ブロック=ペア解消の既知制約を既存ノート/ソースに合わせた。
+- 判断: v1.0 無料の正本と T33 購入コードの存在は別。無料/課金の提出ビルド確認を返信前ゲートとし、UGC フィルタ・運営対応期限・空の連絡先も適合済みと断定しない。今回は文書だけを変更し、課金/通報コード・設定・実デモ・ASC は操作していない。
+- 検証(23:24): 一時 Node 検査で5条項それぞれに返信型/スクショ/動画/手順、再提出10項目、ローカルリンク33件(見出し18件)とコードフェンスを確認。REQUIREMENTS §8 のリンクを修正し全件 PASS。GitHub Markdown とローカル GFM で描画し、Chromium 1180px/390px で横溢れなし。索引の A4 印刷プレビューは `/Count 1` (1ページ)、本文の表・英語型・再提出欄も目視確認した。プレビュー/PDF/検査ハーネスは一時ファイルで、納品対象は Markdown。
+- 検証: `python3 tools/verify_metadata.py` / `verify_screenshots.py` / `verify_press.py` はすべて OK、`python3 -m unittest discover -s tools -p 'test_*.py'` は64件 PASS (marketing ディレクトリ)。`git diff --check` PASS。型/lint/iOS build は対象外(アプリ/設定/CI の変更なし、文書の直接検査で代替)。実ビルド採証・ストア返信・デモ発行・再提出は今回未実施で、実施済みと書いていない。
+- 独立レビュー: 文書の受入条件・根拠/事実境界・権限・課金/UGC を1人にまとめて依頼し、必須修正なし。実ビルドと運営基準等の未確認境界はガイドに保持。追加の全体レビューは行わない。
+- 提出前確認: 受入条件3項目の文書は揃った。差分は審査用 Markdown 3件と JOURNAL の追記だけで、secret/個人情報/アプリ挙動の変更なし。指定ブランチへ commit/push 後、PR を作成して CI とリモート SHA を確認する(レビュー役職が判断するためマージしない)。
+- 提出(23:27): `6adf2e2` を `consilium/107-g5b` へ push し、PR #130 (https://github.com/Ryoki63/Challenge/pull/130) を作成。ローカル/リモート HEAD 一致、PR は OPEN / base main / 未マージ。`lien-ci` run 39439002890 は6ジョブすべて success (store metadata / pages / deno / ops / plant / e2e unit+type check、ネットワークE2Eではない)。
+- 結果: Issue #107 の受入条件3項目について文書を実装・検証し PR 提出まで完了。最終監査追記も別 commit で push し、その HEAD の CI は PR/Issue へ記録する。レビュー役職の判断を待つため Issue close・main マージ・status ラベルの変更・DONE 台帳の完了扱いは行わない。採証/申請/公開は未実施。
+- 完了チェック: [PASS] 受入条件3項目の文書 [PASS] 関連既存テスト64件 [PASS] 出典/リンク/表示/独立レビュー [PASS] diff 検査・残実装TODOゼロ [対象外] 型/lint/iOS build (Markdownのみ。CIの型検査成功とiOSビルドを混同しない) [対象外] 実機/ASC操作 (手順作成が契約、実行は別承認)。
