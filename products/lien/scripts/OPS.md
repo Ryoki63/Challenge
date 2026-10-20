@@ -203,7 +203,7 @@ CONFIRM_GRANT=yes bash products/lien/scripts/ops/run-cron-fn.sh grant-tickets 20
 
 - 無料枠はしばらくアクセスが無いと自動で停止する。2026-10-12 に実際に 4か月の放置で `INACTIVE` だった
 - 停止中は cron も動かない。復元後は §4 で止まっていた期間を埋める
-- 恒久対策は D5(リリース前に Pro 化。〜12/1)。それまでも、毎朝の自動監視(`project`)が停止を検知して赤になる
+- 恒久対策は D5(リリース前に Pro 化。〜10/30)。それまでも、毎朝の自動監視(`project`)が停止を検知して赤になる
 
 ## 6. 鍵の更新(cron 専用シークレット)
 
