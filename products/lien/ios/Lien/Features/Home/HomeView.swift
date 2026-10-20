@@ -75,6 +75,12 @@ struct HomeView: View {
                 PlantNameSheet(model: naming)
             }
         }
+        // シェア画像(T22)。ホームの導線と、節目(7/30/100/365日)のお祝いの両方がここから開く
+        .sheet(item: sharePresentationBinding) { presentation in
+            if let shareImage = viewModel.shareImage {
+                ShareImageSheet(model: shareImage, presentation: presentation)
+            }
+        }
         // 通報の確認・メールを開けなかったときのアラート・ブロック(ペア解消)の説明シート(T23 #23)
         .moderationPresentation(moderation)
         .onAppear {
@@ -112,6 +118,16 @@ struct HomeView: View {
         return Binding(
             get: { isShown },
             set: { viewModel.plantNaming?.isSheetPresented = $0 }
+        )
+    }
+
+    /// シェア画像のシート(ホームの導線・節目のお祝い)。閉じたときはモデル側で「見た」を記録する。
+    /// 観測する状態は body の中で読む(Binding の getter の中では読まない — T23 #23)
+    private var sharePresentationBinding: Binding<ShareImageModel.Presentation?> {
+        let presentation = viewModel.shareImage?.presentation
+        return Binding(
+            get: { presentation },
+            set: { viewModel.shareImage?.setPresentation($0) }
         )
     }
 
@@ -205,6 +221,18 @@ private struct SnapshotContent: View {
 
             if viewModel.showsStreak {
                 StreakArea(current: snapshot.streakCurrent, best: snapshot.streakBest)
+            }
+
+            // シェア画像(任意タイミング — REQUIREMENTS §3.13 / T22)。ペア成立中で記録があるときだけ
+            if viewModel.canShareRecord {
+                Button {
+                    viewModel.presentShareImage()
+                } label: {
+                    Label(Strings.Share.createButton, systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(LienColors.shareAccent)
             }
 
             TodayArea(viewModel: viewModel, snapshot: snapshot, moderation: moderation)

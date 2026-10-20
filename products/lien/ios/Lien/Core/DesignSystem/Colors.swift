@@ -22,4 +22,16 @@ enum LienColors {
     static let photoControl = Color.white
     /// 植物の全画面の演出(段階アップ・おかえり — PB #57)の背景。ライト / ダークの標準の背景(プレートが暗い背景でも輪郭を見せる)
     static let celebrationBackground = Color(uiColor: .systemBackground)
+
+    // シェア画像(T22)。端末のライト / ダークに関係なく、いつも同じ色で書き出す(共有先で見え方が変わらないように)
+    /// 背景の上(クリーム)
+    static let shareBackgroundTop = Color(red: 0.984, green: 0.969, blue: 0.925)
+    /// 背景の下(若草)
+    static let shareBackgroundBottom = Color(red: 0.894, green: 0.945, blue: 0.871)
+    /// 文字の濃い緑
+    static let shareInk = Color(red: 0.169, green: 0.227, blue: 0.196)
+    /// 見出し・アプリ名の緑
+    static let shareAccent = Color(red: 0.239, green: 0.420, blue: 0.322)
+    /// 背景にぼかして置く光(やわらかい黄)
+    static let shareGlow = Color(red: 0.969, green: 0.851, blue: 0.549)
 }
