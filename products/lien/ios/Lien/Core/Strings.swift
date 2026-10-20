@@ -245,7 +245,7 @@ enum Strings {
         static func stageUpBody(_ grownDays: Int) -> String {
             "ふたりで \(grownDays)回 そろったよ"
         }
-        static let celebrationClose = "とじる"
+        static let celebrationClose = "閉じる"
         /// 変わる前 / 後の植物(VoiceOver)
         static func celebrationBefore(_ stageName: String) -> String {
             "さっきまで: \(stageName)"
@@ -269,7 +269,7 @@ enum Strings {
         // MARK: 名前付け(GROWTH §5.3。最初の「ふたば」の演出の中で付ける。先に付けた人の名前に決まる)
 
         static let nameTitle = "名前をつけてあげよう"
-        static let renameTitle = "名前をかえる"
+        static let renameTitle = "名前を変える"
         static let namePlaceholder = "なまえ(8文字まで)"
         static let nameNote = "どちらかが先につけると、その名前に決まります。あとからいつでも変えられます。"
         static let nameSubmit = "名前をつける"
@@ -282,7 +282,7 @@ enum Strings {
         static let nameEmptyError = "名前を入力してね"
         static let nameTooLongError = "名前は8文字までです"
         /// 改行・見えない文字・向きを変える制御文字など(サーバーの invalid_name と同じ規則)
-        static let nameInvalidError = "使えない文字が入っています"
+        static let nameInvalidError = "改行や見えない文字は、名前に使えません"
         static let nameSaveError = "保存できませんでした。通信状態を確認して、もう一度お試しください"
         static let nameNoPairError = "いまはペアがいないので、名前をつけられません"
         /// 自分が付けた: 「『みどり』と名づけたよ」
@@ -425,7 +425,7 @@ enum Strings {
     enum Checkin {
         // 写真を添える(完了後・任意・その日1枚 — §3.4)
         static let attachPhotoButton = "写真を添える"
-        static let attachPhotoSending = "写真をおくっています…"
+        static let attachPhotoSending = "写真を送っています…"
         static let attachPhotoDoneNote = "今日の写真を添えました"
         static let attachPhotoErrorMessage = "写真を送れませんでした。もう一度お試しください"
 
@@ -478,7 +478,7 @@ enum Strings {
             "\(partnerName)の今日の写真(大きい表示)"
         }
         /// 全画面を閉じるボタンの VoiceOver 名
-        static let viewerCloseButton = "とじる"
+        static let viewerCloseButton = "閉じる"
         /// 全画面の通報・ブロックのメニューボタンの VoiceOver 名(App Store ガイドライン 1.2: 拡大したままでも通報できる)
         static let viewerMenuButton = "通報・ブロック"
     }
@@ -630,7 +630,7 @@ enum Strings {
         static let lead = "ペアを解消すると、相手との共有がすべて止まります。"
         static let effectPhotos = "相手の写真・約束・チェックインは、お互いに見えなくなります"
         static let effectNudges = "つつく・リアクション・通知も、相手とのあいだで届かなくなります"
-        static let effectArchive = "植物とストリークの記録はアーカイブされ、同じ相手と組み直しても復活しません"
+        static let effectArchive = "植物とふたりの記録は、ここでいったん区切られます。同じ相手と組み直しても、前の続きにはなりません"
         static let effectHistory = "あなたのチェックイン履歴は、あなたの記録として残ります"
         static let partnerNote = "相手には通知は届きません。次にアプリを開いたときに、ペアが終わったことがわかります。"
         static let button = "ペアを解消する"
