@@ -460,3 +460,9 @@
 - `HomeView.SnapshotContent` の `onShowPaywall` に既定 nil を付け、課金導線を持たないスクショ描画から呼べるようにした(UI は変えない)
 - ローカル検証: `check.sh test` = **1106 tests / 0 failures / 26519 assertions**、`views` 120 ファイル OK、`widget` 18 ファイル OK
 - 次: merge commit を push → lien-ios で最新 main の画面から画像を生成 → artifact を差し替える
+
+## 2026-10-20 17:32 (ux-exec) — MK7 #80 main 取り込み後の再生成と CI の赤直し
+- merge 後 `lien-ios` #39389661638 で再生成。1回目は全ステップ成功後に20分の実行上限で cancelled(artifact は取得可)、再実行(attempt 2)で **success**。manifest = commit `c308e5c` / runAttempt 2 / generatedAt 17:28 JST
+- 画像12枚 + 一覧は b5265f9 の版と SHA-256 で**完全一致**(main の課金導線はスクショでは nil のため、画面の見た目は変わらない)。manifest と README の来歴だけ更新
+- main が赤だった2件を補修(どちらもテストの期待値のみ): deno 型検査は #97 の `todayLocal` 必須化に `snapshot_test.ts` の pairPlan ケースが未追随、`SNAPSHOT_KEYS` は #96 の `pairPlan` 追加で22個なのに期待値21
+- 検証: `verify_screenshots.py` OK / unittest 36 OK / `lien-ci` #39392331252 success / `lien-ios` #39389661638(attempt 2) success

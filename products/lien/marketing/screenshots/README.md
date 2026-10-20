@@ -45,8 +45,8 @@ G4(#42)の承認材料。**実際の画面**(アプリの本物の SwiftUI View)
 | 項目 | 値 |
 |---|---|
 | 生成 | `manifest.json` の `generatedAt`(Asia/Tokyo) |
-| CI 実行 | [lien-ios #39385881488](https://github.com/Ryoki63/Challenge/actions/runs/39385881488)(2026-10-20 16:33 JST) |
-| コミット | `manifest.json` の `provenance.commit`(`b5265f9`。この画像を描いたテストの版) |
+| CI 実行 | [lien-ios #39389661638](https://github.com/Ryoki63/Challenge/actions/runs/39389661638)(2026-10-20。main 取り込み後) |
+| コミット | `manifest.json` の `provenance.commit`(`c308e5c`。この画像を描いたテストの版) |
 | キャプションの SHA-256 | `manifest.json` の `captionsSHA256`(いまの `captions.json` と一致すること) |
 | artifact | `store-screenshots`(完成画像 + raw/ + manifest + 一覧) |
 

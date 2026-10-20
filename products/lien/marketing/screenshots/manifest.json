@@ -52,12 +52,12 @@
       "scene" : "home_solo"
     }
   ],
-  "generatedAt" : "2026-10-20T16:33:35+09:00",
+  "generatedAt" : "2026-10-20T17:28:46+09:00",
   "provenance" : {
-    "commit" : "b5265f9a85632265477d3943209799359cf5d5fa",
+    "commit" : "c308e5c83f5d4672755100f23aa277130fa04677",
     "repository" : "Ryoki63/Challenge",
-    "runAttempt" : "1",
-    "runId" : "39385881488",
+    "runAttempt" : "2",
+    "runId" : "39389661638",
     "workflow" : "lien-ios"
   },
   "sizes" : {
