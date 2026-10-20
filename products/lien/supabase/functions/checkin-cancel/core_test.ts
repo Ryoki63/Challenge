@@ -219,6 +219,7 @@ Deno.test("checkin-cancel: 当日削除成功 — 削除後snapshot返却+相手
     schemaVersion: 1,
     pairId: "pair-1",
     updatedAt: "2026-06-10T03:00:00.000Z",
+    dateLocal: "2026-06-10",
     streakCurrent: 5,
     streakBest: 5,
     todayMeDone: false,
@@ -236,6 +237,7 @@ Deno.test("checkin-cancel: 当日削除成功 — 削除後snapshot返却+相手
     plantName: "みどり",
     hasPartnerPhotoToday: false,
     ticketBalance: 2,
+    pairPlan: "free",
   };
   assertEquals(result.body.snapshot, expectedMine, "自分用 snapshot(削除後)");
 
@@ -402,6 +404,7 @@ Deno.test("checkin-cancel: ソロ状態(未ペア)でも自分のcheckin削除�
     schemaVersion: 1,
     pairId: null,
     updatedAt: "2026-06-10T03:00:00.000Z",
+    dateLocal: "2026-06-10",
     streakCurrent: 0,
     streakBest: 0,
     todayMeDone: false,
@@ -419,6 +422,7 @@ Deno.test("checkin-cancel: ソロ状態(未ペア)でも自分のcheckin削除�
     plantName: null,
     hasPartnerPhotoToday: false,
     ticketBalance: null,
+    pairPlan: "free",
   };
   assertEquals(result.body.snapshot, expected, "ソロ snapshot");
   assertEquals(sent.length, 0, "ソロは push 先がない");

@@ -62,6 +62,19 @@ final class AppModel {
         }
     )
 
+    /// プレミアム判定(T33)。自分の購読(RevenueCat)と snapshot.pairPlan の両方を見る
+    @ObservationIgnored lazy var entitlements = EntitlementStore()
+
+    /// ペイウォールの組み立て(T33)。RevenueCat のログインに Supabase の user id を使う
+    @ObservationIgnored lazy var paywall: PaywallDependencies? = {
+        guard let purchases = services.purchases else { return nil }
+        return PaywallDependencies(
+            purchases: purchases,
+            entitlements: entitlements,
+            userIDProvider: { [auth = services.auth] in auth.currentUserID?.uuidString }
+        )
+    }()
+
     // MARK: - 依存
 
     let services: AppServices
@@ -304,10 +317,13 @@ final class AppModel {
     /// 端末の記録の後始末を確かめる(confirmSessionVanished)
     private func reloadFromStore() {
         let hadSession = phase != .onboarding
+        let snapshot = services.store?.loadSnapshot()
         phase = AppRouter.phase(
             hasSession: services.auth.currentUserID != nil,
-            snapshot: services.store?.loadSnapshot()
+            snapshot: snapshot
         )
+        // ペアのプラン(サーバー導出)をプレミアム判定へ反映する(T33)
+        entitlements.update(pairPlan: snapshot?.pairPlan ?? .free)
         snapshotRevision += 1
         applyPendingInvite()
         scheduleReminderSync()

@@ -43,6 +43,7 @@ exclude_from_module() {
     Lien/App/RootView.swift) return 0 ;;                    # iOS 専用の API(navigationBarTitleDisplayMode など)
     Lien/App/AppServices+Live.swift) return 0 ;;            # supabase-swift(views で stubs/LiveStubs.swift を付けて型検査する)
     Lien/Core/SupabaseService.swift) return 0 ;;            # supabase-swift
+    Lien/Core/Purchases/RevenueCatPurchasesClient.swift) return 0 ;; # RevenueCat SDK(CI の iOS ビルドだけ)
     Lien/Core/PushManager.swift) return 0 ;;                # UIKit・UserNotifications(stubs/PushAuthorizingStub.swift が代わり)
     Lien/Core/DesignSystem/Colors.swift) return 0 ;;        # UIKit(views で macOS 用に書き換えて型検査する)
     Lien/Core/DesignSystem/PlantCharacterView.swift) return 0 ;;  # SwiftUI の View
@@ -58,10 +59,12 @@ exclude_from_module() {
 #   AppServicesTests / ConfigTests : AppServices+Live.swift(supabase-swift)を使う
 #   PlantRenderTests / PlantLayersTests / HomeRenderChecksTests / NotificationSettingsRenderTests / WidgetRenderTests(と、その道具 WidgetRenderSupport): アセットカタログ・SwiftUI の描画・UIKit のウィンドウと色・XCTAttachment を使う
 #   ShareImageRenderTests : シェア画像の実描画(ImageRenderer・アセットカタログ・XCTAttachment)。T22
+#   StoreScreenshotRenderTests(と、その枠 StoreScreenshotFrames): ストア用スクリーンショットの実描画。画面の View
+#     (HomeView / HistoryView / WidgetRootView / ShareImageCardView)を実寸で描くので、module だけでは型が足りない。issue #80
 #   DeviceTokenStoreTests : AppDelegate.swift(UIKit)を使う
 #   QRCodeGeneratorTests : QRCodeGenerator.swift(UIImage)を使う
 #   SmokeTests : アプリ本体のバンドルの前提
-EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSupport ShareImageRenderTests DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
+EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSupport ShareImageRenderTests PaywallRenderTests StoreScreenshotRenderTests StoreScreenshotFrames DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
 
 is_excluded_test() {
   local name="$1" e
@@ -214,6 +217,7 @@ do_views() {
       # UIKit・@main・iOS 専用の画面は型検査の対象にしない
       Lien/App/AppDelegate.swift|Lien/App/LienApp.swift|Lien/App/RootView.swift) continue ;;
       Lien/Core/SupabaseService.swift|Lien/Core/PushManager.swift|Lien/Core/DesignSystem/Colors.swift) continue ;;
+      Lien/Core/Purchases/RevenueCatPurchasesClient.swift) continue ;; # RevenueCat SDK(CI の iOS ビルドだけ)
       Lien/Features/Debug/*|Lien/Features/Pairing/QRCodeGenerator.swift) continue ;;
       Lien/Features/Onboarding/*View.swift|Lien/Features/Pairing/*View.swift|Lien/Features/PromiseSetup/*View.swift) continue ;;
     esac

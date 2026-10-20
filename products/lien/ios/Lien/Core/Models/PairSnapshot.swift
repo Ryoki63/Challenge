@@ -6,6 +6,7 @@
 //     "schemaVersion": 1,
 //     "pairId": "uuid | null(ソロ状態)",
 //     "updatedAt": "ISO8601",
+//     "dateLocal": "2026-06-11",
 //     "streakCurrent": 23,
 //     "streakBest": 40,
 //     "todayMeDone": true,
@@ -20,7 +21,8 @@
 //     "plantMood": "normal | happy | fidget | sad",
 //     "plantName": "みどり",
 //     "hasPartnerPhotoToday": false,
-//     "ticketBalance": 2
+//     "ticketBalance": 2,
+//     "pairPlan": "free | premium"
 //   }
 //
 // - snapshot は**受信者視点**でサーバーが組み立てる(me/partner をクライアントで反転しない — §3.4)
@@ -35,6 +37,9 @@
 //   * お休みチケットの残数(ticketBalance。DESIGN §3.4)は**省略可**: 無い(古いサーバー・古いキャッシュ)・
 //     null(ソロ、またはサーバーが残数を読めていない)は nil のまま持ち、ホームはバッジを出さない。
 //     0 は「0枚」の有効な値として持ち、バッジを出す(罰なし — REQUIREMENTS §3.5)。型が違っても壊さず nil
+//   * 組み立てに使った「今日」(dateLocal。DESIGN §3.4)は**省略可**: 無い(古いサーバー・古いキャッシュ)・
+//     null・形が違う("YYYY-MM-DD" でない)は nil のまま持ち、`updatedAt` から保守的に判定する
+//     (LocalNotificationID.completionOnItsOwnDay)
 // - このファイルは Lien / LienWidget / LienNSE の3ターゲットでソース共有される(project.yml 参照)。
 //   Foundation 以外に依存させないこと。
 
@@ -50,6 +55,13 @@ enum PlantMood: String, Equatable, Sendable {
     case fidget
     /// 2日連続未達成のしょんぼり
     case sad
+}
+
+/// ペアのプラン(REQUIREMENTS §3.14 / §5)。メンバーの users.premium_until からサーバーが導出する
+/// (plan カラムは持たない)。アプリは「自分の購読 ∪ pairPlan == .premium」でプレミアムを判定する
+enum PairPlan: String, Codable, Equatable, Sendable {
+    case free
+    case premium
 }
 
 extension PlantMood: Codable {
@@ -71,6 +83,13 @@ struct PairSnapshot: Equatable, Sendable {
     var pairId: String?
     /// サーバーが snapshot を組み立てた時刻(ISO8601)
     var updatedAt: Date
+    /// この snapshot を組み立てるのに使った「今日」(サーバーの `dateLocal`。date_local "YYYY-MM-DD")。
+    /// `todayMeDone` / `todayPartnerDone` は**この日の**完了(2026-10-20・issue #72)。サーバーは checkin /
+    /// checkin-cancel / nudge の snapshot を、クライアントが送った日付を「今日」として組み立てる(その日が確定する
+    /// 翌日の 1:00 まで)。そのため `updatedAt` の日付とは 1 日ずれることがあり、`updatedAt` からは
+    /// 「どの日の完了か」を決められない。nil = キーが無い(古いサーバー・古いキャッシュ)・null・形が違う
+    /// → `updatedAt` から保守的に判定する(`LocalNotificationID.completionOnItsOwnDay`)
+    var dateLocal: String? = nil
     var streakCurrent: Int
     var streakBest: Int
     var todayMeDone: Bool
@@ -99,6 +118,9 @@ struct PairSnapshot: Equatable, Sendable {
     /// 古いキャッシュ)・null(ソロ、またはサーバーが残数を読めていない)・型違い → バッジを出さない。
     /// ペアの2人に同じ値が見える(受信者視点で反転しない)
     var ticketBalance: Int? = nil
+    /// ペアのプラン(pairPlan)。メンバーのどちらかがプレミアムなら .premium。
+    /// キーが無い(古いサーバー・古いキャッシュ)・未知の値は .free(課金していない側に倒す)
+    var pairPlan: PairPlan = .free
 }
 
 // MARK: - Codable(§3.4 のキー名と一字一句一致させる)
@@ -108,6 +130,7 @@ extension PairSnapshot: Codable {
         case schemaVersion
         case pairId
         case updatedAt
+        case dateLocal
         case streakCurrent
         case streakBest
         case todayMeDone
@@ -125,6 +148,7 @@ extension PairSnapshot: Codable {
         case plantName
         case hasPartnerPhotoToday
         case ticketBalance
+        case pairPlan
     }
 
     init(from decoder: Decoder) throws {
@@ -133,6 +157,8 @@ extension PairSnapshot: Codable {
         schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
         updatedAt = try c.decode(Date.self, forKey: .updatedAt)
         pairId = try c.decodeIfPresent(String.self, forKey: .pairId)
+        // 組み立てに使った「今日」: 省略可。無い・null・形が違うは nil(古いサーバーと同じ道に落とす)
+        dateLocal = PairSnapshot.normalizedDayKey(try? c.decodeIfPresent(String.self, forKey: .dateLocal))
         streakCurrent = try c.decodeIfPresent(Int.self, forKey: .streakCurrent) ?? 0
         streakBest = try c.decodeIfPresent(Int.self, forKey: .streakBest) ?? 0
         todayMeDone = try c.decodeIfPresent(Bool.self, forKey: .todayMeDone) ?? false
@@ -152,6 +178,8 @@ extension PairSnapshot: Codable {
         hasPartnerPhotoToday = try c.decodeIfPresent(Bool.self, forKey: .hasPartnerPhotoToday) ?? false
         // 残数: 省略可。無い・null・型違いは nil(バッジを出さない)。0 はそのまま 0(0枚でもバッジを出す)
         ticketBalance = try? c.decodeIfPresent(Int.self, forKey: .ticketBalance)
+        // プラン: 省略可。無い・null・未知の値・型違いは free(課金していない側に倒す)
+        pairPlan = (try? c.decodeIfPresent(PairPlan.self, forKey: .pairPlan)) ?? .free
     }
 
     func encode(to encoder: Encoder) throws {
@@ -159,6 +187,8 @@ extension PairSnapshot: Codable {
         try c.encode(schemaVersion, forKey: .schemaVersion)
         try c.encode(pairId, forKey: .pairId) // nil は明示的に null として書く(§3.4 "uuid | null")
         try c.encode(updatedAt, forKey: .updatedAt)
+        // 「今日」は、持っているときだけ書く(キーが無い snapshot を、書き出しで日付のキーに変えない)
+        try c.encodeIfPresent(dateLocal, forKey: .dateLocal)
         try c.encode(streakCurrent, forKey: .streakCurrent)
         try c.encode(streakBest, forKey: .streakBest)
         try c.encode(todayMeDone, forKey: .todayMeDone)
@@ -183,6 +213,7 @@ extension PairSnapshot: Codable {
         try c.encode(hasPartnerPhotoToday, forKey: .hasPartnerPhotoToday)
         // 残数は、nil でもキーを省略せず null で書く(サーバーの形と同じ。DESIGN §3.4「キーは省略せず null で出す」)
         try c.encode(ticketBalance, forKey: .ticketBalance)
+        try c.encode(pairPlan, forKey: .pairPlan)
     }
 }
 
@@ -194,6 +225,23 @@ extension PairSnapshot {
     var hasActivePromise: Bool {
         guard let title = myPromiseTitle else { return false }
         return !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+// MARK: - 日付のキー(date_local)
+
+extension PairSnapshot {
+    /// `dateLocal` の形("YYYY-MM-DD")を確かめる。崩れた値は nil にして、キーが無い古いサーバーと同じ道に落とす
+    /// (日付として解釈できない値で、通知の取り消しを誤らないため)。存在する日かどうかは暦に任せる
+    /// (`LocalNotificationID.date(fromDayKey:calendar:)` が往復で確かめる)
+    static func normalizedDayKey(_ raw: String?) -> String? {
+        guard let raw, raw.count == 10 else { return nil }
+        let parts = raw.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
+              parts.allSatisfy({ $0.allSatisfy { $0.isASCII && $0.isNumber } })
+        else { return nil }
+        return raw
     }
 }
 
