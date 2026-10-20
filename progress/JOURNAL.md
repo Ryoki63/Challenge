@@ -797,3 +797,11 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 06:23 — #155 MK6 #79 Chrome画像選択・08:00体制復旧 (ops-exec)
+- 着手: 指定 worktree `Challenge-155`、ブランチ `consilium/155-ops-mk6-79-08-00-chrome` を確認。開始時 tracked/untracked 差分なし。`git pull --rebase` は Already up to date。
+- 受入: #79 の既存オーナー返信を再質問せず、画像選択異常を診断し、2026-10-21 08:00 JST のcomputer-operator実セッションを証拠付き確保または具体的未確保理由を #79 へ返す。実行前条件が揃わない限り投稿・予約しない。
+- 06:24 実測: ネイティブ Chrome は「フォルダへ移動」入力欄ではなく、ルート `/` のファイル選択シートを表示。閉じる操作でシートは解除されず「最近の項目」へ移動し、Escape でルート `/` のシートへ戻った。親のX画像選択画面には復帰せず。既報のパス入力2失敗に対する3回目は行わず、別素材も使っていない。今回の停止画面は保存せず、既存証跡はPR #154のもの。
+- 06:24 割当調査: `consilium jobs due` は `due=[]`, `allowed=[]`。runtime status にあるのは本Issueの実行lease (PID 5068、06:22:51開始、07:52:51期限) で、08:00時刻ジョブではない。CLIに将来時刻枠の登録コマンドがなく、接続ツールにもcomputer-operator予約経路なし。このworktree外/HQ設定は禁止範囲のため変更せず、担当・開始時刻・ジョブIDなし、08:00枠未確保と判定。
+- 06:26 #79 へ復旧実測と08:00未確保の具体的理由をコメント (issuecomment-6301838850)。投稿/予約・購入・認証・アカウント設定・別素材使用なし。Chromeシートは親画面に戻らず、投稿/画像/代替テキスト/下書き状態・24時間観測は未完了。
+- 結果: Issue本文の受入は技術障害の再現記録と時刻担当未確保の明示まで実施。投稿実行体制は未確保のため、#79 の投稿/24h観測は未完了。
