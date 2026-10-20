@@ -1,15 +1,64 @@
 # App Review Notes — Lien (v1.0)
 
-- Status: **FINAL DRAFT — 文書側は 2026-10-20 に確定。実ビルド(内部 TestFlight)での確認だけが残り**(G0 #38 の Apple 承認後。TASKPLAN §9.2)
-- Last updated: 2026-10-20
+- Status: **提出用文書を整理済み / 提出不可**。実ビルド・署名・公開URL・連絡先・UGC対策・Privacy申告のゲートは [G5-CHECKLIST.md](store_metadata/G5-CHECKLIST.md) を正とする(#115、2026-10-20)。文書完成を実機適合や審査承認とは扱わない。
+- Last updated: 2026-10-21 JST
 - Related issues: #30 (this task) / #8 (Supabase deploy, G0 待ち) / #23 (T23: 設定・通報・ブロック・アカウント削除。**実装済み** 2026-10-13) / #28 (T28準備は済み。内部 TestFlight は G0 の後) / #55 (W1: ソロモード・招待シート。完了) / #58 (レビューで見つかった文書の食い違い。**T30 で 2026-10-20 に反映**) / #59 (PV: 相手の今日の写真。**実装済み**) / #61 (§1.1・§1.2 を W1 の実装に合わせた) / #65 (§1.1 の約束の編集の記述・ソロの植物の記述、§1.2 手順5の前提を実装に合わせた) / #69 (§1.1・§1.2・§1.4・§1.5 と §2.6 を PV・T23 の実装に合わせた) / #81 (公開目標 10/31・機能凍結 10/24 への前倒し)
 - 正本の優先順位: `docs/REQUIREMENTS.md` → `docs/DESIGN.md` → `docs/CONCEPT.md`(矛盾時はこの順で優先)
 
-> 2026-10-20 の更新で、依存ゼロの文書側を確定しました: §1.3 の審査用デモ運用(相手役の操作スクリプト+提出日に発行する招待コード)、§2.1 の App Privacy 草案(D6 と `PrivacyInfo.xcprivacy` に一致)、§2.2 の年齢レーティング(UGC 設問)、§2.7 のプライバシーマニフェスト、#58 の引き継ぎ(D6・D3)の反映です。**残るのは、G0 後の内部 TestFlight での実ビルド確認(§1.1・§1.4・§1.5)と、審査提出日(10/27)に App Store Connect の Notes for Review へ招待コードを記入する運用だけ**です。コードは 72 時間で失効する使い捨てなので、リポジトリには書きません(§1.3)。
+> #115 更新: 以下の詳細デモ手順は実装照合済みの説明で、実機再現済みとは限らない。提出用の短い英文は §0、質問票回答は [ASC-ANSWERS.md](store_metadata/ASC-ANSWERS.md)、画面別操作は [ASC-ENTRY.md](store_metadata/ASC-ENTRY.md)。旧記録の「実ビルド確認だけが残り」「依存はSupabaseだけ」「4+確定」は現状の証拠にならない。G4 #42 の承認コメントがあっても、空の値や404は解消しない。
+
+## 0. Notes for Review に貼る本文
+
+**オーナー向け**: G5の入力開始前条件を満たした後、下の英文だけをコピーし、**必須の2組**の実コード・失効日時・運用連絡手順をASC内で末尾に追加する。REQUIREMENTS §8の2組を、審査員の端末数にかかわらず用意する。未発行のまま貼付/提出しない。コード・セッション・審査連絡先はGit/Issue/PRへ書かない。全文の長い§1や内部日本語記録を丸ごと貼らない。本文は無料v1.0用で、課金が有効なビルドには使用禁止。
+
+```text
+Lien is an iPhone app for keeping one daily promise with a chosen partner.
+No username, password or separate test account is needed. An anonymous
+session is created automatically during onboarding. There is no third-party
+or social login. Internet access is needed for server-backed actions.
+
+Solo demo (one device): Tap はじめる, enter any nickname, choose an emoji,
+and agree to the Terms of Use and Privacy Policy. Allow notifications or tap
+あとで; declining notifications does not prevent use. Set a promise and tap
+この約束にする. On Home, tap できた! to check in; 取り消す undoes today's entry.
+Pairing is optional. In solo mode there are no shared photos or partner actions.
+
+Pair demo (two devices): Complete onboarding and promise setup on each.
+On A: Home > 相手を招待する > 招待をつくる. On B: Home > 相手を招待する >
+コードを入力, enter A's case-sensitive 8-character code and tap ペアになる.
+Invites expire after 72 hours and are single use. Both users can check in,
+see each other's promise and send preset nudges/reactions. Refresh Home
+by returning to the foreground. Push needs a physical iPhone and permission;
+background widget updates are scheduled by iOS and are not instantaneous.
+
+Optional photo: After a paired check-in, tap 写真を添える and select an image
+with the system photo picker. Only the chosen photo is shared with the
+current partner. No camera, location, contacts or full photo-library access
+is requested. The partner sees only today's photo, not a photo album.
+
+Safety: Long-press a partner photo, nickname, promise or plant name to
+report or block. Full-screen photos also have a menu. Settings > サポート >
+不適切な内容を通報する opens an email draft for the user to review and send.
+Blocking dissolves the pair after confirmation. No public feed or user search.
+
+Account deletion: Settings > アカウント > アカウントを削除する, confirm twice.
+This deletes the user's account and associated data and ends the pairing.
+If a network error occurs, the app offers a retry rather than reporting success.
+
+This submission is the free v1.0 release; no purchase is required or offered.
+Notifications are optional daily reminders and partner activity alerts.
+Photos are optional. The widget is added from the iOS widget gallery.
+
+If only one device is available, use either of the two fresh partner invite
+codes supplied below by the operator, or contact us via App Review messages
+if a code has expired or has already been used. Solo mode remains accessible.
+```
+
+権限用途の提出用説明は上記の通知・写真の段落。通知許可は iOS ダイアログを使い、独自の UsageDescription キーは作らない。PhotosPicker は選択写真だけを取得する。カメラ・位置・連絡先・ATT の用途文は不要(利用していると虚偽記入しない)。Review Contact の実名/電話/メールはオーナーがASCだけで入力する。
 
 ---
 
-## 1. App Review 用ノート本文(英語・App Store Connect "Notes for Review" 欄に貼る想定)
+## 1. 審査手順の詳細参照(貼付本文は§0だけ)
 
 ### 1.1 Solo mode works without a pair (no "must have 2 users" blocker)
 
@@ -87,14 +136,14 @@ Lien v1.0 uses **anonymous authentication only** (Supabase anonymous sign-in). T
 
 Lien v1.0 uses **anonymous authentication** (see §1.2): there are **no usernames, passwords or demo credentials to hand over**. For App Review, a "test pair" is therefore provided as **an invite code plus a partner account that we operate**, not as an account/password pair.
 
-Two demonstrations are prepared. **Demo B needs only one device and is the recommended path for App Review**; Demo A (two devices) is in §1.2.
+Two demonstration procedures are documented (not provisioned in this task). **Two operated demo partners and their valid invite codes are mandatory under REQUIREMENTS §8**, regardless of the reviewer's device count. Demo A is an additional self-service two-device path in §1.2, not a substitute for supplying those two partners. Demo B needs only one device but depends on fresh codes and an available operator; do not present it as an unattended, permanently available demo.
 
 | Demonstration | What the reviewer does | What we provide | Where the value lives |
 |---|---|---|---|
 | **A. Two devices (self-service)** | Complete onboarding and promise setup on two devices, then pair them with an invite code (§1.2, steps 1–3) | Nothing account-specific | — |
 | **B. One device + our partner (2 pairs)** | Complete onboarding and promise setup, open the invite sheet from Home, enter the 8-character code under "コードを入力", and tap "ペアになる" | Two partner accounts ("レビュー相手1" / "レビュー相手2") and **fresh invite codes** | App Store Connect → App Review Information → Notes for Review (entered on the submission day; **never committed to this repository**) |
 
-**Why the codes are not in this file:** an invite is valid for **72 hours and can be used once** (`INVITE_TTL_HOURS = 72` in `supabase/functions/invite-create/core.ts` / REQUIREMENTS §3.2). A code written here would be expired by the time a reviewer reads it, and a live code in a public repository would let anyone pair with the demo partner. The operator issues the codes on the submission day and, if review is delayed past 72 hours, issues new ones and updates the Notes for Review. **No app update and no new build are needed for that** — only the ASC text changes.
+**Why the codes are not in this file:** an invite is valid for **72 hours and can be used once** (`INVITE_TTL_HOURS = 72` in `supabase/functions/invite-create/core.ts` / REQUIREMENTS §3.2). A live code in a public repository would let anyone pair with the demo partner. The operator issues codes on submission day, records their expiry in ASC, and checks availability through review. If delayed/consumed, use `new-invite` only for an unpaired slot; if already paired, prepare a separate new demo partner rather than silently breaking the reviewer's pair. Code renewal does not require a new binary, but **ASC fields may be locked during review**: send refreshed instructions through App Review messages when needed; never claim the text can always be edited. Access dependent on expiring codes remains a 2.1 gate, not an unconditional PASS.
 
 **Operator procedure (the partner side).** The tool is `products/lien/scripts/review-demo/partner.sh` (a thin wrapper around `partner.ts`); usage and the security notes are in `products/lien/scripts/review-demo/README.md`. It uses only the public anon key (no service-role key), keeps the anonymous session in a local file outside the repository (default `~/.lien-review-demo/partner-<slot>.json`, mode 0600), and never prints tokens.
 
@@ -172,13 +221,13 @@ REQUIREMENTS §8(6項目。2026-10-13 に、オンボの規約への明示の同
 | ユーザー ID | `NSPrivacyCollectedDataTypeUserID` | auth の匿名ユーザー ID(`users.id`) | アプリ機能(アカウント・ペア・RLS) | する | しない |
 | デバイス ID | `NSPrivacyCollectedDataTypeDeviceID` | `users.push_token`(APNs のデバイストークン) | アプリ機能(通知の送信) | する | しない |
 
-- **タイムゾーン**(`users.timezone`): 位置情報ではなく、その日のチェックインを判定するためだけに使う。App Privacy に独立したカテゴリが無いため、提出時に「その他のユーザーコンテンツ」への包含でよいか、申告が要るかを質問票で確認する(マニフェストは `OtherUserContent` で包含している)。
-- **収集しないもの**: 位置情報・連絡先・カレンダー・HealthKit・金融情報・購入(v1.0 は課金なし)・検索履歴・ブラウジング履歴・**利用状況(Usage Data)**・診断・広告データ。**v1.0 は分析 SDK も計測専用テーブルも入れず、アプリは計測のために何も送らない**(D6 / REQUIREMENTS §7)。クラッシュ収集 SDK も無い(Apple が利用者の同意で集めるクラッシュレポートは、アプリが送るものではない)。
-- **トラッキング**: なし。ATT の対象になる第三者トラッキング・広告 SDK は無く、外部依存は `supabase-swift` だけ。`NSPrivacyTracking` は app / NSE / widget の3マニフェストとも `false`、`NSPrivacyTrackingDomains` は空。
+- **タイムゾーン**(`users.timezone`): 日付判定の端末設定であり、位置情報APIによる取得ではない。入力用回答案ではOther Dataとして保守的に分類し、現行manifestとの分類の違いを提出前に解消する。
+- **計測の境界**: D6 / REQUIREMENTS §7は、分析SDKや計測専用テーブルを追加せず既存DBのcheckin/nudge/inviteをSQL集計する方針。専用送信なしをAppleのUsage Data/Analytics用途なしと同一視しない。位置/連絡先/HealthKit等のAPI不使用と、約束・写真・サポート・SDK/ログの実収集も別。非収集と申告する範囲は [ASC-ANSWERS.md §2](store_metadata/ASC-ANSWERS.md#2-app-privacy) の棚卸し条件に従う。
+- **トラッキング**: 現行ソースにATT/IDFA取得・広告SDKは無い。依存は `supabase-swift` **と RevenueCat**(T33)。3マニフェストとも `NSPrivacyTracking=false`・ドメイン空だが、それだけでSDKの非収集を証明しない。無料v1.0でRevenueCatが初期化/通信しないことを提出ビルドで検証する。設定値/キー自体は読まず、担当者の非初期化証跡を参照する。
 - **Sign in with Apple**: v1.0 は提供しない(D3。§1.2)。したがって v1.0 の申告に SIWA の識別子(`users.apple_sub`)は含めない。v1.0.1 で追加するときは、`User ID` として申告し、`privacy-policy.md` §8 と本表を同時に更新する。
 - **App Privacy の回答とマニフェストの一致**: 上の5型が `Lien/PrivacyInfo.xcprivacy` の `NSPrivacyCollectedDataTypes` と一致する。NSE と widget のマニフェストは収集データ・必須理由 API とも空(ペイロードを App Group に書く/読むだけ)。この一致は `products/lien/scripts/ops/marketing_docs_static_test.ts` が検査する(2026-10-20 追加)。
 
-**状態: 草案を確定(2026-10-20)。D6(計測しない)と D3(SIWA は v1.0.1)を反映し、マニフェストと一致させた。** 残るのは、App Store Connect の質問票での最終確認(G4/G5。カテゴリ名・「Analytics 用途」の要否)と、G4 の連絡先・Pages 公開。機能のために保存する記録を品質改善に集計する場合の「用途」の申告は、提出時に質問票で決める。
+**状態: 上表は現在の自前マニフェスト5型との対応表で、完全な提出回答ではない。** [ASC-ANSWERS.md §2](store_metadata/ASC-ANSWERS.md#2-app-privacy)を入力用正本とする。DB既存データの行動集計もAppleのAnalytics用途に該当し得る(分析SDKなしとは別)。タイムゾーン・サポートメール・SDK分を含む回答案とマニフェスト/ポリシーの差異を同書で明示した。解消前は申告確定にしない。
 
 ### 2.2 年齢レーティング(Age Rating)質問票の想定回答
 
@@ -192,7 +241,7 @@ Apple は 2025-07-24 に年齢レーティングを改定し、**4+ / 9+ / 13+ /
 | Capabilities | 無制限の Web アクセス(アプリ内ブラウザ)があるか | いいえ | アプリ内ブラウザは無い。規約・ポリシー・招待ページは Safari で開き、招待ページは `lien://` でアプリに戻るだけ |
 | Capabilities | ユーザー生成コンテンツ(UGC)があるか | **はい** | ペアの相手にだけ見える写真(任意)・ニックネーム・約束の文・植物の名前。公開フィード・検索・ユーザー一覧は無い |
 | Capabilities | ソーシャルメディアか | いいえ | フィード・フォロー・公開プロフィール・拡散が無い。1ユーザー1ペアの閉じた共有だけ |
-| Capabilities | メッセージ・チャットがあるか | いいえ | 自由文の送受信が無い。つつきとリアクションは定型スタンプのみ |
+| Capabilities | メッセージ・チャットがあるか | **はい(保守的な回答案)** | Appleの定義は自由文に限定しない。ペアへの写真共有・定型ナッジ/リアクションによる直接通信を隠さない |
 | Capabilities | 広告があるか | いいえ | 広告 SDK なし(§2.1) |
 | Medical or wellness | 健康・ウェルネスの話題があるか | **いいえ(要確認)** | アプリは習慣の記録であって、健康・運動・食事の助言やコンテンツを提供しない。利用者が自分で決めた約束(例: 散歩)を記録するだけ。**Apple が習慣アプリを wellness と見なす場合は「はい」= 9+** になるので、提出時に質問票の説明を確認して決める(推奨: いいえ。根拠をこのノートに書く) |
 | Medical or wellness | 医療・治療の情報があるか | いいえ | 無い |
@@ -202,36 +251,35 @@ Apple は 2025-07-24 に年齢レーティングを改定し、**4+ / 9+ / 13+ /
 
 #### 想定結果
 
-- 上の草案どおりなら **4+**(Capabilities の UGC = 4+、Messaging / Advertising = 4+)。**「健康・ウェルネス」を「はい」にすると 9+**。
+- **4+は保証しない**。上表は過去の検討経緯を含み、貼付回答の正本は [ASC-ANSWERS.md §1](store_metadata/ASC-ANSWERS.md#1-年齢レーティング)に置いた全設問表。健康/ウェルネスは提供者の助言の有無で回答する。結果はOS/地域でも変わるためAppleの算出値を記録する。
 - 4+ は `terms.md` 第4条(すべての年齢の方が利用できる内容)・`aso.md` の記載と一致する。9+ にする場合は、規約第4条の「4+」の文言も同時に直す(現在は 4+ と書いてある)。
-- 自動計算より**高い**レーティングへの上書きはできるが、**低い**レーティングへの上書きはできない。迷う場合は高く申告するのが安全だが、本アプリは UGC をペア内だけに閉じ、通報・ブロック・規約同意・運営の連絡先(§1.4)を備えるので、4+ の根拠は説明できる。
+- Appleの質問への事実回答を優先し、低いレーティングに合わせて回答を調整しない。閉じたペアであることや規約同意だけでは、UGCの安全対策の充足を証明できない。
 
 #### UGC(Guideline 1.2)との関係
 
-UGC の申告は、レーティングだけでなく Guideline 1.2 の4要件(不適切な内容への対策・通報・ブロック・公開された連絡先)を満たす必要がある。本アプリの対応は §1.4・§2.6 のとおり(通報・ブロック・規約同意は実装済み。連絡先だけ G4 待ち)。
+UGC の申告は、レーティングだけでなく Guideline 1.2 の要件を満たす必要がある。導線は §1.4・§2.6 にあるが、宛先空・公開URL404・フィルタ方式/適時対応の証跡未確認が残る。「連絡先だけ待ち」「適合済み」とはしない。
 
-**状態: 草案を確定(2026-10-20)。** 残るのは App Store Connect の質問票での最終確認(特に「健康・ウェルネス」の回答)と、G4 の連絡先。**質問票の正確な文言は提出時に確認する**(要確認)。
+**状態: 入力用回答案を用意、確定申告/適合は未確認。** 全設問と条件はASC-ANSWERS、提出前の不足はG5-CHECKLISTを正本とする。
 
 参照: [Updated age ratings in App Store Connect(Apple Developer News, 2025-07-24)](https://developer.apple.com/news/?id=ks775ehf) / [Age ratings values and definitions](https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions)
 
 ### 2.3 Export Compliance(暗号化の輸出コンプライアンス)
 
 - `products/lien/ios/project.yml` の Info.plist 設定で **`ITSAppUsesNonExemptEncryption: false`** が既に設定済み(project.yml:54、T06実装時点)。
-- 本アプリが使う暗号化は標準のHTTPS/TLS通信のみ(Supabase REST/Functions呼び出し、APNs)。独自暗号アルゴリズムの実装・カスタム暗号ライブラリは使用していない(コード上確認: 外部依存はsupabase-swiftのみ、DESIGN §3.1)。
+- 自前コードの通信は標準HTTPS/TLS(Supabase、APNs)。依存はsupabase-swiftとRevenueCat。依存バイナリも含む提出archiveの棚卸し前に「全暗号処理がOSだけ」と断定しない。
 - 一般的な理解として、標準OS提供の暗号化(HTTPS/TLS)のみを使うアプリは輸出コンプライアンス上の「免除」対象になることが多いという認識があるが、**この分類の正確な適用条件(免除カテゴリの文言・該当条文)はApple/米国輸出関連規則の正確な引用が必要なため要確認**とし、本ドラフトでは断定しない。
 - `ITSAppUsesNonExemptEncryption: false` を設定済みであれば、通常はApp Store Connect提出時の輸出コンプライアンス質問が自動的にスキップされる(Info.plistの値が優先される)という理解があるが、これも**挙動の詳細は要確認**。
 
-**状態: Info.plist設定は準備済み(project.yml:54、既存)。質問票が出た場合の回答根拠整理も準備済み。提出時(T28)に実際の挙動を確認し、想定外の挙動であれば本ファイルを更新する。**
+**状態: ソースのfalse設定を確認、提出archive未確認**。Apple公式の「OS内の暗号化のみ」の分岐と「暗号化を一切使わない」は別。[ASC-ANSWERS.md §3](store_metadata/ASC-ANSWERS.md#3-輸出コンプライアンス)の回答表を使い、独自/SDK暗号があれば提出を止めて再分類する。
 
 ### 2.4 Support URL / Privacy Policy URL の公開先
 
-- 現状、`products/lien/marketing/legal/privacy.html` / `terms.html` は**リポジトリ内に存在するが、まだどこにもホストされていない**。**2026-10-20 に実際に開いて HTTP 404 を確認した**(`https://ryoki63.github.io/Challenge/lien/legal/privacy.html` と `.../lien/i/`)。
-- `products/lien/marketing/legal/CHECKLIST-G4.md` 3節に「GitHub Pages の公開URLを確定する」とあるが、**具体的なURL(リポジトリ公開設定・パス構成)はまだ決定していない** — これは人間判断が必要な項目(下記「人間判断が必要な項目」参照)。
-- Support URL(問い合わせ先)についても、`terms.md`/`privacy-policy.md`の連絡先メールアドレスが`【要記入: G4: 連絡先メールアドレス】`のまま未確定。Support URLとして専用ページを作るか、`mailto:`リンクのみにするかも未決定。
-- 本リポジトリは `Ryoki63/Challenge` でPublicに設定済み(GitHub Pages自体は技術的に有効化可能な状態)。ただしこのリポジトリは本アプリ専用ではなく複数ドキュメントを含む構成のため、Pages公開時の対象ディレクトリ・公開範囲は要検討。
+- 法務HTMLは `marketing/legal/` と `web/site/lien/legal/` に存在する。確認URLの404は、そのURLで提供されていない証拠であり、他の全ホストの不存在を証明しない。
+- #76 の `web/site.json` は基点 `https://ryoki63.github.io/Challenge` を設定済み。配信物 `web/site/index.html` の公開予定先は **`https://ryoki63.github.io/Challenge/`**。同ページにサポート節があり、公開メール確定後のSupport URL候補もこのルートを使う。専用の `support.html` 生成物は存在しない。mailtoだけをSupport URLにしない。
+- `terms.md`/`privacy-policy.md`の連絡先は `【要記入: G4: 連絡先メールアドレス】` のまま。G4承認があっても実値を推測で埋めない。
 - アプリ側のリンク先は `SupportLinks.swift` の `webBaseURL` + `/lien/legal/{terms,privacy}.html` に集約してあり、公開後にこの2行(と `contactEmail`)を確定すれば全画面に反映される。**公開されるまで、外部テスト・審査に出す lien-release は HTTP 200 を確認できず止まる**(`internal_only` を除く)。
 
-**状態: 人間ゲート(G4/#42)待ち。本タスクでは決定不可 — 下記「人間判断が必要な項目」に記載。** 2026-10-20 時点の公開状況(404)を確認済み。
+2026-10-20 23:45 JST、初期候補5URLをGETして全て404。うち `/lien/` と `/lien/support.html` は現行生成先とは一致しないため入力先として採用しない。実際のルートURLは別途確認して [G5-CHECKLIST.md §3](store_metadata/G5-CHECKLIST.md#3-最終ゲート表) に記録する。「URLの構成」と「公開成功」を分ける。
 
 ### 2.5 テストペア2組の準備手順(審査用デモアカウント)
 
@@ -239,7 +287,7 @@ UGC の申告は、レーティングだけでなく Guideline 1.2 の4要件(�
 
 1. **アカウント情報は存在しない**(匿名認証)。「テストペア」は、**招待コード+開発者が操作する相手役**として提供する(§1.3)。
 2. 相手役は `products/lien/scripts/review-demo/partner.sh` で作る。`create --slot 1` / `--slot 2` で匿名ユーザー・約束・招待コードを用意し、`checkin`・`nudge`・`status`・`delete` で相手側の操作を再現する。公開の anon キーだけを使い、service-role キーは使わない。
-3. 招待コードは **72時間・1回きり**なので、提出日(10/27)に発行して App Store Connect の Notes for Review に記入する。リポジトリには書かない。レビューが遅れて失効したら `new-invite` で再発行し、Notes を差し替える(アプリの再提出は不要)。
+3. 招待コードは **72時間・1回きり**なので、提出日(10/27)に発行して Notes for Review に記入する。リポジトリには書かない。失効/使用済み時は§1.3の更新条件に従う。ASCの編集可否を決めつけず、ロック時は人間が審査メッセージで連絡する。本タスクでは発行・本番データ投入・ASC連絡は実施しない。
 4. 既存のG1計測用ペアとは分離した新しい匿名ユーザーで、使い捨て前提。レビュー後に `delete` で消す。
 5. Supabaseバックエンド(migration適用・functions デプロイ・匿名サインイン有効化)は2026-06-11時点で完了・稼働済み(詳細: `products/lien/scripts/g1/RUNBOOK.md`、issue #8/#38のJOURNAL記録)。G0(#38)の残項目(Apple Developer Program加入)はAPNs投入・実機G1計測・TestFlight提出に必要だが、デモ用の相手役を作ること自体の前提ではない。
 
@@ -255,6 +303,8 @@ UGC の申告は、レーティングだけでなく Guideline 1.2 の4要件(�
 | 不適切ユーザーの排除(block) | 長押しの「ブロック(ペアを解消)」と Settings → ペアを解消する(確認2段階)で共有を完全停止 | **実装済み(T23 #23)**。規約(terms.md第7条)記載済み |
 | 利用規約への同意 | オンボのニックネーム画面で、規約・プライバシーポリシーへの同意のチェックが入るまで「同意してはじめる」を押せない(リンクと禁止事項の注意書きつき)。規約・ポリシーへのリンクは設定にもある | **実装済み(T23 #23)**。旧「未確認事項」(issue #30 の敵対検証の懸念)は解消。実ビルドでの確認は T30。**2026-10-20 にコードで確認済み**(§1.1) |
 | コンテンツの連絡先情報公開 | 運営者連絡先(メール)は`terms.md`/`privacy-policy.md`に記載欄あり、現在プレースホルダ。アプリ側も `SupportLinks.contactEmail` が空(通報・お問い合わせのメールの宛先になる)。G4 で同じアドレスに揃える | **G4(#42)待ち** |
+| 不適切コンテンツのフィルタ | 通報・規約同意・ペア限定公開は事前フィルタの代わりではない | **⚠️ 適合性未検証**。1.2のフィルタ要件を満たす方式・実装/運用証跡が必要。存在しない自動検閲を審査ノートに書かない |
+| 通報への適時対応 | OPS §13の対処手順だけでは、監視担当・対応時間・実際の応答を保証しない | **⚠️ 未検証**。有効な通報宛先と担当/一次対応期限の運用証跡を添えてから提出 |
 
 ### 2.7 プライバシーマニフェスト(PrivacyInfo.xcprivacy)
 
@@ -271,7 +321,7 @@ T28準備(#28)で追加した3つのマニフェストを、提出前の最終�
 - `ios/LienTests/PrivacyManifestTests` が Swift ソースを走査し、使っているのに宣言が無い必須理由 API を検出する。依存パッケージ分は `lien-release` の dry-run が archive の中身から棚卸しする(シンボルは宣言が無いと失敗する)。
 - **v1.0.1 で Sign in with Apple を足すとき**: `users.apple_sub` を `User ID` として申告し、`NSPrivacyCollectedDataTypes` に追加する(既に `UserID` があるため、用途の追記で足りるかは Apple の質問票で確認)。`privacy-policy.md` §8 と §2.1 を同時に更新する。
 
-**状態: 準備済み(2026-10-20 に §2.1 と一致を確認)。** 残るのは、提出時の App Store Connect の回答との最終突き合わせ(G4/G5)と、`lien-release` の dry-run での必須理由 API の棚卸し(CI で実施済み)。
+**状態: 自前マニフェストと説明の5型対応を確認。提出archive/SDK全体は未確認。** 過去のunsigned dry-runは署名済み提出物の棚卸しを代替しない。App Privacyの用途/追加型との未整合は§2.1とASC-ANSWERSのとおり。
 
 ---
 
@@ -289,11 +339,13 @@ T28準備(#28)で追加した3つのマニフェストを、提出前の最終�
 
 ## 4. 人間判断が必要な項目(まとめ)
 
-- **Support URL / Privacy Policy URL の公開先が未確定**: GitHub Pagesのどのパスで `privacy.html` / `terms.html` を公開するか(リポジトリ公開範囲含む)。`CHECKLIST-G4.md` 3節参照。G4(#42)で決定。**2026-10-20 時点では 404**(§2.4)。
+**#115時点の優先記録**: G4 #42 の2026-10-20 21:40承認コメントはあるが「本文に入っている値」は現行ではプレースホルダ。4項目の値を推測しない。オーナーへの質問は [G5-CHECKLIST.md §5](store_metadata/G5-CHECKLIST.md#5-引継ぎと判断依頼)に1件へ集約。以下は旧台帳であり、提出可否/入力回答はG5-CHECKLIST/ASC-ANSWERSを優先する。
+
+- **Support URL / Privacy Policy URL の公開**: §2.4の構成はあるが、公開/本文/実値の反映証拠が必要。公開先は#76で承認済みのため再承認は求めない。
 - **事業者名・連絡先メールアドレス・制定日・管轄裁判所が未確定**: `terms.md` / `privacy-policy.md` の `【要記入: G4: ...】` 箇所。G4(#42)で決定。アプリ側の `SupportLinks.contactEmail` も同じ値にする。
 - **年齢レーティング質問票の最終回答**: 草案は 4+(§2.2)。**「健康・ウェルネス」を「はい」にすると 9+** になるため、App Store Connect の質問票の説明を見て決める(G4/G5)。9+ にする場合は `terms.md` 第4条の「4+」も直す。
 - **Export Compliance 質問票の正確な回答**: `ITSAppUsesNonExemptEncryption: false` は設定済み(§2.3)。Apple の最新の質問文言は提出時に確認する(要確認)。
 - **提出日(10/27)の招待コード発行と Notes for Review への記入**: §1.3 の運用。コードは 72 時間で失効するため、リポジトリではなく App Store Connect に書く。失効時は `partner.sh new-invite` で再発行する(人間の操作)。
-- ~~**利用状況計測手段(自前テーブル or TelemetryDeck)が未確定**~~ → **D6(2026-10-12)で確定**。v1.0 は分析 SDK も計測専用テーブルも入れず、アプリは計測のために何も送らない(REQUIREMENTS §7)。§2.1 と `privacy-policy.md` 第1条をその方針に直した(2026-10-20)。残るのは App Store Connect の「用途」の申告の確認だけ。
+- **既存DB集計とデータ申告の整合**: D6はSDK/計測専用テーブルなしの方針。既存データのAnalytics用途やサポート等の申告を不要にはしない。ASC/manifest/公開ポリシーの不整合を担当者が解消するまで提出不可。
 - ~~**Sign in with Apple の扱い**~~ → **D3 で v1.0.1 に移動済み**。v1.0 のプライバシーポリシー・App Privacy・マニフェストから SIWA の識別子を外した(2026-10-20)。v1.0.1 で追加するときに、§2.1・§2.7・ポリシー §8 を同時に更新する。
 - ~~**オンボーディングでの利用規約同意UIの要否**~~ → 2026-10-13 に T23(#23)で実装した(§1.4・§2.6)。残るのは、実ビルドでの確認(T30)と、リンク先の公開(Pages・G4 — 上の「Support URL / Privacy Policy URL の公開先」)。
