@@ -14,10 +14,13 @@
 //   ストリークは、1 日でも抜けるとリセットされる(お休みチケットで守られない限り)。何日も先の夜 9 時に「ふたりの N 日」と
 //   出すのは、その日までふたりが続けた場合の話で、アプリを開かないまま途切れた記録について通知してしまう。そこで:
 //     - snapshot が今日のもの: 今日(まだふたりそろっていなければ)。今日すでにふたりそろっていれば、**明日**(記録は続いていく)
-//     - snapshot が昨日のもの(同期できないまま日をまたいだ)で、昨日ふたりそろっていた: 今日(昨日までの記録が続いている)
+//     - snapshot が昨日のもの(同期できないまま日をまたいだ・0:00〜1:00 に前の日の日付で組み立てられた)で、
+//       昨日ふたりそろっていた: 今日(昨日までの記録が続いている)
 //     - それ以外(2 日以上前・日付が先・ふたりそろった日が分からない・ストリークが 0)は予約しない
-//   完了の組み合わせが確かでないとき(日付が変わって 1:00 までに作られた snapshot — TodayCompletion)は、完了を前提にせず、
-//   「どちらも未完」の言い方で今日の分を予約する。
+//   「snapshot がいつのものか」は、サーバーが組み立てに使った「今日」(snapshot.dateLocal)で決める。キーが無い古い
+//   サーバーの snapshot だけ updatedAt の日付で代用する。完了の組み合わせが確かでないとき(キーが無い snapshot で、
+//   日付が変わって 1:00 までに組み立てられた — TodayCompletion)は、完了を前提にせず「どちらも未完」の言い方で
+//   今日の分を予約する。
 
 import Foundation
 
@@ -72,9 +75,8 @@ enum StreakRiskPlan {
     /// どの日に・どの言い方で出すか(時刻を過ぎたかは見ない)。ペアのストリーク(続いている日数が 1 以上)が無ければ nil
     static func target(snapshot: PairSnapshot, now: Date, calendar: Calendar) -> Target? {
         guard snapshot.pairId != nil, snapshot.streakCurrent > 0 else { return nil }
-        let today = calendar.startOfDay(for: now)
-        let snapshotDay = calendar.startOfDay(for: snapshot.updatedAt)
-        guard let daysSinceSnapshot = calendar.dateComponents([.day], from: snapshotDay, to: today).day else { return nil }
+        // snapshot の「今日」(サーバーの dateLocal。無ければ updatedAt の日)が、いまのローカル日から何日前か
+        guard let daysSinceSnapshot = snapshot.daysSinceSnapshotDay(now: now, calendar: calendar) else { return nil }
 
         switch daysSinceSnapshot {
         case 0: // snapshot は今日のもの

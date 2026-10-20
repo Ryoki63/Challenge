@@ -4,6 +4,7 @@
     "schemaVersion": 1,
     "pairId": "1f0c5a4e-9d3b-4c1a-8f2e-7b6d5a4c3b2a",
     "updatedAt": "2026-06-11T08:30:00.000Z",
+    "dateLocal": "2026-06-11",
     "streakCurrent": 6,
     "streakBest": 6,
     "todayMeDone": false,
@@ -20,6 +21,7 @@
     "plantMood": "fidget",
     "plantName": "みどり",
     "hasPartnerPhotoToday": false,
-    "ticketBalance": 2
+    "ticketBalance": 2,
+    "pairPlan": "free"
   }
 }

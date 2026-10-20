@@ -774,6 +774,53 @@ enum Strings {
         static let later = "あとで"
     }
 
+    /// プレミアム(課金)のペイウォール(T33 / REQUIREMENTS §3.14)。
+    /// 3文脈(節目・アルバム30日超・チケット切れ)で見出しと説明を出し分ける。
+    /// 押し売りしない: 閉じるボタンを常に置き、罰・恥・煽りの語は使わない(§3.5)。
+    /// 価格・トライアル日数は offerings から表示する(コードに書かない)
+    enum Paywall {
+        static let title = "プレミアム"
+        static let closeButton = "あとで"
+        static let benefitsTitle = "ペアのふたりに、できること"
+        static let benefits = [
+            "写真アルバムに制限がない",
+            "お休みチケットが毎月5枚",
+            "植物の品種と鉢替え",
+            "ウィジェットのテーマ",
+        ]
+        static let monthlyPrefix = "月額"
+        static let yearlyPrefix = "年額"
+        static let recommended = "おすすめ"
+        static func trialNote(_ days: Int) -> String {
+            "\(days)日間 無料で試せます"
+        }
+        static let purchaseButton = "このプランにする"
+        static let purchasing = "購入しています…"
+        static let restoreButton = "購入を復元する"
+        static let restoring = "復元しています…"
+        static let appliedByPartner = "相手がすでにプレミアムなので、このペアは適用済みです。購入は不要です"
+        static let purchaseDone = "プレミアムがはじまりました"
+        static let restoreDone = "購入を復元しました"
+        static let restoreNotFound = "復元できる購入が見つかりませんでした"
+        static let unavailable = "いまは購入できません。準備ができたらお知らせします"
+        static let errorMessage = "購入を完了できませんでした。時間をおいて、もう一度お試しください"
+        static let cancelled = "購入をキャンセルしました"
+        static let pending = "購入の確認を待っています。完了するとプレミアムがはじまります"
+        static let legalNote = "料金は App Store のアカウントに請求されます。自動更新は、購入後いつでも設定から止められます"
+        static let terms = "利用規約"
+        static let privacy = "プライバシーポリシー"
+
+        // 3文脈(REQUIREMENTS §3.14)
+        static func milestoneHeadline(_ days: Int) -> String {
+            "\(days)日、ふたりで続いたね"
+        }
+        static let milestoneMessage = "この記録も写真も、これから先も残せるように。プレミアムで、ふたりの場所がもう少し広がります"
+        static let albumHeadline = "30日より前の写真も、残しておける"
+        static let albumMessage = "プレミアムなら、写真アルバムに制限がありません。ふたりで重ねた日を、ずっと見返せます"
+        static let ticketEmptyHeadline = "チケットがなくなっても、続けられる"
+        static let ticketEmptyMessage = "プレミアムなら、お休みチケットが毎月5枚。ペアのふたりで使えます"
+    }
+
     /// カレンダー履歴(REQUIREMENTS §3.11 / T18 #18)。
     /// 途切れた日は無彩色の点だけにして、言葉で責めない(REVIEW-2026-10-12 §4.2)。
     enum History {

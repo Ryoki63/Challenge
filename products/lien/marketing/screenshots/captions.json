@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "updated": "2026-10-20",
+  "note": "App Store 用スクリーンショットのキャプション(正本)。画像はこのファイルの文言と scene から CI が描く(products/lien/ios/LienTests/StoreScreenshotRenderTests.swift)。文言を変えたら画像を作り直す(手順は README.md)。claim は mkt-review が根拠を確かめるための欄で、画像には出ない。",
+  "sizes": {
+    "6.7in": {
+      "width": 1290,
+      "height": 2796,
+      "pointWidth": 430,
+      "pointHeight": 932,
+      "device": "iPhone 15 Pro Max(430×932pt @3x)"
+    },
+    "6.1in": {
+      "width": 1179,
+      "height": 2556,
+      "pointWidth": 393,
+      "pointHeight": 852,
+      "device": "iPhone 15 Pro(393×852pt @3x)"
+    }
+  },
+  "frames": [
+    {
+      "id": "01_home_both",
+      "scene": "home_both",
+      "badge": "約束はひとつ",
+      "accent": "#82C95C",
+      "headline": ["約束は、", "ひとつだけ。"],
+      "sub": "ふたりで決めて、毎日つづける習慣アプリ",
+      "claim": "CONCEPT §5・REQUIREMENTS §3.4: 約束は1人1つ。ふたりとも達成した日に「ふたりの記録」が1日のびる。画面は実装済みのホーム(植物・ストリーク・ふたりの今日)。"
+    },
+    {
+      "id": "02_home_waiting",
+      "scene": "home_waiting",
+      "badge": "ふたりの今日",
+      "accent": "#FF9C9C",
+      "headline": ["相手の今日が、", "ひと目でわかる。"],
+      "sub": "相手が先にやった日は、ホームに「待ってるよ」",
+      "claim": "REQUIREMENTS §3.10: 相手が先に完了すると「(相手の名前)が待ってるよ」を出す。ホームの2つのチップで自分と相手の今日がわかる。"
+    },
+    {
+      "id": "03_widget",
+      "scene": "widget",
+      "badge": "ウィジェット",
+      "accent": "#FFCF4D",
+      "headline": ["ホーム画面でも、", "ふたりの今日。"],
+      "sub": "自分と相手の今日の○×、ストリーク、植物",
+      "claim": "REQUIREMENTS §3.10・T17a(#17): systemSmall / systemMedium に、自分と相手の今日の○×・ストリーク・植物を出す。相手の写真は v1.0 では出さない(v1.0.1)。"
+    },
+    {
+      "id": "04_history",
+      "scene": "history",
+      "badge": "カレンダー",
+      "accent": "#E6895C",
+      "headline": ["つづいた日が、", "記録になる。"],
+      "sub": "ふたりがそろった日だけ、記録がのびていきます",
+      "claim": "REQUIREMENTS §3.11・T18(#18): 1か月を7列で表示し、ふたり達成・片方だけ・お休みチケット・途切れた日を無彩色の点で出す。罰の表現は使わない。"
+    },
+    {
+      "id": "05_share",
+      "scene": "share",
+      "badge": "シェア画像",
+      "accent": "#8FC7E8",
+      "headline": ["記録は、", "かたちに残せる。"],
+      "sub": "7日・30日・100日の節目に、記録の画像をつくれます",
+      "claim": "REQUIREMENTS §3.13・T22(#22): 縦9:16(1080×1920)と正方形(1080×1080)の画像をつくれる。節目は7・30・100・365日。チェックインの写真は画像に含めない。"
+    },
+    {
+      "id": "06_home_solo",
+      "scene": "home_solo",
+      "badge": "ペアのはじめかた",
+      "accent": "#B5E58C",
+      "headline": ["はじめるのは、", "ふたりで。"],
+      "sub": "招待リンクを送って、ふたりでペアになります",
+      "claim": "REQUIREMENTS §3.2・T11(#11): 招待リンク(ディープリンク)でペアになる。ペア成立前(ソロ)もチェックインはできる。画面は実装済みのソロのホーム。"
+    }
+  ]
+}

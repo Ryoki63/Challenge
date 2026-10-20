@@ -23,6 +23,7 @@ Challenge/
 ├── LOOP.md             # 自律ループ1回分の実行手順書
 ├── README.md           # 人間向けの全体説明(仕組み・使い方)
 ├── docs/               # 企画・仕様・設計・計画ドキュメント
+├── marketing/          # 獲得計画・X 投稿・計測設計(ストア文言は products/lien/marketing/)
 ├── products/           # アプリ本体置き場(1アプリ = 1サブフォルダ)
 ├── progress/           # 実行履歴・監査ログ
 ├── ralph.ps1           # ヘッドレスループランナー(外側のループ)
@@ -95,6 +96,14 @@ Lien のドキュメント群。**矛盾したら REQUIREMENTS → DESIGN → CO
 | `E2E-M1.md` | M1(ペア成立→約束→チェックイン→ストリーク→つつく→通知)の実機 E2E チェックリストとランブック(T20) |
 | `STRUCTURE.md` | 本書。リポジトリ構成ガイド |
 
+### marketing/ — 獲得計画・投稿・計測
+
+公開前後の獲得(マーケティング)の計画と記録。**ストアの文言・スクショ・法務文書は `products/lien/marketing/`**にあり、こちらは「いつ・どのチャネルで・何を根拠に出すか」を扱う。置き場が 2 つに分かれるのは、前者がアプリの提出物(ASC に投入する値)で、後者が継続的に更新する運用文書のため。
+
+| ファイル | 役割 |
+|---|---|
+| `plan.md` | 公開前後 30 日の獲得計画(週次の投稿カレンダー・チャネル・予算・各週の指標と分母)。Issue #74(MK1)。**数値の定義は `docs/KPI.md`、日程は `docs/TASKPLAN.md` §9.2 が正** |
+
 ### products/ — アプリ本体
 
 **1アプリ = 1サブフォルダ**。案内の `README.md` と、第1弾の **`products/lien/`**(TASKPLAN の T01 で作成した雛形)が入っている。
@@ -106,8 +115,9 @@ products/lien/
 ├── ios/          # SwiftUI アプリ(XcodeGen)。本体 / ウィジェット / NSE / テスト / xcconfig
 ├── supabase/     # migrations(連番SQL)と Edge Functions(deno)
 ├── assets/       # 植物のイラスト(SVG レイヤー)・アイコン
+├── web/          # GitHub Pages に配信する静的サイト(ティザー・法務・招待。#76)
 ├── web/invite/   # 招待用静的ページ(GitHub Pages)
-└── marketing/    # ASO文言・スクショ・プライバシーポリシー・利用規約
+└── marketing/    # ASO文言・スクショ・プライバシーポリシー・利用規約・計測設計(measurement.md)
 ```
 
 ### progress/ — 実行履歴・監査ログ

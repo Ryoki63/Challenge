@@ -51,3 +51,8 @@ verify_jwt = false
 
 [functions.delete-account]
 verify_jwt = false
+
+# RevenueCat Webhook(T33)。RevenueCat は Supabase の JWT を送らない。
+# 認証は関数内で REVENUECAT_WEBHOOK_AUTH との完全一致(定数時間比較)に行う(core.ts)
+[functions.revenuecat-webhook]
+verify_jwt = false
