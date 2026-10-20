@@ -797,3 +797,10 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 02:41 (eng-exec) — Issue #141 T-AND-8 着手条件確認
+- 着手: 指定 worktree / consilium/141-t-and-8-android-app-links の追跡・未追跡差分なし、origin一致、対象ブランチのremote ref・既存PRなしを確認。これは着手条件の確認であり、Android実装は開始していない。
+- 依存検査: GitHub実取得で #134 / #136 はいずれもOPEN・needs-approval・human-gate。最新の非botコメントもエージェントの質問マーカー付きで、当該依存の人間返信は未確認。#119 はCLOSED、対応PR #131 は2026-10-21 01:54 JSTにmainへマージ済み（698f46d469f2391d494094ef9e8050189a25467a）。#134から参照されるPR #145は共通雛形の親 #121 用であり、#134自体の完了とは扱わない。
+- 排他・範囲: #141 のassigneeは空。依存完了・マージおよび排他割当が未成立のためコードを変更しない。host/package/配信fingerprintを推測せず、Web・ドメイン・iOS・契約正本・Supabase・認証情報・secret・.envには触れない。
+- 【承認待ち】契約の「完了・マージ確認後のみ着手」に従い停止。推奨は #134 / #136 の完了・マージと排他割当確認後に #141 を再投入すること。Issueへマーカー付きの判断依頼とneeds-approval,human-gateを記録し、Issueは開いたまま維持する。
+- 検証・結果: 承認依頼コメント6297251216の投稿とneeds-approval,human-gateの付与成功。`git diff --check` PASS、差分はJOURNAL末尾追記のみ（既存行の変更・削除なし）。全要件の実装は未着手、テスト件数・対象SHAのCI結果はnull（実装前の停止のため未実施）。型チェック・lint・build・emulator/instrumentation・独立コードレビューは監査ログ追記には対象外であり、タスクの受入合格を意味しない。結果はBLOCKED、実装・PR提出・Issue close・マージなし。監査ログのみ指定ブランチへcommit/pushする。
