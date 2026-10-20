@@ -810,3 +810,5 @@
 - 04:17 提出・レビュー節目: af9fedf をpushし draft PR #152 を作成。lien-ci #39481501671 の全6ジョブ（新規RLS含む）が成功。独立レビュー1回はSQLへの指摘なし、テストにP2指摘1件（本人送信/本人所有だけでも対照PASS）。同日DE→CDの相手checkinにEから送信された行を加え、読めるcheckin経由のみで許可される分岐を補強する。
 - 04:17 変更外のCI異常: lien-play.yml の run #39481499553 は failure / jobsなし / ログなし。親mainの7991bc5でも #39463901466 が同じ failure、当該workflowは今回未変更。無関係な修正はせずPR/結果に既存異常として分離して報告する。
 - 04:17 記録訂正: 直前2行の04:17も記入時刻の転記誤りで実時刻は04:15前後。追加対照後は1 test/8stepがPASS、lint/fmt/diffもPASS。独立レビュワーにはP2該当箇所だけ再確認を依頼済み。今回の残TODOはレビュー判定と最終pushのCI確認のみ。
+- 04:18 結果: PR #152（https://github.com/Ryoki63/Challenge/pull/152）へ修正を提出。2772d28 の lien-ci #39482112795 は全6ジョブ成功、Linuxで419件＋RLS 1件/8step＋契約fixture22件一致をログ確認。独立レビューP2は限定再確認で解消、本人所有checkin限定の誤実装では新stepが失敗することも独立確認済み。
+- 04:18 提出前チェック: 受入3項目PASS／関連テスト全PASS／型PASS／lint・format・diffPASS／DB build＝実0001→0009適用PASS／iOS・Android buildは変更なしのため対象外／残TODOゼロ（マージ判断と本番migration適用は本タスク対象外）。無関係なlien-play.ymlの既存failureは未解消としてPRにも記録。Issueはレビュー役職へ引き渡すためOPENのまま、main直push・マージ・本番変更なし。
