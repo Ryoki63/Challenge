@@ -52,10 +52,15 @@ REQUIRED_SECTIONS = (
     "画面イメージ",
 )
 
+# プレスに使う v1.0 の3枚。01_home_both.png は画像内のサブコピー「ふたりで決めて」が
+# 本文の「ふたりがそれぞれ」と食い違うため使わない（MK7 の完成画像を加工しない。
+# 直すなら captions.json を更新して再生成する）。03_widget.png は v1.0.1 の M を含むため
+# 使わない（REQUIREMENTS §3.10）。04_history.png はデモデータの 10/13 途切れと
+# 23日のストリークが両立しないため使わない（10/13 で途切れれば、10/20 が未完了の時点で現在は6日）。
 SCREENSHOTS = (
-    "01_home_both.png",
     "02_home_waiting.png",
-    "03_widget.png",
+    "06_home_solo.png",
+    "05_share.png",
 )
 
 EXPECTED_WIDTH = 1290

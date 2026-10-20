@@ -100,6 +100,8 @@ xcodebuild test -project Lien.xcodeproj -scheme Lien \
 
 `lien-release`(`.github/workflows/lien-release.yml`)が archive・署名・アップロードまで行う。**手動起動のみ**。
 
+**実行時は [本番実行シート（Secrets 6件・dry_run → 本番・切り戻し・内部配布）](RELEASE-RUNBOOK.md) を使う。** 取得・登録担当と承認境界もこの1枚にまとめている。`internal_only` はApple側の配布制限ではなく、連絡先・公開ページ検査の緩和だけなので、内部グループへの割当はオーナーが確認する。
+
 ### 8.1 準備(1 回だけ。順序に注意)
 
 1. Apple Developer Program へ加入する(G0)
@@ -107,7 +109,7 @@ xcodebuild test -project Lien.xcodeproj -scheme Lien \
    **この登録を先に済ませる**: 次の App Store Connect の「新規アプリ」で選べる Bundle ID は、ここに登録済みのものだけ。
    Capabilities は選ばなくてよい(下の注記のとおり、足りないものはクラウド署名が付ける)
 3. App Store Connect → アプリ →「新規アプリ」でレコードを作る(プラットフォーム iOS・名前は仮でよい・Bundle ID は 2. で登録した `com.ryoki63.lien` — G0)
-   - **実機に Xcode から直接入れるとき(E2E の経路A — [docs/E2E-M1.md](../../../docs/E2E-M1.md) §1.2)だけ**: Developer Portal → **Devices** に、その実機の UDID を登録する
+   - **実機に Xcode から直接入れる場合だけ**（E2E は TestFlight 配布が前提 — [docs/E2E-M1.md](../../../docs/E2E-M1.md) §1）: Developer Portal → **Devices** に、その実機の UDID を登録する
      (Xcode の自動署名で実機をつなぐと、自動で登録されることもある)。TestFlight へ上げるだけなら UDID の登録は要らない
 4. App Store Connect → ユーザとアクセス → 統合 → **App Store Connect API** でキーを発行し、`.p8` をダウンロードする
    (一度しかダウンロードできない)。ロールは **Admin を推奨**(クラウド署名が配布用の証明書を作るため。App Manager で足りるかは初回に確認)
