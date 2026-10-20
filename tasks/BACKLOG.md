@@ -50,3 +50,19 @@ v1.1 課金(#33〜#36)・T21 アルバム・T24 SIWA は `on-hold` ラベルで�
 - 10/26: G4 承認 / 10/27: 審査提出(手動リリース)
 - Supabase Pro 化(D5)は 10/30 まで
 - テスター募集(旧: 11/6 まで)は、外部テスト(T28b)の省略に伴い再確認が必要
+
+## Android 実装契約 (#121 / 2026-10-21)
+
+GitHub Issues が正。以下は依存付きキューであり、未解消の依存を飛ばして着手しない。iOS 10/31 公開を優先。サーバー変更 T-AND-5/6 は critical_review と別の本番適用承認が必須。
+
+- [ ] T-AND-1: 匿名認証と安全なセッション保存 — #134 (https://github.com/Ryoki63/Challenge/issues/134)。依存: #121, #120。詳細・受入・許可範囲はIssue/設計書§10。
+- [ ] T-AND-2: 共有契約DTO・HTTP・snapshot保存 — #135 (https://github.com/Ryoki63/Challenge/issues/135)。依存: #121。詳細・受入・許可範囲はIssue/設計書§10。
+- [ ] T-AND-3: 約束・ソロ・招待・チェックインの最小UI — #136 (https://github.com/Ryoki63/Challenge/issues/136)。依存: #134 (T-AND-1), #135 (T-AND-2), #120, #122。詳細・受入・許可範囲はIssue/設計書§10。
+- [ ] T-AND-4: Glanceウィジェットとsnapshot更新 — #137 (https://github.com/Ryoki63/Challenge/issues/137)。依存: #135 (T-AND-2), #136 (T-AND-3), #120, #122。詳細・受入・許可範囲はIssue/設計書§10。
+- [ ] T-AND-5: FCM登録用の追加DB・本人認可API — #138 (https://github.com/Ryoki63/Challenge/issues/138)。依存: #121, #120。詳細・受入・許可範囲はIssue/設計書§10。
+- [ ] T-AND-6: 受信者UUIDによるFCM送信とAPNs後方互換 — #139 (https://github.com/Ryoki63/Challenge/issues/139)。依存: #138 (T-AND-5)。詳細・受入・許可範囲はIssue/設計書§10。
+- [ ] T-AND-7: FCM受信・通知許可・worker・token同期 — #140 (https://github.com/Ryoki63/Challenge/issues/140)。依存: #134 (T-AND-1), #135 (T-AND-2), #137 (T-AND-4), #138 (T-AND-5), #139 (T-AND-6), #122。詳細・受入・許可範囲はIssue/設計書§10。
+- [ ] T-AND-8: 招待パーサーとApp Links関連付け準備 — #141 (https://github.com/Ryoki63/Challenge/issues/141)。依存: #134 (T-AND-1), #136 (T-AND-3), #119。詳細・受入・許可範囲はIssue/設計書§10。
+- [ ] T-AND-9: 写真・履歴・Storage契約の移植 — #142 (https://github.com/Ryoki63/Challenge/issues/142)。依存: #134 (T-AND-1), #135 (T-AND-2), #136 (T-AND-3), #120, #122。詳細・受入・許可範囲はIssue/設計書§10。
+- [ ] T-AND-10: 設定・解消・削除・ローカルリマインダー — #143 (https://github.com/Ryoki63/Challenge/issues/143)。依存: #134 (T-AND-1), #135 (T-AND-2), #136 (T-AND-3), #120, #122。詳細・受入・許可範囲はIssue/設計書§10。
+- [ ] T-AND-11: QA計画に沿う統合検証とリリース引渡し — #144 (https://github.com/Ryoki63/Challenge/issues/144)。依存: #136 (T-AND-3), #137 (T-AND-4), #138 (T-AND-5), #139 (T-AND-6), #140 (T-AND-7), #141 (T-AND-8), #142 (T-AND-9), #143 (T-AND-10), #123。詳細・受入・許可範囲はIssue/設計書§10。

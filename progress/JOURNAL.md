@@ -783,3 +783,17 @@
 - 検証: Python unittest **15件 PASS**（RS256 の実署名を openssl で検証、track body、AAB 検査、失敗時 cleanup、commit 順）。ローカル HTTP サーバーで OAuth→edit→bundle upload→track→commit の5呼び出し、dry-run の4呼び出し（edit 削除込み）を確認。workflow YAML parse OK、`bash -n` 12ブロック OK、`git diff --check` OK、docs の外部リンク 18件 HTTP 200、ローカルリンク欠落なし。
 - 残課題: Android 雛形は #121 / #145 が未マージのため、本ブランチでは build/publish を detect job でスキップ（PR の CI は scripts job のみ）。`versionCode` を CI 実行番号から反映する実装、最終 `applicationId`、課金/通報/写真権限などデータセーフティ §6 の未確定項目は引き渡し。
 - 結果: 変更を commit / push し、PR を作成する（マージ・Play 登録・ストア申請・アップロードは行わない）。
+
+## 2026-10-21 00:46 — #121 Android 技術選定・設計・空アプリ (eng-lead)
+- 着手: 指定 worktree / consilium/121-and-eng-android-kotlin-compose で開始。tracked/untracked とも開始時 clean。Issue は OPEN、assignee なし、HQ の status:in-progress。承認待ち一覧に #121 はない。他タスクは今回再開しない。
+- 同期: 指定ブランチはまだ remote にないため pull は remote ref 不在で停止。origin/main を fetch し、未公開の指定ブランチが同一 HEAD であることを確認した (rebase: up to date)。main への書込・既存公開履歴の変更はしない。
+- 方針: REQUIREMENTS → DESIGN → contracts/ と既存実装を照合し、Android 固有ディレクトリ・設計書・専用 CI だけ追加。iOS / Supabase / 契約正本は変更しない。比較と見積り、後続 Issue の依存・触る範囲・ロールバックを明記する。ビルドと関連検査、独立レビュー1回を経て PR を提出し、マージ・Issue close は行わない。
+- 環境: Java runtime / Android SDK / Gradle は初期 PATH にない。必要な検証用ツールとキャッシュはこの worktree 内の gitignored 領域だけに置き、署名鍵・実認証情報・本番接続は扱わない。
+- 00:54 設計節目: Kotlin+Compose を推奨、Flutter/KMP と17–25人日（計画見積り）を比較。Supabase匿名/RLS・全共有fixture・Glance・FCM・App Links の境界を設計書へ追加。v1.0 は匿名のみのまま、任意連携は将来設計。APNsの既存push_tokenだけを条件とする10経路の変更が必要で、FCM追加だけでは配送されないことを確認。サーバー改修は別Issue/critical_reviewへ分離する。
+- 00:54 並列作業: Android雛形/専用CIの限定workerを1名起動。親は設計/Issue分解を担当（書込範囲非重複）。新規SDK契約への同意は行わず、必要なら既設SDKを持つCIでビルドを検証する。既存mainの直近lien-ci=39427686022、lien-ios=39424980235はsuccess（別SHAなので今回の変更の検証とは区別）。
+- 01:02 タスク契約: T-AND-1〜11 を #134〜#144 として起票し、依存・受入条件・変更許可範囲・ロールバック・人日を本文に記載。共有サーバーを変える #138/#139 に difficulty:high を付け、iOS優先とcritical_reviewを明記。BACKLOGに実Issueリンクを追記した。#121のassigneeは自分に設定済み。
+- 01:02 検査: contracts/tools/generate.ts --check は22 fixture一致、contracts/tools の Deno test は3件PASS。Android workflowの公式Actions固定SHAは各リリースtagと一致した。Androidのコンパイル・test・lintはまだ結果未確定。設計/雛形/CIを1名の独立レビュワーが確認中。
+- 01:07 提出途中: コード31a17bcを指定ブランチへpushしdraft PR #145を作成。独立レビュー1回はP1/P2ブロッカーなし。lien-ci #39454196823は全6ジョブ成功。Android CI #39454196872はassembleDebugとJUnit3件が成功、lintで失敗（成功扱いしない）。
+- 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
+- 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
+- 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
