@@ -100,10 +100,12 @@ migration の一時コピーを次の 3 通り壊し、いずれもテストが�
 読める（別ペアのチェックイン本体は読めない）。
 
 - 欠陥: [Ryoki63/Challenge#151](https://github.com/Ryoki63/Challenge/issues/151)
-- クライアント経路: `products/lien/ios/Lien` で直接 SELECT しているテーブルは `users` と
-  `promises` のみで、`reactions` の直接 SELECT は確認範囲では見つからない。ただし任意の
-  JWT で PostgREST を叩けるため、悪意あるクライアントでは再現可能。非ブロッカーの根拠は
-  「チェックイン本文・写真・約束が漏れない」ことに置く（画面経路の有無には置かない）。
+- クライアント経路: `products/lien/ios/Lien`（テストを除く）で直接 PostgREST を呼ぶ箇所は
+  `users`・`promises`（`Core/SupabaseService.swift`）、`pairs`・`checkins`・`streak_days`
+  （`Core/Repositories/HistoryRepository.swift`）、`checkins`（`Core/Api/NudgeReactAPIClient.swift`）。
+  `reactions` の直接 SELECT は確認範囲では見つからない。ただし任意の JWT で PostgREST を
+  叩けるため、悪意あるクライアントでは再現可能。非ブロッカーの根拠は「チェックイン本文・
+  写真・約束が漏れない」ことに置く（画面経路の有無には置かない）。
 - 再現: `auth_boundaries.test.ts` の `既知の欠陥 #151` ステップ（`ignore: true`）。
   `ignore` を外すと現在は `actual=[{checkin_id, from_user, stamp}] expected=[]` で失敗する。
 - 修正後: このステップの `ignore` を外し、回帰テストとして有効化する。
