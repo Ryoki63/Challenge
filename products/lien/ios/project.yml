@@ -159,6 +159,7 @@ targets:
       - path: Lien/Core/Notifications/StreakRiskPlan.swift
       - path: Lien/Core/Notifications/NotificationReconciler.swift
       - path: Lien/Core/Notifications/LocalNotificationPushSync.swift
+      - path: Lien/Core/Notifications/PushSnapshotWriter.swift
       - path: Lien/Core/Notifications/UserNotificationCenterScheduler.swift
     settings:
       base:

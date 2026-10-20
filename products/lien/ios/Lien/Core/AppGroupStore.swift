@@ -25,6 +25,7 @@ struct AppGroupStore {
     static let pendingOpsFileName = "pending_ops.json"
     static let photoThumbFileName = "photo_thumb.jpg"
     static let notificationPrefsFileName = "notification_prefs.json"
+    static let snapshotSyncFileName = "snapshot_sync.json"
 
     /// App Group ID を Info.plist から引くキー。
     /// 実体は Config/Base.xcconfig の LIEN_APP_GROUP_ID(project.yml が全ターゲットの Info.plist に埋め込む)
@@ -72,8 +73,10 @@ struct AppGroupStore {
 
     /// snapshot をアトミックに書き込む(アプリ本体用)
     func saveSnapshot(_ snapshot: PairSnapshot) throws {
-        let data = try PairSnapshot.makeJSONEncoder().encode(snapshot)
-        try writeAtomically(data, to: snapshotFileURL)
+        try coordinateSnapshotWrite {
+            let data = try PairSnapshot.makeJSONEncoder().encode(snapshot)
+            try writeAtomically(data, to: snapshotFileURL)
+        }
     }
 
     /// 生の JSON データを**検証してから**アトミックに書き込む(NSE がプッシュペイロードを渡す用)。
@@ -81,8 +84,44 @@ struct AppGroupStore {
     @discardableResult
     func saveSnapshotData(_ data: Data) throws -> PairSnapshot {
         let snapshot = try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: data)
-        try writeAtomically(data, to: snapshotFileURL)
+        try saveSnapshot(snapshot)
         return snapshot
+    }
+
+    func applySnapshot(_ snapshot: PairSnapshot, ifUnchangedSince expected: PairSnapshot?) throws -> Bool {
+        try coordinateSnapshotWrite {
+            guard loadSnapshot() == expected else { return false }
+            try writeAtomically(PairSnapshot.makeJSONEncoder().encode(snapshot), to: snapshotFileURL)
+            return true
+        }
+    }
+
+    func applyPushSnapshot(_ snapshot: PairSnapshot) throws -> (snapshot: PairSnapshot?, changed: Bool) {
+        try coordinateSnapshotWrite {
+            let previous = loadSnapshot()
+            if FileManager.default.fileExists(atPath: pendingOpsFileURL.path) {
+                guard let data = try? Data(contentsOf: pendingOpsFileURL),
+                      let pending = try? JSONSerialization.jsonObject(with: data) as? [Any],
+                      pending.isEmpty else { return (previous, false) }
+            }
+            if let previous, previous.updatedAt >= snapshot.updatedAt { return (previous, false) }
+            var normalized = snapshot
+            normalized.updatedAt = previous?.updatedAt ?? snapshot.updatedAt
+            try writeAtomically(PairSnapshot.makeJSONEncoder().encode(snapshot), to: snapshotFileURL)
+            return (snapshot, normalized != previous)
+        }
+    }
+
+    private func coordinateSnapshotWrite<Value>(_ write: () throws -> Value) throws -> Value {
+        try FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
+        var coordinationError: NSError?
+        var result: Result<Value, Error>?
+        NSFileCoordinator().coordinate(writingItemAt: snapshotFileURL, options: .forMerging, error: &coordinationError) { _ in
+            result = Result { try write() }
+        }
+        if let coordinationError { throw coordinationError }
+        guard let result else { throw CocoaError(.fileWriteUnknown) }
+        return try result.get()
     }
 
     // MARK: - pending_ops.json(オフラインキュー — DESIGN §3.7。型定義は T14)
@@ -160,7 +199,8 @@ struct AppGroupStore {
     /// 端末に置いた記録をすべて消す(snapshot・未送信キュー・相手の写真のサムネ・ローカル通知の設定)。
     /// ウィジェットは次の reload で空の表示になる(呼び出し側が reload する)。ファイルが無くても成功する
     func eraseAll(fileManager: FileManager = .default) {
-        for url in [snapshotFileURL, pendingOpsFileURL, photoThumbFileURL, notificationPrefsFileURL] {
+        for url in [snapshotFileURL, pendingOpsFileURL, photoThumbFileURL, notificationPrefsFileURL,
+                    containerURL.appendingPathComponent(Self.snapshotSyncFileName)] {
             try? fileManager.removeItem(at: url) // 無いファイルの削除エラーは無視する
         }
     }
