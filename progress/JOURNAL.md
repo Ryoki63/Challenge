@@ -496,3 +496,31 @@
 - 提出: **PR #111** https://github.com/Ryoki63/Challenge/pull/111 を作成。変更を commit/push 済み、mainへの直接push・force push・マージはしない。PR作成時点のCIは lien-ci **6/6 PASS**、lien-ios は pending。iOS完了とは報告しない。
 - 最終確認: 全要件の実装=未達(公開・X・画像の受入・文言承認)、関連テスト=47件PASS、静的サイトbuild=11件成功、生成物一致=11件PASS、公開前チェック=FAIL(exit 1)、型/lint/iOS build=本変更は文書のみで対象外、直接文書検査=PASS、残TODOゼロ=未達。未達項目は PUBLISH-STATUS.md に明示。
 - 結果: **BLOCKED**。公開先承認の反映と検証・引継ぎまで実施。公開用の具体値は推測せず、法務原本・サイト設定・生成物・公開設定を変更しない。担当役職の未解決レビュー指摘と、オーナー入力後の公開作業が残る。
+
+## 2026-10-20 19:45 (computer-operator) — #79 MK6 オーナー返信後の再開確認
+- 着手: 指定 worktree・`consilium/79-mk6-x` のみで再開。開始時の tracked/untracked 差分は無し。#79 の 18:30 JST のオーナー返信は「ブラウザ操作でアカウントを作成させ、そこで投稿などを開始」であり、以前の「既存アカウントの引継ぎ待ち」から新規作成の準備へ前提を更新した。
+- 同期: PR #103 は既にマージ済み、リモートの作業ブランチは削除済みのため `git pull --rebase` は対象 ref 不在で停止。公開済み履歴を書き換えず `origin/main` を merge。JOURNAL の末尾競合は両側の既存記録を残してマーカーのみ除去した。
+- 承認確認: #75 に 18:31 JST のオーナー返信「投稿文ok!あとはアカウントのブランディング考えないと」がある。一方、原稿13本は `draft`、mkt-review の完了記録は未確認。computer-operator がレビューや ready 化を代行せず、投稿許可と正式レビューを区別する。
+- 排他確認: #79 の assignee は空。Consilium の役職割当は受領しているが、GitHub assignee による排他は未成立。status ラベルは変更しない。
+- ブラウザ確認: Computer Use で新規タブ `https://x.com/i/flow/signup` を開こうとしたが `Browser is not available: iab`。続けて接続ブラウザ一覧を確認し `[]`。X のページはまだ開けておらず、アカウント作成・入力・投稿・認証操作・予約登録は未実行。ネイティブ操作経路の利用可否を次に確認する。
+- 節目(20:03 JST): ネイティブの Chrome に新規 X 登録タブを作成できた。実際の X ドメインに「メールアドレスまたはユーザー名」の空欄と Google/Apple/電話番号の認証経路が表示されたため、契約どおり入力前に停止。連絡先を推測・転用せず、アカウントは未作成、投稿も無し。
+- 証跡: ブラウザ外枠と既存タブ情報を除外し、登録パネルだけを `products/lien/marketing/x/evidence/2026-10-20-x-signup-required.png` に保存(20:02 JST)。1320×1256、SHA-256 `30b0e430525a8e19ce858e57fa28dae97525ccad243301eb8a2897159c07a7ac`。画像を目視確認し、入力欄は空、個人情報・認証情報無し。登録成功の証拠とは扱わない。
+- 検証: `PYTHONDONTWRITEBYTECODE=1 python3 products/lien/marketing/x/tools/check_posts.py` = OK 13本、`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s products/lien/marketing/x/tools -p 'test_*.py'` = 35 tests OK。原稿・承認台帳・コード・設定は未変更。型チェック・アプリ build・独立レビューは実行ログと証跡だけの変更のため対象外。
+- 【承認待ち】: オーナーに開いた Chrome の登録タブで認証・作成確定まで自身で実施してもらい、公開 @ハンドルとログイン済みタブだけを返信してもらう1件の引継ぎを依頼する。mkt-review・ready 化と担当割当の整理は orchestrator に引き継ぐ。投稿 URL・24時間後の反応は引き続き理由付き null、予約・定期実行は未登録。
+- 通知確認(20:05 JST): PR #110 を作成、commit `663a091` を作業ブランチへ push 済み。#79 に認証引継ぎコメント `6289443014` と `needs-approval,human-gate` を付与し、readback で OPEN・bot の通知コメント `6289445727` を確認。モバイル端末への通知配達自体は未確認。status ラベルは変更していない。
+- 最終検査: Python 直接検査で main に対する変更3ファイル限定、JOURNAL/logの過去本文がそのまま接頭辞として残ること、画像のハッシュ/寸法/EXIF無し、理由付き null、予約未登録を PASS。`git diff --check origin/main` PASS。20:05 時点の PR CI は6ジョブ SUCCESS、iOS build/test は IN_PROGRESS（全CI成功とは報告しない）。
+- 結果: **BLOCKED**。登録前画面の到達・証跡・ログ・PR 提出まで実施。アカウント作成・投稿・24時間反応の受入条件は未達。原稿・正式承認・アプリコードに変更無し。Issue/PR は閉じず、マージしない。
+
+## 2026-10-20 21:30 (computer-operator) — #79 MK6 @lien_promise 作成後の再開
+- 着手: 指定 worktree / `consilium/79-mk6-x` のみで開始。開始時の差分無し、`git pull --ff-only` は Already up to date。公開済み履歴は変更していない。PR #110 は OPEN のため同じ PR を継続する。
+- 前提更新: #79 の21:06 JSTのオーナー返信で公開ハンドル `@lien_promise` の作成を確認。新規登録・認証の再依頼はしない。投稿権限と、MK2 の正式な原稿レビュー・指定時刻・実投稿の成功を分けて確認する。
+- 原稿確認: 当ブランチの13本は draft / 正式承認台帳は空。#75 の最新コメントと同 Issue のリモートブランチでは、オーナーの「投稿文ok!」を mkt-lead 承認として記録済みだが mkt-review は未実施、初投稿は10/21 08:00 JSTと明示。10/20の当日原稿は存在しない。computer-operator が原稿を新作・ready化・レビュー代行して投稿しない。
+- 節目(21:34 JST): 現在の Chrome が `x.com/lien_promise` を表示し、Account menu / Profile とも `@lien_promise`、Set up profile / Post 導線と0 postsを確認。投稿経路は利用可能であり、認証・API鍵の再依頼は不要。#79 を自分へ assign 後 readback で一致を確認。status ラベルは変更していない。
+- 証跡: 一時的な全画面表示でブラウザ外枠を除き `products/lien/marketing/x/evidence/2026-10-20-x-lien-promise-login.jpg` を保存して目視確認。3024×1722 / 436174 bytes / SHA-256 `c38f5767cc96f3c7e9726cf53be08504c759741c333d1f634674dbafb8855352`。JPEG返却を確認して保存し、全画面表示を解除した。個人情報・認証情報・他タブは保存していない。表示された課金案内には進まず、投稿やプロフィール変更も行っていない。
+- 検証: check_posts.py = OK 13本、unittest = 35 tests OK（並列ローカルジョブ、両 exit 0）。コード・原稿・設定に変更無しのためアプリbuild / 型チェック / lint / 独立レビューは対象外。ログイン確認と投稿成功を分離し、投稿URL・24時間反応は理由付き null、予約・定期実行は未登録のまま記録。
+- 【承認待ち】: 残る判断は1件。推奨は orchestrator が mkt-review を割り当て、#75 の初回10/21 08:00原稿を正式レビュー・ready化して #79 へ渡すこと。代替は初回投稿の保留。ログイン済みブラウザは既に確認済みなので、オーナーへの認証再依頼はしない。
+- 検証のつまずき(21:37 JST): 保存JPEGにAPP1メタデータが存在し「EXIF/XMP無し」検査がFAIL。値は読み出し・表示せず、投稿や外部共有の前に画像メタデータのみ除去する。画素を再圧縮せず、保存後のハッシュと寸法を再検査する。先のテスト35件とログ接頭辞検査のPASSとは区別する。
+- メタデータ除去結果: APP1等2セグメントを除去し、圧縮スキャン部分は元と完全一致。配布画像は同じパスで3024×1722 / 436050 bytes / SHA-256 `8de2076d3434a98fc4420941823d9bec2f796c69450104ebaadd5b8de9597624`。上の436174 bytesと旧ハッシュは取得直後の記録であり、現在の配布画像は本行の値。過去の記録は編集せず訂正を追記した。
+- 最終機械検査: 既存HEADに対するJOURNAL/logの接頭辞保持、追加2ログ+画像1枚限定、JPEG寸法/容量/ハッシュ/APP1等無し、秘密・連絡先の典型パターン無し、欠測8項目の理由付きnull、予約未登録、`git diff --check` はすべてPASS。APP1検出の初回FAILはメタデータ除去後の限定再検査で解消した。
+- 通知(21:38 JST): #79 コメント `6291026868` で「推奨: orchestrator による mkt-review 割当・ready原稿引継ぎ / 代替: 初回保留」の1問に集約。`needs-approval,human-gate` と OPEN をreadbackで確認。認証の再依頼無し、statusラベルは不変更。通知先端末へのプッシュ到達は未確認。
+- 結果: **BLOCKED**。投稿手段・アカウント一致・証跡保存は確認済み。受入条件の実投稿・指定時刻の運用・24時間反応は未達。PR #110 に記録を提出し、Issue close・PR mergeは行わない。build/型/lintはコード非変更のため対象外であり、アプリを実行・ビルドしたとは報告しない。
