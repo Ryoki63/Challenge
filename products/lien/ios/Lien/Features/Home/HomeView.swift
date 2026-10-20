@@ -1,7 +1,8 @@
 // HomeView.swift — ホーム画面(T13+T14 / REQUIREMENTS §3.4, §3.5, §3.9, §3.10 / §6)
 //
 // 構成: 植物(SVG レイヤーの重ね合わせ+葉の下の約束の絵文字+名前+ゲージの文+今日のひとこと — PlantHeroView)/ ストリーク /
-//       ふたりの今日(自分・相手チップ+相手の今日の写真)/ チェックインフロー(CheckinFlowView — 1タップ完了+写真添付+当日取消)。
+//       お休みチケットの残数バッジ(T19a #19。0枚でも出す — REQUIREMENTS §3.6)/ ふたりの今日(自分・相手チップ+相手の今日の写真)/
+//       チェックインフロー(CheckinFlowView — 1タップ完了+写真添付+当日取消)。
 // 植物の全画面の演出(段階アップ・おかえり — PlantCelebrationView)は、ホームの上に重ねるオーバーレイ(PB #57)。
 // 名前を付ける・変えるシート(PlantNameSheet)はホームから開く。
 // 相手の今日の写真(PV #59)は、相手が写真を添えた日だけ出る(PartnerPhotoView.swift)。写真が無い日・
@@ -229,6 +230,11 @@ private struct SnapshotContent: View {
 
             if viewModel.showsStreak {
                 StreakArea(current: snapshot.streakCurrent, best: snapshot.streakBest)
+            }
+
+            // お休みチケットの残数バッジ(§3.6 / T19a #19)。0枚でも出す。nil(ソロ・キー欠落)は出さない
+            if let ticketBalance = viewModel.ticketBalance {
+                TicketBalanceBadge(balance: ticketBalance)
             }
 
             TodayArea(viewModel: viewModel, snapshot: snapshot, moderation: moderation)
@@ -501,7 +507,8 @@ extension PairSnapshot {
         plantGrownDays: Int? = 11,
         plantStageFloor: Int? = 7,
         plantNextStageAt: Int? = 14,
-        plantMood: PlantMood = .fidget
+        plantMood: PlantMood = .fidget,
+        ticketBalance: Int? = 2
     ) -> PairSnapshot {
         PairSnapshot(
             schemaVersion: PairSnapshot.currentSchemaVersion,
@@ -522,7 +529,8 @@ extension PairSnapshot {
             plantNextStageAt: plantNextStageAt,
             plantMood: plantMood,
             plantName: "みどり",
-            hasPartnerPhotoToday: false
+            hasPartnerPhotoToday: false,
+            ticketBalance: ticketBalance
         )
     }
 }
@@ -545,13 +553,21 @@ extension PairSnapshot {
     )
 }
 
+#Preview("チケット0枚(バッジは出したまま)") {
+    HomeView(
+        store: AppGroupStore.preview(snapshot: PairSnapshot.previewValue(ticketBalance: 0)),
+        checkinService: LocalEchoCheckinService()
+    )
+}
+
 #Preview("ソロ(土の中で眠るタネの子)") {
     HomeView(
         store: AppGroupStore.preview(snapshot: PairSnapshot.previewValue(
             pairId: nil,
             todayPartnerDone: false,
             plantStage: 0,
-            plantMood: .normal
+            plantMood: .normal,
+            ticketBalance: nil
         )),
         checkinService: LocalEchoCheckinService()
     )

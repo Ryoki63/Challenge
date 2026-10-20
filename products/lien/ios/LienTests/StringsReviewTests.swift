@@ -79,6 +79,8 @@ enum StringsCatalog {
     /// 名前は日本語・英字・絵文字入り、日数は 0 と大きい値を含める
     static let representativeNames = ["ゆうき", "Aki", "🌱はな"]
     static let representativeDays = [0, 1, 23, 365]
+    /// お休みチケットの残数の代表(0枚でもバッジを出す — REQUIREMENTS §3.5)
+    static let representativeTicketBalances = [0, 1, 2, 5]
     static let representativeDates = ["2026年10月20日 21:00", "Oct 20, 2026 at 9:00 PM"]
     /// 運営の連絡先として文言に入るメールアドレスの代表(メールを開けなかったときの案内)
     static let representativeAddresses = ["support@example.com"]
@@ -208,6 +210,11 @@ enum StringsCatalog {
         }
         for name in representativeNames {
             add("Home.partnerWaiting(\(name))", Strings.Home.partnerWaiting(name))
+        }
+
+        // Tickets(お休みチケットの残数バッジ — T19a #19)
+        for count in representativeTicketBalances {
+            add("Tickets.balance(\(count))", Strings.Tickets.balance(count))
         }
 
         // Checkin
