@@ -309,3 +309,12 @@
 - CI(正本): **lien-ios run 39351451628 success**(12m44s・commit d229f32)。`Executed 1075 tests, with 0 failures` / `** TEST SUCCEEDED **`。新規の `TicketBalanceBadgeRenderTests` 2件、`PairSnapshotTests` / `HomeViewModelTests` / `ContractFixtureTests` の ticketBalance テストがログ上で passed。lien-ci run 39351451853 も success(サーバー側の変更なし)。
 - 目視: CI artifact `plant-render-sheets` の `ticket_01_balances.png` / `ticket_zero_large.png` / `ticket_zero_accessibility5.png` を取得して確認。0枚でもバッジが表示され、最大の文字サイズ(accessibility5)でも折り返して欠けない。
 - 結果: **PR #84 作成**(https://github.com/Ryoki63/Challenge/pull/84)。お休み宣言 UI / rest-declare は D3・TASKPLAN §9 のとおり v1.0.1 の対象なので実装していない。レビュー役職(eng-review)の判断待ちで、issue は閉じない。
+
+## 2026-10-20 11:54 (eng-exec) — T27 #27 Strings.swift 全文言のレビュー
+- 着手: オンボ磨き・空状態・エラー文言の総点検(罰なし原則)。`Strings.swift` を全件読み、`StringsCatalog` の 297 単位(580 出力)をレビュー
+- 成果: `docs/STRINGS-REVIEW.md` に全 297 単位の判定(OK 291 / 修正 6 / 保留 0)、空状態 14・エラー文言 33 の点検、判定基準、修正理由、変えないと決めた点を記録
+- 修正 6 件: Dissolve の「ストリーク」「アーカイブ」をユーザーの言葉に / 閉じるボタン2件を「閉じる」に / 「名前をかえる」→「名前を変える」/ 「写真をおくっています…」→「写真を送っています…」/ nameInvalidError を「改行や見えない文字は、名前に使えません」に
+- 検査: `scripts/macos-check/check.sh` = module 74ファイル・**992 tests 0 failed**(assertions 24446)・views 102ファイル・widget 18ファイル。レビュー関連 28 tests 0 failed。CI `lien-ios` は PR #86 で確認
+- 回帰検査: `StringsReviewTests` にログ網羅・文言一致・集計・開発者ことば・閉じる・通信エラーの6テストを追加
+- 残: 初回同期失敗時に `.promiseSetup` を出す画面遷移は文言では決められないため、`docs/STRINGS-REVIEW.md` §6.1 に判断材料と推奨案を残した(eng-lead / T30)。実機 VoiceOver は T20
+- 結果: PR #86 を作成(レビュー待ち。マージはしない)
