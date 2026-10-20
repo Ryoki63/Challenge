@@ -524,3 +524,16 @@
 - 最終機械検査: 既存HEADに対するJOURNAL/logの接頭辞保持、追加2ログ+画像1枚限定、JPEG寸法/容量/ハッシュ/APP1等無し、秘密・連絡先の典型パターン無し、欠測8項目の理由付きnull、予約未登録、`git diff --check` はすべてPASS。APP1検出の初回FAILはメタデータ除去後の限定再検査で解消した。
 - 通知(21:38 JST): #79 コメント `6291026868` で「推奨: orchestrator による mkt-review 割当・ready原稿引継ぎ / 代替: 初回保留」の1問に集約。`needs-approval,human-gate` と OPEN をreadbackで確認。認証の再依頼無し、statusラベルは不変更。通知先端末へのプッシュ到達は未確認。
 - 結果: **BLOCKED**。投稿手段・アカウント一致・証跡保存は確認済み。受入条件の実投稿・指定時刻の運用・24時間反応は未達。PR #110 に記録を提出し、Issue close・PR mergeは行わない。build/型/lintはコード非変更のため対象外であり、アプリを実行・ビルドしたとは報告しない。
+
+## 2026-10-20 18:29 — Issue #94 [mkt M8] 紹介記事とプレス向け素材
+- 着手: worktree・ブランチ・origin を確認。Issue #94 の受入条件に沿って、ファクトシート・紹介文 3 種・スクリーンショット素材を作成し、レビュー可能な PR まで進める。
+- 節目: 正本を照合。v1.0 は全機能無料（terms.html 第3条）、公開前法務欄に運営者名と連絡先メールの G4 プレースホルダーが残る。将来価格案（月700円・年2,400円）は CONCEPT §6 の将来案であり、公開時価格に使わない。既存スクショ6枚は v4 実画面生成で、3枚を同梱する。
+- 作業上の制約: PDFスキルを適用。スキル指定の artifact-operation marker は当該ファイルが worktree に無く実行できなかったため、PDFは生成せず編集可能な1枚HTMLのファクトシートを作る。連絡先・提供元は事実を補完せず G4 未確定と明記する。
+- 節目: `products/lien/marketing/press/` にHTMLファクトシート・紹介文3種・v4実画面3枚を作成。紹介文は60/198/556文字で確認。Safari の印刷プレビューでA4 1ページを確認。mkt-review は未実施なので、Issue の完了条件は未達。
+- 制約: PDFスキル指定の marker が worktree 内に無く、reportlab/pdfplumber/Poppler/WeasyPrint も未導入。HTMLを印刷可能な納品物として採用しPDFは生成していない。
+- 続き(再開): 前段の下書きを引き継ぎ、正本と再照合して確定。紹介文は 60 / 196 / 554 字（60字は上限ちょうど、200/600 は上限内）。将来機能・価格案・実績値は本文から除外し、提供元・連絡先は G4 #42 の `<OPERATOR_NAME>` / `<CONTACT_EMAIL>` のままにした。
+- 修正: ファクトシートにスクショ3枚を埋め込み、対象を「恋人・夫婦・友達・家族」に統一（CONCEPT §5）。価格の出典に CONCEPT §6 を追加。A4 1ページ（Chrome headless 印刷、595×842pt、`/Count 1`）を確認した。
+- 追加: `products/lien/marketing/tools/verify_press.py`（文字数・宣言一致・v1.0 の範囲・将来価格/実績値の不在・必須項目・G4 トークン・スクショ3枚の寸法/アルファ/元画像 SHA-256 一致・リンク切れ）と `test_verify_press.py` 27件。CI `store-metadata` に検査ステップを追加。
+- 検証: `verify_press.py` OK / `python3 -m unittest discover -s tools -p "test_*.py"` 63件 OK / YAML 構文 OK / `git diff --check` OK。
+- 訂正: 前段の「60/198/556」「Safari の印刷プレビュー」「PDFスキル」は確定記録ではない。確定値は 60/196/554、A4 1ページは Chrome headless で確認した。PDF は納品物にせず、編集可能な HTML を正本にした。
+- 更新: 600字版に「相手のチェックインは、相手の名前で通知されます。」を追加し、578字に確定（宣言・README も 578 に更新）。
