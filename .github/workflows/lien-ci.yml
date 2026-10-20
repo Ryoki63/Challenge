@@ -151,6 +151,12 @@ jobs:
       - name: "Verify store_metadata/ja (T32: 文字数制限 + 罰なし原則 + keywords の重複/表示名との重複 + Pairy 語の不在)"
         run: python3 tools/verify_metadata.py
 
+      # ストア用スクリーンショット(issue #80 / MK7)。6.7in / 6.1in 各6枚の寸法・アルファなし・
+      # captions.json と manifest.json(SHA-256)の一致・一覧画像の有無を、Pillow 無しで確かめる。
+      # 画像は CI(lien-ios)の artifact からコミットする。文言を変えて画像を作り直していないと落ちる
+      - name: "Verify store screenshots (issue #80: 寸法 + アルファなし + captions/manifest の一致)"
+        run: python3 tools/verify_screenshots.py
+
       - name: "Test verify_metadata.py (検査ロジックの単体テスト)"
         run: python3 -m unittest discover -s tools -p "test_*.py" -v
 
@@ -162,3 +168,21 @@ jobs:
 
       - name: "Test check_posts.py (検査ロジックの単体テスト)"
         run: python3 -m unittest discover -s x/tools -p "test_*.py" -v
+
+  pages-site:
+    name: pages site (md→html の生成物一致 + 公開前チェック)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/lien/web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # 落ちたときは `cd products/lien/web && python3 tools/build_site.py` で再生成してコミットする
+      # (privacy-policy.md / terms.md が正本。HTML を手で直さない)
+      - name: "生成物が md と一致するか(#76)"
+        run: python3 tools/build_site.py --check
+
+      - name: "ティザーと法務ページの検査(フォーム無し・スクショ3枚・禁止語・リンク切れ・SVG)"
+        run: python3 -m unittest discover -s tools -p "test_*.py" -v

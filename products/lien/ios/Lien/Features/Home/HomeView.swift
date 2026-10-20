@@ -32,19 +32,25 @@ struct HomeView: View {
     private let moderation: ModerationViewModel?
     /// カレンダー履歴(T18 #18)。nil なら導線を出さない(プレビュー・履歴を使わない組み立て)
     private let historyRepository: HistoryRepository?
+    /// ペイウォール(T33)。nil なら課金の導線を出さない(プレビュー・課金を使わない組み立て)
+    private let paywall: PaywallDependencies?
+    /// 出しているペイウォールの文脈(チケット切れなど)。nil = 出していない
+    @State private var paywallContext: PaywallContext?
 
     init(
         viewModel: HomeViewModel,
         reloadToken: Int = 0,
         onInvite: (() -> Void)? = nil,
         moderation: ModerationViewModel? = nil,
-        historyRepository: HistoryRepository? = nil
+        historyRepository: HistoryRepository? = nil,
+        paywall: PaywallDependencies? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.reloadToken = reloadToken
         self.onInvite = onInvite
         self.moderation = moderation
         self.historyRepository = historyRepository
+        self.paywall = paywall
     }
 
     /// プレビュー・簡易構成用(本番の依存は RootView が HomeViewModel として渡す)
@@ -56,7 +62,13 @@ struct HomeView: View {
         ScrollView {
             Group {
                 if let snapshot = viewModel.snapshot {
-                    SnapshotContent(viewModel: viewModel, snapshot: snapshot, onInvite: onInvite, moderation: moderation)
+                    SnapshotContent(
+                        viewModel: viewModel,
+                        snapshot: snapshot,
+                        onInvite: onInvite,
+                        moderation: moderation,
+                        onShowPaywall: showPaywall
+                    )
                 } else {
                     EmptyHomeContent()
                 }
@@ -89,6 +101,12 @@ struct HomeView: View {
         }
         // 通報の確認・メールを開けなかったときのアラート・ブロック(ペア解消)の説明シート(T23 #23)
         .moderationPresentation(moderation)
+        // ペイウォール(T33 / REQUIREMENTS §3.14)。文脈はチケット切れから開く(節目・アルバムは画面側の実装後)
+        .sheet(item: $paywallContext) { context in
+            if let paywall {
+                PaywallView(model: paywall.makeViewModel(context: context))
+            }
+        }
         // カレンダー履歴(T18 #18)。ペア成立後のホームからのみ開ける
         .toolbar {
             if historyRepository != nil, viewModel.snapshot?.pairId != nil {
@@ -135,6 +153,12 @@ struct HomeView: View {
                 Task { await viewModel.flushPendingOps() }
             }
         }
+    }
+
+    /// ペイウォールを開く導線(課金を使わない組み立てでは nil)
+    private var showPaywall: ((PaywallContext) -> Void)? {
+        guard paywall != nil else { return nil }
+        return { context in paywallContext = context }
     }
 
     /// 名前のシートを出しているか。観測する状態は body の中で読む(Binding の getter の中では読まない — T23 #23)
@@ -197,11 +221,16 @@ private extension View {
 
 // MARK: - snapshot あり(通常表示)
 
-private struct SnapshotContent: View {
+/// ホームの中身(スクロールの外側を除く)。ストア用スクリーンショット(issue #80)は、
+/// ImageRenderer が ScrollView を描けないため、この View を直接 端末と同じ大きさで描く。
+struct SnapshotContent: View {
     let viewModel: HomeViewModel
     let snapshot: PairSnapshot
     let onInvite: (() -> Void)?
     let moderation: ModerationViewModel?
+    /// ペイウォールを開く(T33)。nil なら課金の導線を出さない。
+    /// 既定 nil は、課金の導線を持たないストア用スクリーンショット(issue #80)の実描画のため
+    var onShowPaywall: ((PaywallContext) -> Void)? = nil
 
     var body: some View {
         VStack(spacing: LienSpacing.m) {
@@ -258,9 +287,14 @@ private struct SnapshotContent: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(LienColors.shareAccent)
+            }
             // お休みチケットの残数バッジ(§3.6 / T19a #19)。0枚でも出す。nil(ソロ・キー欠落)は出さない
             if let ticketBalance = viewModel.ticketBalance {
-                TicketBalanceBadge(balance: ticketBalance)
+                // 0枚のときは、タップでペイウォール(チケット切れの文脈)を開ける(T33)
+                TicketBalanceBadge(
+                    balance: ticketBalance,
+                    onTap: ticketBalance == 0 ? { onShowPaywall?(.ticketEmpty) } : nil
+                )
             }
 
             TodayArea(viewModel: viewModel, snapshot: snapshot, moderation: moderation)

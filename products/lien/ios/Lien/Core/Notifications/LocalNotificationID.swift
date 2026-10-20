@@ -47,6 +47,23 @@ enum LocalNotificationID {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
+
+    /// dayKey("yyyy-MM-dd"。桁は固定)を、calendar のタイムゾーンでのその日の 0:00 に戻す。形が違う・存在しない日
+    /// (2026-02-31 など、暦が繰り上げて別の日になるもの)は nil。"2026-1-5" のような桁の足りない書き方も受けない
+    /// (サーバーの date_local はゼロ埋めされた 10 文字 — DESIGN §9)
+    static func date(fromDayKey dayKey: String, calendar: Calendar) -> Date? {
+        let parts = dayKey.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
+              parts.allSatisfy({ $0.allSatisfy { $0.isASCII && $0.isNumber } }),
+              let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2])
+        else { return nil }
+        let components = DateComponents(year: year, month: month, day: day)
+        guard let date = calendar.date(from: components) else { return nil }
+        let roundTrip = calendar.dateComponents([.year, .month, .day], from: date)
+        guard roundTrip.year == year, roundTrip.month == month, roundTrip.day == day else { return nil }
+        return date
+    }
 }
 
 // MARK: - 暦
@@ -71,7 +88,9 @@ enum LocalNotificationCalendar {
     /// サーバーが、前の日の確定(close-day)を終えたとみなす時刻(その日の何時か)。サーバーの `CLOSE_DAY_SETTLE_HOUR`
     /// (supabase/functions/_shared/snapshot.ts)と同じ値。cron は 00:10 だが、遅れや再試行を見込んで 1:00 とする。
     /// これより前に組み立てた snapshot の「今日」は、クライアントが送った日付(checkin・checkin-cancel・nudge の
-    /// `dateLocal`)で上書きされていることがあり、前の日のことかもしれない(→ `PairSnapshot.completionOnItsOwnDay`)
+    /// `dateLocal`)で上書きされていることがあり、前の日のことかもしれない(→ `PairSnapshot.completionOnItsOwnDay`)。
+    /// サーバーが snapshot に `dateLocal` を載せるようになった(2026-10-20・issue #72)ので、この値を使うのは
+    /// **キーが無い古いサーバー**の snapshot だけ
     static let snapshotSettleHour = 1
 }
 
@@ -86,21 +105,49 @@ struct TodayCompletion: Equatable {
 }
 
 extension PairSnapshot {
-    /// この snapshot が、`now` の日(端末のローカル日)に作られたものか。`todayMeDone` / `todayPartnerDone` は snapshot を作った日の
-    /// 「今日」の完了なので、前の日の snapshot の「完了」を今日の完了と取り違えないために使う
-    func reflectsToday(now: Date, calendar: Calendar) -> Bool {
-        calendar.isDate(updatedAt, inSameDayAs: now)
+    /// サーバーが載せた「組み立てに使った今日」(`dateLocal`)を、端末の暦でのその日の 0:00 にしたもの。
+    /// 無い(古いサーバー・古いキャッシュ)・null・読めない値("yyyy-MM-dd" でない・存在しない日)は nil。
+    /// そのときは `updatedAt` から保守的に判定する(= 古いサーバーの snapshot と同じ扱い)
+    func serverDay(calendar: Calendar) -> Date? {
+        guard let dateLocal else { return nil }
+        return LocalNotificationID.date(fromDayKey: dateLocal, calendar: calendar)
     }
 
-    /// この snapshot が作られた日(`updatedAt` のローカル日)の、自分と相手の完了。**確かなときだけ**値を返す。
+    /// この snapshot の完了フラグ(`todayMeDone` / `todayPartnerDone`)が属する日(端末のローカル日の 0:00)。
+    /// サーバーが組み立てに使った「今日」(`dateLocal`)があればその日、無ければ(古いサーバー・古いキャッシュ)
+    /// `updatedAt` のローカル日
+    func snapshotDay(calendar: Calendar) -> Date {
+        serverDay(calendar: calendar) ?? calendar.startOfDay(for: updatedAt)
+    }
+
+    /// `now` のローカル日から見て、この snapshot の完了が属する日が何日前か(0 = 今日 / 1 = 昨日 / 負 = 未来)。
+    /// 日付の差は暦で数える(夏時間で 1 日が 23/25 時間でも 1 日と数える)
+    func daysSinceSnapshotDay(now: Date, calendar: Calendar) -> Int? {
+        calendar.dateComponents([.day], from: snapshotDay(calendar: calendar), to: calendar.startOfDay(for: now)).day
+    }
+
+    /// この snapshot が、`now` の日(端末のローカル日)のものか。`todayMeDone` / `todayPartnerDone` は snapshot の
+    /// 「今日」の完了なので、前の日の snapshot の「完了」を今日の完了と取り違えないために使う。
+    /// サーバーの `dateLocal`(組み立てに使った「今日」)があればその日で、無ければ `updatedAt` のローカル日で判定する
+    func reflectsToday(now: Date, calendar: Calendar) -> Bool {
+        daysSinceSnapshotDay(now: now, calendar: calendar) == 0
+    }
+
+    /// この snapshot の完了が属する日(`dateLocal`)の、自分と相手の完了。**確かなときだけ**値を返す。
     ///
+    /// `todayMeDone` / `todayPartnerDone` が**どの日の**完了かは、`updatedAt`(組み立てた時刻)からは決まらない:
     /// サーバーは、checkin・checkin-cancel・nudge の snapshot を、クライアントが送った日付を「今日」として組み立てる
-    /// (深夜 0 時前後の時計のずれや、送信キューの再送を吸収するため。相手へ送る snapshot も同じ)。その日付は、翌日の 1:00 に
-    /// なるまで有効なので、**日付が変わって 1:00 までの間に作られた snapshot の完了フラグは、前の日のこと**かもしれない
-    /// (たとえば 23:58 に圏外で押したチェックインが、0:07 に届く)。それを「今日の完了」と読むと、今日のリマインドを
-    /// 取り消し、ストリーク危機を明日に回してしまう。そこでこの間のものは「不明」(nil)として、完了を前提にしない。
-    /// 日付をサーバーが snapshot に載せるようになれば(`dateLocal`)、この判定は要らなくなる
+    /// (深夜 0 時前後の時計のずれや、送信キューの再送を吸収するため。相手へ送る snapshot も同じ)。その日付は、翌日の
+    /// 1:00 になるまで有効なので、**日付が変わって 1:00 までの間に組み立てられた snapshot の完了フラグは、前の日の
+    /// こと**かもしれない(たとえば 23:58 に圏外で押したチェックインが、0:07 に届く)。
+    /// そこでサーバーは組み立てに使った「今日」を `dateLocal` に載せる(2026-10-20・issue #72)。このキーがあれば、
+    /// 完了がどの日のものかは**確か**なので、0:00〜1:00 でも「不明」にしない(その時間帯に自分でチェックインした人の、
+    /// その日のリマインドが、済んでいるのに残るのを直す)。キーが無い(読めない)古いサーバーの snapshot だけ、
+    /// 時刻から保守的に判定する
     func completionOnItsOwnDay(calendar: Calendar) -> TodayCompletion? {
+        guard serverDay(calendar: calendar) == nil else {
+            return TodayCompletion(me: todayMeDone, partner: todayPartnerDone)
+        }
         let hour = calendar.component(.hour, from: updatedAt)
         guard hour >= LocalNotificationCalendar.snapshotSettleHour else { return nil }
         return TodayCompletion(me: todayMeDone, partner: todayPartnerDone)
@@ -119,8 +166,8 @@ enum LocalNotificationCancellation {
     /// snapshot から見て、**今日の分のうち、もう出さなくてよい**ローカル通知の識別子。
     ///   - リマインド: 自分が今日すでに完了している
     ///   - ストリーク危機: ふたりとも完了した / ペアがない(解消された)/ ふたりの記録が続いていない(ストリークが 0)
-    /// snapshot が今日のもの(reflectsToday)でなければ、何も言えないので空。完了が確かでない(日付が変わって間もない)ときは、
-    /// 完了を理由にした取り消しはしない(TodayCompletion)。
+    /// snapshot が今日のもの(reflectsToday)でなければ、何も言えないので空。完了が確かでない(キーが無い古いサーバーの
+    /// snapshot で、日付が変わって間もない)ときは、完了を理由にした取り消しはしない(TodayCompletion)。
     /// ReminderScheduler.desiredRequests は、ここに挙がる識別子を**予約しない**(両者が食い違わないことをテストが確かめる)
     static func staleIDsForToday(snapshot: PairSnapshot, now: Date, calendar: Calendar) -> [String] {
         guard snapshot.reflectsToday(now: now, calendar: calendar) else { return [] }

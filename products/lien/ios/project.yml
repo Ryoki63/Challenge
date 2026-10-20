@@ -5,7 +5,7 @@
 # - Bundle ID / App Group は Config/Base.xcconfig の LIEN_BUNDLE_ID_BASE /
 #   LIEN_APP_GROUP_ID に変数化している(G0 で人間が最終決定 — DESIGN §3.1。
 #   変更時は Base.xcconfig の2行 + 各 *.entitlements を更新する)
-# - 外部依存は supabase-swift のみ(DESIGN §3.1 で唯一の許可依存。T10 で追加)。
+# - 外部依存は supabase-swift と RevenueCat(v1.1 課金。DESIGN §3.1。どちらもタスク本文で明記)。
 #   リンクするのは Lien ターゲットだけ(LienWidget / LienNSE には混ぜない — DESIGN §3.4)
 # - 各ターゲットのフォルダにある PrivacyInfo.xcprivacy は sources に含まれ、リソースとして同梱される
 #   (必須理由 API と収集データの宣言。issue #28。整合は LienTests/PrivacyManifestTests)
@@ -25,6 +25,11 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
     exactVersion: "2.55.3"
+  # 課金(RevenueCat — T33 / REQUIREMENTS §3.14)。Lien ターゲットだけがリンクする。
+  # API キーが無い CI では UnavailablePurchasesClient に切り替わり、この SDK は呼ばれない
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios
+    exactVersion: "5.96.0"
 
 # Debug / Release とも共通設定は Config/Base.xcconfig に置く。
 # Base.xcconfig の末尾で Secrets.xcconfig を optional include しているため、
@@ -69,6 +74,8 @@ targets:
         SUPABASE_URL: "$(SUPABASE_URL)"
         SUPABASE_ANON_KEY: "$(SUPABASE_ANON_KEY)"
         LIEN_APP_GROUP_ID: "$(LIEN_APP_GROUP_ID)"
+        # 課金(RevenueCat — T33)。空ならアプリは UnavailablePurchasesClient に切り替わる
+        REVENUECAT_API_KEY: "$(REVENUECAT_API_KEY)"
         # サイレント push(content-available: 1 — checkin-cancel / promise-set の pair_update)で
         # アプリを起こし、snapshot を GET /snapshot で取り直すため(AppDelegate / AppModel — issue #55)。
         # 可視 push は NSE が処理するので、これが無くても通知は届く(サイレントのフォールバック経路用)
@@ -80,6 +87,9 @@ targets:
       # supabase-swift はアプリ本体のみ(Widget/NSE は App Group 経由の読み取り設計を維持)
       - package: Supabase
         product: Supabase
+      # 課金(RevenueCat — T33)。Lien ターゲットのみ(Widget / NSE には入れない)
+      - package: RevenueCat
+        product: RevenueCat
     scheme:
       testTargets:
         - LienTests
