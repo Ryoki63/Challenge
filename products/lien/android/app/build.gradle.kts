@@ -30,6 +30,8 @@ android {
         abortOnError = true
         warningsAsErrors = true
         checkReleaseBuilds = false
+        // 互換性のため BOM と activity-compose を意図して固定している。更新は #121 の後続で検証して行う
+        disable += "GradleDependency"
     }
 }
 
