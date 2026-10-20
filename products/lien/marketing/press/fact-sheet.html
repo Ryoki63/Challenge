@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lien（リアン）ファクトシート</title>
+  <style>
+    @page { size: A4; margin: 12mm; }
+    :root { color-scheme: light; --ink: #49372b; --muted: #705d4d; --green: #82c95c; --cream: #fffbf2; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f0e7; color: var(--ink); font: 10.5pt/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; }
+    main { width: 210mm; min-height: 297mm; margin: 16px auto; padding: 12mm; background: var(--cream); }
+    header { border-bottom: 2px solid var(--green); padding-bottom: 8px; display: flex; align-items: end; justify-content: space-between; gap: 18px; }
+    h1 { margin: 0; font-size: 29pt; line-height: 1.1; letter-spacing: .03em; }
+    header p { margin: 4px 0 0; color: var(--muted); font-size: 11pt; }
+    .version { color: var(--muted); font-size: 8.5pt; text-align: right; line-height: 1.35; }
+    .lead { margin: 12px 0 12px; font-size: 14pt; line-height: 1.45; font-weight: 650; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
+    section { break-inside: avoid; }
+    h2 { margin: 0 0 3px; padding-bottom: 2px; border-bottom: 1px solid #d9e8c9; color: #4e7940; font-size: 10.5pt; }
+    p, ul { margin: 2px 0 0; }
+    ul { padding-left: 1.2em; }
+    li { margin: 0; }
+    .wide { grid-column: 1 / -1; }
+    .note { color: var(--muted); font-size: 8.3pt; line-height: 1.4; }
+    .placeholder { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #fff3cd; padding: 0 3px; border-radius: 3px; font-size: 9pt; }
+    .shots { display: flex; gap: 12px; justify-content: center; align-items: flex-start; margin-top: 3px; }
+    .shots figure { margin: 0; text-align: center; }
+    .shots img { height: 54mm; width: auto; border: 1px solid #e4ddcf; border-radius: 5px; }
+    .shots figcaption { color: var(--muted); font-size: 8pt; margin-top: 1px; }
+    .status { margin-top: 9px; padding: 7px 10px; border-radius: 8px; background: #edf5e5; font-size: 8.8pt; line-height: 1.4; }
+    footer { margin-top: 7px; padding-top: 5px; border-top: 1px solid #e4ddcf; color: var(--muted); font-size: 7.8pt; line-height: 1.4; }
+    @media print {
+      body { background: white; font-size: 9.5pt; }
+      main { width: auto; min-height: auto; margin: 0; padding: 0; }
+      .lead { margin: 10px 0 10px; }
+      .grid { gap: 7px 18px; }
+      .shots img { height: 52mm; }
+      .status { margin-top: 7px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Lien <span style="font-size:15pt;font-weight:500">リアン</span></h1>
+        <p>ふたりで約束をひとつ決めて続ける習慣アプリ</p>
+      </div>
+      <div class="version">紹介・プレス向け<br>ファクトシート｜v1.0<br>公開前下書き</div>
+    </header>
+    <p class="lead">それぞれの「今日できた」を持ち寄って、ふたりの記録と植物を育てる。約束は、ひとつだけ。</p>
+    <div class="grid">
+      <section>
+        <h2>サービス概要</h2>
+        <p>ふたりで相手を招待し、それぞれが自分の約束（習慣）をひとつ設定。できた日にチェックインして、ふたりの日々と植物を育てます。</p>
+      </section>
+      <section>
+        <h2>対象</h2>
+        <p>恋人・夫婦・友達・家族など、習慣を一緒に続けたいふたり。</p>
+      </section>
+      <section class="wide">
+        <h2>v1.0 の主な機能</h2>
+        <ul>
+          <li>招待コード・QR・リンクでペアになり、それぞれの約束を設定</li>
+          <li>毎日チェックインでき、写真はペア成立後、任意で添付できます</li>
+          <li>ふたりの今日（自分・相手）をホーム画面とウィジェットで確認</li>
+          <li>ふたりそろった日の累計に応じて、植物「タネの子」が育つ</li>
+          <li>履歴カレンダーで振り返り、節目には記録画像を作成してシェア</li>
+        </ul>
+      </section>
+      <section>
+        <h2>提供環境・価格</h2>
+        <p>iOS アプリ。v1.0 は全機能無料で提供します。</p>
+        <p class="note">将来の価格は本資料では案内しません。</p>
+      </section>
+      <section>
+        <h2>提供元</h2>
+        <p><span class="placeholder">&lt;OPERATOR_NAME&gt;</span></p>
+        <p class="note">G4（#42）で確定。App Store の販売者名と一致させます。</p>
+      </section>
+      <section>
+        <h2>連絡先</h2>
+        <p><span class="placeholder">&lt;CONTACT_EMAIL&gt;</span></p>
+        <p class="note">G4（#42）で確定。アプリ内「お問い合わせ」の宛先にも同じアドレスを設定します。</p>
+      </section>
+      <section>
+        <h2>本資料に載せていないこと</h2>
+        <p class="note">v1.0 に無い機能、利用者数・ダウンロード数・順位などの実績値、公開日は記載していません。実績値は docs/KPI.md の計測前のため扱いません。</p>
+      </section>
+      <section class="wide">
+        <h2>画面イメージ（v4「タネの子」）</h2>
+        <div class="shots">
+          <figure>
+            <img src="screenshots/01_home_both.png" alt="ホーム画面。ふたり達成と植物、ふたりの記録">
+            <figcaption>ホーム（ふたり達成）</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshots/02_home_waiting.png" alt="ホーム画面。相手だけ完了し、相手が待っている状態">
+            <figcaption>ホーム（相手が待っている）</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshots/03_widget.png" alt="ウィジェット。ふたりの今日とストリーク、植物">
+            <figcaption>ウィジェット</figcaption>
+          </figure>
+        </div>
+        <p class="note">実際のアプリ画面（SwiftUI View）を CI のシミュレータで描画し、ストア用に合成した画像です。モックや実在しない画面は含みません。</p>
+      </section>
+    </div>
+    <div class="status"><strong>資料の状態:</strong> 公開前の下書き。提供元名と連絡先は G4（#42）で確定します。mkt-lead の承認と mkt-review のレビュー後に使用してください。</div>
+    <footer>出典: docs/REQUIREMENTS.md §3.2–§3.13（v1.0 の機能）、docs/CONCEPT.md §5（対象・設計原則）、products/lien/marketing/legal/terms.html 第3条・docs/CONCEPT.md §6（価格）。画面: products/lien/marketing/screenshots/README.md（v4 / MK7）。実績・市場の数値は記載していません。</footer>
+  </main>
+</body>
+</html>
