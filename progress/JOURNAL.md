@@ -353,3 +353,10 @@
 - **判明(重大): main が赤**。`#85`(T22 シェア画像)が 2026-10-20 03:38 の lien-ios **failure** のままマージされ、`HomeView.swift` の `if viewModel.canShareRecord {` と `HomeViewModel.swift` の `func presentShareImage()` の閉じ括弧が1つずつ落ちていた。ほかに `StringsReviewTests` が T18/T19a/T22 で追加された 43 単位を `docs/STRINGS-REVIEW.md` に持たずに赤(2件)。どちらもこの作業の前提(ビルド・テスト緑)を満たせないため、最小の修正を同じブランチに入れた
 - 方針: 画像は (1) 本物の View(HomeView/HistoryView/WidgetRootView/ShareImageCardView)を 430×932 / 393×852pt・3倍で ImageRenderer 描画 → raw、(2) キャプションと合成して 1290×2796 / 1179×2556。キャプションの正本は `marketing/screenshots/captions.json`(mkt-exec と共有)。システムが描くもの(ステータスバー・ナビバー・壁紙)は描かない
 - ローカル検証: `scripts/macos-check/check.sh all` = module 80 ファイル・**1069 tests / 0 failures / 25851 assertions**、views 112 ファイル、widget 18 ファイルとも OK(既存の ISO8601DateFormatter の Swift 6 警告のみ)。新テストは枠と一緒に views の型検査セットで型検査し、CI の実描画に回す
+
+## 2026-10-20 16:50 (ux-exec) — MK7 #80 続き(CI artifact を取り込んで確定)
+- lien-ios #39385881488(commit b5265f9)の artifact `store-screenshots` を取得。6.7in 1290×2796 / 6.1in 1179×2556 の PNG 各6枚、manifest(provenance=b5265f9 / runId=39385881488)、G4 用の一覧 `contact-sheet-6.7in.png` を `marketing/screenshots/` に追加
+- 目視: 12枚とも実画面(ホーム・相手待ち・ウィジェット・カレンダー・シェア画像・ソロ)が描けている。空画像・文字切れは無し。カレンダー10/13 は薄い点(途切れ)で、赤や「失敗」の表現は無い
+- 旧 T26 の SVG 下絵10枚と `gen_screenshot_svg.py` を削除(plan.md / README.md の「廃止」と実体を一致させた)。画像の縦横比は元の実描画のまま(歪めていない)
+- 検証: `cd products/lien/marketing && python3 tools/verify_screenshots.py` = OK(各6枚・アルファなし・寸法一致・captions の SHA-256 一致)、`python3 -m unittest discover -s tools` = 36 tests OK
+- 結果: 画像・manifest・一覧・設計/手順・機械検査をコミットし、PR を作成(レビュー待ち)
