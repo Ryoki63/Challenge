@@ -70,6 +70,7 @@ final class AppServicesTests: XCTestCase {
         XCTAssertTrue(services.accountClient is StubAccountClient, "ペア解消・アカウント削除の口はスタブにもある(T23 #23)")
         XCTAssertTrue(services.plantNaming is StubPlantNaming, "植物の名前付けの口はスタブにもある(PB #57)")
         XCTAssertTrue(services.plantMemory is UserDefaultsPlantMemoryStore, "段階アップの演出の記録は、スタブでも端末に残す(PB #57)")
+        XCTAssertTrue(services.history is StubHistoryRepository, "カレンダー履歴の口はスタブにもある(T18 #18)")
     }
 
     func testLocalFallbackStoreLivesInApplicationSupport() {
@@ -111,6 +112,7 @@ final class AppServicesTests: XCTestCase {
         XCTAssertTrue(services.accountClient is EdgeFunctionAccountClient, "ペア解消・アカウント削除(T23 #23)")
         XCTAssertTrue(services.plantNaming is EdgeFunctionPlantNaming, "植物の名前を付ける・変える(plant-name — PB #57)")
         XCTAssertTrue(services.plantMemory is UserDefaultsPlantMemoryStore, "段階アップの演出の記録(PB #57)")
+        XCTAssertTrue(services.history is PostgRESTHistoryRepository, "カレンダー履歴は PostgREST を直接読む(T18 #18)")
         XCTAssertNotNil(services.pendingOps)
         XCTAssertEqual(services.store?.containerURL, temp.store.containerURL)
         XCTAssertTrue(
@@ -136,6 +138,9 @@ final class AppServicesTests: XCTestCase {
         await assertFails("植物の名前付け") { _ = try await services.plantNaming?.setName("みどり", mode: .first) }
         await assertFails("相手の写真") {
             _ = try await services.partnerPhotos?.loadThumbnail(pairID: PartnerPhotoFixtures.pairID, dateLocal: PartnerPhotoFixtures.today)
+        }
+        await assertFails("カレンダー履歴") {
+            _ = try await services.history?.fetchMonth(HistoryMonth(year: 2026, month: 6))
         }
         XCTAssertEqual(StubURLProtocol.captured.count, 0, "トークンが無い間は Edge Function も PostgREST も Storage も呼ばない")
     }

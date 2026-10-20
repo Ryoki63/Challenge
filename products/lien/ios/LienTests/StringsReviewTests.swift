@@ -506,6 +506,44 @@ enum StringsCatalog {
             }
         }
 
+        // History(T18 #18)
+        add("History.title", Strings.History.title)
+        add("History.openButtonLabel", Strings.History.openButtonLabel)
+        add("History.previousMonth", Strings.History.previousMonth)
+        add("History.nextMonth", Strings.History.nextMonth)
+        for (index, symbol) in Strings.History.weekdaySymbols.enumerated() {
+            add("History.weekdaySymbols[\(index)]", symbol)
+        }
+        add("History.bothDone", Strings.History.bothDone)
+        add("History.meOnly", Strings.History.meOnly)
+        add("History.partnerOnly", Strings.History.partnerOnly)
+        add("History.restTicket", Strings.History.restTicket)
+        add("History.noRecord", Strings.History.noRecord)
+        add("History.beforePair", Strings.History.beforePair)
+        add("History.future", Strings.History.future)
+        add("History.todayPending", Strings.History.todayPending)
+        add("History.loadFailed", Strings.History.loadFailed)
+        add("History.retry", Strings.History.retry)
+        add("History.empty", Strings.History.empty)
+        for year in [2025, 2026] {
+            for month in [1, 10, 12] {
+                add("History.monthTitle(\(year), \(month))", Strings.History.monthTitle(year: year, month: month))
+            }
+        }
+        for day in [1, 5, 31] {
+            add("History.dayTitle(\(day))", Strings.History.dayTitle(month: 10, day: day))
+        }
+        for mark in [
+            Strings.History.bothDone, Strings.History.meOnly, Strings.History.partnerOnly,
+            Strings.History.restTicket, Strings.History.noRecord, Strings.History.beforePair,
+            Strings.History.future, Strings.History.todayPending,
+        ] {
+            add(
+                "History.dayAccessibility(\(mark))",
+                Strings.History.dayAccessibility(Strings.History.dayTitle(month: 10, day: 5), mark)
+            )
+        }
+
         return items
     }
 }
