@@ -7,6 +7,7 @@
 - 送信・投稿の順序: mkt-exec(下書き) → mkt-lead(方針の承認) → mkt-review(景表法・誇大表現・未実装機能のレビュー) → computer-operator(投稿)または人間(DM・LINE)
 - 訴求の根拠: [docs/CONCEPT.md](../../../../docs/CONCEPT.md) §7 / [docs/REQUIREMENTS.md](../../../../docs/REQUIREMENTS.md) §0・§2・§3
 - ストア文言との整合: [`../store_metadata/ja/`](../store_metadata/ja/)(T32 で確定)
+- 置き場所: リポジトリ直下に `marketing/` は無く、Lien のマーケ資産は `products/lien/marketing/` に置く規約([docs/STRUCTURE.md](../../../../docs/STRUCTURE.md))。issue #77 の `marketing/` はこの配下を指す
 
 ## 1. 受入条件との対応(issue #77)
 
