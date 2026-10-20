@@ -27,6 +27,11 @@ CURRENT_PROJECT_VERSION = 1
 SUPABASE_URL =
 SUPABASE_ANON_KEY =
 
+// ---- 課金(RevenueCat — T33 / REQUIREMENTS §3.14)
+// 空のままでもビルド・テストは通り、アプリは「いまは購入できません」を出す(偽の価格を出さない)。
+// 実値は Secrets.xcconfig(gitignore 済み)が下の optional include で上書きする。G6 で人間が設定する
+REVENUECAT_API_KEY =
+
 // ---- optional include: ファイルが存在しなくてもエラーにならない(末尾の ? が重要)
 // Secrets.example.xcconfig を Secrets.xcconfig にコピーして実値を入れる(人間 / G0)
 #include? "Secrets.xcconfig"

@@ -202,7 +202,8 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
   "plantMood": "normal | happy | fidget | sad",
   "plantName": "みどり",
   "hasPartnerPhotoToday": false,
-  "ticketBalance": 2
+  "ticketBalance": 2,
+  "pairPlan": "free | premium"
 }
 ```
 
@@ -219,13 +220,20 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
   - **0 枚は `0`**(`null` ではない。0 枚でもバッジを出す — 罰なし。REQUIREMENTS §3.5)。**ソロ(ペアがない)は `null`**(キーは省略せず `null` で出す。ペア共有の在庫なので持ち主がいない = バッジを出さない)。`getActivePair` が残数を読んでいない・不正な値のときも `null`(誤った「0枚」を見せない)
   - 残数が変わる契機と、アプリが追いつく経路: 自動消費(close-day。`ticket_used` の push が消費後の残数の snapshot を運ぶ)・初期付与(invite-accept。成立の push と応答の snapshot)・月次付与(grant-tickets。push は送らないので、アプリは次の前面復帰の GET /snapshot で追いつく)。お休み宣言(rest-declare)は 1.0.1(D3)
   - 契約フィクスチャ: `products/lien/contracts/snapshot.paired.json`(2)・`snapshot.solo.json` / `snapshot.empty.json`(`null`)ほか snapshot を含むもの
+AD
+- **ペアのプラン(2026-10-20・T33 / REQUIREMENTS §3.14)**
+  - `pairPlan`: `"free"` / `"premium"`。メンバーの `users.premium_until` からサーバーが導出する(plan カラムは持たない。§5)。どちらか一方が未来の期限を持てば `premium`。ソロは `"free"`
+  - アプリは「自分の購読(RevenueCat の `customerInfo`)∪ `pairPlan == "premium"`」でプレミアムを判定する(`EntitlementStore`)。自分の購読が無いのに `pairPlan` が `premium` のときは、ペイウォールに「相手がすでにプレミアムなのでこのペアは適用済み」を出して誤課金を防ぐ
+  - RevenueCat Webhook(`revenuecat-webhook`)が `users.premium_until` を更新する。`app_user_id` は Supabase の user id(`Purchases.logIn(supabaseUserId)` の規約)
+- **互換性**: キーの**追加のみ**(`schemaVersion` は 1 のまま)。古いアプリは未知のキーを無視し、新しいアプリは無いキーを nil として扱いゲージを出さない・`ticketBalance` が無い(または `null`)ときはバッジを出さない(表示がちらつかない)・`dateLocal` が無い(または読めない)ときは `updatedAt` の時刻から保守的に判定する・`pairPlan` が無い(古いサーバー)ときは `free` として扱う(課金していない側に倒す)。古いアプリは段階 6 以上を 5 として描く(外部配布の前にサーバーと新しいアプリをそろえる — GROWTH §8.6)。この snapshot を組み立てる全関数(§5.3)は**まとめてデプロイする**(一部だけ出すと、通知ごとに古い形と新しい形が混ざる)
+
 - **組み立てに使った「今日」(2026-10-20・issue #72)**
   - `dateLocal`: この snapshot を組み立てるのに使った「今日」(date_local `"YYYY-MM-DD"`)。`todayMeDone` / `todayPartnerDone` は**この日の**完了。ペア・ソロのどちらにも載せる
   - なぜ要るか: §5.4 の「override」のとおり、checkin / checkin-cancel / nudge は、クライアントが送った `dateLocal` を「今日」として組み立てる(その日が確定する翌日の 1:00 まで有効)。そのため **0:00〜1:00 に組み立てた snapshot は、`updatedAt` の日付と完了の日付が 1 日ずれる**ことがある(23:58 に圏外で押したチェックインが 0:07 に届く)。クライアントは `updatedAt` からは「どの日の完了か」を決められない
   - クライアントの扱い: 完了の日は `dateLocal` で判定し、`dateLocal` が今日でなければ今日の完了として使わない(`PairSnapshot.snapshotDay` / `completionOnItsOwnDay`)。これで 0:00〜1:00 の「不明」扱い(旧: `updatedAt` の時刻が 1:00 より前なら不明)は要らなくなり、その時間帯に自分でチェックインした人の、その日のリマインドもその場で取り消せる(README §12)
   - `dateLocal` が無い古いサーバーの snapshot は、クライアントが `updatedAt` の時刻から保守的に判定する(互換性のため。キーは省略可として受ける)
   - 契約フィクスチャ: どの snapshot にも載る(`snapshot.*.json` / `checkin.*.json` / `nudge.ok.json` ほか)。固定入力は JST 2026-06-11 17:30(確定後)なので `"2026-06-11"`
-- **互換性**: キーの**追加のみ**(`schemaVersion` は 1 のまま)。古いアプリは未知のキーを無視し、新しいアプリは無いキーを nil として扱いゲージを出さない・`ticketBalance` が無い(または `null`)ときはバッジを出さない(表示がちらつかない)・`dateLocal` が無い(または読めない)ときは `updatedAt` の時刻から保守的に判定する。古いアプリは段階 6 以上を 5 として描く(外部配布の前にサーバーと新しいアプリをそろえる — GROWTH §8.6)。この snapshot を組み立てる全関数(§5.3)は**まとめてデプロイする**(一部だけ出すと、通知ごとに古い形と新しい形が混ざる)
+
 - 相手の今日の写真サムネは `photo_thumb.jpg` として同コンテナに保存(NSE がダウンロード、200KB上限)。失敗時は植物表示にフォールバック
 
 ### 3.5 ウィジェット実装方針

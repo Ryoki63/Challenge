@@ -430,4 +430,30 @@ final class PairSnapshotTests: XCTestCase {
         snapshot.ticketBalance = 0
         XCTAssertEqual(snapshot.resettingForNewDay().ticketBalance, 0, "0 を nil に落とさない")
     }
+
+
+    // MARK: - ペアのプラン pairPlan(省略可 — T33 / REQUIREMENTS §3.14)
+
+    func testDecodePairPlan() throws {
+        XCTAssertEqual(try decode(designExampleJSON).pairPlan, .free, "キーが無い古いサーバーは free")
+        let premium = designExampleJSON.replacingOccurrences(
+            of: "\"hasPartnerPhotoToday\": false",
+            with: "\"hasPartnerPhotoToday\": false, \"pairPlan\": \"premium\""
+        )
+        XCTAssertEqual(try decode(premium).pairPlan, .premium)
+        let unknown = designExampleJSON.replacingOccurrences(
+            of: "\"hasPartnerPhotoToday\": false",
+            with: "\"hasPartnerPhotoToday\": false, \"pairPlan\": \"platinum\""
+        )
+        XCTAssertEqual(try decode(unknown).pairPlan, .free, "未知の値は free(課金していない側に倒す)")
+    }
+
+    func testEncodePairPlanRoundTrip() throws {
+        var snapshot = try decode(designExampleJSON)
+        snapshot.pairPlan = .premium
+        let data = try PairSnapshot.makeJSONEncoder().encode(snapshot)
+        let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+        XCTAssertTrue(text.contains("\"pairPlan\":\"premium\""), text)
+        XCTAssertEqual(try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: data).pairPlan, .premium)
+    }
 }

@@ -12,6 +12,8 @@
 //         ない日が昨日まで2日以上続く)。枯れない・後退しない
 //   - お休みチケットの残数(2026-10-13・issue #19 / REQUIREMENTS §3.6): ticketBalance = pairs.ticket_balance
 //       (ペア共有の残数。ホームのバッジ用)。ソロは null(ペアが無いので持ち主がいない)。キーは省略せず null で出す
+//   - ペアのプラン(2026-10-20・T33 / REQUIREMENTS §3.14): pairPlan = メンバーの users.premium_until から導出
+//       (どちらかが未来なら premium。ソロは free。キーは省略せず必ず出す)
 //   - ストリーク導出: docs/DESIGN.md §5.4(確定は close-day。表示はプレビュー値)
 //   - 組み立てに使った「今日」(dateLocal。2026-10-20・issue #72): サーバーは checkin / checkin-cancel / nudge の
 //     snapshot を、クライアントが送った日付を「今日」として組み立てる(翌日の 1:00 まで有効 — resolveTodayLocal)。
@@ -32,6 +34,7 @@ import {
   previewStreak,
   type StreakDayRecord,
 } from "./streak.ts";
+import { derivePairPlan, type PairPlan } from "./premium.ts";
 
 export const SNAPSHOT_SCHEMA_VERSION = 1;
 export const DEFAULT_TIMEZONE = "Asia/Tokyo";
@@ -84,6 +87,15 @@ export interface PairSnapshot {
    * (アプリは無いキーを nil として扱う — DESIGN §3.4 の互換性)
    */
   ticketBalance: number | null;
+  /**
+   * ペアのプラン(REQUIREMENTS §3.14 / §5)。メンバーの users.premium_until から導出する
+   * (plan カラムは持たない)。ソロは "free"。キーは省略せず必ず出す。
+   *
+   * アプリは「自分の購読 ∪ pairPlan === "premium"」でプレミアムを判定し、
+   * 自分の購読が無いのに pairPlan が premium なら「相手がすでにプレミアムなのでこのペアは適用済み」と
+   * 表示して、誤課金を防ぐ(REQUIREMENTS §3.14)。古いサーバーはこのキーを出さない(アプリは free として扱う)
+   */
+  pairPlan: PairPlan;
 }
 
 // ---- 植物の導出(REQUIREMENTS §3.9 / GROWTH §3) ----
@@ -376,6 +388,11 @@ export interface BuildPairSnapshotInput {
   hasPartnerPhotoToday: boolean;
   /** pairs.ticket_balance(省略 = 読んでいない → snapshot では null) */
   ticketBalance?: number | null;
+  /**
+   * ペアのプラン。省略 = メンバーの premium_until を読んでいない → "free"。
+   * loadSnapshotForUser は user / partner の premiumUntil から導出して渡す(T33)
+   */
+  pairPlan?: PairPlan;
 }
 
 /**
@@ -430,6 +447,7 @@ export function buildPairSnapshot(input: BuildPairSnapshotInput): PairSnapshot {
     plantName: input.plantName,
     hasPartnerPhotoToday: input.hasPartnerPhotoToday,
     ticketBalance: normalizeTicketBalance(input.ticketBalance),
+    pairPlan: input.pairPlan ?? "free",
   };
 }
 
@@ -469,6 +487,7 @@ export function buildSoloSnapshot(input: {
     plantName: null,
     hasPartnerPhotoToday: false,
     ticketBalance: null,
+    pairPlan: "free",
   };
 }
 
@@ -559,6 +578,11 @@ export interface SnapshotUserRow {
    * snapshot の組み立て自体は使わない
    */
   pushEnv?: "sandbox" | "production" | null;
+  /**
+   * users.premium_until(ISO8601 | null)。snapshot の pairPlan の導出に使う(T33)。
+   * 省略 = 読んでいない(古い実装・テスト) → free 扱い。push の送信先としては使わない
+   */
+  premiumUntil?: string | null;
 }
 
 export interface SnapshotPromiseRow extends PromiseSummary {
@@ -695,5 +719,11 @@ export async function loadSnapshotForUser(
     plantName: plant?.name ?? null,
     hasPartnerPhotoToday: partnerCheckin?.photoPath != null,
     ticketBalance: pair.ticketBalance,
+    // プレミアム判定はメンバーの premium_until から導出(REQUIREMENTS §5)。
+    // どちらかが読めていなければ free 側に倒れる(derivePairPlan)
+    pairPlan: derivePairPlan(
+      [user.premiumUntil, pair.partner.premiumUntil],
+      params.now,
+    ),
   });
 }

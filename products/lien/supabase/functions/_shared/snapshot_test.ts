@@ -625,7 +625,8 @@ Deno.test("resolveTodayLocal: override が無ければ実際の今日、確定�
 /**
  * DESIGN §3.4 schemaVersion=1 の全21キー(成長ルール v2 でキー3つを足した: 16 → 19、
  * お休みチケットの残数 ticketBalance を足した: 19 → 20 (issue #19)、
- * 組み立てに使った「今日」dateLocal を足した: 20 → 21 (issue #72))
+ * 組み立てに使った「今日」dateLocal を足した: 20 → 21 (issue #72)、
+ * ペアのプラン pairPlan を足した: 21 → 22 (T33))
  */
 const SNAPSHOT_KEYS = [
   "schemaVersion",
@@ -649,6 +650,7 @@ const SNAPSHOT_KEYS = [
   "plantName",
   "hasPartnerPhotoToday",
   "ticketBalance",
+  "pairPlan",
 ].sort();
 
 /**
@@ -764,6 +766,7 @@ Deno.test("buildPairSnapshot: 自分だけ完了 = 確定ストリーク表示+f
     plantName: "みどり",
     hasPartnerPhotoToday: false,
     ticketBalance: 2,
+    pairPlan: "free",
   };
   assertEquals(snapshot, expected);
 });
@@ -903,6 +906,7 @@ Deno.test("buildSoloSnapshot: ソロ状態は pairId null・土だけ・約束�
     plantName: null,
     hasPartnerPhotoToday: false,
     ticketBalance: null,
+    pairPlan: "free",
   };
   assertEquals(snapshot, expected);
 });
@@ -963,6 +967,68 @@ Deno.test("ticketBalance は JSON にしたとき必ず残る(ソロは undefine
   ));
   assertEquals("ticketBalance" in zero, true);
   assertEquals(zero.ticketBalance, 0);
+});
+
+// ---- ペアのプラン pairPlan(T33 / REQUIREMENTS §3.14・§5。メンバーの premium_until から導出) ----
+
+Deno.test("buildPairSnapshot: pairPlan は渡された値(省略は free)。キーは必ず出す", () => {
+  assertEquals(buildPairSnapshot(baseInput()).pairPlan, "free");
+  assertEquals(
+    buildPairSnapshot({ ...baseInput(), pairPlan: "premium" }).pairPlan,
+    "premium",
+  );
+  const json = JSON.parse(JSON.stringify(buildPairSnapshot(baseInput())));
+  assertEquals("pairPlan" in json, true);
+  assertEquals(json.pairPlan, "free");
+  const solo = JSON.parse(JSON.stringify(buildSoloSnapshot({
+    updatedAtIso: "2026-06-10T03:00:00.000Z",
+    todayMeDone: false,
+    myPromise: null,
+  })));
+  assertEquals("pairPlan" in solo, true);
+  assertEquals(solo.pairPlan, "free");
+});
+
+Deno.test("loadSnapshotForUser: pairPlan は自分か相手の premium_until が未来なら premium", async () => {
+  const now = new Date("2026-06-10T03:00:00Z");
+  // 自分だけ premium
+  const mine = pairWorld({
+    users: [
+      { ...userA, premiumUntil: "2026-07-10T00:00:00Z" },
+      userB,
+    ],
+  });
+  assertEquals(
+    (await loadSnapshotForUser(makeFakeRepo(mine), { userId: "user-a", now }))
+      .pairPlan,
+    "premium",
+  );
+  // 相手だけ premium(自分視点でも premium。どちらか一方でペア全体に適用)
+  const partners = pairWorld({
+    users: [
+      userA,
+      { ...userB, premiumUntil: "2026-07-10T00:00:00Z" },
+    ],
+  });
+  assertEquals(
+    (await loadSnapshotForUser(makeFakeRepo(partners), {
+      userId: "user-a",
+      now,
+    })).pairPlan,
+    "premium",
+  );
+  // 期限切れ・未設定・不正な値は free
+  const free = pairWorld({
+    users: [
+      { ...userA, premiumUntil: "2026-06-01T00:00:00Z" },
+      { ...userB, premiumUntil: "not-a-date" },
+    ],
+  });
+  assertEquals(
+    (await loadSnapshotForUser(makeFakeRepo(free), { userId: "user-a", now }))
+      .pairPlan,
+    "free",
+  );
 });
 
 // ---- 昨日の仮判定(GROWTH §7.3 の最小版。純粋関数) ----

@@ -5,9 +5,11 @@
 - 実施日: 2026-10-20
 - 実施: eng-exec（T27 本体）
 - 検査: `LienTests/StringsReviewTests.swift`（罰なし lint・`StringsCatalog`・本ログの網羅）を CI `lien-ios` で毎回実行
-- 対象: 340 件（OK 334 / 修正 6 / 保留 0）
-- 内訳: 340 単位（`StringsCatalog` の出力を確認。関数型の文言は代表値で展開し、全通りを機械検査）
+AD
+- 対象: 369 件（OK 363 / 修正 6 / 保留 0）
+- 内訳: 369 単位（`StringsCatalog` の全出力を確認。関数型の文言は代表値で展開し、全通りを機械検査）
 - 追記（2026-10-20・issue #72 の検証中）: T27 の本体（#27・PR #86）のあとに足された 43 単位（`Tickets.balance` / 履歴 T18 #18 / シェア画像 T22 #22）を、同じ判定基準で追記レビューした（§7.20〜§7.22）。文言は変えていない（すべて OK）
+
 
 ## 1. 結論
 
@@ -722,9 +724,11 @@
 
 | テスト | 検査内容 |
 |---|---|
-| `testReviewLogCoversEveryStringsCatalogEntry` | `StringsCatalog` の全 340 単位が、このログの表に**ちょうど1回**出ていること。文言を足してログを忘れると落ちる |
+AD
+| `testReviewLogCoversEveryStringsCatalogEntry` | `StringsCatalog` の全 369 単位が、このログの表に**ちょうど1回**出ていること。文言を足してログを忘れると落ちる |
 | `testReviewLogTextsMatchStringsCatalog` | 表の文言が現在の `Strings.swift` と一致すること（1件の単位は完全一致、関数型は代表値が含まれること）。文言を変えてログを忘れると落ちる |
-| `testReviewLogSummaryMatchesVerdicts` | 冒頭の「340 件（OK 334 / 修正 6 / 保留 0）」が、表の判定の数と一致すること |
+| `testReviewLogSummaryMatchesVerdicts` | 冒頭の「369 件（OK 363 / 修正 6 / 保留 0）」が、表の判定の数と一致すること |
+
 | `testUserFacingStringsAvoidDeveloperJargon` | 画面の文言に「ストリーク」「アーカイブ」「セッション」などの開発者ことばが戻らないこと |
 | `testCloseLabelsAreConsistent` | 閉じるボタンの文言が「閉じる」に揃っていること |
 | `testNetworkErrorMessagesAreIdentical` | 通信エラーの文言が7箇所で同じであること |
@@ -746,3 +750,85 @@
 - §6.1 の初回同期失敗時の画面（eng-lead / T30 の判断）。
 - T30 の審査チェックリストで、実際の画面（スクリーンショット）と文言の最終確認。
 - 実機の VoiceOver で、植物・ウィジェット・通知の読み上げを確認（T20）。
+
+## 11. プレミアム（課金）の文言 — T33
+
+- 追加日: 2026-10-20（T33 / REQUIREMENTS §3.14）
+- 3文脈（節目・アルバム30日超・チケット切れ）で見出しと説明を出し分ける。価格・トライアル日数は offerings から表示し、コードに書かない。
+- 押し売りしない: 閉じる（「あとで」）と復元を常に置き、罰・恥・煽りの語を使わない。
+
+| 名前 | 文言（代表） | 判定 | メモ |
+|---|---|---|---|
+| `Paywall.title` | プレミアム | OK | 課金の名前。画面の見出し |
+| `Paywall.closeButton` | あとで | OK | 押し売りしない。常に閉じられる |
+| `Paywall.benefitsTitle` | ペアのふたりに、できること | OK | 特典の見出し。ふたりに効くことを先に言う |
+| `Paywall.benefits` | 写真アルバムに制限がない | OK | 特典の代表（配列の先頭）。REQUIREMENTS §3.14 のプレミアム特典 |
+| `Paywall.monthlyPrefix` | 月額 | OK | 価格の見出し。価格そのものは StoreKit の表示 |
+| `Paywall.yearlyPrefix` | 年額 | OK | 価格の見出し。年額を推す |
+| `Paywall.recommended` | おすすめ | OK | 年額のバッジ。煽らない |
+| `Paywall.trialNote` | 17日間 無料で試せます | OK | トライアル日数は offerings から。代表 17 日（G6 で最終化） |
+| `Paywall.purchaseButton` | このプランにする | OK | 購入ボタン。選んだプランであることを言う |
+| `Paywall.purchasing` | 購入しています… | OK | 購入中の表示 |
+| `Paywall.restoreButton` | 購入を復元する | OK | 復元。機種変更・再インストール用 |
+| `Paywall.restoring` | 復元しています… | OK | 復元中の表示 |
+| `Paywall.appliedByPartner` | 相手がすでにプレミアムなので、このペアは適用済みです。購入は不要です | OK | 誤課金防止（REQUIREMENTS §3.14）。責めない |
+| `Paywall.purchaseDone` | プレミアムがはじまりました | OK | 購入完了 |
+| `Paywall.restoreDone` | 購入を復元しました | OK | 復元成功 |
+| `Paywall.restoreNotFound` | 復元できる購入が見つかりませんでした | OK | 復元するものが無い。事実のみ |
+| `Paywall.unavailable` | いまは購入できません。準備ができたらお知らせします | OK | G6 前・API キー未設定。偽の価格を出さない |
+| `Paywall.errorMessage` | 購入を完了できませんでした。時間をおいて、もう一度お試しください | OK | 通信・ストアの失敗。次の一歩 |
+| `Paywall.cancelled` | 購入をキャンセルしました | OK | 利用者が閉じたとき（画面には出さない想定） |
+| `Paywall.pending` | 購入の確認を待っています。完了するとプレミアムがはじまります | OK | Ask to Buy など。保留を説明する |
+| `Paywall.legalNote` | 料金は App Store のアカウントに請求されます。自動更新は、購入後いつでも設定から止められます | OK | 特商法・自動更新の説明。G6 で最終確認 |
+| `Paywall.terms` | 利用規約 | OK | 法務ページへのリンク |
+| `Paywall.privacy` | プライバシーポリシー | OK | 法務ページへのリンク |
+| `Paywall.milestoneHeadline` | 30日、ふたりで続いたね | OK | 節目の文脈。代表 30 日 |
+| `Paywall.milestoneMessage` | この記録も写真も、これから先も残せるように。プレミアムで、ふたりの場所がもう少し広がります | OK | 節目の文脈。押し売りしない |
+| `Paywall.albumHeadline` | 30日より前の写真も、残しておける | OK | アルバム30日超の文脈（T21） |
+| `Paywall.albumMessage` | プレミアムなら、写真アルバムに制限がありません。ふたりで重ねた日を、ずっと見返せます | OK | アルバム30日超の文脈 |
+| `Paywall.ticketEmptyHeadline` | チケットがなくなっても、続けられる | OK | チケット切れの文脈。罰・恥を出さない |
+| `Paywall.ticketEmptyMessage` | プレミアムなら、お休みチケットが毎月5枚。ペアのふたりで使えます | OK | チケット切れの文脈。事実のみ |
+
+| `Tickets.balance` | お休みチケット 残り0枚 | OK | T19a。0枚でも出す（代表 0） |
+| `Share.title` | シェア画像 | OK | T22。画面の題名 |
+| `Share.createButton` | シェア画像をつくる | OK | ホームの任意タイミングの導線 |
+| `Share.subtitle` | ふたりの記録を、画像にして残せます | OK | シェア画像の説明 |
+| `Share.formatPickerLabel` | 画像の形 | OK | 縦・正方形の切替 |
+| `Share.formatStory` | ストーリーズ(9:16) | OK | 縦長 |
+| `Share.formatSquare` | 正方形(1:1) | OK | 正方形 |
+| `Share.loading` | 画像をつくっています… | OK | 生成中 |
+| `Share.shareButton` | シェアする | OK | 共有 |
+| `Share.closeButton` | 閉じる | OK | 閉じる（表記統一） |
+| `Share.retry` | もう一度ためす | OK | 失敗時の再試行 |
+| `Share.unavailableMessage` | シェアできる記録がまだありません | OK | 記録が無いとき。責めない |
+| `Share.errorMessage` | シェア画像を準備できませんでした。通信状態を確認して、もう一度お試しください | OK | 失敗時の次の一歩 |
+| `Share.privacyNote` | チェックインの写真は入りません | OK | プライバシーの案内（REQUIREMENTS §3.13） |
+| `Share.streakCaption` | ふたりの記録 | OK | 画像の中の見出し |
+| `Share.dayUnit` | 日 | OK | 画像の中の単位 |
+| `Share.meFallbackName` | あなた | OK | 名前が無いとき |
+| `Share.partnerFallbackName` | あいて | OK | 名前が無いとき |
+| `Share.names` | ゆうき と ゆうき | OK | 画像の中の名前（代表） |
+| `Share.startedOn` | 2026年10月20日 21:00から | OK | 開始日の表記（代表） |
+| `Share.milestoneTitle` | 🎉 ふたりで0日! | OK | 節目のお祝い（代表 0 日） |
+| `Share.milestoneBody` | この記録を、画像にして残そう | OK | 節目のお祝いの本文 |
+| `Share.sharePreviewTitle` | 0日の記録 | OK | 共有シートの題名（代表 0 日） |
+| `Share.previewLabel` | ゆうきとゆうきの30日のシェア画像 | OK | VoiceOver の読み上げ（代表） |
+| `History.title` | ふたりの記録 | OK | T18。画面の題名 |
+| `History.openButtonLabel` | ふたりの記録を開く | OK | ホームの導線の VoiceOver |
+| `History.previousMonth` | 前の月 | OK | 月移動 |
+| `History.nextMonth` | 次の月 | OK | 月移動 |
+| `History.weekdaySymbols` | 日 | OK | 曜日（代表は日曜） |
+| `History.bothDone` | ふたり達成 | OK | 凡例 |
+| `History.meOnly` | じぶんだけ | OK | 凡例 |
+| `History.partnerOnly` | あいてだけ | OK | 凡例 |
+| `History.restTicket` | お休み | OK | 凡例 |
+| `History.noRecord` | 記録なし | OK | 凡例（画面には文字を出さない） |
+| `History.beforePair` | ペアになる前 | OK | 凡例（画面には文字を出さない） |
+| `History.future` | これから | OK | 凡例（画面には文字を出さない） |
+| `History.todayPending` | 今日 | OK | 凡例（画面には文字を出さない） |
+| `History.loadFailed` | 記録を読み込めませんでした。通信状態を確認して、もう一度お試しください | OK | 失敗時の次の一歩 |
+| `History.retry` | もう一度 | OK | 再試行 |
+| `History.empty` | ペアになると、ふたりの記録がのこります | OK | 空状態。責めない |
+| `History.monthTitle` | 2025年1月 | OK | 月の見出し（代表） |
+| `History.dayTitle` | 10月1日 | OK | 日の見出し（代表） |
+| `History.dayAccessibility` | 10月5日、ふたり達成 | OK | VoiceOver の読み上げ（代表） |

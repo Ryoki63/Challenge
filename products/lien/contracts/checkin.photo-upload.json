@@ -21,7 +21,8 @@
     "plantMood": "fidget",
     "plantName": "みどり",
     "hasPartnerPhotoToday": false,
-    "ticketBalance": 2
+    "ticketBalance": 2,
+    "pairPlan": "free"
   },
   "photoUpload": {
     "photo": {

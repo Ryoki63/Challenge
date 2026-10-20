@@ -29,26 +29,12 @@ import {
 import { assertDateLocal } from "../_shared/streak.ts";
 import { dateLocalInTimeZone, DEFAULT_TIMEZONE } from "../_shared/snapshot.ts";
 import { type ParseResult, rejectUnknownKeys } from "../_shared/cron_http.ts";
+import { derivePairPlan } from "../_shared/premium.ts";
 
 export { TICKET_RULES };
-
-/**
- * ペアのプラン導出(REQUIREMENTS §5: メンバーの premium_until から。plan カラムは持たない)。
- * いずれかのメンバーの premium_until が now より未来なら premium。
- * null・過去・不正な日時文字列は free 扱い。
- */
-export function derivePairPlan(
-  premiumUntils: ReadonlyArray<string | null>,
-  now: Date,
-): PairPlan {
-  const nowMs = now.getTime();
-  const isPremium = premiumUntils.some((p) => {
-    if (p === null) return false;
-    const t = new Date(p).getTime();
-    return Number.isFinite(t) && t > nowMs;
-  });
-  return isPremium ? "premium" : "free";
-}
+// 判定の実装は _shared/premium.ts(T33 で snapshot と共用するため移した)。
+// invite-accept/core.ts がこのパスから import しているので、ここから再エクスポートする
+export { derivePairPlan };
 
 /** date_local が属する月の初日("YYYY-MM-01") */
 export function monthStartOf(dateLocal: string): string {
