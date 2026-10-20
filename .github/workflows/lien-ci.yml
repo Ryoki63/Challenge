@@ -3,7 +3,7 @@
 #
 # ジョブ: deno-test(Edge Functions とその契約フィクスチャ)/ ops-tests(ファイルを読む運用の静的テスト — issue #66)/
 #         e2e-tests(本番に対する API 通しテストの単体テストと型検査 — issue #67。通しテスト本体は CI で動かさない)/
-#         plant-assets(植物の SVG レイヤーの再生成と検査)/ store-metadata(ストア文言の文字数と禁止ワード)
+#         plant-assets(植物の SVG レイヤーの再生成と検査)/ store-metadata(ストア文言・スクショ・プレス素材の静的検査)
 #
 # action は commit SHA で固定する(タグは付け替えられる。lien-deploy・lien-ios などと同じ方針)。
 # 更新するときは、新しいタグが指す commit を確かめてから(gh api repos/<owner>/<repo>/commits/<tag> --jq .sha)差し替える
@@ -156,6 +156,11 @@ jobs:
       # 画像は CI(lien-ios)の artifact からコミットする。文言を変えて画像を作り直していないと落ちる
       - name: "Verify store screenshots (issue #80: 寸法 + アルファなし + captions/manifest の一致)"
         run: python3 tools/verify_screenshots.py
+
+      # 紹介・プレス向け素材(issue #94 / M8)。紹介文3種の文字数・必須項目・v1.0 の範囲・
+      # 将来価格/実績値の不在・スクショ3枚(1290×2796・アルファなし・元画像と SHA-256 一致)を確かめる
+      - name: "Verify press kit (issue #94: 文字数 + 必須項目 + v1.0 の範囲 + スクショ3枚)"
+        run: python3 tools/verify_press.py
 
       - name: "Test verify_metadata.py (検査ロジックの単体テスト)"
         run: python3 -m unittest discover -s tools -p "test_*.py" -v

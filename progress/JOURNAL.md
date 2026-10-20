@@ -394,6 +394,10 @@
 - 検証: `python3 x/tools/check_posts.py` = OK 13本 / unittest 35件 OK / 既存の `verify_metadata.py` OK・unittest 24件 OK（回帰なし）/ YAML の構文とステップ追加を確認
 - 結果: **PR #99 作成**（https://github.com/Ryoki63/Challenge/pull/99）。CI `lien-ci` run 39375076692 は全ジョブ success（store-metadata に追加した2ステップも実行され、`OK: 13 本` と unittest 35 件を確認）。`status: ready` は mkt-lead 承認 + mkt-review レビュー待ちのため付けていない（検査で固定）。issue は承認待ちとして開いたまま
 
+## 2026-10-20 15:10 (mkt-exec) — #75 追補: X アカウントのブランディング案
+- 着手: オーナー返信「投稿文ok!あとはアカウントのブランディング考えないと」(2026-10-20)を受けて再開。13本の文面は mkt-lead 承認として記録し、受け皿（表示名・handle・bio・アイコン・ヘッダー・固定ポスト・トーン）の設計を追加する
+- 前提: handle の空き確認はこの作業では行わない（X にログインしない）。未確認と明記し、取得はオーナーの操作にする
+- 判断: ブランディングは「10/21 08:00 の初投稿までに設定できるもの」に限定する。ヘッダー画像は未制作でも開始できるようにし、日付・URL を描かない
 ## 2026-10-20 14:05 (mkt-lead) — MK1 #74 公開前後 30 日の獲得計画
 - 着手: Issue #74。worktree `Challenge-74` / ブランチ `consilium/74-mk1-30-10-21-11-30`(origin/main `fdf1ef5`)。作業前に origin の対象ブランチ・PR を確認(重複なし)
 - 置き場所の判断: Issue の完了条件は「docs/GROWTH.md か marketing/plan.md」。`docs/GROWTH.md` は**植物の成長ルール**(プロダクト仕様)で獲得計画の置き場ではないため、`marketing/plan.md` を新設する。MK2(#75)の `marketing/x/`・MK5(#78)の `marketing/measurement.md` と同じく、マーケの新しい文書はリポジトリ直下の `marketing/` に置く(既存アセットは `products/lien/marketing/`)
@@ -467,6 +471,36 @@
 - main が赤だった2件を補修(どちらもテストの期待値のみ): deno 型検査は #97 の `todayLocal` 必須化に `snapshot_test.ts` の pairPlan ケースが未追随、`SNAPSHOT_KEYS` は #96 の `pairPlan` 追加で22個なのに期待値21
 - 検証: `verify_screenshots.py` OK / unittest 36 OK / `lien-ci` #39392331252 success / `lien-ios` #39389661638(attempt 2) success
 
+## 2026-10-20 21:17 — G4 #42 承認返信の反映 (eng-exec)
+- 着手: 指定 worktree / branch `consilium/42-g4` は clean。origin/main と同一 HEAD `13f0570`、同名リモート branch・既存 PR は無し。Issue の assignee は空だが、今回の Consilium 作業者タスクで直接割当済み。main は変更しない。
+- 承認根拠: オーナー `Ryoki63` の 2026-10-20 18:48 JST「それでOK!」(issuecomment-6288190684)を確認。直前の承認依頼はストア文言6ファイルと Pairy 不採用・新年訴求の2方針。スクショ・法務記入事項・独自ドメインまで承認済みとは拡張せず、現物と依頼範囲を照合する。
+- 方針: 文言の承認記録と未決項目を分離する。ストア申請・外部公開・ドメイン購入は行わず、対象資料の検証後に PR を提出する。human-gate の Issue は close しない。
+- 照合: 承認依頼時 `37e12ed` と HEAD の差分を確認。表示名・サブタイトル・リリースノートは同一 blob、キーワード・プロモーション・説明文は変更済み。#90 の通年案を旧新年案への「それでOK!」だけで承認済みにしない。旧版へ戻すと成長ルール等の不整合が戻るため、素材は維持して再確認を求める。
+- 直接確認: スクショ12枚の寸法・アルファ・manifest とキャプション一致は既存検査で OK。6.7in 一覧画像も目視確認。法務原稿の制定日・事業者表記・連絡先・裁判所は未記入、`SupportLinks.contactEmail` は空。スクショのオーナー承認、実機表示、App Privacy、リージョン、提供地域、独自ドメインの判断は確認できていない。
+- 変更: `marketing/G4-REVIEW.md` に承認コメントの日時・対象版・文言 hash・各受入項目の状態・判断依頼1件を記録。ASC 投入シートと法務チェックリストから参照し、全体承認・ASC 設定完了との混同を防止する。実装・素材・法務原文は変更しない。
+- 検証: `marketing/tools/verify_metadata.py --print` PASS(6ファイル・keywords 99/100字)、`verify_screenshots.py` PASS(12枚)、marketing unittest **36 tests / 0 failures**。web `build_site.py --check` PASS(生成物11件一致)、web unittest **47 tests / 0 failures**。
+- 公開ゲート: `web/tools/build_site.py --check-publishable` は exit 1。法務HTML4件の G4 未記入と `site.json` の `xUrl` 未設定を検出(5件)。既存ブロッカーとして保持し、再実行・回避・公開はしない。iOS の型チェック/lint/バイナリ build は実装無変更のため対象外。
+- 機械検査補足: 文書の hash/リンク照合は実際の10件すべて一致したが、検査用ワンショットの総数assertを11件とした誤りで初回 exit 1。検査対象自体を減らさず、6文言+2画像来歴+2相対リンクの計10件へ集計を直して再確認する。
+- 独立レビュー1回: G4 完了と #76 の公開ゲート(`xUrl`)を混同する1文に P2 指摘。該当文だけ修正し、#42 本文の確認・承認とサイト公開可否を明確に分離した。全体の再レビューは追加しない。
+- 検査結果: hash/相対リンク照合 **10件 PASS**、`git diff --check` PASS。全要件の確認は一部未了(現行文言・画像・法務の人間承認待ち)、関連テスト83件 PASS、HTML生成11件 PASS。型チェック/lint/iOS build は文書変更のみで対象外、公開前ゲートは既存未記入で FAIL、残TODOゼロとはしない。
+- 結果: **blocked / 承認待ち**。承認済み範囲と証拠の記録は作成済み。残る判断は1件にまとめて #42 に通知し、PR を提出する。Issue close・マージ・ストア入力・申請・公開・購入は行わない。
+- 提出: commit `9d73be5` を `origin/consilium/42-g4` へ push。PR #114 https://github.com/Ryoki63/Challenge/pull/114 を作成(main 向け・未マージ)。`lien-ci` run 39422336491 は対象 SHA `9d73be5` で **success**。iOS build の新規実行を意味しない。
+- 【承認待ち】: #42 comment-6290842503 に現行素材と法務必須値の判断を1件に集約して通知し、`needs-approval,human-gate` を付与。Issue は open を維持。hash・相対リンク・差分検査済み。提出時点で tracked worktree clean / local HEAD = remote branch を確認(この提出記録の追記は別 commit で同期する)。
+
+## 2026-10-20 20:21 (ux-exec) — MK3 #76 公開先承認後の再開確認
+- 着手: 指定 worktree / `consilium/76-mk3-github-pages` のみで再開。開始時の tracked/untracked 差分なし。PR #100 は 2026-10-20 に main へマージ済み。公開先の推奨案に対するオーナー返信(issuecomment-6287900053)を確認し、`Ryoki63/Challenge` / `https://ryoki63.github.io/Challenge` を確定値として扱う。URL の再承認は求めない。
+- 同期: 公開済み履歴を書き換えず origin/main を merge。squash 済み PR #100 と元ブランチの重複による3ファイルの競合を、main の CI・構成図と両側の JOURNAL 記録を保持して解消。別 worktree や secret は読み書きしていない。
+- 判明: #76 は assignee 未設定(本セッションの Consilium 割当はあるが Issue による排他は未確認)。#42 の「それでOK!」は確認できたが、制定日・事業者名・公開連絡先・管轄裁判所の具体値は原本に未記入。#79 にも公開 X ハンドルの記載が無く `site.json.xUrl` は null。これらを包括的な「推奨案で」の返信から推測しない。
+- 公開状態: Pages GET は HTTP 404。リポジトリ本体は public だが Pages サイトの有効化・配備成功は確認できない。設定の変更・workflow_dispatch・法務公開は実行しない。PR #100 の GitHub review は0件であり、mkt-review 済みとする証拠にはならない。
+- 時刻補正: 上の見出しと着手コメントの「20:21」は転記時の誤り。再開直前の実測は `2026-10-20 20:15:27 +0900`、本追記直前の実測は `2026-10-20 20:19:23 +0900`。既存記録を改変せず訂正を追記する。
+- 検証: web の unittest **47件 PASS**、`build_site.py` **11件生成 PASS(生成物差分なし)**、`--check` **11件一致 PASS**。`--check-publishable` は **exit 1(法務4出力の未記入・xUrl未設定)**。公開不可を検知した結果であり、公開検査のPASSとは扱わない。`git diff --check origin/main` PASS。型チェック/lint/iOS build はコード変更なしのため対象外。
+- 独立レビュー1回: サブエージェントに mkt-review 観点をまとめて依頼し、**要修正/公開不可**。約束の各自1つという単位、チケット保護/記録伸長の条件、実画面と SVG の差を指摘。`web/PUBLISH-STATUS.md` に根拠と未確認境界を記録。正式な Consilium 役職評価や文言承認済みとはしない。公開情報が未提供のため停止し、未解決指摘をPASSに変えない。
+- 変更: web README と G4 チェックリストに公開先承認を反映。Pages 有効化や mkt-review は `--check-publishable` が検査しないことを明確化。`PUBLISH-STATUS.md` に Issue 本文の完了条件を逐語的に照合し、公開未達・X未達・スクショ受入留保・文言未承認を明記。
+- 【承認待ち】2026-10-20 20:25 JST: #76 に質問を1件へ集約して投稿(issuecomment-6289781172)。URLは再質問せず、残る公開用5項目の提供(推奨)か保留かを依頼。`needs-approval,human-gate` を付与。`status:*`・assignee は変更せず、Issue は開いたまま。
+- 提出: **PR #111** https://github.com/Ryoki63/Challenge/pull/111 を作成。変更を commit/push 済み、mainへの直接push・force push・マージはしない。PR作成時点のCIは lien-ci **6/6 PASS**、lien-ios は pending。iOS完了とは報告しない。
+- 最終確認: 全要件の実装=未達(公開・X・画像の受入・文言承認)、関連テスト=47件PASS、静的サイトbuild=11件成功、生成物一致=11件PASS、公開前チェック=FAIL(exit 1)、型/lint/iOS build=本変更は文書のみで対象外、直接文書検査=PASS、残TODOゼロ=未達。未達項目は PUBLISH-STATUS.md に明示。
+- 結果: **BLOCKED**。公開先承認の反映と検証・引継ぎまで実施。公開用の具体値は推測せず、法務原本・サイト設定・生成物・公開設定を変更しない。担当役職の未解決レビュー指摘と、オーナー入力後の公開作業が残る。
+
 ## 2026-10-20 19:45 (computer-operator) — #79 MK6 オーナー返信後の再開確認
 - 着手: 指定 worktree・`consilium/79-mk6-x` のみで再開。開始時の tracked/untracked 差分は無し。#79 の 18:30 JST のオーナー返信は「ブラウザ操作でアカウントを作成させ、そこで投稿などを開始」であり、以前の「既存アカウントの引継ぎ待ち」から新規作成の準備へ前提を更新した。
 - 同期: PR #103 は既にマージ済み、リモートの作業ブランチは削除済みのため `git pull --rebase` は対象 ref 不在で停止。公開済み履歴を書き換えず `origin/main` を merge。JOURNAL の末尾競合は両側の既存記録を残してマーカーのみ除去した。
@@ -494,3 +528,278 @@
 - 最終機械検査: 既存HEADに対するJOURNAL/logの接頭辞保持、追加2ログ+画像1枚限定、JPEG寸法/容量/ハッシュ/APP1等無し、秘密・連絡先の典型パターン無し、欠測8項目の理由付きnull、予約未登録、`git diff --check` はすべてPASS。APP1検出の初回FAILはメタデータ除去後の限定再検査で解消した。
 - 通知(21:38 JST): #79 コメント `6291026868` で「推奨: orchestrator による mkt-review 割当・ready原稿引継ぎ / 代替: 初回保留」の1問に集約。`needs-approval,human-gate` と OPEN をreadbackで確認。認証の再依頼無し、statusラベルは不変更。通知先端末へのプッシュ到達は未確認。
 - 結果: **BLOCKED**。投稿手段・アカウント一致・証跡保存は確認済み。受入条件の実投稿・指定時刻の運用・24時間反応は未達。PR #110 に記録を提出し、Issue close・PR mergeは行わない。build/型/lintはコード非変更のため対象外であり、アプリを実行・ビルドしたとは報告しない。
+
+## 2026-10-20 18:29 — Issue #94 [mkt M8] 紹介記事とプレス向け素材
+- 着手: worktree・ブランチ・origin を確認。Issue #94 の受入条件に沿って、ファクトシート・紹介文 3 種・スクリーンショット素材を作成し、レビュー可能な PR まで進める。
+- 節目: 正本を照合。v1.0 は全機能無料（terms.html 第3条）、公開前法務欄に運営者名と連絡先メールの G4 プレースホルダーが残る。将来価格案（月700円・年2,400円）は CONCEPT §6 の将来案であり、公開時価格に使わない。既存スクショ6枚は v4 実画面生成で、3枚を同梱する。
+- 作業上の制約: PDFスキルを適用。スキル指定の artifact-operation marker は当該ファイルが worktree に無く実行できなかったため、PDFは生成せず編集可能な1枚HTMLのファクトシートを作る。連絡先・提供元は事実を補完せず G4 未確定と明記する。
+- 節目: `products/lien/marketing/press/` にHTMLファクトシート・紹介文3種・v4実画面3枚を作成。紹介文は60/198/556文字で確認。Safari の印刷プレビューでA4 1ページを確認。mkt-review は未実施なので、Issue の完了条件は未達。
+- 制約: PDFスキル指定の marker が worktree 内に無く、reportlab/pdfplumber/Poppler/WeasyPrint も未導入。HTMLを印刷可能な納品物として採用しPDFは生成していない。
+- 続き(再開): 前段の下書きを引き継ぎ、正本と再照合して確定。紹介文は 60 / 196 / 554 字（60字は上限ちょうど、200/600 は上限内）。将来機能・価格案・実績値は本文から除外し、提供元・連絡先は G4 #42 の `<OPERATOR_NAME>` / `<CONTACT_EMAIL>` のままにした。
+- 修正: ファクトシートにスクショ3枚を埋め込み、対象を「恋人・夫婦・友達・家族」に統一（CONCEPT §5）。価格の出典に CONCEPT §6 を追加。A4 1ページ（Chrome headless 印刷、595×842pt、`/Count 1`）を確認した。
+- 追加: `products/lien/marketing/tools/verify_press.py`（文字数・宣言一致・v1.0 の範囲・将来価格/実績値の不在・必須項目・G4 トークン・スクショ3枚の寸法/アルファ/元画像 SHA-256 一致・リンク切れ）と `test_verify_press.py` 27件。CI `store-metadata` に検査ステップを追加。
+- 検証: `verify_press.py` OK / `python3 -m unittest discover -s tools -p "test_*.py"` 63件 OK / YAML 構文 OK / `git diff --check` OK。
+- 訂正: 前段の「60/198/556」「Safari の印刷プレビュー」「PDFスキル」は確定記録ではない。確定値は 60/196/554、A4 1ページは Chrome headless で確認した。PDF は納品物にせず、編集可能な HTML を正本にした。
+- 更新: 600字版に「相手のチェックインは、相手の名前で通知されます。」を追加し、578字に確定（宣言・README も 578 に更新）。
+
+## 2026-10-20 18:14 (eng-exec) — E3 #93 通知・ウィジェットの取りこぼし対策
+- 着手前確認: 指定 worktree / ブランチ `consilium/93-e3-nse`、追跡・未追跡差分なし。HEAD と origin/main は `13f057030a1e63fefe295bb0fc5e6519b343e652` で一致。対象リモートブランチ・既存 PR はなし。
+- 排他確認: `gh issue view 93 --repo Ryoki63/Challenge --json assignees` は `assignees: []`。認証ユーザーは `Ryoki63`。役職タスクは受領済みだが、AGENTS.md の「着手前に自分が assignee か確認する」を満たせないため、実装・テスト・ビルドは開始しない。
+- 承認返信確認: `needs-approval` Issue の bot を除く最新コメントを確認し、人間の返信に該当する未処理コメントはなし。他タスクは変更していない。
+- 【承認待ち】Issue #93 の排他担当割当を依頼する。推奨: `Ryoki63` を assignee に設定して本 worktree の eng-exec を再開。別担当が稼働中なら本タスクを待機。
+- 結果: blocked。受入条件4項目はすべて未検証。コード・テスト・設定・secret は変更していない。担当割当後、NSE → App Group、起動時差分補完、リトライ・重複防止テスト、lien-ios CI の順で進める。
+
+## 2026-10-20 19:10 (eng-exec) — E3 #93 承認後の実装再開
+- 着手: オーナーの「実行しちゃってください／担当は任せます」をタスク契約で確認。Issue #93 の assignee に認証本人 `Ryoki63` を設定・再取得し排他割当を確認、着手コメントを投稿した。
+- 同期確認: `git fetch origin main` 後、HEAD と origin/main の追加差分なし。既存 PR・対象リモートブランチなし。作業前差分は前回停止時の JOURNAL 追記のみで、その内容は保持する。指定ブランチを使い、rebase・main 直接 push・マージは行わない。
+- 検証計画: 既存 NSE・共有ストア・起動同期を調査 → 必要な最小変更と回帰テスト → 独立レビュー1回 → ローカル検査と lien-ios CI → PR/Issue に証拠を記録。ローカルは Command Line Tools のみで `xcodebuild` 不可のため、iOS ビルド/実行は CI で検証する。
+- 調査/判断: NSE 保存と起動 GET /snapshot は既存。ただし push の重複/逆順で無条件上書き・reload、同期失敗の自動再試行なし、差分取得なし。既存の「状態は snapshot が正」を維持し、差分は HTTP ETag による条件付き GET(内容が同じなら 304、違えば最新状態)で実装する。イベント履歴/DB migration/新しい通知は追加しない。
+- 互換性: PairSnapshot/プッシュの JSON キーは変更しない。条件ヘッダなしの旧アプリには従来の 200 応答。共有ストアはプロセス間の read-compare-write を調停し、重複/逆順と競合取得を抑止する。リトライは1回だけ(最大2試行)、認証エラーは自動再試行しない。G1 の p50/実機 NSE 実行と写真 DL(T17b)は今回の完了根拠に含めない。
+- 19:33 検証節目: `deno test` 全419件、snapshot の局所11件、契約フィクスチャ一致とツールテスト3件、releaseスクリプト130件、snapshot/index.ts の `deno check` が PASS。Swift ローカル型検査は SDK 明示でも既定でもホストの `SwiftBridging` 重複定義で失敗(2回)したため、以降ローカルコンパイラは再試行せず CI の Xcode を使う。独立レビュー1件を並行で実施中。
+- 19:38 検証方針更新: 既存 `scripts/macos-check/check.sh` に、このホストの SwiftBridging 重複を SDK 非変更の VFS overlay で解消する専用手順があることを確認。同じ直接型検査の3回目ではなく、この既存補助テストを出力先も worktree 内に限定して実施する。iOS/NSE 本体の成否は引き続き lien-ios を正本とする。
+- 19:42 検証/修正: 専用補助検査で Lien module 89ファイルの build が通過。追加 NSE テストの同期 closure に MainActor 専用の既存 ReloadCounter を使った隔離違反を検出したため、そのテストだけローカル Int カウンタへ修正した(製品の actor 制約は変えない)。同じテストスイートを再確認する。
+- 19:45 検証節目: 専用補助検査の全1126テスト/26578 assertionsが PASS。旧SHAの lien-ios はテスト修正前のためキャンセルを要求し、修正後に新規実行する。ETag の200応答取得と、再起動時に前回ETagから取りこぼした最新状態を回復する回帰テストも追加する。
+- 19:44 記録時刻の訂正: 上の「19:45」は入力時刻の誤記で、実際の1126件PASS確認・2件追加は19:43以前。追加後は全1128テスト/26587 assertionsが PASS。過去行は編集せず本行で訂正する。
+- 19:47 提出準備: 実装/回帰テスト/設計記録を consilium/93-e3-nse に push(SHA 565653e)。PR #109 を作成: https://github.com/Ryoki63/Challenge/pull/109 。lien-ci #39410095257 成功、lien-ios #39410095377 進行中。PR本文も未検証項目は未チェックのまま。独立レビューの結果と iOS CI の完了を待ち、マージは実施しない。
+- 19:53 独立レビュー: P2「304後、A→B→A の遅延B pushで巻き戻る」、P1「消去後にNSEが旧snapshotを復元」を受領。304の確認時刻ヘッダを保存し、消去を同じ調停に参加させ、snapshot無しではNSEが初期化しない形で修正。各回帰テストを追加した。初回取得は認証済みGETの責務とし、製品仕様/JSON schemaは変更しない。19:47の提出準備行は19:46の操作(実時計確認前に記入した分)で、成否の記録は変更なし。
+- 19:54 修正検証: 全1130補助テスト/26595 assertions、Deno全419件、deno check が PASS。確認時刻なしの304を拒否するHTTP回帰テストも追加し局所確認へ進む。独立再レビューは上記2指摘の修正に限定して1回依頼した。修正前の iOS run はキャンセル済みで成功扱いしない。
+- 20:06 限定再レビュー結果: 304の指摘は解消確認。消去失敗時の未調停フォールバックには競合が残るとの指摘を受領し、その分岐を削除した。消去エラーを呼出元へ返し、AppModelは同期を閉じたままセッションを維持、次のライフサイクル通知で後始末を再試行する。失敗を成功扱いせず、サインアウトは調停済み消去の後に行う。全体レビューの追加反復は行わず、この差分と回帰テストをeng-reviewへ明示して渡す。
+- 20:06 局所検査の注意: AppModelAccountTests単独選択は既存共通モックがAppModelTests内にあるためコンパイル不可(製品のコンパイルは成功)。依存テストを含む全スイートで確認し直す。同じコマンドの繰り返しではなくテスト選択不足を解消する。
+- 20:12 検証節目: 全1133補助テスト/26609 assertionsがPASS。消去失敗→前面復帰での再試行と通常同期停止を確認。先行SHA e5b5d6eのlien-ios #39411277506は1216 XCTest/0 failures、TEST SUCCEEDEDで成功。最新の消去失敗処理はまだこのCIに含まれないため、最終SHAで再実行する。未解決P1とAppModelの新規影響を根拠として、例外的な追加確認をこの差分のみに絞って同じレビュワーへ依頼(全体の再評価なし)。
+- 20:14 テスト選択の訂正: 共通MockSnapshotClientの定義はAppModelTestsでなくSnapshotSynchronizerTestsだった。局所選択2回で同じ不足が続いたため、局所選択は打ち切り(3回目なし)。アカウント削除の後始末失敗も成功にしないテストを1件追加したため、直前に成功した全スイートで追加差分を検証する。
+- 20:18 限定確認: 未調停消去のP1解消をレビュワーが確認。新規P2「メモリだけの消去待ちは再起動で失う」を受け、消去開始マーカーをApp Groupへ永続化し、初期化時に同期を閉じ、NSEも適用しないよう修正。マーカー保存失敗なら消去を開始せず、完了後だけ解除する。AppModel再生成→後始末再開と消去待ち中push拒否の回帰テストを追加。直前の全1134件/26618 assertionsはPASSだが、この永続化差分は別途確認する。
+- 20:20 永続化差分の検証: 全1136補助テスト/26628 assertions、module 89ファイルbuild、git diff --checkがPASS。再起動後の消去再開・NSE拒否・失敗伝搬を実行で確認。これ以上のレビュー反復はせず、P2修正後の再レビューは未実施と明記してeng-reviewへ渡す。最終コードをpushしiOS CIを確認する。
+- 20:27 CI待ち: 最終コードSHA `0e2f5d252cae1a56d76f76887866d10b6a65c7cf` はローカル/リモート一致。lien-ci #39414244113成功、lien-ios #39414244122はBuild & test中。受入条件4は結果待ちであり未完了。PR #109はOPEN、マージしていない。CI後の本JOURNAL追記は監査ログのみの差分としてcode SHAとの同一性を別に確認する。
+- 20:36 CI失敗と原因: lien-ios #39414244122はbuild成功後、1221 XCTest中1件失敗。SDKセッション破棄テストがsnapshot削除だけを完了条件にし、後続のasyncサインアウト/植物メモリreset前に観測した。永続マーカー導入に合わせ、該当する2件の待機条件をsnapshot無しかつ消去待ちマーカー解除へ変更(テスト削除/skipなし)。製品動作の失敗と混同せず、失敗runを成功扱いしない。修正後の同じiOS CIで検証する。
+- 20:52 CI成功: 最終コードSHA `af426291d6e73141fe8ab00a475f74b1f31f159e` の lien-ios #39416345514 は 1221 XCTest / 0 failures、**TEST SUCCEEDED**(14m24s)。lien-ci #39416345543 も全ジョブ成功。受入条件4項目(NSE→App Group、起動/前面復帰の差分補完、リトライ/重複表示防止テスト、CI緑)を確認した。
+- 20:53 引き渡し: PR #109 を eng-review へ引き渡す。G1/T20 の APNs→NSE→WidgetKit 実機 p50≦60秒、NSE 実行/通知予約合わせ込み、写真サムネDL(T17b)は残課題であり、今回のPASSに含めない。マージ・本番デプロイ・ストア申請は行っていない。以後の差分は本JOURNALの監査記録のみで、製品コードは af42629 から変えない。
+
+## 2026-10-20 20:52 (eng-exec) — T32 #32 オーナー承認後の再開
+- 着手: 指定 worktree / consilium/32-t32-aso-pairy で再開。開始時の tracked/untracked 変更なし。PR #90 は 2026-10-20 13:01 JST に main へマージ済み、同一 head の追加 PR は未作成。
+- 承認確認: #32 のオーナー返信「それで良い」(2026-10-20 18:36 JST)は PR #90 の通年訴求・キーワード99字・「約束」重複維持と、G0 承認後に人間が ASC 投入する提案への同意。文言の再承認は求めない。
+- 依存確認: G0 #38 は OPEN で Apple Developer 加入完了の証跡なし。G4 #42 は OPEN だが 2026-10-20 18:48 JST にオーナー返信「それでOK!」あり。ASC 設定済みとは扱わず、投入手順・承認記録と残る人間操作を照合する。
+- 同期: PR #90 の head は origin から削除済みで pull --ff-only は同期不可。履歴を書き換えず origin/main を merge。CI は main の既存検査をすべて保持し、JOURNAL は両側の記録を保持して今回の記録だけ末尾へ置いた。
+- 変更: ASC-ENTRY と alternatives に #32 / #42 の承認原文と時刻を記録。#42 の返信は旧候補に対するものなので、通年版の採用根拠は #32 と明記。文言の再承認・ASC の代理操作・審査提出を行わず、人間の保存・再読み込み確認と証跡返却を次の工程にした。
+- 発見・修正: `verify_metadata.py --print` の見出しだけが「App 情報 > キーワード」のままだった。既存の ASC-ENTRY に合わせ「バージョン情報 > キーワード」へ修正し、回帰テスト1件を追加。承認済み `ja/*.txt` は main と差分なし。
+- ローカル検証: marketing で `PYTHONDONTWRITEBYTECODE=1 python3 tools/verify_metadata.py --print` = OK / keywords 99/100字、`python3 -m unittest discover -s tools -p 'test_*.py' -v` = 37件 PASS(メタデータ25件・スクショ12件)、`python3 tools/verify_screenshots.py` = 各6枚 OK。変更 Python 2ファイルは AST 構文検査 PASS、`git diff --check` PASS。
+- 適用外: iOS/バックエンド変更なしのため iOS ビルド・型チェックは対象外。Python の専用型チェック/lint/build 設定はなく、関連テスト・AST・CLI 実行・差分検査で確認。独立レビュー1回を依頼済み(結果待ち)。ASC の受入条件は未達のためタスク全体を done にしない。
+- 独立レビュー: 重大指摘なし。残リスク「G4 対象素材」を追加の受入条件と誤解しうる点だけ、ASC-ENTRY §3 に「G4 全体の close / スクショ完成はキーワード・説明文保存の追加受入条件にしない」と明記。再レビューが必要な重大未解決事項なし。
+- 提出: PR #113 を作成(未マージ)。`lien-ci` #39419045074 は6ジョブすべて success。main 同期によって自動起動した `lien-ios` #39419044975 は実行中のためビルド完了とはまだ扱わない。
+- 最新検査: head c5d7425 の `lien-ci` #39419301608 も6ジョブすべて success。PR #113 にコマンド・37件 PASS・独立レビュー・非該当/未確認の境界をコメントした。
+- 【承認待ち】#32 に comment 6290434543 を投稿し、`needs-approval,human-gate` を付与。質問は文言の再承認ではなく、G0確認後の人間による ASC 入力・保存・再読み込みと証跡返却の1点。#32 / #38 / #42 は close せず、status ラベルは HQ に委ねた。
+- 提出チェック: リポジトリ側修正 PASS / 関連37テスト PASS / CLI動作確認 PASS / AST構文 PASS / diff --check PASS / 独立レビュー1回・重大指摘なし / 型チェック・lint専用設定なし / iOS・バックエンドの実装変更なし。残TODOはASC保存証跡の人間返却で、受入「App Store Connect にキーワード・説明文設定完了」は未達。
+- 結果: **BLOCKED(人間のASC入力・保存証跡待ち)**。承認済み文言は変更せず、PR #113 を push 済み・未マージで提出。審査提出・公開・本番変更は未実施。
+
+## 2026-10-20 15:40 (mkt-exec) — #75 追補2: main 取り込み（MK7 の実画面・T33 の課金）への追随
+- 着手: オーナー返信を受けた追補の続き。origin/main は #96（T33 課金）・#100（MK3）・#104（MK7 スクショ）まで進んでいた。**PR #99 は squash で main に入っていた**ため、分岐点が無く rebase すると同じ記録を二重に積む。履歴を書き換えないよう、`git merge origin/main` で取り込み、衝突は x/ 配下を自分の側（承認・ブランディング入り）、`.github/workflows/lien-ci.yml` を main の側（pages-site と MK7 の検査を含む）で解いた
+- 判断: MK7 の実画面6枚を使い、`指定:` だった5本（10-23・10-25・10-31・11-01・11-07）を差し替えた。**代替テキストは実際の画像（contact sheet）を見て書き直した**（本文は変えていない）。残る指定は 10-24（チェックイン完了）と 10-26（ロック画面の通知）の2本
+- 判断: 画像の選択は mkt-exec の裁量（役職カード「スクリーンショットのキャプションと訴求順」）。mkt-lead の承認は本文・リンク方針・投稿順に対するものとして review.md §7 の範囲を書き直した
+- 発見: T33 でペイウォールが main に入った。`REVENUECAT_API_KEY` が公開ビルドに入ると、商品設定（T37 / G6・〜11/1）より先に「購入できないペイウォール」が出て、10/31 の「いまは全部、無料で使えます」と矛盾する。review.md §5-7 に、公開ビルドのキーを G4 で確認するよう記録（マーケ側では直せない）
+- 検証: `check_posts.py` OK（13本 + branding）/ unittest **52件** OK / `verify_metadata.py` OK・unittest 24件 OK（回帰なし）
+- 結果: 追補の PR を作成（マージしない）。`status: ready` は mkt-review 待ちのため付けない
+
+## 2026-10-20 23:40 (pmo-lead) — #119 Android 全体計画（日程・テスター12人×14日・依存・判断カード）
+- 着手: 指定 worktree `Challenge-119` / `consilium/119-and-pmo-android-12-14`。開始時の tracked/untracked 変更なし。iOS の 10/31 公開と v1.1 の 11/12〜13 を最優先とし、Android のコードは 11/13 まで main に入れない方針にした。
+- 事実確認: Google 公式で、個人アカウント（2023-11-13 以降作成）は 12 人以上×14 日連続のクローズドテストが必須、組織アカウントは対象外で D-U-N-S と組織情報・書類が必要（D-U-N-S は最大30日）、個人は Android 10 以上の実機で端末確認が必要、個人は氏名・国・メール（課金時は住所）、組織は名称・住所・メール・電話を Play 上に表示する、個人→組織の変更は可能、登録料は 25 USD 一度きり、を確認した。
+- 現状: early-pairs は確定 0 組（tracker は全項目 `—`）、X は 0 posts / 0 followers（2026-10-20 21:33）。「テスターを募集せず」は個人アカウントでは成立しないため、A（個人＋15〜20人募集、11/13 に12人の見込みがなければ B へ）を推奨し、B（組織＋D-U-N-S）と C（保留）を比較した。
+- 日程: A は 12/7 内部テストビルド → 12/8〜14 内部テスト → 12/15〜28 クローズド14日 → 12/29 本番申請 → 2027-01-06 公開目標。B は D-U-N-S を 10/23 に申請し、12/1 までに組織アカウント有効化 → 12/7 ビルド → 12/15 本番申請 → 2026-12-23 公開目標。どちらもゲート付きで、外部への約束にしない。iOS が遅れたら Android の開始も同じ日数遅らせる。
+- 予算の矛盾: 既知の固定費 16,550 円（Apple 12,800 + Supabase Pro 3,750）+ 広告上限 10,000 + Play 3,750 = 30,300 円で、総損失上限 30,000 円を 300 円超える。LLM $3/日（10/31〜12/31 で 29,485 円）を上限内に数える会計なら、Play を足すだけで 33,235 円。Issue の「Play は上限内」という前提は、広告0・端末借用・LLMの扱い次第でしか成立しない。支払い前に DECISION-AND-002 で決める。
+- 成果物: `docs/android/PLAN-ANDROID.md`（全体計画・出典）、`docs/android/DEPENDENCIES-ANDROID.md`（#119〜#127 の依存・担当・期限・人間タスク・ready 0 防止）、`docs/android/decisions/DECISION-AND-001.yaml`（A/B/C）、`DECISION-AND-002.yaml`（予算）、`docs/android/README.md`。`docs/STRUCTURE.md` に Android フォルダを追記。
+- 検証: 判断カード2件を PyYAML 6.0.3 でパースし、`status: open` / `decision: null` / 推奨 option が選択肢内にあることを確認。Markdown の内部リンク・コードフェンス・表の列数を Python で検査してすべて OK。日付の算術（12/15〜12/28 = 14日、10/31〜12/31 = 62日、10/23 + 30日 = 11/22、30,300 − 30,000 = 300、29,485 + 3,750 = 33,235）を確認。`git diff --check` は OK。
+- 結果: PR #131（https://github.com/Ryoki63/Challenge/pull/131）を作成（未マージ）。`lien-ci` は push 後に起動し、実行中。A/B の決定（期限 10/23 18:00）と予算の会計基準（10/27 18:00）はオーナー待ち。Issue #119 は close しない。外部送信・Play 登録・支払い・ストア申請・コード変更は行っていない。
+
+## 2026-10-21 00:30 (pmo-lead) — #119 追補: D-U-N-S の事実を再確認し、B 推奨に修正
+- 着手: 同じ worktree `Challenge-119` / `consilium/119-and-pmo-android-12-14`。前回の未コミット差分（PLAN-ANDROID.md の途中修正）を確認したところ、B の公開日が §1/§3.4 で「2027-02頃」、§3.3 で「2027-01-07頃」と不一致、§3.3 の 10/23 行が重複、§3.2 の見出しが「A 推奨」のまま、という矛盾があった。これを単純にコミットせず、事実から作り直した。
+- 事実確認: TSR 公式で、D-U-N-S の新規発番は **7 営業日 15,000 円/件（税別）または 30 営業日なら無料**、納期は受付完了の翌営業日を起算日とした TSR の営業日、個人事業主・任意団体は屋号の確認書類で発番可能、D&B のシステム反映は数日〜2 か月、を確認。Google 公式の testing 要件は「personal developer accounts created after November 13, 2023」向けで、Get started も testing と端末確認を "(Personal accounts only)" と表示している。個人アカウントで先に公開したアプリを組織へ移管しても 12 人 × 14 日が残るコミュニティ報告（2026-03-05）も確認した。
+- 判断: オーナーの「テスターは募集せず」を守れる唯一の候補として **B（組織アカウント + 無料 D-U-N-S）を第一推奨**に変更。A は「公開募集はせず、知人への個別依頼だけ」に限定する例外がある場合の代案、C はどちらも不可の場合。有料 D-U-N-S 15,000 円は固定費込みの会計で Play 3,750 円と合わせて 18,750 円、Apple 12,800 円を足すと 31,550 円で上限を超えるため、DECISION-AND-002 の承認まで選ばない。
+- 修正: `PLAN-ANDROID.md` の §1/§3/§4/P3 の日付と金額を統一（B は有料 7 営業日なら 2026-12-23 頃、無料の標準は 2027-01-07 頃、D&B 反映が最長なら 2027-03 頃）。`DEPENDENCIES-ANDROID.md`、`README.md`、`DECISION-AND-001.yaml`、`DECISION-AND-002.yaml` を同じ前提に更新。10/23 の重複行を削除し、ファクト ID を F1〜F15 に分離して出典 ID との混同をなくした。
+- 検証: PyYAML で判断カード2件をパースし、`status: open` / `decision: null` / 推奨 option が選択肢内に1つだけあることを確認。Markdown の内部リンク・表の列数を Python で検査。日付算術（12/15〜12/28 = 14日、10/23 申請 + 30 営業日 = 12/8、30,300 − 30,000 = 300、29,485 + 3,750 = 33,235、12,800 + 3,750 + 15,000 = 31,550）を確認。`git diff --check` は OK。
+- 結果: 修正を commit `0c4efe6` にまとめ、PR #131 を更新する。A/B/C の決定（期限 10/23 18:00）と予算の会計基準（10/27 18:00）はオーナー待ちで、Issue #119 は close しない。外部送信・Play 登録・支払い・D-U-N-S 申請・ストア申請・コード変更は行っていない。
+
+## 2026-10-21 00:39 (pmo-lead) — #119 計画・判断カードの最新状態と提出条件を再確認
+- 着手: 指定 worktree `Challenge-119` / `consilium/119-and-pmo-android-12-14`。開始時は tracked/untracked 差分なし。`git pull --rebase` は `Already up to date`。Issue #119 と既存 PR #131 の記録を読み、前回の作業と owner 判断待ちを引き継ぐ。
+- 方針: iOS 10/31 優先を維持し、Issue の受入条件と現在 main の日程・部署 Issue を突合する。古い clone の情報を根拠にせず current main SHA を取得する。公式規約・登録要件を再照合し、既存の判断カードを実態に合わせて更新する。
+
+## 2026-10-21 01:05 (pmo-lead) — #119 公式要件・受入成果物の再確認
+- 着手: 指定 worktree / branch で開始。開始時点に `docs/android/PLAN-ANDROID.md` と本 JOURNAL に既存の未コミット差分を確認し、保持して継続。origin/main は `cb951bea6b7d61997d8d68b0e0c6849db453e3fe`。
+- 確認: 公式 Google Play の日本向け本人確認資料に「個人事業主は開業届を提出して組織として本人確認できる」と明記。TSR の公式ガイドは個人事業主を対象に含め、屋号確認書類・無料30営業日/有料7営業日の手順を説明。従前の「Google 適格性 null・事前照会必須」は公式根拠と不整合のため修正する。個別審査の通過・owner の開業届/D-U-N-S保有状況は引き続き null。
+- 作業方針: 計画・依存1枚・判断カード・README の断定と未確認を公式資料に合わせ、部署 Issue の実状態を GitHub で再取得して反映する。外部申請・支払い・連絡は行わない。
+
+## 2026-10-21 01:13 (pmo-lead) — #119 公式根拠の再照合と提出前の整合
+- 着手: 指定 worktree `Challenge-119` / `consilium/119-and-pmo-android-12-14`。HEAD `e9784ed`、origin/main `cb951be`。開始時の未コミット差分（PLAN と本 JOURNAL）は前回の更新途中と判断し、破棄せず内容を再検証して引き継いだ。
+- 事実確認: G1/G2/G3/G6/G8/G9 を再取得し、12 人×14 日が 2023-11-13 以降の個人アカウント限定であること、組織は D-U-N-S 必須、登録 25 USD、install count の不正水増し・報酬付きレビュー禁止、TSR の 30 営業日無料/7 営業日 15,000 円（税別）、D&B 反映が数日〜2 か月であることを確認。G4 の国別書類リンクから Play Console の日本向け一覧（answer/15633622）を取得し、個人事業主が開業届で組織として確認できることを確認した。G11（16501669）は Android Developer Verification の別プログラムで、Play Console の組織アカウントの根拠には使わないと訂正した。
+- 修正: PLAN の F3/F10/F16、§2.2/§3.3/§4.1/§4.2/§4.3/§9、判断カード 2 枚、DEPENDENCIES、README を同じ根拠に同期。F10 の「相互インストール」断定を公式条文（不正な install count 水増し・報酬付き評価・他アプリ install を主機能として誘引）に直した。Issue 状態を #124 は in-progress、#122 は waiting（human-gate）など 2026-10-21 01:13 時点に更新。
+- 検証: PyYAML でカード 2 件（status open / decision null / 推奨 option が 1 つ）を確認。Markdown の表の列数・内部リンク OK。F1〜F16 の重複なし、G1〜G12 の参照と定義が一致。出典 URL 17 件すべて HTTP 200。日付算術（12/15〜12/28 = 14 日、10/23 申請 + 30 営業日 = 12/8、30,300 − 30,000 = 300、29,485 + 3,750 = 33,235、12,800 + 3,750 + 15,000 = 31,550）と `git diff --check` を確認。
+- 結果: docs を `f22d3c7` に commit。PR #131 を更新し、Issue #119 に提出コメントを投稿する。A/B/C の決定（期限 10/23 18:00）と予算の会計基準（10/27 18:00）はオーナー待ちのため Issue は close しない。外部送信・Play 登録・支払い・D-U-N-S 申請・ストア申請・コード変更は行っていない。
+
+## 2026-10-21 01:51 (pmo-lead) — #119 PR #131 レビュー差戻し修正
+- 着手: 指定 worktree `Challenge-119` / branch `consilium/119-and-pmo-android-12-14`。開始時 tracked/untracked 差分なし、HEAD `01ef4f2`、`git pull --rebase` は `Already up to date`。PR #131 は OPEN、同じ head branch。Issue #119 は OPEN / `status:in-progress`。
+- 指示: 既存 PR の同じブランチを維持し、レビューの3 blocker（DECISION-AND-002 の Supabase 月数、A 案の iOS 保護期間重複、G12 日本向け URL）を修正して再提出する。新規 PR は作らない。
+- 修正: DECISION-AND-002 の Supabase 閾値を 4 か月（31,550 円）/3 か月（27,800 円）に訂正。A の Play 登録・支払・本人確認・端末確認とテスター打診を iOS 保護期間後の 11/1〜11/5 に移し、11/5 を越えた場合の D3・後続ゲート再計算、テスト日数を圧縮せずずらす規則を追記。PLAN、両判断カード、DEPENDENCIES、README の A 日程を同期。G12 を日本指定の公式 URL に統一。
+- 根拠確認: Google Play Console の公式日本向けページを開き、Sole proprietor は Opening/Closing Notification of a Private Business で organization として確認可能との記載を確認（行 67）。
+
+## 2026-10-21 00:02 — Issue #120 Android v1.0 要件整理
+- 着手: Android v1.0 の iOS 差分・範囲・ウィジェット/通知/課金方針を調査し、受入条件に沿う要件表を作成する。
+- 同期で発生したこと: 作業記録の追記後、未コミット変更があるため `git pull --rebase` は拒否された。記録を保ったまま先にコミットし、再同期する。
+- 判断: iOS v1.0 は無料・匿名 Auth・共有 Supabase・APNs + snapshot を前提に実装済み。Android は中核の製品挙動と DB 契約を共有できるが、FCM 登録/配信、Glance 更新、通知権限、Play 審査は別実装。Play 個人アカウントの closed test 条件は公式ヘルプでも 12 人連続 14 日と確認した。Android ユーザー需要の実顧客証拠はこの Issue/リポジトリに見当たらず、需要は未検証 hypothesis として扱う。
+- 成果物: `docs/android/REQUIREMENTS-ANDROID.md` を追加。REQUIREMENTS §0–§10 を節単位で「同じ/変える/捨てる」に分類し、Glance・FCM・RevenueCat・Play テストゲートの推奨と、混在ペアの Supabase/RLS/snapshot/push-token 互換確認項目を記載した。
+- 検証: `git diff --check` はエラーなし。Android 実装は変更していないためアプリ build/test は対象外。内容の独立レビューを実施中。
+- 再開・検証: 既存の PR #132（未マージ）と `docs/android/REQUIREMENTS-ANDROID.md` を再点検した。REQUIREMENTS.md の見出し26節（§0〜§10、§3.1〜§3.15）と表の26行が一致し、相対リンク3件はすべて実在。受入条件3項目は表・推奨・互換確認の各節に対応している。外部資料の記述のうち、Glance の更新頻度の案内が逆になっていたため修正する。
+- 独立レビュー: 重大2件の指摘。①§3.12「v1.0 で植物名通知を送らない」は誤り（REQUIREMENTS §3.12 は植物名通知を [v1.0 P1] としている）。②§3.2 の「新しい相手との再スタート v1.1」と §3.15 の「サインアウト [v1.0]」の欠落。あわせて §3.3 曜日指定・§3.9 P1・§3.10 インタラクティブ/複数ペア・§3.11「この日のふたり」の後続優先度を追記して修正。再レビューで「重大2件とも解消・承認可」。
+- 仕上げ: 「v1.0 の範囲（含める/P1/含めない/未確定）」を追加。CONCEPT.md §9 が Android を v2+ としていた戦略との差分をオーナー指示として記録。需要の証拠は Issue・リポジトリ内で `null`（オーナー指示は投資判断であり顧客の行動証拠ではない）と明示。Glance の更新頻度案内の向き、RevenueCat 共用可否（可・条件付き）、FCM の data メッセージで widget を更新する経路を修正・追記した。
+- 検証: 26節マッピング・相対リンク4件の実在・`git diff --check` を確認。文書のみの変更のためアプリの build/test は対象外。push 後に lien-ci を確認する。
+- CI: push `9c4f04d` の lien-ci run 39446913929 は6ジョブすべて success（deno / ops / e2e / pages / plant layers / store metadata）。文書のみの変更のためアプリの build/test は対象外。
+- 結果: PR #132 を更新（未マージ・レビュー待ち）。受入条件3項目（節ごとの仕分け表・v1.0 範囲の推奨・混在ペアのデータ互換確認）を満たす成果物を提出した。Issue #120 はレビュー完了まで開いたままにする。
+
+## 2026-10-21 00:40 (product-lead) — Issue #120 再開・外部資料の再確認
+- 着手: 既存ブランチ（REQUIREMENTS-ANDROID.md・PR #132 オープン）を再点検。完了条件3項目（仕分け26節・v1.0範囲の推奨・混在ペアのデータ互換）は文書上そろうことを確認。
+- 検証: 表26行と REQUIREMENTS §0〜§10 の節が一致。相対リンク4件の実在。iOS 側の事実（招待8文字・72時間・1回限り、push_env の APNs 用、ウィジェット4ファミリ）と文書が一致。
+- 修正（断定の取り下げ）: 本セッションで公式本文を取得できなかった2点を「要再確認（hypothesis）」に改めた。①Glance の定期更新の上限（1時間に1回）②Play の 12人×14日の本文（前回は照合済みと書いていたが、今回は再確認できず）。あわせて FCM と Google Analytics の関係（§7）も未確認として残した。
+- 判断: 推奨の方向（Glance・FCM・Play Billing+RevenueCat 共用は条件付き）は変えない。確認できない条文は断定せず、実装・Play 判断の前に公式資料で確かめる前提に留めた。
+- 取得の制約: developer.android.com・support.google.com・firebase.google.com の該当ページは本セッションでは本文が切り詰められて届いた（HTTP 200 だが本文不足）。
+- 残り: PR #132 のレビュー（未マージ）。Play の条件の確定と組織アカウントの扱いは #119（AND-PMO）の判断事項。
+- 00:31 記録時刻の訂正: 上の「00:40」「00:45」は見積もりの誤記。実時刻は 00:31 JST（TZ=Asia/Tokyo の date で確認）。過去行は編集せず本行で訂正する。
+- 00:33 一次資料の再確認: Supabase 匿名認証の本文で、匿名ユーザーは authenticated ロール・JWT の is_anonymous で RLS 区別・端末間の記録共有は不可、を確認（文書の「UUID を OS 間で共有しない」と整合）。RevenueCat Identifying Customers の本文で、App User ID はプロジェクト単位・大文字小文字区別・同一 ID は全プラットフォームで権限を共有、を確認。Android 通知権限の本文は取得できず（未確認のまま）。
+
+## 2026-10-21 00:43 (product-lead) — Issue #120 再開・一次資料の再照合
+- 着手: PR #132 の未コミット差分を確認。Issue の排他担当が空欄だったため、直接依頼された本作業の担当 `Ryoki63` を Issue #120 に設定し、readback で確認した。
+- 範囲: 受入成果物は前回提出済み。今回は公式資料を一次確認して残っていた仮説表示を直し、PR #132 に反映する。PR は未マージのままレビュー待ちとし、Issue も閉じない。
+- 一次資料確認: Glance `updatePeriodMillis` は最大30分に1回、WorkManager は例として15分間隔。Android 13+ の `POST_NOTIFICATIONS` 実行時許可、Android 8+ の通知チャンネル、FCM 通知メッセージのバックグラウンド処理と data-only callback の区別、Play の対象個人アカウントにおける12人・14日連続 opt-in、Analytics が FCM 自体ではなく Console delivery reports / BigQuery export に必要な点を公式資料で確認。
+- 未確認のまま残す事項: 実際の Play developer account 種別・作成日、組織アカウントの適用条件、実機での更新/通知達成値、Android の実顧客需要。対象値は取得していないため `null`。
+- 独立レビュー: 外部仕様の変更箇所を別レビュワーが再確認。Android 8+ の通知チャンネル要件は targetSdk 26+ 条件を補うよう指摘され、その範囲表現に限定して修正。他の対象記述は公式資料と整合し、相互矛盾なしとの評価。
+- 最終ローカル確認: REQUIREMENTS の番号節26件と Android 分類表26行が順序一致。文書内相対リンク6件がすべて実在。`git diff --check` pass。コード/テスト対象に変更なし。
+
+## 2026-10-21 01:20 (qa-lead) — #123 Android テスト計画・端末マトリクス
+- 着手: 指定 worktree / `consilium/123-and-qa-android`。開始時の tracked 差分なし。Issue #123 の受入条件4項目を確認し、#120 / #121 / #137 / #138 / #139 / #140 / #143 / #144、PR #132 の Android 要件差分、PR #131 の PMO 計画、REQUIREMENTS / DESIGN / E2E-M1 / contracts を突合した。
+- 判断: テスト対象を Android 10〜16（API 29〜36）、推奨 `minSdk 29` / `targetSdk 36` / `compileSdk 36` とした。Google Play の 2026-08-31 以降の API 36 要件と、Android 13+ の通知権限、Android 14 の正確なアラーム既定拒否、16 KB page size を確認。最小構成は E29 / E36 / P36（stock）/ P-OEM（OEM）/ I17（iPhone）の5構成。E31/E33/E34/E35-16K と実機追加は RC 前後とした。
+- 成果物: `docs/android/TESTPLAN-ANDROID.md`。ウィジェット14件（W-01〜W-14）、FCM 18件（F-01〜F-18、F-10b 含む）、Doze 10件（D-01〜D-10）、iOS⇄Android 23件（X-01〜X-23）、Android 回帰12件（C-01〜C-12）、セキュリティ12件（S-01〜S-12）を記載。CI は unit/contract/lint/assemble を毎 PR、instrumentation を API 36、API 29/33 を nightly/RC とし、実 FCM・OEM 電池・実 launcher・性能・Play pre-launch は実機/Play Console に分離した。
+- 未確定（null）: Android 実機と iPhone の確保状況、最終 minSdk、FCM 検証環境、複数端末/provider の token モデル、正確なローカル通知の許容幅、16 KB native の有無、Play Data safety / アカウント削除 Web 導線。実機なしでは「公開可」を出さない。
+- 検証: 24 テーブルの列数一致、ローカル相対リンクの実在、公式 URL 16件の到達（HEAD 非対応の Play Help 3件は GET 200）、`git diff --check` clean。文書のみの変更で Android のビルド・テストは対象外（`products/lien/android` は #121 作成中で未存在）。
+- 次の一手: PR を作成し、lien-ci の結果を確認する。実機確保は #124 / PMO と調整する。マージはしない。
+- 時刻訂正: 上の見出し「01:20」は実際の着手・記録時刻「01:11 JST」の誤記。内容は変更しない。
+- 提出: PR #146 を作成（未マージ）。`lien-ci` run 39455269861 は6ジョブすべて success。文書のみのため `lien-ios` は起動せず、Android の Gradle build/test は #121 の雛形待ちで対象外。
+- 記録: Issue #123 に完了コメント（6295476511）、PR #146 に検証コメント（6295477091）。実機・FCM・Doze の実行結果はまだなく、計画の「未実施」を合格に読み替えない。
+- 結果: done（計画・端末マトリクスの提出まで）。次はレビュー対応と、実機/検証環境の確保（#124 / PMO）。
+- 件数訂正: 上の「FCM 18件（F-01〜F-18、F-10b 含む）」は、F-01〜F-18 に F-10b を加えた **19件** が正しい。PR #146 の本文も19件に訂正した。内容・ケースは変更していない。
+
+## 2026-10-20 22:04 — Issue #94 [mkt M8] mkt-review 指摘の修正
+- 背景: PR #108 は 2026-10-20 12:46:50Z にマージ済み（merge 26e7a70、CI 6件 success）だが、PR のレビューは 0 件で Issue #94 は OPEN。独立レビュー（mkt-review 観点・読み取り専用）に依頼した。
+- レビュー結果: **FAIL**。Blocker 1件 = `press/screenshots/03_widget.png` に v1.0.1 の M ウィジェットが写っている（`docs/REQUIREMENTS.md` §3.10、`docs/TASKPLAN.md` T17b。v1.0 は S とロック画面のみ）。`verify_press.py` は PNG の寸法・ハッシュしか見ないため、画像内の M を検出できない。Minor = 60字の「ふたりで約束をひとつ」の誤読、生成 commit `c308e5c` が main に無い監査性、ストア素材のデモデータ整合。
+- 修正: 03 を削除し、v1.0 の `05_share.png`（シェア画像）に差し替え。プレス3枚は 01 / 02 / 05。ファクトシート・press/README・screenshots/README・`verify_press.py`・`test_verify_press.py` を追随。60字版を「ふたりがそれぞれ約束をひとつ決める…」（実測60字）に、ヘッダも同様に変更。植物の説明を「タネの子の頭の植物が育つ」に修正（REQUIREMENTS §3.9）。
+- 検証: `verify_press.py` OK / `python3 -m unittest discover -s tools -p "test_*.py"` 64件 OK / `verify_screenshots.py` OK / 紹介文 60・196・578字 / ファクトシート A4 1ページ（595×842pt）/ 05_share の SHA-256 が元画像と一致 / リンク切れ0 / `git diff --check` OK。
+- 提出: PR #117 を作成（OPEN・未マージ）。CI は実行中。正式な mkt-review の承認は未取得で、再レビューを依頼中。
+- 残: ストア用 `marketing/screenshots/6.7in/03_widget.png` の M（MK7 / #80 の範囲。プレスでは不使用）、ストア README のデモデータ整合、G4 #42 の提供元・連絡先、mkt-lead 承認。
+
+## 2026-10-20 22:08 (mkt-exec) — Issue #94 再開: PR #117 の競合解消と再レビュー
+- 着手: Issue #94 は OPEN（assignees は空。HQ 振り分けの role:mkt-exec / status:in-progress で再開）。PR #108 は main マージ済み、フォローアップ PR #117（head fc95e23）は main と CONFLICTING。
+- 注意: worktree は指定ブランチ `consilium/94-mkt-m8-1-3` ではなく PR #117 のブランチ `consilium/94-mkt-m8-review-followup` に乗っている。指定ブランチは origin から削除済み（PR #108 で使用済み）。新規ブランチを切ると PR が二重になるため、PR #117 のブランチに積む。
+- 方針: 履歴は書き換えず、origin/main を merge で取り込む。受入条件（字数・v1.0 範囲・数値の出典・スクショ v4）を照合したあと、再レビューに出す。
+
+## 2026-10-20 23:02 (mkt-exec) — Issue #94 再開: PR #117 の差分確認
+- 着手: Issue #94 は OPEN、role:mkt-exec / status:in-progress。PR #117 は OPEN・MERGEABLE、直近の lien-ci 6 job はすべて成功。正式レビューは未登録。
+- 作業境界: 指定 worktree 内で確認。ブランチ名は指定値でなく `consilium/94-mkt-m8-review-followup`（PR #117 head）。指定 branch は PR #108 で使用済みのため、既存フォローアップ PR を継続する。既存未コミット差分（press素材・検査コード変更、01画像削除、04画像追加）を確認し、破棄せず保持する。
+- 同期: HEAD `413ee6e` は origin/main を merge 済みで、PR #117 の現在の head と一致。未コミット差分の範囲と新しい画面構成を受入条件・v1.0仕様に照合する。
+- 仕様照合: REQUIREMENTS §3.2–§3.13 で各主張を確認。03(M ウィジェット)は除外。04 のカレンダーに出るお休みマークは v1.0 の §3.6 に規定された履歴表示。提供元・メールは G4 #42 未確定なのでトークンを維持し、数値実績は資料に載せていない。画像3枚を実表示し、キャプションと画面の対応を確認。
+- 次: `verify_press.py` と marketing tools の回帰テスト、画像の寸法/ハッシュ、HTMLの1ページ描画、差分整合を検証する。レビュー結果は mkt-review に相当する独立確認1回を依頼する。
+- 提出: 差分を commit `da7d4e6` として作成し、PR #117 の既存ブランチへ push。local HEAD と origin branch SHA は一致、tracked/untracked の残差分なし。PR CI 6 job は push 直後のため pending（成功未確定）。
+- レビュー/描画境界: mkt-review 観点の独立 read-only レビューを1回依頼中。ローカル環境に Chromium / PDF renderer がないため、A4 1ページの実描画確認は未実施。PR #117 の再レビューを依頼する。
+
+## 2026-10-20 23:12 (mkt-exec) — Issue #94 再開: 受入条件の再検証と PR 本文の整合
+- 着手: PR #117（head `ec045cd`、origin と一致）を継続。ブランチ名は指定の `consilium/94-mkt-m8-1-3` ではなく PR #117 の `consilium/94-mkt-m8-review-followup`（指定ブランチは PR #108 で使用済みのため、二重 PR を避けて既存フォローアップを継続）。
+- 受入条件の照合: ファクトシートに機能・対象・価格・提供元・連絡先の見出しあり。提供元・連絡先は G4 #42 の未確定値（`G4-REVIEW.md` で事業者表記・問い合わせメールとも `null`）なので、推測で埋めず `<OPERATOR_NAME>` / `<CONTACT_EMAIL>` を維持。v1.0 の範囲は REQUIREMENTS §3.2–§3.13 と照合し、スクショ3枚は v1.0 の 02 / 04 / 05（M ウィジェットの 03 は不使用）。
+- 検証: `python3 tools/verify_press.py` OK / `python3 -m unittest discover -s tools -p 'test_*.py'` 64 tests OK / `python3 tools/verify_screenshots.py` OK（各6枚）/ 紹介文 60・200・582 字（宣言一致）/ 3枚とも 1290×2796・元画像と SHA-256 一致 / `git diff --check` OK。
+- A4 再確認: Chrome headless で `fact-sheet.html` を PDF 印刷し、`/Count 1`・MediaBox 595×842pt（A4 1ページ）を確認（出力は /tmp、リポジトリ外・未追跡）。
+- PR 本文の訂正: スクショの記載が旧構成（01 / 02 / 05）・文字数が旧値（196 / 578）のままだったため、実物に合わせて 02 / 04 / 05・60 / 200 / 582 に修正。PR #117 の本文を更新した。
+- レビュー: mkt-review 観点の独立 read-only レビューを依頼中。結果を受けて Blocker があれば修正し、PASS を確認してから完了とする。正式な mkt-review の承認はまだ得ていない。
+- レビュー結果(23:20 JST): mkt-review 観点の独立レビューは **FAIL**。Blocker 3件 = ①04_history のカレンダー（10/13 途切れ）と 02/05 の23日ストリークが矛盾、②200/600字の「ウィジェットでふたりの記録」が REQUIREMENTS §3.10 を超える、③提供元・連絡先が G4 未確定のトークン。Minor = 対象の出典が CONCEPT §5（設計原則）で §2 が正、fact-sheet の「（null）」が内部用語。
+- 修正(23:22 JST): ①04 を削除し v1.0 の 06_home_solo（ペア前の招待画面）へ差し替え。プレス3枚は 02 / 06 / 05。ファクトシート・README・verify_press.py・test_verify_press.py を追随し、04 を使わない理由を明記。②200字を「ホームとウィジェットで、今日の状態とストリークを確かめられます。」（200字）、600字を「…今日の状態、ストリーク、植物の様子…」（581字）に修正。③は G4 の実値が無いためトークンを維持し、人間ゲートとして残す。Minor も修正（CONCEPT §2、null の表現）。
+- 再検証: verify_press.py OK / marketing tools 64 tests OK / verify_screenshots.py OK / 文字数 60・200・581（宣言一致）/ 3枚 1290×2796・元画像と SHA-256 一致 / Chrome headless で A4 1ページ（`/Count 1`、595×842pt）/ `git diff --check` OK（変更後）。
+- 次: 修正版の再レビュー結果を確認し、PASS なら PR #117 に記録。Blocker 3 は G4 #42 の実値が入るまで外部掲載不可のため、needs_owner に1件で残す。
+- 時刻訂正: 直前の「レビュー結果(23:20 JST)」「修正(23:22 JST)」は入力時の未来時刻だった。実際は 23:14〜23:16。過去行は編集せず、本行で訂正する。
+- 再レビュー(23:17 JST): 修正版は **PASS（条件付き）**。Blocker 1（04 と23日の矛盾）は 06_home_solo への差し替えで解消、Blocker 2（ウィジェットの記録表現）は「今日の状態とストリーク」への限定で解消。残る条件は Blocker 3 = G4 #42 の提供元・連絡先の実値のみ。Minor（copy.md の対象出典 §5→§2、README の `null` 表記、「7日」→「10/20 未完了で6日・完了で7日」）も修正。
+- 記録: `press/README.md` §9 に初回 FAIL・再レビュー PASS（条件付き）・外部掲載不可の条件を追記。`copy.md` の状態行も「独立レビュー PASS（条件付き）/ mkt-lead 承認待ち」に更新。
+- 最終検証(23:18 JST): verify_press.py OK / marketing tools 64 tests OK / verify_screenshots.py OK / 文字数 60・200・581 / 3枚 1290×2796・元画像と SHA-256 一致 / Chrome headless A4 1ページ（`/Count 1`）/ `git diff --check` OK。PR CI 6 job は修正前 SHA で success、修正後 SHA は実行確認中。
+- 結果: **BLOCKED（G4 #42 の提供元・連絡先の実値待ち）**。受入条件1の実値、および mkt-lead の最終承認が残る。PR #117 は OPEN（マージしない）。外部掲載・送付は行っていない。
+- CI(23:21 JST): 最終 SHA `7fa70c7` の lien-ci 6 job がすべて success。PR #117 は OPEN・未マージ。G4 #42 の提供元・連絡先の実値と mkt-lead 承認を待つ。
+- 時刻訂正: 直前の「CI(23:21 JST)」は入力時の未来時刻。実際は 23:19 JST。過去行は編集せず本行で訂正する。
+
+## 2026-10-20 23:00 (qa-lead) — #105 T20b 実機 E2E を30分手順に確定
+- 着手: Issue #105 は OPEN、担当未設定だったため自分を assignee に追加して再取得確認。既存の着手コメントがあることを確認し、追加着手コメントを記録。作業ブランチ `consilium/105-t20b-e2e-30` は origin/main と同期済み、開始時 worktree clean。
+- 対象: `docs/E2E-M1.md` と REQUIREMENTS / DESIGN / 既存 E2E の照合。Issue の12項目・30分・単独実施・機種/OS/準備/対処・視認可能な期待値・記録表/失敗Issue雛形を満たす。実機の未実施結果は記入しない。
+- 10/20 23:06 JST 節目: 既存 E2E は項目数と所要の矛盾（⑥で10回計測、⑫で日付跨ぎ、セットアップ30〜60分）を確認。30分当日枠と時間依存の別検証を切り分け、テスト可能な12項目に再編する方針。
+- 10/20 23:18 JST 節目: `docs/E2E-M1.md` を30分・12項目・1人用に更新。各項目に時間・操作・目視期待値・証拠を定義し、実施情報/結果記録表、P0〜P3、Issue雛形、10回p50/日付依存/OSマトリクスの別検証を追加。実施結果は未記入のまま。
+- 10/20 23:24 JST 節目: 項目間の状態遷移を通読し、#2で先にソロチェックインすると同日#7が重複になる矛盾を発見。#2を表示確認のみへ変更し、初回チェックインを#7に一本化。#12にストリークの1日増加を可視確認として追加。
+- 10/20 23:13 JST 時刻異常: 上記の 23:18 / 23:24 は現在の壁時計 23:13 より未来。過去記録は書き換えず、以後は実時刻で追記する（未来時刻として報告）。
+- 10/20 23:13 JST 修正: 実装を再確認し、B が promiseSetup のままでは招待シートが開かない（コードは保留され、約束保存後に開く）ため、#2 を「A と B の両方が約束を保存」に訂正。旧「#2は表示確認のみ」はこの訂正で置き換え。
+- 10/20 23:14 JST 追記: #4 に保留コードの挙動、#8 に T0/T1 と S ウィジェットの見え方、§2.1 につまずき時の対処、§3 に総合判定/起票 Issue、§5 に ATT/プライバシー確認を追加。写真は PhotosPicker のためフルアクセス許可の手順を削除。
+- 10/20 23:15 JST 検証: 12項目の合計30分、期待値/証拠の空欄なし、内部リンク実在、`Strings.swift` の実文言と一致、`git diff --check` 無出力を確認。
+- 10/20 23:16 JST 参照修正: `products/lien/ios/README.md` の E2E §1.2 参照を新 §1 へ更新（E2E は TestFlight 配布前提を明記）。次: commit/push/PR、qa-review。
+- 10/20 23:16 JST 自己点検: 待機「最大1分」と「60秒待つ」の矛盾、写真の全画面閲覧、#5の両端末演出、旧①〜⑫との番号対応、復帰時のPASS条件を修正。commit `18e94df` として push。
+- 10/20 23:17 JST 検証: PR #128 の CI 6ジョブ（deno / e2e / ops / pages / plant / store metadata）がすべて pass。iOS ワークフローは docs のみのパスフィルタで未起動。実機E2Eは未実施。
+- 10/20 23:17 JST レビュー: qa-review に独立レビューを依頼。結果を受けて must-fix を反映し、PR/Issue に PASS を記録する。
+- 10/20 23:18 JST レビュー結果: qa-review は **PASS**（must_fix 0）。should_fix 3件（#12の主語、#2でBも保存する理由、#8のチェック印）を反映し、再確認も PASS。commit `1172aa2`。
+- 10/20 23:18 JST 最終検証: 最終 HEAD の CI 6ジョブがすべて pass。PR #128 はレビュー済みでマージ待ち（マージはしない）。Issue は `status:review` のまま。
+
+## 2026-10-20 23:01 (eng-lead) — Issue #106 T28b 本番リリース実行手順
+- 着手: 指定 worktree・ブランチ・origin と追跡差分なしを確認。Issue #106 の受入条件だけを対象に、Secrets 6件の取得担当、dry_run → 本番、切り戻し、内部 TestFlight の確認を1枚にまとめる。
+- 範囲: release workflow・署名スクリプト・既存 README の読み取りと手順書／導線／レビュー記録のみ。secret・.env の読み書き、workflow の実起動、Apple／Supabase の変更、配布・招待送信、main への push／マージは行わない。
+- 前提: 役職カードの旧12/11ではなく、現行指示の10/24機能凍結・10/27審査提出・10/31公開を基準とする。1時間は目標であり、Apple側の処理時間や署名権限を確認せず達成済みとは扱わない。
+- 節目: assigneeをRyoki63に設定・再取得し、着手コメントを投稿。開始直後のJOURNAL追記によりpull --rebaseが未ステージ差分で停止したため、autostash付きで同期し「Already up to date」を確認。needs-approvalを走査し、#29に人間返信があるがon-holdかつ今回の単一タスク範囲外のため変更しない。
+- 設計判断: 単一Markdownの実行シートを追加し既存README §8から案内。workflow/署名/ExportOptions/CI gateを照合し、internal_onlyはApple側の配布制限ではないこと、署名warning・アップロード結果不明・run_number再利用の境界を明記。データ移行は対象外。
+- 出典確認: Apple公式のTeam API keys・クラウド証明書・内部テスター、およびSupabase公式のAPI keysを確認。Adminというロール名だけで初回署名を保証しない。ローカルはCommand Line Toolsのみで、署名・iOS実ビルドを実測したとは扱わない。
+- 検証途中: release関連Python unittest 130件PASS。既存release成功履歴は別SHAであり、今回の本番署名成功とは扱わない。1枚の手順に対するeng-reviewを次に実施する。
+- 23:14 節目: 独立eng-reviewは4受入条件すべてPASS・重大指摘なし。非阻害のmain更新race指摘を採用し、SHA不一致/取得不能時の取消・ASC到達確認・配布禁止を明記した。限定段落のみ再確認を依頼する。レビューと検証の境界はdocs/REVIEW-106-RELEASE.mdへ記録。
+- 表示確認: 外部通信を遮断したChromeのローカルプレビューで表2個・各7行・コード例3個・横overflowなしを確認、Secrets表と切り戻し表を目視。full-page撮影は失敗したためviewport撮影で代替した。QA生成物はworktree内の無視対象build配下のみ。
+- 23:22 検証ゲート: eng-reviewの限定再確認PASS・未解決指摘なし。全要件の記載PASS／関連テスト130件PASS／コード例3ブロックとrelease.shのbash -n PASS／ローカルリンク・Secrets6件一致・秘密値形式不在・JOURNAL追記のみ・git diff --check PASS。型チェック・lint・ローカルiOS buildは文書のみのため対象外（Xcode未導入）。署名・Appleアップロード・招待送信は未実行。残TODOゼロ（今回の文書受入範囲）。
+- 提出準備: 指定ブランチへcommit/pushしPRを作成する。mainへ直接pushせず、PRのマージはレビュー役職へ委ねる。push後CIは提出SHAで確認し、既存runの緑で代替しない。
+- 23:24 提出: 実装コミットf3311d9を指定ブランチへpushしPR #129を作成。mainへの直接push・マージは行っていない。提出SHAのlien-ci run 39438487582は6ジョブsuccess、lien-ios run 39438492922は実行中。最終CI結果はPR #129へ追記し、実行中を成功とは扱わない。
+- 結果（文書・レビュー）: Issue #106の4受入条件を満たす単一実行シートと導線、eng-review PASS記録をPR #129へ提出済み。署名・TestFlight到達・招待受信は今回の実行対象外。公開期限は変更せず、初回署名とApple処理待ちのリスクを残検証として明記。PRはOPENのままレビュー役職へ引き継ぐ。
+- 23:42 CI障害: lien-ios run 39438492922の初回はSwiftPM依存取得中にGitHub:443接続不能およびRevenueCat cloneのcurl 56 timeout/early EOFで失敗（exit 74）。アプリのbuild/testには到達しておらず、完了ゲート未達。無関係なworkflow/依存定義は変更せず、同runの失敗ジョブを1回だけ再実行した。再失敗時は3回目を行わず未完了として返す。
+- 23:50 CI節目: attempt 2はSwiftPM依存解決を23:45 JSTに通過し、初回の接続障害箇所は回復。iPhone 17シミュレータ起動中でbuild/testはまだ未到達。結果を待ち、依存解決成功だけでCI全体PASSとは扱わない。
+- 2026-10-21 00:03 CI最終: attempt 2は無署名build/testがsuccess、1221件・0 failures・TEST SUCCEEDEDをログで確認。しかしジョブ全体は20分15秒で上限超過、API conclusion=cancelled。CI全体successではないため完了扱いにしない。同操作の3回目は行わない。
+- 結果（最終判定）: failed。文書4受入条件・eng-review・ローカル130件・CIの無署名1221件はPASSだが、提出実装SHAのlien-ios全体緑ゲートは未達。PR #129はOPEN・未マージ、Issue #106もOPENを維持。CI実行時間の復旧と再検証を引き継ぎ、今回はworkflowやアプリを変更しない。secret/Appleアップロード/招待/本番変更なし。
+
+## 2026-10-20 23:01 (eng-exec) — G5b #107 審査リジェクト一次返信・証拠ガイド
+- 着手: 指定 worktree と `consilium/107-g5b` を確認。作業前差分なし、対象リモートブランチ・既存 PR なし。認証本人 `Ryoki63` を Issue #107 の assignee に設定し再取得した。
+- 同期: `git fetch origin main` と `git merge --ff-only origin/main` は Already up to date。履歴の書き換え・main 直接 push・他 worktree の操作は行わない。
+- 範囲: 5 種の却下理由別の返信型と証拠、デモ情報・審査導線の1枚索引、再提出チェックリストを作る。認証情報は読まず複製せず、ストアへの返信・申請・本番変更は行わない。
+- 確認計画: 既存 `review-notes.md` と確定仕様・実装を照合 → Apple 公式ガイドライン確認 → 文書作成 → リンク・必須項目・出典の直接検査と必要な資料レビュー → 指定ブランチへ commit/push、PR 提出。承認待ち一覧は確認済みだが、割り当て外 Issue の再開・状態変更はしない。
+- 節目(23:10): Apple 公式 Guidelines と ASC 返信/再提出ヘルプを照合。5条項の返信型・スクショ/動画/手順、デモ正本への1枚索引、再提出チェックリストを作成した。通知拒否/PhotosPicker、匿名認証、通報=メール下書き、ブロック=ペア解消の既知制約を既存ノート/ソースに合わせた。
+- 判断: v1.0 無料の正本と T33 購入コードの存在は別。無料/課金の提出ビルド確認を返信前ゲートとし、UGC フィルタ・運営対応期限・空の連絡先も適合済みと断定しない。今回は文書だけを変更し、課金/通報コード・設定・実デモ・ASC は操作していない。
+- 検証(23:24): 一時 Node 検査で5条項それぞれに返信型/スクショ/動画/手順、再提出10項目、ローカルリンク33件(見出し18件)とコードフェンスを確認。REQUIREMENTS §8 のリンクを修正し全件 PASS。GitHub Markdown とローカル GFM で描画し、Chromium 1180px/390px で横溢れなし。索引の A4 印刷プレビューは `/Count 1` (1ページ)、本文の表・英語型・再提出欄も目視確認した。プレビュー/PDF/検査ハーネスは一時ファイルで、納品対象は Markdown。
+- 検証: `python3 tools/verify_metadata.py` / `verify_screenshots.py` / `verify_press.py` はすべて OK、`python3 -m unittest discover -s tools -p 'test_*.py'` は64件 PASS (marketing ディレクトリ)。`git diff --check` PASS。型/lint/iOS build は対象外(アプリ/設定/CI の変更なし、文書の直接検査で代替)。実ビルド採証・ストア返信・デモ発行・再提出は今回未実施で、実施済みと書いていない。
+- 独立レビュー: 文書の受入条件・根拠/事実境界・権限・課金/UGC を1人にまとめて依頼し、必須修正なし。実ビルドと運営基準等の未確認境界はガイドに保持。追加の全体レビューは行わない。
+- 提出前確認: 受入条件3項目の文書は揃った。差分は審査用 Markdown 3件と JOURNAL の追記だけで、secret/個人情報/アプリ挙動の変更なし。指定ブランチへ commit/push 後、PR を作成して CI とリモート SHA を確認する(レビュー役職が判断するためマージしない)。
+- 提出(23:27): `6adf2e2` を `consilium/107-g5b` へ push し、PR #130 (https://github.com/Ryoki63/Challenge/pull/130) を作成。ローカル/リモート HEAD 一致、PR は OPEN / base main / 未マージ。`lien-ci` run 39439002890 は6ジョブすべて success (store metadata / pages / deno / ops / plant / e2e unit+type check、ネットワークE2Eではない)。
+- 結果: Issue #107 の受入条件3項目について文書を実装・検証し PR 提出まで完了。最終監査追記も別 commit で push し、その HEAD の CI は PR/Issue へ記録する。レビュー役職の判断を待つため Issue close・main マージ・status ラベルの変更・DONE 台帳の完了扱いは行わない。採証/申請/公開は未実施。
+- 完了チェック: [PASS] 受入条件3項目の文書 [PASS] 関連既存テスト64件 [PASS] 出典/リンク/表示/独立レビュー [PASS] diff 検査・残実装TODOゼロ [対象外] 型/lint/iOS build (Markdownのみ。CIの型検査成功とiOSビルドを混同しない) [対象外] 実機/ASC操作 (手順作成が契約、実行は別承認)。
+
+## 2026-10-21 01:12 (ops-lead) — #124 Google Play Console 登録・CI
+- 着手: Issue #124 を確認し、自分を assignee に設定して排他割当を確認。worktree は指定ブランチ、開始時 tracked/untracked 差分なし。`git pull --rebase origin main` は Already up to date。
+- 方針: iOS 10/31 公開を優先し、Android は登録準備・CI・内部テスト自動化まで。Play の申請/公開、契約・送金・認証情報作成は実施しない。
+- 調査: Android 実装は未マージ（eng #121 / draft PR #145 に雛形と lien-android CI あり）。本タスクは Play 登録・署名・Play API 自動化・申告回答表に限定し、Android の雛形は重複作成しない。Play API のアップロードはサービスアカウント JWT を openssl で署名し、外部 action / pip 依存を足さない方針。
+- 次の作業: `docs/android/` の3文書、`products/lien/scripts/play/` の API スクリプトと単体テスト、`.github/workflows/lien-play.yml`（build/test → 内部テストトラック）を作成する。
+- 成果: `docs/android/` に登録1枚（30分）・署名/Secrets・データセーフティ等の回答表・索引を作成。`.github/workflows/lien-play.yml` は build/test（未署名 AAB）と、手動 + Environment `play-internal` 承認時だけの内部テスト署名・アップロードを分離。`products/lien/scripts/play/publish_play.py` は標準ライブラリ + openssl の RS256 JWT で Play API を呼び、本番トラックを拒否し、失敗時は edit を削除する。
+- 検証: Python unittest **15件 PASS**（RS256 の実署名を openssl で検証、track body、AAB 検査、失敗時 cleanup、commit 順）。ローカル HTTP サーバーで OAuth→edit→bundle upload→track→commit の5呼び出し、dry-run の4呼び出し（edit 削除込み）を確認。workflow YAML parse OK、`bash -n` 12ブロック OK、`git diff --check` OK、docs の外部リンク 18件 HTTP 200、ローカルリンク欠落なし。
+- 残課題: Android 雛形は #121 / #145 が未マージのため、本ブランチでは build/publish を detect job でスキップ（PR の CI は scripts job のみ）。`versionCode` を CI 実行番号から反映する実装、最終 `applicationId`、課金/通報/写真権限などデータセーフティ §6 の未確定項目は引き渡し。
+- 結果: 変更を commit / push し、PR を作成する（マージ・Play 登録・ストア申請・アップロードは行わない）。
+
+## 2026-10-21 00:46 — #121 Android 技術選定・設計・空アプリ (eng-lead)
+- 着手: 指定 worktree / consilium/121-and-eng-android-kotlin-compose で開始。tracked/untracked とも開始時 clean。Issue は OPEN、assignee なし、HQ の status:in-progress。承認待ち一覧に #121 はない。他タスクは今回再開しない。
+- 同期: 指定ブランチはまだ remote にないため pull は remote ref 不在で停止。origin/main を fetch し、未公開の指定ブランチが同一 HEAD であることを確認した (rebase: up to date)。main への書込・既存公開履歴の変更はしない。
+- 方針: REQUIREMENTS → DESIGN → contracts/ と既存実装を照合し、Android 固有ディレクトリ・設計書・専用 CI だけ追加。iOS / Supabase / 契約正本は変更しない。比較と見積り、後続 Issue の依存・触る範囲・ロールバックを明記する。ビルドと関連検査、独立レビュー1回を経て PR を提出し、マージ・Issue close は行わない。
+- 環境: Java runtime / Android SDK / Gradle は初期 PATH にない。必要な検証用ツールとキャッシュはこの worktree 内の gitignored 領域だけに置き、署名鍵・実認証情報・本番接続は扱わない。
+- 00:54 設計節目: Kotlin+Compose を推奨、Flutter/KMP と17–25人日（計画見積り）を比較。Supabase匿名/RLS・全共有fixture・Glance・FCM・App Links の境界を設計書へ追加。v1.0 は匿名のみのまま、任意連携は将来設計。APNsの既存push_tokenだけを条件とする10経路の変更が必要で、FCM追加だけでは配送されないことを確認。サーバー改修は別Issue/critical_reviewへ分離する。
+- 00:54 並列作業: Android雛形/専用CIの限定workerを1名起動。親は設計/Issue分解を担当（書込範囲非重複）。新規SDK契約への同意は行わず、必要なら既設SDKを持つCIでビルドを検証する。既存mainの直近lien-ci=39427686022、lien-ios=39424980235はsuccess（別SHAなので今回の変更の検証とは区別）。
+- 01:02 タスク契約: T-AND-1〜11 を #134〜#144 として起票し、依存・受入条件・変更許可範囲・ロールバック・人日を本文に記載。共有サーバーを変える #138/#139 に difficulty:high を付け、iOS優先とcritical_reviewを明記。BACKLOGに実Issueリンクを追記した。#121のassigneeは自分に設定済み。
+- 01:02 検査: contracts/tools/generate.ts --check は22 fixture一致、contracts/tools の Deno test は3件PASS。Android workflowの公式Actions固定SHAは各リリースtagと一致した。Androidのコンパイル・test・lintはまだ結果未確定。設計/雛形/CIを1名の独立レビュワーが確認中。
+- 01:07 提出途中: コード31a17bcを指定ブランチへpushしdraft PR #145を作成。独立レビュー1回はP1/P2ブロッカーなし。lien-ci #39454196823は全6ジョブ成功。Android CI #39454196872はassembleDebugとJUnit3件が成功、lintで失敗（成功扱いしない）。
+- 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
+- 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
+- 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 05:35 JST — MK6 #79 日程訂正の受領・実行前照合 (computer-operator)
+- 着手: Consilium 指定 worktree `Challenge-79` / branch `consilium/79-mk6-x` のみで作業。開始時 tracked/untracked とも clean、#79 は OPEN / assignee Ryoki63 / status:in-progress、human-gate と needs-approval は既に外れていた。今回の担当者はラベル変更していない。
+- 同期: `git pull --rebase` は上流の同名ブランチ削除により失敗。公開済み履歴を書き換えず `git merge origin/main` を選択。JOURNAL の競合2箇所は main 側の追加記録をすべて保持し、競合マーカーだけを除去。既存原稿が draft だったのは古いブランチの状態であり、main の ready・両承認記録を取り込んだ。
+- 照合中: #79 の本人による訂正要求 comment-6300601004 と既存10/21 08:00指示 comment-6291197767、会社側の明示指定された #264 / PR #278 / PRレビュー2件だけを参照する。別worktree・親ディレクトリ・Drive・認証情報は変更しない。
+- 時刻境界: 実時計は2026-10-21 05:31:47 JSTから開始。10/21 08:00は未来。今すぐの投稿、10/22への独断変更、予約・定期実行の登録、24時間後反応の推定は行っていない。

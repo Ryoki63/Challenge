@@ -53,12 +53,17 @@ struct EdgeFunctionTransport {
 
     /// 送信して (本文, HTTP ステータス) を返す。応答が返らない失敗は TransportError.network
     func send(_ request: URLRequest) async throws -> (data: Data, status: Int) {
+        let result = try await sendResponse(request)
+        return (result.data, result.response.statusCode)
+    }
+
+    func sendResponse(_ request: URLRequest) async throws -> (data: Data, response: HTTPURLResponse) {
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else {
                 throw TransportError.network
             }
-            return (data, http.statusCode)
+            return (data, http)
         } catch {
             throw TransportError.network
         }
