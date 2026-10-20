@@ -30,10 +30,12 @@ struct CapturedRequest {
 final class StubURLProtocol: URLProtocol {
     /// リクエスト → (ステータス, 本文)。throw すると通信エラー(応答なし)になる
     static var handler: ((URLRequest) throws -> (status: Int, body: Data))?
+    static var responseHeaders: [String: String] = [:]
     private(set) static var captured: [CapturedRequest] = []
 
     static func reset() {
         handler = nil
+        responseHeaders = [:]
         captured = []
     }
 
@@ -59,7 +61,7 @@ final class StubURLProtocol: URLProtocol {
                 url: request.url ?? URL(fileURLWithPath: "/"),
                 statusCode: status,
                 httpVersion: "HTTP/1.1",
-                headerFields: ["Content-Type": "application/json"]
+                headerFields: ["Content-Type": "application/json"].merging(Self.responseHeaders) { _, replacement in replacement }
             )!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: body)

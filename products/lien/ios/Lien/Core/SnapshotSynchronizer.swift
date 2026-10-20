@@ -46,6 +46,7 @@ final class SnapshotSynchronizer {
     private let hasPendingOps: () -> Bool
     private let reloadWidgets: () -> Void
     private let canApply: @MainActor () -> Bool
+    private let retryDelay: () async throws -> Void
 
     /// - canApply: false の間は、取得できても端末へ書かない(アカウントの削除・サインアウトの最中 — T23 #23)
     init(
@@ -53,21 +54,34 @@ final class SnapshotSynchronizer {
         store: AppGroupStore?,
         hasPendingOps: @escaping () -> Bool = { false },
         reloadWidgets: @escaping () -> Void = {},
-        canApply: @escaping @MainActor () -> Bool = { true }
+        canApply: @escaping @MainActor () -> Bool = { true },
+        retryDelay: @escaping () async throws -> Void = { try await Task.sleep(nanoseconds: 250_000_000) }
     ) {
         self.client = client
         self.store = store
         self.hasPendingOps = hasPendingOps
         self.reloadWidgets = reloadWidgets
         self.canApply = canApply
+        self.retryDelay = retryDelay
     }
 
     func sync() async -> Outcome {
-        let before = store?.loadSnapshot()
+        let first = await syncOnce()
+        guard first == .failed(.network) || first == .failed(.server) || first == .failed(.storage),
+              canApply(), !Task.isCancelled else { return first }
+        do { try await retryDelay() } catch { return first }
+        guard canApply(), !Task.isCancelled else { return .skippedSessionEnded }
+        return await syncOnce()
+    }
 
-        let fetched: PairSnapshot
+    private func syncOnce() async -> Outcome {
+        let before = store?.loadSnapshot()
+        let checkpoint = SnapshotCheckpoint.load(from: store)
+        let etag = checkpoint?.snapshot == before ? checkpoint?.etag : nil
+
+        let changes: SnapshotChanges
         do {
-            fetched = try await client.fetchSnapshot()
+            changes = try await client.fetchChanges(etag: etag)
         } catch let error as SnapshotClientError {
             return .failed(Self.failure(for: error))
         } catch {
@@ -79,16 +93,26 @@ final class SnapshotSynchronizer {
         if hasPendingOps() { return .skippedPendingOps }
         if store?.loadSnapshot() != before { return .skippedLocalChanged }
 
+        let fetched: PairSnapshot
+        let nextEtag: String?
+        switch changes {
+        case .snapshot(let snapshot, let etag):
+            fetched = snapshot
+            nextEtag = etag
+        case .unchanged(let confirmedAt):
+            guard var confirmed = before, let etag else { return .failed(.server) }
+            confirmed.updatedAt = max(confirmed.updatedAt, confirmedAt)
+            fetched = confirmed
+            nextEtag = etag
+        }
+
         if let store {
             do {
-                try store.saveSnapshot(fetched)
+                guard try store.applySnapshot(fetched, ifUnchangedSince: before) else { return .skippedLocalChanged }
+                if Self.hasVisibleChange(from: before, to: fetched) { reloadWidgets() }
+                if let nextEtag { try SnapshotCheckpoint(snapshot: fetched, etag: nextEtag).save(to: store) }
             } catch {
                 return .failed(.storage)
-            }
-            // 表示が変わるときだけウィジェットを reload する(updatedAt だけの差では reload しない —
-            // WidgetKit の reload 予算を前面復帰のたびに消費しない — DESIGN §3.5)
-            if Self.hasVisibleChange(from: before, to: fetched) {
-                reloadWidgets()
             }
         }
         return .applied(fetched)
