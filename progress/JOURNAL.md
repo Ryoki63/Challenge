@@ -310,15 +310,11 @@
 - 目視: CI artifact `plant-render-sheets` の `ticket_01_balances.png` / `ticket_zero_large.png` / `ticket_zero_accessibility5.png` を取得して確認。0枚でもバッジが表示され、最大の文字サイズ(accessibility5)でも折り返して欠けない。
 - 結果: **PR #84 作成**(https://github.com/Ryoki63/Challenge/pull/84)。お休み宣言 UI / rest-declare は D3・TASKPLAN §9 のとおり v1.0.1 の対象なので実装していない。レビュー役職(eng-review)の判断待ちで、issue は閉じない。
 
-## 2026-10-20 12:15 (HQ/eng-exec — #29 T29 フィードバック反映) — 実フィードバック未着のため着手不可(blocked)
-- 着手: Issue #29。受入条件は本文の1点のみ —「フィードバック内容をJOURNALに記録し、修正をリリースビルドに反映」。追加の受入条件は無い
-- 事実確認(読み取りのみ。2026-10-20 12:15 JST):
-  - 依存の T28(#28)・G0(#38)・G3(#41) はすべて OPEN。#28 の残りは G0 後の人間作業(ASC の API キー+Secrets 6件 → `lien-release` の本番実行)で、T29 の前提「T28(G3完了後)」を満たさない
-  - `lien-release` の全7実行を確認。TestFlight へアップロードした実行は 38287713501(2026-10-12)の1件だけで **failure**。成功した6件はすべて job 名「archive (dry-run / unsigned)」。**TestFlight に配布済みのビルドは無い**
-  - TASKPLAN §9.2(2026-10-20 改定): 初回の内部 TestFlight は **10/23(T28a)**、前提は 10/20〜21 の G0(Apple 承認)解消。外部テスト(T28b)は省略
-  - Issue #29 のコメント2件はどちらもエージェント(`<!-- lien-agent -->` あり)。人間によるフィードバック転記は **0件**。受付窓口は #29 のみ
-- 判断: フィードバック実体が無いため、修正の実装もリリースビルドへの反映もできない。空の「反映済み」やモックでの代替はしない(#29 の進め方コメントも「捏造・モック不可のため前倒し成果物なし」と明記)。バグ・要望を作って埋めるのは「仕様を独断で足さない」に反する
-- 計画の前提変化: 外部テスト省略(§9.2)により、T29 の入力は内部 TestFlight(10/23〜)だけになる。公開後(10/31〜)の App Store レビュー・問い合わせを対象に含めるかは未決のため、needs_owner で確認する
-- 検証: `gh issue view`・`gh run list`・`gh run view` の読み取りのみ。外部送信・本番データ変更・secret の参照はしていない
-- 成果物: PR #87(`progress/JOURNAL.md` のみ。コード変更なし)。`lien-ci` run 39363531635 = success(`lien-ios` はパスフィルタ対象外で未起動)。Issue #29 に承認待ちコメント(`🔔`)+`needs-approval,human-gate` を付与
-- 結果: **blocked(コード変更なし)**。判断待ちは1件 —「フィードバックの受け取り方法と T29 の対象範囲」
+## 2026-10-20 11:54 (eng-exec) — T27 #27 Strings.swift 全文言のレビュー
+- 着手: オンボ磨き・空状態・エラー文言の総点検(罰なし原則)。`Strings.swift` を全件読み、`StringsCatalog` の 297 単位(580 出力)をレビュー
+- 成果: `docs/STRINGS-REVIEW.md` に全 297 単位の判定(OK 291 / 修正 6 / 保留 0)、空状態 14・エラー文言 33 の点検、判定基準、修正理由、変えないと決めた点を記録
+- 修正 6 件: Dissolve の「ストリーク」「アーカイブ」をユーザーの言葉に / 閉じるボタン2件を「閉じる」に / 「名前をかえる」→「名前を変える」/ 「写真をおくっています…」→「写真を送っています…」/ nameInvalidError を「改行や見えない文字は、名前に使えません」に
+- 検査: `scripts/macos-check/check.sh` = module 74ファイル・**992 tests 0 failed**(assertions 24446)・views 102ファイル・widget 18ファイル。レビュー関連 28 tests 0 failed。CI `lien-ios` は PR #86 で確認
+- 回帰検査: `StringsReviewTests` にログ網羅・文言一致・集計・開発者ことば・閉じる・通信エラーの6テストを追加
+- 残: 初回同期失敗時に `.promiseSetup` を出す画面遷移は文言では決められないため、`docs/STRINGS-REVIEW.md` §6.1 に判断材料と推奨案を残した(eng-lead / T30)。実機 VoiceOver は T20
+- 結果: PR #86 を作成(レビュー待ち。マージはしない)
