@@ -1,0 +1,309 @@
+# Lien Android — build/test and internal-track upload (Issue #124)
+#
+# 目的: Android の AAB を作り、Play の内部テストトラックへ自動でアップロードする。
+# - push / pull_request では「ビルド + 単体テスト + lint」まで。Secrets は使わない。
+# - アップロードは workflow_dispatch で publish=true を明示したときだけ。
+#   Environment `play-internal` の承認（オーナー）と Secrets が前提。
+# - 本番トラック（production）にはアップロードしない。スクリプト側でも拒否する。
+#
+# 前提: products/lien/android/ は #121 / #145 で追加される。未マージの間は
+# detect job が「無い」と判断し、build / publish をスキップする（失敗にしない）。
+# 既存の lien-android.yml（#145）は build/test を持つが、この workflow は
+# リリース用に「未署名 AAB の生成 → アップロード鍵で署名 → Play API」までを
+# 1 本で行う。Secrets は publish job だけに渡す。
+#
+# 必要な Secrets / Variables の名前は docs/android/PLAY-SIGNING-AND-SECRETS.md。
+# 値は絶対にこのファイル・ログ・Issue に書かない。
+
+name: lien-play
+
+on:
+  push:
+    paths:
+      - "products/lien/android/**"
+      - "products/lien/scripts/play/**"
+      - ".github/workflows/lien-play.yml"
+  pull_request:
+    paths:
+      - "products/lien/android/**"
+      - "products/lien/scripts/play/**"
+      - ".github/workflows/lien-play.yml"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "true = 内部テストトラックへアップロード（Environment play-internal の承認が必要）"
+        type: boolean
+        default: false
+      release_notes:
+        description: "Play に表示するリリースノート（ja-JP、空なら既定文）"
+        type: string
+        default: ""
+
+concurrency:
+  group: lien-play-${{ github.ref }}
+  cancel-in-progress: false # アップロードの同時実行・途中キャンセルはしない
+
+permissions:
+  contents: read
+
+jobs:
+  scripts:
+    name: Play script unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run unit tests (no network, no secrets)
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3 -m unittest discover -s products/lien/scripts/play -p 'test_*.py' -v
+
+  detect:
+    name: Detect Android project
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      present: ${{ steps.check.outputs.present }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check products/lien/android
+        id: check
+        env:
+          PUBLISH_INPUT: ${{ github.event.inputs.publish }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ -x products/lien/android/gradlew ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "Android project found."
+            exit 0
+          fi
+          echo "present=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::products/lien/android is not present on this branch. Build and publish are skipped until #121 / #145 lands."
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$PUBLISH_INPUT" = "true" ]; then
+            echo "::error::publish=true was requested but products/lien/android is missing."
+            exit 1
+          fi
+
+  build:
+    name: Android build + test (unsigned AAB)
+    needs: detect
+    if: needs.detect.outputs.present == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: products/lien/android
+    env:
+      LIEN_VERSION_CODE: ${{ github.run_number }}
+      LIEN_VERSION_NAME: 0.1.0-${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "17.0.18+8"
+
+      # ubuntu-24.04 ランナーの既載 SDK を使う。SDK のダウンロードや
+      # ライセンスの自動承諾はしない（新しい同意が必要なら人間の判断）。
+      - name: Check Android SDK
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_HOME:-}" || { echo "::error::ANDROID_HOME is not set"; exit 1; }
+          test -d "$ANDROID_HOME/platforms/android-36" || {
+            echo "::error::platforms/android-36 is missing from the runner image"; exit 1;
+          }
+          test -x "$ANDROID_HOME/build-tools/35.0.0/aapt2" || {
+            echo "::error::build-tools/35.0.0 is missing from the runner image"; exit 1;
+          }
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+      # versionCode は CI の実行番号を渡す。Android 側が -PversionCode を
+      # 読む実装になるまでは無視される（#121 / #145 の残課題）。
+      # 未対応のまま 2 回アップロードすると Play API が同じ versionCode を拒否する。
+      - name: Assemble debug, test, lint, and bundle release
+        run: |
+          ./gradlew --no-daemon --console=plain \
+            -PversionCode="$LIEN_VERSION_CODE" \
+            -PversionName="$LIEN_VERSION_NAME" \
+            assembleDebug testDebugUnitTest lintDebug bundleRelease
+
+      - name: Upload APK, AAB, and reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lien-play-artifacts
+          path: |
+            products/lien/android/app/build/outputs/apk/debug/*.apk
+            products/lien/android/app/build/outputs/bundle/release/*.aab
+            products/lien/android/app/build/test-results/testDebugUnitTest/
+            products/lien/android/app/build/reports/tests/testDebugUnitTest/
+            products/lien/android/app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
+          retention-days: 7
+
+  publish:
+    name: Sign and upload to Play internal testing
+    needs: [detect, build]
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.publish == 'true' &&
+      needs.detect.outputs.present == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: play-internal
+      url: https://play.google.com/console
+    permissions:
+      contents: read
+      actions: read # gh run download で同じ run の artifact を取る
+    env:
+      PLAY_PACKAGE_NAME: ${{ vars.PLAY_PACKAGE_NAME }}
+      AAB_DIR: ${{ runner.temp }}/lien-play-aab
+      KEYSTORE_PATH: ${{ runner.temp }}/lien-upload.jks
+      SA_PATH: ${{ runner.temp }}/play-service-account.json
+      SIGNED_AAB: ${{ runner.temp }}/lien-release-signed.aab
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the AAB artifact from this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          rm -rf "$AAB_DIR"
+          mkdir -p "$AAB_DIR"
+          gh run download "$RUN_ID" --repo "$REPO" --name lien-play-artifacts --dir "$AAB_DIR"
+          find "$AAB_DIR" -type f -name '*.aab' -print
+
+      - name: Preflight (names only; never print values)
+        env:
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in \
+            ANDROID_UPLOAD_KEYSTORE_BASE64 \
+            ANDROID_UPLOAD_KEYSTORE_PASSWORD \
+            ANDROID_UPLOAD_KEY_ALIAS \
+            ANDROID_UPLOAD_KEY_PASSWORD \
+            PLAY_SERVICE_ACCOUNT_JSON; do
+            [ -n "${!name:-}" ] || missing="$missing $name"
+          done
+          [ -n "${PLAY_PACKAGE_NAME:-}" ] || missing="$missing PLAY_PACKAGE_NAME"
+          if [ -n "$missing" ]; then
+            echo "::error::missing secrets/variables:$missing"
+            echo "::error::See docs/android/PLAY-SIGNING-AND-SECRETS.md. Do not paste values into this log."
+            exit 1
+          fi
+          if [ "$PLAY_PACKAGE_NAME" = "com.example.lien" ]; then
+            echo "::error::PLAY_PACKAGE_NAME is still the placeholder com.example.lien. Set the final applicationId first."
+            exit 1
+          fi
+          echo "preflight: names present, package=$PLAY_PACKAGE_NAME"
+
+      - name: Restore upload keystore and verify alias
+        env:
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH" || { echo "::error::keystore is empty"; exit 1; }
+          keytool -list -keystore "$KEYSTORE_PATH" \
+            -storepass:env ANDROID_UPLOAD_KEYSTORE_PASSWORD \
+            -alias "$ANDROID_UPLOAD_KEY_ALIAS" >/dev/null
+          echo "keystore: alias $ANDROID_UPLOAD_KEY_ALIAS is present"
+
+      - name: Sign the AAB with the upload key
+        env:
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          aab="$(find "$AAB_DIR" -type f -name '*.aab' -print -quit)"
+          test -n "$aab" || { echo "::error::no .aab in the artifact"; exit 1; }
+          jarsigner -keystore "$KEYSTORE_PATH" \
+            -storepass:env ANDROID_UPLOAD_KEYSTORE_PASSWORD \
+            -keypass:env ANDROID_UPLOAD_KEY_PASSWORD \
+            -sigalg SHA256withRSA -digestalg SHA-256 \
+            -signedjar "$SIGNED_AAB" "$aab" "$ANDROID_UPLOAD_KEY_ALIAS"
+          # `jarsigner -verify` exits 0 for an unsigned JAR too. Require the
+          # actual "jar verified" line, not just the exit status.
+          verify_out="$(jarsigner -verify "$SIGNED_AAB" 2>&1)"
+          printf '%s\n' "$verify_out" | grep -q "jar verified" || {
+            printf '%s\n' "$verify_out"
+            echo "::error::the AAB is not signed"
+            exit 1
+          }
+          echo "signed AAB: $(basename "$SIGNED_AAB") ($(stat -c%s "$SIGNED_AAB") bytes)"
+
+      - name: Write the service-account JSON
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > "$SA_PATH"
+          chmod 600 "$SA_PATH"
+          python3 -m json.tool "$SA_PATH" >/dev/null
+          echo "service-account JSON: valid JSON (contents not printed)"
+
+      - name: Dry run (auth + list bundles; no upload)
+        env:
+          RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+        run: |
+          set -euo pipefail
+          python3 products/lien/scripts/play/publish_play.py \
+            --service-account "$SA_PATH" \
+            --package "$PLAY_PACKAGE_NAME" \
+            --aab "$SIGNED_AAB" \
+            --dry-run
+
+      - name: Upload to the internal testing track
+        env:
+          RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+        run: |
+          set -euo pipefail
+          notes="${RELEASE_NOTES:-Lien Android 内部テスト (build $GITHUB_RUN_NUMBER)}"
+          python3 products/lien/scripts/play/publish_play.py \
+            --service-account "$SA_PATH" \
+            --package "$PLAY_PACKAGE_NAME" \
+            --aab "$SIGNED_AAB" \
+            --track internal \
+            --status completed \
+            --version-name "Lien Android ($GITHUB_RUN_NUMBER)" \
+            --release-notes "$notes"
+
+      - name: Cleanup temporary credentials
+        if: always()
+        run: |
+          rm -f "$KEYSTORE_PATH" "$SA_PATH" "$SIGNED_AAB"
+          echo "temporary credentials removed"
