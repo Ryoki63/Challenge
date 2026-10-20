@@ -610,3 +610,5 @@
 - 表示確認: 外部通信を遮断したChromeのローカルプレビューで表2個・各7行・コード例3個・横overflowなしを確認、Secrets表と切り戻し表を目視。full-page撮影は失敗したためviewport撮影で代替した。QA生成物はworktree内の無視対象build配下のみ。
 - 23:22 検証ゲート: eng-reviewの限定再確認PASS・未解決指摘なし。全要件の記載PASS／関連テスト130件PASS／コード例3ブロックとrelease.shのbash -n PASS／ローカルリンク・Secrets6件一致・秘密値形式不在・JOURNAL追記のみ・git diff --check PASS。型チェック・lint・ローカルiOS buildは文書のみのため対象外（Xcode未導入）。署名・Appleアップロード・招待送信は未実行。残TODOゼロ（今回の文書受入範囲）。
 - 提出準備: 指定ブランチへcommit/pushしPRを作成する。mainへ直接pushせず、PRのマージはレビュー役職へ委ねる。push後CIは提出SHAで確認し、既存runの緑で代替しない。
+- 23:24 提出: 実装コミットf3311d9を指定ブランチへpushしPR #129を作成。mainへの直接push・マージは行っていない。提出SHAのlien-ci run 39438487582は6ジョブsuccess、lien-ios run 39438492922は実行中。最終CI結果はPR #129へ追記し、実行中を成功とは扱わない。
+- 結果（文書・レビュー）: Issue #106の4受入条件を満たす単一実行シートと導線、eng-review PASS記録をPR #129へ提出済み。署名・TestFlight到達・招待受信は今回の実行対象外。公開期限は変更せず、初回署名とApple処理待ちのリスクを残検証として明記。PRはOPENのままレビュー役職へ引き継ぐ。
