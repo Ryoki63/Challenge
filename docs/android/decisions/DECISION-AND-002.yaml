@@ -2,7 +2,7 @@ id: DECISION-AND-002
 title: Play 登録 25 USD・D-U-N-S・Android 検証端末の予算計上（総損失上限 3 万円）
 status: open
 created_at: "2026-10-20T23:58:00+09:00"
-updated_at: "2026-10-21T00:25:00+09:00"
+updated_at: "2026-10-21T01:35:00+09:00"
 issue: 119
 repo: Ryoki63/Challenge
 route_class: critical_review
@@ -26,6 +26,7 @@ context:
   - "D&B のシステム反映に数日〜2 か月かかるため、B の公開が 2027-01〜03 まで伸びると、その間の Supabase Pro（11 月〜3 月分 = 3,750 円 × 5 = 18,750 円）をどの計画に計上するかで上限の見え方が変わる。"
   - "個人アカウントは Android 10 以上の実機（非 root）で端末確認が必要。オーナーが実機を持っていない場合、借用（0 円）か購入（額は未見積）かを選ぶ必要がある。"
   - "組織アカウントの事業用住所・電話・ウェブサイトは、既存なら 0 円、新規なら実費（未見積）。バーチャルオフィス・電話・ドメインを新規に契約すると、総損失上限を超える可能性が高い。"
+  - "個人事業主は開業届で組織として本人確認できる（Google Play Console の日本向け書類一覧）。これは組織アカウントの適格性を広げるが、D-U-N-S と事業用連絡先の費用は変わらない。"
 
 options:
   - id: A
@@ -107,6 +108,7 @@ consequences:
 evidence:
   - "https://support.google.com/googleplay/android-developer/answer/6112435?hl=en"
   - "https://support.google.com/googleplay/android-developer/answer/14316361?hl=en"
+  - "https://support.google.com/googleplay/android-developer/answer/15633622?hl=en"
   - "https://duns.tsr-net.co.jp/duns-web/index?showOther=true"
   - "marketing/plan.md §5"
   - "docs/android/PLAN-ANDROID.md §4.6"
