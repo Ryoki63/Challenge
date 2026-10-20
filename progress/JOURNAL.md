@@ -394,6 +394,10 @@
 - 検証: `python3 x/tools/check_posts.py` = OK 13本 / unittest 35件 OK / 既存の `verify_metadata.py` OK・unittest 24件 OK（回帰なし）/ YAML の構文とステップ追加を確認
 - 結果: **PR #99 作成**（https://github.com/Ryoki63/Challenge/pull/99）。CI `lien-ci` run 39375076692 は全ジョブ success（store-metadata に追加した2ステップも実行され、`OK: 13 本` と unittest 35 件を確認）。`status: ready` は mkt-lead 承認 + mkt-review レビュー待ちのため付けていない（検査で固定）。issue は承認待ちとして開いたまま
 
+## 2026-10-20 15:10 (mkt-exec) — #75 追補: X アカウントのブランディング案
+- 着手: オーナー返信「投稿文ok!あとはアカウントのブランディング考えないと」(2026-10-20)を受けて再開。13本の文面は mkt-lead 承認として記録し、受け皿（表示名・handle・bio・アイコン・ヘッダー・固定ポスト・トーン）の設計を追加する
+- 前提: handle の空き確認はこの作業では行わない（X にログインしない）。未確認と明記し、取得はオーナーの操作にする
+- 判断: ブランディングは「10/21 08:00 の初投稿までに設定できるもの」に限定する。ヘッダー画像は未制作でも開始できるようにし、日付・URL を描かない
 ## 2026-10-20 14:05 (mkt-lead) — MK1 #74 公開前後 30 日の獲得計画
 - 着手: Issue #74。worktree `Challenge-74` / ブランチ `consilium/74-mk1-30-10-21-11-30`(origin/main `fdf1ef5`)。作業前に origin の対象ブランチ・PR を確認(重複なし)
 - 置き場所の判断: Issue の完了条件は「docs/GROWTH.md か marketing/plan.md」。`docs/GROWTH.md` は**植物の成長ルール**(プロダクト仕様)で獲得計画の置き場ではないため、`marketing/plan.md` を新設する。MK2(#75)の `marketing/x/`・MK5(#78)の `marketing/measurement.md` と同じく、マーケの新しい文書はリポジトリ直下の `marketing/` に置く(既存アセットは `products/lien/marketing/`)
@@ -585,6 +589,14 @@
 - 【承認待ち】#32 に comment 6290434543 を投稿し、`needs-approval,human-gate` を付与。質問は文言の再承認ではなく、G0確認後の人間による ASC 入力・保存・再読み込みと証跡返却の1点。#32 / #38 / #42 は close せず、status ラベルは HQ に委ねた。
 - 提出チェック: リポジトリ側修正 PASS / 関連37テスト PASS / CLI動作確認 PASS / AST構文 PASS / diff --check PASS / 独立レビュー1回・重大指摘なし / 型チェック・lint専用設定なし / iOS・バックエンドの実装変更なし。残TODOはASC保存証跡の人間返却で、受入「App Store Connect にキーワード・説明文設定完了」は未達。
 - 結果: **BLOCKED(人間のASC入力・保存証跡待ち)**。承認済み文言は変更せず、PR #113 を push 済み・未マージで提出。審査提出・公開・本番変更は未実施。
+
+## 2026-10-20 15:40 (mkt-exec) — #75 追補2: main 取り込み（MK7 の実画面・T33 の課金）への追随
+- 着手: オーナー返信を受けた追補の続き。origin/main は #96（T33 課金）・#100（MK3）・#104（MK7 スクショ）まで進んでいた。**PR #99 は squash で main に入っていた**ため、分岐点が無く rebase すると同じ記録を二重に積む。履歴を書き換えないよう、`git merge origin/main` で取り込み、衝突は x/ 配下を自分の側（承認・ブランディング入り）、`.github/workflows/lien-ci.yml` を main の側（pages-site と MK7 の検査を含む）で解いた
+- 判断: MK7 の実画面6枚を使い、`指定:` だった5本（10-23・10-25・10-31・11-01・11-07）を差し替えた。**代替テキストは実際の画像（contact sheet）を見て書き直した**（本文は変えていない）。残る指定は 10-24（チェックイン完了）と 10-26（ロック画面の通知）の2本
+- 判断: 画像の選択は mkt-exec の裁量（役職カード「スクリーンショットのキャプションと訴求順」）。mkt-lead の承認は本文・リンク方針・投稿順に対するものとして review.md §7 の範囲を書き直した
+- 発見: T33 でペイウォールが main に入った。`REVENUECAT_API_KEY` が公開ビルドに入ると、商品設定（T37 / G6・〜11/1）より先に「購入できないペイウォール」が出て、10/31 の「いまは全部、無料で使えます」と矛盾する。review.md §5-7 に、公開ビルドのキーを G4 で確認するよう記録（マーケ側では直せない）
+- 検証: `check_posts.py` OK（13本 + branding）/ unittest **52件** OK / `verify_metadata.py` OK・unittest 24件 OK（回帰なし）
+- 結果: 追補の PR を作成（マージしない）。`status: ready` は mkt-review 待ちのため付けない
 
 ## 2026-10-20 22:04 — Issue #94 [mkt M8] mkt-review 指摘の修正
 - 背景: PR #108 は 2026-10-20 12:46:50Z にマージ済み（merge 26e7a70、CI 6件 success）だが、PR のレビューは 0 件で Issue #94 は OPEN。独立レビュー（mkt-review 観点・読み取り専用）に依頼した。
