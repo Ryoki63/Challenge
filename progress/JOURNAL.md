@@ -306,3 +306,6 @@
 - 実装: `PairSnapshot.ticketBalance: Int?`(キー欠落・null・型違いは nil、0 は有効値、エンコードは null を明示) / `HomeViewModel.ticketBalance`(ペア成立かつ 0 以上のときだけ返す。ソロ・負の値は nil)/ `TicketBalanceBadge`(ホームのストリーク直下。0枚でも表示、アイコン+「お休みチケット 残り○枚」)/ `Strings.Tickets`。`HomeView` は nil のときバッジごと出さない。
 - テスト: PairSnapshot の欠落/null/型違い/0/往復/翌日リセット、HomeViewModel の 2・0・nil・ソロ・負・空状態、契約フィクスチャ(snapshot/checkin/invite-accept/nudge/plant-name/pair-dissolve/push)の値、StringsCatalog、0枚バッジの実描画(白紙でない)。既存の全テストに回帰なし。
 - 検証: `scripts/macos-check/check.sh all` = module 74 ファイル・**998 tests / 0 failures / 20152 assertions**、views 103 ファイル、widget 18 ファイルとも OK(既存の ISO8601DateFormatter の Swift 6 警告のみ。この変更では増えていない)。フルのシミュレータ CI は push 後。
+- CI(正本): **lien-ios run 39351451628 success**(12m44s・commit d229f32)。`Executed 1075 tests, with 0 failures` / `** TEST SUCCEEDED **`。新規の `TicketBalanceBadgeRenderTests` 2件、`PairSnapshotTests` / `HomeViewModelTests` / `ContractFixtureTests` の ticketBalance テストがログ上で passed。lien-ci run 39351451853 も success(サーバー側の変更なし)。
+- 目視: CI artifact `plant-render-sheets` の `ticket_01_balances.png` / `ticket_zero_large.png` / `ticket_zero_accessibility5.png` を取得して確認。0枚でもバッジが表示され、最大の文字サイズ(accessibility5)でも折り返して欠けない。
+- 結果: **PR #84 作成**(https://github.com/Ryoki63/Challenge/pull/84)。お休み宣言 UI / rest-declare は D3・TASKPLAN §9 のとおり v1.0.1 の対象なので実装していない。レビュー役職(eng-review)の判断待ちで、issue は閉じない。
