@@ -797,3 +797,10 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 02:25 JST — #138 T-AND-5 FCM 登録 DB/API の着手前ゲート確認 (eng-exec)
+- 着手: 指定 worktree / consilium/138-t-and-5-android-fcm-db-api で依存と着手可否だけを確認。開始時 clean、origin は Ryoki63/Challenge、対象 remote branch / PR は未作成、Issue #138 の assignee は空。実装・認証情報の参照・本番接続は行っていない。
+- 同期: `git pull --rebase origin main` は Already up to date。HEAD / origin main は `7991bc55088b9ccff9b335410a88f726910f8b04`。公開履歴の変更はない。
+- ゲート確認: #120 と #121 はともに OPEN。関連 PR #132 は 2026-10-21 01:55:05 JST、#145 は同日 02:11:31 JST に MERGED だが、Issue の完了とは区別する。#138 本文の「依存（完了・マージ確認後のみ着手）」は未充足。
+- 【承認待ち】: `docs/android/PLAN-ANDROID.md` §1 / §3.1 / P1 と #121 最新コメントは Android 実装開始を 2026-11-14 としている。現在は 2026-10-21 のため、今回の起動だけで日程変更や依存完了とみなさず、実装停止。推奨は依存完了と計画上の開始日を待つこと。前倒しする場合は eng-lead/HQ の明示判断と critical_review が必要。本番 migration/deploy は引き続き禁止。
+- 結果: BLOCKED。承認待ちコメント https://github.com/Ryoki63/Challenge/issues/138#issuecomment-6296947264 を投稿し、needs-approval / human-gate の付与と OPEN 維持を再取得で確認。変更はこの監査記録だけ、`git diff --check` は PASS。実装要件は未充足、テスト・型チェック・lint・build・DB負の認可・独立コードレビューはコード未変更かつ着手ゲート未通過のため未実施。PR / DONE / Issue close は行わず、監査記録だけを指定ブランチに保存する。
