@@ -348,6 +348,15 @@
 - 判断: v2 の再制作・#40 への再提出はしない(差し戻し済みの案の再提出は混乱と退行になる)。再発防止として `v2_drafts/README.md` に経緯・受入証拠・再生成手順を記録
 - 結果: PR を作成(レビュー待ち)。#49 は「フェーズ1完了・v4 で置換済み」として、close の判断をレビュー役職/人間に委ねる
 
+## 2026-10-20 15:03 (computer-operator) — #79 MK6 X 投稿の実行前確認
+- 着手: 指定 worktree・`consilium/79-mk6-x` で確認を開始。作業開始時の tracked/untracked 差分は無し。origin/main と HEAD は一致し、対象リモートブランチは未作成のため、そのブランチからの pull は未実施。
+- 確認: #79 は OPEN・assignee 未設定。Consilium の本タスク割当はあるが、Issue の assignee による排他は確認できない。オーナーの X ハンドル・ログイン済みブラウザの指定は本文・コメントに無い。無関係なブラウザやアカウントを探索せず、投稿操作は開始していない。
+- 節目: #75 の最新非 bot コメントは `<!-- lien-agent -->` 付きの承認依頼で、人間の返信は無し。PR #99 は OPEN・レビュー無し、HEAD `62d4bc7a7f49ce512bff4ed343f4caefe4422bfc` の承認台帳は未承認。記入例や mkt-exec の自己点検を承認に数えない。
+- 【承認待ち】: MK2 の承認・レビューと対象アカウントの引継ぎが未成立のため外部操作を停止。初回提案は明日 2026-10-21 08:00 JST で、時刻承認・投稿予約・24時間後確認の登録はしていない。`products/lien/marketing/x/log.md` に未投稿と欠測値 `null` を記録し、#79 へ1件にまとめて引継ぎを依頼する。
+- 検証: 一時的な Python の直接検査で、初回は検査側の行数期待値16が誤りのため FAIL。14項目の名前を明示して検査し直し、理由付き null・架空キャプチャ無し・未来の提案時刻/未登録の区別・JOURNAL 追記のみ・変更2ファイルの範囲を PASS。`git diff --check` PASS。コード/設定/画像の変更が無いためアプリのテスト・型チェック・lint・build・独立レビューは対象外。
+- 通知: #79 に承認待ちコメント（6284552555）を投稿し、`needs-approval,human-gate` を付与。readback で OPEN のままと bot の通知コメントを確認（モバイル端末への配達は未確認）。`status:*` は変更していない。
+- 結果: **BLOCKED**。指定時刻の投稿・URL/キャプチャ・24時間後反応は未達。未承認投稿をしない条件は遵守。承認・アカウント引継ぎ待ちの実行ログのみ提出し、原稿や承認台帳は変更せず、Issue は close しない。
+
 ## 2026-10-20 13:18 (eng-exec) — T33 #33 RevenueCat組込 + ペイウォール(3文脈)
 - 着手: G6(#44)/T37 前でも実装・CI 検証できる範囲を実装する。実際の課金設定(RevenueCat アカウント・商品・価格・特商法・ストア申請)は行わない。
 - サーバー: `_shared/premium.ts` に `derivePairPlan` を抽出(grant-tickets から再エクスポート)。`snapshot.pairPlan`(free/premium)をメンバーの `users.premium_until` から導出し、`USER_COLUMNS`/`PARTNER_SELECT` に premium_until を追加。RevenueCat Webhook(`revenuecat-webhook`。Authorization の定数時間比較、期限は延ばす方向だけ・EXPIRATION は現在の期限以下だけ失効)を追加。contract fixtures 22 件再生成。
