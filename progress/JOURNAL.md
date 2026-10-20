@@ -681,3 +681,44 @@
 - 記録: Issue #123 に完了コメント（6295476511）、PR #146 に検証コメント（6295477091）。実機・FCM・Doze の実行結果はまだなく、計画の「未実施」を合格に読み替えない。
 - 結果: done（計画・端末マトリクスの提出まで）。次はレビュー対応と、実機/検証環境の確保（#124 / PMO）。
 - 件数訂正: 上の「FCM 18件（F-01〜F-18、F-10b 含む）」は、F-01〜F-18 に F-10b を加えた **19件** が正しい。PR #146 の本文も19件に訂正した。内容・ケースは変更していない。
+
+## 2026-10-20 22:04 — Issue #94 [mkt M8] mkt-review 指摘の修正
+- 背景: PR #108 は 2026-10-20 12:46:50Z にマージ済み（merge 26e7a70、CI 6件 success）だが、PR のレビューは 0 件で Issue #94 は OPEN。独立レビュー（mkt-review 観点・読み取り専用）に依頼した。
+- レビュー結果: **FAIL**。Blocker 1件 = `press/screenshots/03_widget.png` に v1.0.1 の M ウィジェットが写っている（`docs/REQUIREMENTS.md` §3.10、`docs/TASKPLAN.md` T17b。v1.0 は S とロック画面のみ）。`verify_press.py` は PNG の寸法・ハッシュしか見ないため、画像内の M を検出できない。Minor = 60字の「ふたりで約束をひとつ」の誤読、生成 commit `c308e5c` が main に無い監査性、ストア素材のデモデータ整合。
+- 修正: 03 を削除し、v1.0 の `05_share.png`（シェア画像）に差し替え。プレス3枚は 01 / 02 / 05。ファクトシート・press/README・screenshots/README・`verify_press.py`・`test_verify_press.py` を追随。60字版を「ふたりがそれぞれ約束をひとつ決める…」（実測60字）に、ヘッダも同様に変更。植物の説明を「タネの子の頭の植物が育つ」に修正（REQUIREMENTS §3.9）。
+- 検証: `verify_press.py` OK / `python3 -m unittest discover -s tools -p "test_*.py"` 64件 OK / `verify_screenshots.py` OK / 紹介文 60・196・578字 / ファクトシート A4 1ページ（595×842pt）/ 05_share の SHA-256 が元画像と一致 / リンク切れ0 / `git diff --check` OK。
+- 提出: PR #117 を作成（OPEN・未マージ）。CI は実行中。正式な mkt-review の承認は未取得で、再レビューを依頼中。
+- 残: ストア用 `marketing/screenshots/6.7in/03_widget.png` の M（MK7 / #80 の範囲。プレスでは不使用）、ストア README のデモデータ整合、G4 #42 の提供元・連絡先、mkt-lead 承認。
+
+## 2026-10-20 22:08 (mkt-exec) — Issue #94 再開: PR #117 の競合解消と再レビュー
+- 着手: Issue #94 は OPEN（assignees は空。HQ 振り分けの role:mkt-exec / status:in-progress で再開）。PR #108 は main マージ済み、フォローアップ PR #117（head fc95e23）は main と CONFLICTING。
+- 注意: worktree は指定ブランチ `consilium/94-mkt-m8-1-3` ではなく PR #117 のブランチ `consilium/94-mkt-m8-review-followup` に乗っている。指定ブランチは origin から削除済み（PR #108 で使用済み）。新規ブランチを切ると PR が二重になるため、PR #117 のブランチに積む。
+- 方針: 履歴は書き換えず、origin/main を merge で取り込む。受入条件（字数・v1.0 範囲・数値の出典・スクショ v4）を照合したあと、再レビューに出す。
+
+## 2026-10-20 23:02 (mkt-exec) — Issue #94 再開: PR #117 の差分確認
+- 着手: Issue #94 は OPEN、role:mkt-exec / status:in-progress。PR #117 は OPEN・MERGEABLE、直近の lien-ci 6 job はすべて成功。正式レビューは未登録。
+- 作業境界: 指定 worktree 内で確認。ブランチ名は指定値でなく `consilium/94-mkt-m8-review-followup`（PR #117 head）。指定 branch は PR #108 で使用済みのため、既存フォローアップ PR を継続する。既存未コミット差分（press素材・検査コード変更、01画像削除、04画像追加）を確認し、破棄せず保持する。
+- 同期: HEAD `413ee6e` は origin/main を merge 済みで、PR #117 の現在の head と一致。未コミット差分の範囲と新しい画面構成を受入条件・v1.0仕様に照合する。
+- 仕様照合: REQUIREMENTS §3.2–§3.13 で各主張を確認。03(M ウィジェット)は除外。04 のカレンダーに出るお休みマークは v1.0 の §3.6 に規定された履歴表示。提供元・メールは G4 #42 未確定なのでトークンを維持し、数値実績は資料に載せていない。画像3枚を実表示し、キャプションと画面の対応を確認。
+- 次: `verify_press.py` と marketing tools の回帰テスト、画像の寸法/ハッシュ、HTMLの1ページ描画、差分整合を検証する。レビュー結果は mkt-review に相当する独立確認1回を依頼する。
+- 提出: 差分を commit `da7d4e6` として作成し、PR #117 の既存ブランチへ push。local HEAD と origin branch SHA は一致、tracked/untracked の残差分なし。PR CI 6 job は push 直後のため pending（成功未確定）。
+- レビュー/描画境界: mkt-review 観点の独立 read-only レビューを1回依頼中。ローカル環境に Chromium / PDF renderer がないため、A4 1ページの実描画確認は未実施。PR #117 の再レビューを依頼する。
+
+## 2026-10-20 23:12 (mkt-exec) — Issue #94 再開: 受入条件の再検証と PR 本文の整合
+- 着手: PR #117（head `ec045cd`、origin と一致）を継続。ブランチ名は指定の `consilium/94-mkt-m8-1-3` ではなく PR #117 の `consilium/94-mkt-m8-review-followup`（指定ブランチは PR #108 で使用済みのため、二重 PR を避けて既存フォローアップを継続）。
+- 受入条件の照合: ファクトシートに機能・対象・価格・提供元・連絡先の見出しあり。提供元・連絡先は G4 #42 の未確定値（`G4-REVIEW.md` で事業者表記・問い合わせメールとも `null`）なので、推測で埋めず `<OPERATOR_NAME>` / `<CONTACT_EMAIL>` を維持。v1.0 の範囲は REQUIREMENTS §3.2–§3.13 と照合し、スクショ3枚は v1.0 の 02 / 04 / 05（M ウィジェットの 03 は不使用）。
+- 検証: `python3 tools/verify_press.py` OK / `python3 -m unittest discover -s tools -p 'test_*.py'` 64 tests OK / `python3 tools/verify_screenshots.py` OK（各6枚）/ 紹介文 60・200・582 字（宣言一致）/ 3枚とも 1290×2796・元画像と SHA-256 一致 / `git diff --check` OK。
+- A4 再確認: Chrome headless で `fact-sheet.html` を PDF 印刷し、`/Count 1`・MediaBox 595×842pt（A4 1ページ）を確認（出力は /tmp、リポジトリ外・未追跡）。
+- PR 本文の訂正: スクショの記載が旧構成（01 / 02 / 05）・文字数が旧値（196 / 578）のままだったため、実物に合わせて 02 / 04 / 05・60 / 200 / 582 に修正。PR #117 の本文を更新した。
+- レビュー: mkt-review 観点の独立 read-only レビューを依頼中。結果を受けて Blocker があれば修正し、PASS を確認してから完了とする。正式な mkt-review の承認はまだ得ていない。
+- レビュー結果(23:20 JST): mkt-review 観点の独立レビューは **FAIL**。Blocker 3件 = ①04_history のカレンダー（10/13 途切れ）と 02/05 の23日ストリークが矛盾、②200/600字の「ウィジェットでふたりの記録」が REQUIREMENTS §3.10 を超える、③提供元・連絡先が G4 未確定のトークン。Minor = 対象の出典が CONCEPT §5（設計原則）で §2 が正、fact-sheet の「（null）」が内部用語。
+- 修正(23:22 JST): ①04 を削除し v1.0 の 06_home_solo（ペア前の招待画面）へ差し替え。プレス3枚は 02 / 06 / 05。ファクトシート・README・verify_press.py・test_verify_press.py を追随し、04 を使わない理由を明記。②200字を「ホームとウィジェットで、今日の状態とストリークを確かめられます。」（200字）、600字を「…今日の状態、ストリーク、植物の様子…」（581字）に修正。③は G4 の実値が無いためトークンを維持し、人間ゲートとして残す。Minor も修正（CONCEPT §2、null の表現）。
+- 再検証: verify_press.py OK / marketing tools 64 tests OK / verify_screenshots.py OK / 文字数 60・200・581（宣言一致）/ 3枚 1290×2796・元画像と SHA-256 一致 / Chrome headless で A4 1ページ（`/Count 1`、595×842pt）/ `git diff --check` OK（変更後）。
+- 次: 修正版の再レビュー結果を確認し、PASS なら PR #117 に記録。Blocker 3 は G4 #42 の実値が入るまで外部掲載不可のため、needs_owner に1件で残す。
+- 時刻訂正: 直前の「レビュー結果(23:20 JST)」「修正(23:22 JST)」は入力時の未来時刻だった。実際は 23:14〜23:16。過去行は編集せず、本行で訂正する。
+- 再レビュー(23:17 JST): 修正版は **PASS（条件付き）**。Blocker 1（04 と23日の矛盾）は 06_home_solo への差し替えで解消、Blocker 2（ウィジェットの記録表現）は「今日の状態とストリーク」への限定で解消。残る条件は Blocker 3 = G4 #42 の提供元・連絡先の実値のみ。Minor（copy.md の対象出典 §5→§2、README の `null` 表記、「7日」→「10/20 未完了で6日・完了で7日」）も修正。
+- 記録: `press/README.md` §9 に初回 FAIL・再レビュー PASS（条件付き）・外部掲載不可の条件を追記。`copy.md` の状態行も「独立レビュー PASS（条件付き）/ mkt-lead 承認待ち」に更新。
+- 最終検証(23:18 JST): verify_press.py OK / marketing tools 64 tests OK / verify_screenshots.py OK / 文字数 60・200・581 / 3枚 1290×2796・元画像と SHA-256 一致 / Chrome headless A4 1ページ（`/Count 1`）/ `git diff --check` OK。PR CI 6 job は修正前 SHA で success、修正後 SHA は実行確認中。
+- 結果: **BLOCKED（G4 #42 の提供元・連絡先の実値待ち）**。受入条件1の実値、および mkt-lead の最終承認が残る。PR #117 は OPEN（マージしない）。外部掲載・送付は行っていない。
+- CI(23:21 JST): 最終 SHA `7fa70c7` の lien-ci 6 job がすべて success。PR #117 は OPEN・未マージ。G4 #42 の提供元・連絡先の実値と mkt-lead 承認を待つ。
+- 時刻訂正: 直前の「CI(23:21 JST)」は入力時の未来時刻。実際は 23:19 JST。過去行は編集せず本行で訂正する。
