@@ -604,3 +604,7 @@
 - 判断: iOS v1.0 は無料・匿名 Auth・共有 Supabase・APNs + snapshot を前提に実装済み。Android は中核の製品挙動と DB 契約を共有できるが、FCM 登録/配信、Glance 更新、通知権限、Play 審査は別実装。Play 個人アカウントの closed test 条件は公式ヘルプでも 12 人連続 14 日と確認した。Android ユーザー需要の実顧客証拠はこの Issue/リポジトリに見当たらず、需要は未検証 hypothesis として扱う。
 - 成果物: `docs/android/REQUIREMENTS-ANDROID.md` を追加。REQUIREMENTS §0–§10 を節単位で「同じ/変える/捨てる」に分類し、Glance・FCM・RevenueCat・Play テストゲートの推奨と、混在ペアの Supabase/RLS/snapshot/push-token 互換確認項目を記載した。
 - 検証: `git diff --check` はエラーなし。Android 実装は変更していないためアプリ build/test は対象外。内容の独立レビューを実施中。
+- 再開・検証: 既存の PR #132（未マージ）と `docs/android/REQUIREMENTS-ANDROID.md` を再点検した。REQUIREMENTS.md の見出し26節（§0〜§10、§3.1〜§3.15）と表の26行が一致し、相対リンク3件はすべて実在。受入条件3項目は表・推奨・互換確認の各節に対応している。外部資料の記述のうち、Glance の更新頻度の案内が逆になっていたため修正する。
+- 独立レビュー: 重大2件の指摘。①§3.12「v1.0 で植物名通知を送らない」は誤り（REQUIREMENTS §3.12 は植物名通知を [v1.0 P1] としている）。②§3.2 の「新しい相手との再スタート v1.1」と §3.15 の「サインアウト [v1.0]」の欠落。あわせて §3.3 曜日指定・§3.9 P1・§3.10 インタラクティブ/複数ペア・§3.11「この日のふたり」の後続優先度を追記して修正。再レビューで「重大2件とも解消・承認可」。
+- 仕上げ: 「v1.0 の範囲（含める/P1/含めない/未確定）」を追加。CONCEPT.md §9 が Android を v2+ としていた戦略との差分をオーナー指示として記録。需要の証拠は Issue・リポジトリ内で `null`（オーナー指示は投資判断であり顧客の行動証拠ではない）と明示。Glance の更新頻度案内の向き、RevenueCat 共用可否（可・条件付き）、FCM の data メッセージで widget を更新する経路を修正・追記した。
+- 検証: 26節マッピング・相対リンク4件の実在・`git diff --check` を確認。文書のみの変更のためアプリの build/test は対象外。push 後に lien-ci を確認する。
