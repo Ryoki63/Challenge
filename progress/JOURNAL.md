@@ -793,3 +793,14 @@
 - 検証: `git pull --rebase origin main` は Already up to date、`git diff --check` PASS。変更は本エントリの末尾追記のみ。Android build/test/lint/instrumentation は入力ディレクトリ未存在かつ依存未完了のため未実施。独立レビューはコード変更未着手・監査ログのみのため対象外。UI/widget/通知・実機/本番の検証実績なし。
 - 提出前チェック: [未着手] 全要件の実装 [未実施] 関連テスト・型チェック・lint・build・動作確認（依存ゲート未達） [PASS] 差分の whitespace 検査 [対象外] 新規実装TODO（コード変更なし）。完了条件は未達で、done 扱い・DONE 台帳追記・実装 PR 作成はしない。
 - 結果: BLOCKED（依存完了・マージ待ち）。本指定ブランチに監査記録のみを commit/push して引き渡す。再開時は依存 Issue/PR と担当割当を再確認する。
+
+## 2026-10-21 03:21 JST — #134 オーナー返信後の再投入条件の照合
+- 着手: 指定 worktree / `consilium/134-t-and-1-android` で、オーナーの「即時実装ではない・11/14開始計画を維持・通常の依存待ちは本人承認待ちにしない」という回答を受け、最新の依存・日程・排他担当・既存PRを確認する。コード実装と認証情報・本番疎通は行わない。
+- 開始時確認: 作業ツリーは clean、指定ブランチのローカルと origin は `bcad9ff0ca6b631e6089a8d5a5376457f93be51c` で一致。指定ブランチの既存PRは0件。公開済み履歴の書き換えを避け、最新mainは fetch 後に照合する。
+- 依存の更新: `git fetch origin main consilium/134-t-and-1-android` 後の origin/main は `7991bc55088b9ccff9b335410a88f726910f8b04`。PR #145 は 2026-10-21 02:11:31 JST に同SHAでマージ済みで、設計書・Android雛形もmainに存在する。HEAD `6faffaac20e71e7554dc5d63885225589ac6181a` の lien-android run `39463200170` は成功（assemble/unit test/lint のstep成功）。旧記録の「未マージ・CI失敗」は今回の現状ではない。PRのreviewsは空・reviewDecisionは空文字で、最終SHAの独立レビュー合格はこの取得結果だけでは確認できない（null）。
+- 残る再投入条件: #120/#121 はともに OPEN / status:review（#120はreview:approved、PR #132はマージ済み）。#121の最新記録は後続を11/14開始と明記。PLAN-ANDROID.md §1/§3.1 の実装開始2026-11-14とiOS保護を維持する。現在2026-10-21は開始前で、#134のassigneesも空のため排他担当は未確認。成果物のマージ、依存Issueの完了、レビュー、開始日、排他担当は別々のゲートとして扱う。
+- 一括分類（#134〜#144の全11件を本文照合）: #134/#135/#138 は基盤・要件完了と開始日待ち。#136/#137/#140/#141/#142/#143/#144 は先行実装・UX・QA等の契約上の依存待ち、#139は#138待ち。#138/#139の共有backend・difficulty:highは通常待機と別に変更時のcritical_review/権限境界を維持する。全11件assigneeは空。#134/#135がstatus:in-progress、#136〜#138/#140〜#144がneeds-approval/human-gate付き、#139がstatus:blockedという観測との差をHQへまとめて渡し、他Issueの状態・承認ラベルは一括変更しない。
+- 待機の扱い: #134自身のneeds-approval/human-gateは今回の再取得では既に外れているため再付与しない。オーナーへの同型質問・bot通知・Issue close・status:*更新・未許可の実装着手は行わない。eng-lead/orchestratorへの記録は#134の1コメントに集約し、日程・依存・担当が揃ってから再投入する。
+- 引渡し: #134 comment `6298085214` に依存・日程・レビューの証拠と全11件の分類を1回投稿し、API readbackで投稿者Ryoki63、開始日、待機の扱い、`<!-- lien-agent -->` を確認。外部のHQリポジトリや他worktreeは読まず・変更せず、status:*の再分類はorchestratorへ委ねた。
+- 検証・提出前チェック（03:25 JST）: [未着手] 全実装要件（開始前） [対象外] 今回差分のテスト・型チェック・lint・build・独立レビュー（監査ログ追記のみ、実装未着手） [未実施] Android instrumentation/UI/widget/通知/実機/本番 [PASS] `git diff --check` [PASS] Node検査でJOURNALの既存全文保持・末尾追記、変更ファイルがJOURNALだけ、開始日/CI/SHA/分類証拠を確認 [対象外] 新規実装TODO（コードなし）。依存CIの成功を本タスクのテスト合格へ転用しない。
+- 結果: 実装未完了、日程・依存・排他担当の通常待機として引渡し。新規オーナー判断は不要（needs_owner=null）。実装PRなし、IssueはOPENのまま。監査追記を指定ブランチへcommit/pushする。結果enumにwaitingがないため返却statusはblockedを使うが、本人承認待ち・新規needs-approval通知を意味しない。
