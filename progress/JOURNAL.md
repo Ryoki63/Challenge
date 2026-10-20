@@ -668,3 +668,16 @@
 - 未確認のまま残す事項: 実際の Play developer account 種別・作成日、組織アカウントの適用条件、実機での更新/通知達成値、Android の実顧客需要。対象値は取得していないため `null`。
 - 独立レビュー: 外部仕様の変更箇所を別レビュワーが再確認。Android 8+ の通知チャンネル要件は targetSdk 26+ 条件を補うよう指摘され、その範囲表現に限定して修正。他の対象記述は公式資料と整合し、相互矛盾なしとの評価。
 - 最終ローカル確認: REQUIREMENTS の番号節26件と Android 分類表26行が順序一致。文書内相対リンク6件がすべて実在。`git diff --check` pass。コード/テスト対象に変更なし。
+
+## 2026-10-21 01:20 (qa-lead) — #123 Android テスト計画・端末マトリクス
+- 着手: 指定 worktree / `consilium/123-and-qa-android`。開始時の tracked 差分なし。Issue #123 の受入条件4項目を確認し、#120 / #121 / #137 / #138 / #139 / #140 / #143 / #144、PR #132 の Android 要件差分、PR #131 の PMO 計画、REQUIREMENTS / DESIGN / E2E-M1 / contracts を突合した。
+- 判断: テスト対象を Android 10〜16（API 29〜36）、推奨 `minSdk 29` / `targetSdk 36` / `compileSdk 36` とした。Google Play の 2026-08-31 以降の API 36 要件と、Android 13+ の通知権限、Android 14 の正確なアラーム既定拒否、16 KB page size を確認。最小構成は E29 / E36 / P36（stock）/ P-OEM（OEM）/ I17（iPhone）の5構成。E31/E33/E34/E35-16K と実機追加は RC 前後とした。
+- 成果物: `docs/android/TESTPLAN-ANDROID.md`。ウィジェット14件（W-01〜W-14）、FCM 18件（F-01〜F-18、F-10b 含む）、Doze 10件（D-01〜D-10）、iOS⇄Android 23件（X-01〜X-23）、Android 回帰12件（C-01〜C-12）、セキュリティ12件（S-01〜S-12）を記載。CI は unit/contract/lint/assemble を毎 PR、instrumentation を API 36、API 29/33 を nightly/RC とし、実 FCM・OEM 電池・実 launcher・性能・Play pre-launch は実機/Play Console に分離した。
+- 未確定（null）: Android 実機と iPhone の確保状況、最終 minSdk、FCM 検証環境、複数端末/provider の token モデル、正確なローカル通知の許容幅、16 KB native の有無、Play Data safety / アカウント削除 Web 導線。実機なしでは「公開可」を出さない。
+- 検証: 24 テーブルの列数一致、ローカル相対リンクの実在、公式 URL 16件の到達（HEAD 非対応の Play Help 3件は GET 200）、`git diff --check` clean。文書のみの変更で Android のビルド・テストは対象外（`products/lien/android` は #121 作成中で未存在）。
+- 次の一手: PR を作成し、lien-ci の結果を確認する。実機確保は #124 / PMO と調整する。マージはしない。
+- 時刻訂正: 上の見出し「01:20」は実際の着手・記録時刻「01:11 JST」の誤記。内容は変更しない。
+- 提出: PR #146 を作成（未マージ）。`lien-ci` run 39455269861 は6ジョブすべて success。文書のみのため `lien-ios` は起動せず、Android の Gradle build/test は #121 の雛形待ちで対象外。
+- 記録: Issue #123 に完了コメント（6295476511）、PR #146 に検証コメント（6295477091）。実機・FCM・Doze の実行結果はまだなく、計画の「未実施」を合格に読み替えない。
+- 結果: done（計画・端末マトリクスの提出まで）。次はレビュー対応と、実機/検証環境の確保（#124 / PMO）。
+- 件数訂正: 上の「FCM 18件（F-01〜F-18、F-10b 含む）」は、F-01〜F-18 に F-10b を加えた **19件** が正しい。PR #146 の本文も19件に訂正した。内容・ケースは変更していない。
