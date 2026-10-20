@@ -115,6 +115,7 @@ products/lien/
 ├── ios/          # SwiftUI アプリ(XcodeGen)。本体 / ウィジェット / NSE / テスト / xcconfig
 ├── supabase/     # migrations(連番SQL)と Edge Functions(deno)
 ├── assets/       # 植物のイラスト(SVG レイヤー)・アイコン
+├── web/          # GitHub Pages に配信する静的サイト(ティザー・法務・招待。#76)
 ├── web/invite/   # 招待用静的ページ(GitHub Pages)
 └── marketing/    # ASO文言・スクショ・プライバシーポリシー・利用規約・計測設計(measurement.md)
 ```

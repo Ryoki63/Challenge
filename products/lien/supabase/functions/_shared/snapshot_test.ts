@@ -624,12 +624,15 @@ Deno.test("resolveTodayLocal: override が無ければ実際の今日、確定�
 
 /**
  * DESIGN §3.4 schemaVersion=1 の全21キー(成長ルール v2 でキー3つを足した: 16 → 19、
- * お休みチケットの残数 ticketBalance を足した: 19 → 20、ペアのプラン pairPlan を足した: 20 → 21。issue #19 / T33)
+ * お休みチケットの残数 ticketBalance を足した: 19 → 20 (issue #19)、
+ * 組み立てに使った「今日」dateLocal を足した: 20 → 21 (issue #72)、
+ * ペアのプラン pairPlan を足した: 21 → 22 (T33))
  */
 const SNAPSHOT_KEYS = [
   "schemaVersion",
   "pairId",
   "updatedAt",
+  "dateLocal",
   "streakCurrent",
   "streakBest",
   "todayMeDone",
@@ -693,10 +696,50 @@ Deno.test("buildPairSnapshot: キー集合が §3.4 と一字一句一致する"
 Deno.test("buildSoloSnapshot: キー集合が §3.4 と一字一句一致する", () => {
   const snapshot = buildSoloSnapshot({
     updatedAtIso: "2026-06-10T03:00:00.000Z",
+    todayLocal: "2026-06-10",
     todayMeDone: false,
     myPromise: null,
   });
   assertEquals(Object.keys(snapshot).sort(), SNAPSHOT_KEYS);
+});
+
+Deno.test("dateLocal: 組み立てに使った「今日」をそのまま載せる(issue #72)", () => {
+  // ペア: todayLocal がそのまま dateLocal になる(updatedAt の日付とは別)
+  assertEquals(
+    buildPairSnapshot({ ...baseInput(), todayLocal: "2026-06-09" }).dateLocal,
+    "2026-06-09",
+  );
+  // ソロも同じ(ソロの完了フラグも「今日」のもの)
+  assertEquals(
+    buildSoloSnapshot({
+      updatedAtIso: "2026-06-10T03:00:00.000Z",
+      todayLocal: "2026-06-10",
+      todayMeDone: true,
+      myPromise: null,
+    }).dateLocal,
+    "2026-06-10",
+  );
+  // 既存のキーは変わらない(updatedAt は組み立てた時刻のまま)
+  const snapshot = buildPairSnapshot(baseInput());
+  assertEquals(snapshot.updatedAt, "2026-06-10T03:00:00.000Z");
+  assertEquals(snapshot.streakCurrent, 5, "dateLocal を足しても、ほかのキーの値は変えない");
+});
+
+Deno.test("dateLocal: 形が不正なら組み立てない(updatedAt から日付を推測しない)", () => {
+  assertThrows(
+    () => buildPairSnapshot({ ...baseInput(), todayLocal: "2026-6-10" }),
+    "形式不正な override",
+  );
+  assertThrows(
+    () =>
+      buildSoloSnapshot({
+        updatedAtIso: "2026-06-10T03:00:00.000Z",
+        todayLocal: "2026-06-10T00:00:00Z",
+        todayMeDone: false,
+        myPromise: null,
+      }),
+    "日付ではなく日時の文字列",
+  );
 });
 
 Deno.test("buildPairSnapshot: 自分だけ完了 = 確定ストリーク表示+fidget+成長回数は行の数", () => {
@@ -705,6 +748,7 @@ Deno.test("buildPairSnapshot: 自分だけ完了 = 確定ストリーク表示+f
     schemaVersion: 1,
     pairId: "pair-1",
     updatedAt: "2026-06-10T03:00:00.000Z",
+    dateLocal: "2026-06-10",
     streakCurrent: 5,
     streakBest: 5,
     todayMeDone: true,
@@ -807,6 +851,7 @@ Deno.test("buildPairSnapshot: 今日以降の行は成長回数に数えない(�
 Deno.test("buildPairSnapshot: 新しい3キーは JSON にしたとき必ず残る(next が null でもキーは落ちない)", () => {
   const solo = JSON.parse(JSON.stringify(buildSoloSnapshot({
     updatedAtIso: "2026-06-10T03:00:00.000Z",
+    todayLocal: "2026-06-10",
     todayMeDone: false,
     myPromise: null,
   })));
@@ -835,6 +880,7 @@ Deno.test("buildPairSnapshot: 新しい3キーは JSON にしたとき必ず残�
 Deno.test("buildSoloSnapshot: ソロ状態は pairId null・土だけ・約束は自分のもののみ・進み具合は 0 / 0 / null", () => {
   const snapshot = buildSoloSnapshot({
     updatedAtIso: "2026-06-10T03:00:00.000Z",
+    todayLocal: "2026-06-10",
     todayMeDone: true,
     myPromise: { title: "読書", emoji: "📚" },
   });
@@ -842,6 +888,7 @@ Deno.test("buildSoloSnapshot: ソロ状態は pairId null・土だけ・約束�
     schemaVersion: 1,
     pairId: null,
     updatedAt: "2026-06-10T03:00:00.000Z",
+    dateLocal: "2026-06-10",
     streakCurrent: 0,
     streakBest: 0,
     todayMeDone: true,
@@ -909,6 +956,7 @@ Deno.test("buildPairSnapshot: ticketBalance はペアの残数をそのまま出
 Deno.test("ticketBalance は JSON にしたとき必ず残る(ソロは undefined ではなく null で出す)", () => {
   const solo = JSON.parse(JSON.stringify(buildSoloSnapshot({
     updatedAtIso: "2026-06-10T03:00:00.000Z",
+    todayLocal: "2026-06-10",
     todayMeDone: false,
     myPromise: null,
   })));
@@ -1356,6 +1404,59 @@ Deno.test("loadSnapshotForUser: todayLocalOverride が「今日」を上書き�
     now,
   });
   assertEquals(withoutOverride.todayMeDone, false, "TZ上はもう翌日");
+});
+
+Deno.test("loadSnapshotForUser: dateLocal は組み立てに使った「今日」(updatedAt とは 1 日ずれうる — issue #72)", async () => {
+  const repo = makeFakeRepo(pairWorld({
+    checkins: { "user-a|2026-06-10": { photoPath: null } },
+  }));
+  // JST 2026-06-11 0:05。前の日の確定前なので、override(06-10)がそのまま「今日」になる
+  const now = new Date("2026-06-10T15:05:00Z");
+  const early = await loadSnapshotForUser(repo, {
+    userId: "user-a",
+    now,
+    todayLocalOverride: "2026-06-10",
+  });
+  assertEquals(
+    early.dateLocal,
+    "2026-06-10",
+    "7:00 までに組み立てた snapshot の完了フラグは、前の日のもの",
+  );
+  assertEquals(
+    early.updatedAt,
+    "2026-06-10T15:05:00.000Z",
+    "updatedAt は組み立てた時刻(11 日 0:05)。ここからは「どの日の完了か」が決まらない",
+  );
+
+  // 同じ override でも、その日の確定(翌日の 1:00)を過ぎていれば捨てて本当の今日を使う(resolveTodayLocal)
+  const settled = await loadSnapshotForUser(repo, {
+    userId: "user-a",
+    now: new Date("2026-06-11T00:00:00Z"), // JST 2026-06-11 09:00
+    todayLocalOverride: "2026-06-10",
+  });
+  assertEquals(settled.dateLocal, "2026-06-11");
+
+  // override なし(GET /snapshot)は、つねに now のユーザーTZの日付
+  const plain = await loadSnapshotForUser(repo, { userId: "user-a", now });
+  assertEquals(plain.dateLocal, "2026-06-11");
+});
+
+Deno.test("loadSnapshotForUser: ソロの snapshot にも dateLocal が載る(0:00〜1:00 の完了の解釈に要る)", async () => {
+  const repo = makeFakeRepo({
+    users: [userA],
+    promises: { "user-a": { id: "prom-a", title: "筋トレ", emoji: "💪" } },
+    pair: null,
+    checkins: {},
+    streakDays: [],
+    plant: null,
+  });
+  const snapshot = await loadSnapshotForUser(repo, {
+    userId: "user-a",
+    now: new Date("2026-06-10T15:05:00Z"), // JST 2026-06-11 0:05
+    todayLocalOverride: "2026-06-10",
+  });
+  assertEquals(snapshot.dateLocal, "2026-06-10");
+  assertEquals(snapshot.updatedAt, "2026-06-10T15:05:00.000Z");
 });
 
 // ---- 行から数え直す(GROWTH §7.2): plants.grown_days は読まない ----

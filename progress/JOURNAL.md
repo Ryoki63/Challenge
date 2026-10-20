@@ -407,6 +407,30 @@
 - 補記: 独立レビューのサブエージェントを 1 体起動したが、長時間応答が返らなかったため中断した(成果物には未反映)。代わりに、リンク・曜日・算数・表の列数・節の実在を機械的に検査し、引用した数値と分母はすべて KPI.md §4 / TASKPLAN §5 と突き合わせ済み
 - 追記: 2 体目の独立検証(対象を `marketing/plan.md` と KPI.md §4・TASKPLAN §5 に絞ったもの)が完了。A〜E すべて一致、**受入条件は満たす**との判定。①§6.1 の分母が KPI.md §4 の母数条件と同値(D7=+8日・D30=+31日・招待=結果確定・つながり=作成+7日)②11/30 の D30 分母 0 は `started_on + 31 <= 11/30 ⇒ started_on <= 10/30` で正しい ③500/40%/25% は改変なし ④DL 合計 500・予算 26,550 ≤ 30,000 ⑤受入条件の記載節は §3・§4・§5・§6・§5.1・§11
 
+## 2026-10-20 13:05 (eng-exec) — #72 B5: snapshot に dateLocal を載せる(0:00〜1:00 の完了不明扱いの解消)
+- 着手: worktree `Challenge-72`(origin/main `fdf1ef5`、作業前に対象ブランチ・PR が無いことを確認)。Issue の受入条件5つと、DESIGN §3.4/§4.2・REQUIREMENTS §3.12・README §12 を読んだ
+- 判断(TASKPLAN §9 の直列): snapshot の形を変える順は GS → T19 → T33 → T35。**#72 は T19 の直後・T33 の前**に入れる。v1.0 の通知の修正で、キーの追加だけ・migration 無し。T33 は v1.1 の別ブランチ、T35 は v1.2 以降なので、後ろに置くと v1.0 に間に合わない
+- サーバー: `_shared/snapshot.ts` の `PairSnapshot` に `dateLocal`(組み立てに使った「今日」)を追加。`buildPairSnapshot` は `todayLocal` をそのまま、`buildSoloSnapshot` は入力に `todayLocal` を足して載せる(`loadSnapshotForUser` が解決済みの「今日」を渡す)。既存のキーは変えない(schemaVersion は 1 のまま)
+- クライアント: `PairSnapshot.dateLocal`(省略可 `String?`。デコードで "YYYY-MM-DD" だけ通し、崩れた値は nil)。`snapshotDay(calendar:)` / `daysSinceSnapshotDay(now:calendar:)` を足し、`reflectsToday` と `completionOnItsOwnDay` と `StreakRiskPlan.target` が**完了の日**を `dateLocal` で決める。キーが無い古いサーバーの snapshot だけ従来の時刻判定(1:00 まで不明)に落ちる
+- 効果: 0:00〜1:00 に自分でチェックインした人の、その日のリマインドがその場で取り消される(`staleIDsForToday`)。前の日の日付で組み立てられた snapshot(キューで 0:07 に届いた 23:58 のチェックイン)は、今日の完了として読まない
+- 契約: `contracts/*.json` を再生成(15 ファイルに `dateLocal` の1行だけ。`--check` 一致)。`contracts/README.md` に経緯を追記
+- 検証: deno `397 passed`(新規4)/ contracts `--check` 22 件一致 + tools 3 passed / e2e unit 65 passed / ops 77 passed / iOS `check.sh test` = **84 classes・1085 tests 0 failed** / `check.sh views` 112 ファイル OK / `check.sh widget` 18 ファイル OK
+- **main が赤かった(2件。この PR で直した/報告する)**: ①`HomeViewModel.presentShareImage()` と `HomeView` の `if viewModel.canShareRecord {` の閉じ括弧が #85(T22)で落ちており、**main は iOS ビルドが通らない**(lien-ios の main の run が failure。`HomeView.swift:513/526/609`・`HomeViewModel.swift:282/389/399/410`)。→ この PR で括弧2つを戻した(挙動の変更なし)。②`StringsReviewTests` が 44 件赤 — #83(T18 履歴)と #85(T22 シェア)が `docs/STRINGS-REVIEW.md` を更新していない(43 単位が未記載)。→ 同じ判定基準で追記レビューし、§7.20〜§7.22 と集計(297 → 340 件)を追加した(文言は変えていない)
+- 残: レビュー(eng-review)。デプロイは関数を一括で(DESIGN §3.4 の互換性。アプリの解釈より先にサーバーを出さない — 順序はどちらでも壊れないが、まとめて出す)
+- 結果: PR を作成(マージしない)
+
+## 2026-10-20 14:20 (ux-exec) — MK3 #76 公開前ティザーページと法務ページの生成・配備の仕組み
+- 着手: origin/main(fdf1ef5)から `consilium/76-mk3-github-pages`。まず Issue 本文と関連(#79・#80・#42・TASKPLAN §9.2)・`SupportLinks.swift`・`marketing/store_metadata/ja` を確認
+- 前提の確認: **Issue 本文が「配備先の repo と URL は eng-lead が決め、この Issue に書く」としているが、#76 にそのコメントが無い**。一方でアプリの `SupportLinks.webBaseURL` は `https://ryoki63.github.io/Challenge`、法務は `.../lien/legal/{terms,privacy}.html` を指しており(DESIGN §7・web/invite のコメントも同じ)、配信パスは実装側で既に一意。この土台に合わせて作り、URL の正式決定と初回の Pages 有効化(Settings > Pages > Source = GitHub Actions)は人間に残した
+- **X の @ハンドルは repo のどこにも無い**(#79 が「オーナーが最初にこの Issue へ書く」としている)。実在しないアカウントを指さないため `site.json` の `xUrl` を null にし、未設定のあいだはリンクを出さない。設定すると出ることはテストで固定
+- 変更: `products/lien/web/tools/build_site.py`(md→html の生成器。Markdown パーサも自前、依存ゼロ)/ `site.json` / `web/site/`(配信物)/ `tools/test_build_site.py`(47件)/ `.github/workflows/lien-pages.yml`(Actions 配備。いまは workflow_dispatch のみ)/ `lien-ci.yml` に `pages-site` ジョブ / `web/README.md` / CHECKLIST-G4 §3・§4 / 構成図3か所
+- 生成の検証: 生成した `marketing/legal/{privacy,terms}.html` の `<main>` 本文が、手で保守していた既存 HTML と**バイト一致**(差分は戻りリンクと、terms に無かった表の CSS だけ)。md が正本であることを壊さずに置き換えられた
+- 公開の門: `--check-publishable` が (1) G4 の `【要記入: G4: …】` が残っていたら (2) `xUrl` が未設定なら 配備を止める。プレースホルダ付きの法務ページが公開される事故を機械で防ぐ
+- 画面: ティザーは 1行説明(= 確定済み `subtitle.txt`)・スクリーンショット3枚・「近日公開」・法務リンク・サポート欄。**フォーム・メール収集・外部スクリプト・外部フォントなし**。訴求は `description.txt` / `promotional_text.txt` の確定値から取り、罰・恥系(禁止語)を含まないことをテストで検査
+- スクショ: 旧 SVG(`marketing/screenshots/`)は旧画風(ドット絵)で、v1.0 に無い「ウィジェットの相手写真」「写真→相手のウィジェット」を含むため使わなかった。v4 の合成済み立ち絵(`assets/plant/v4_drafts/composed/`)を埋め込んだ自己完結 SVG を3枚生成(ホーム/ウィジェット/チェックイン完了)。文言は `Strings.swift` と `screenshots/plan.md` §2 のデモデータに合わせた。実機キャプチャへの差し替えは #80
+- 検証: `python3 -m unittest discover -s tools -p "test_*.py"` 47件 OK / `build_site.py --check` OK / `--check-publishable` は想定どおり NG(G4 未記入・xUrl 未設定)。headless Chrome で index と3枚を描画して目視確認
+- 結果: PR を作成。**公開そのものは未了**(G4 の4項目・X の @ハンドル・Pages の有効化が人間の作業)。issue は閉じない
+
 ## 2026-10-20 13:18 (eng-exec) — T33 #33 RevenueCat組込 + ペイウォール(3文脈)
 - 着手: G6(#44)/T37 前でも実装・CI 検証できる範囲を実装する。実際の課金設定(RevenueCat アカウント・商品・価格・特商法・ストア申請)は行わない。
 - サーバー: `_shared/premium.ts` に `derivePairPlan` を抽出(grant-tickets から再エクスポート)。`snapshot.pairPlan`(free/premium)をメンバーの `users.premium_until` から導出し、`USER_COLUMNS`/`PARTNER_SELECT` に premium_until を追加。RevenueCat Webhook(`revenuecat-webhook`。Authorization の定数時間比較、期限は延ばす方向だけ・EXPIRATION は現在の期限以下だけ失効)を追加。contract fixtures 22 件再生成。

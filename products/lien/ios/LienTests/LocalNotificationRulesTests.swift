@@ -96,7 +96,8 @@ final class LocalNotificationRulesTests: XCTestCase {
 
     func testCompletionIsUnknownForASnapshotBuiltBeforeTheSettleHour() {
         // サーバーは、checkin・checkin-cancel・nudge の snapshot を、クライアントが送った日付を「今日」として組み立てる。
-        // その日付は翌日の 1:00 まで有効(snapshot.ts の CLOSE_DAY_SETTLE_HOUR)。この間に作られた snapshot の完了は、前の日のことかもしれない
+        // その日付は翌日の 1:00 まで有効(snapshot.ts の CLOSE_DAY_SETTLE_HOUR)。この間に作られた snapshot の完了は、前の日のことかもしれない。
+        // ※ ここは **dateLocal が無い古いサーバー**の snapshot(新しいサーバーは下のテスト)
         XCTAssertEqual(LocalNotificationCalendar.snapshotSettleHour, 1)
         for (hour, minute, known) in [(0, 0, false), (0, 59, false), (1, 0, true), (1, 1, true), (23, 59, true)] {
             let snapshot = NotificationSnapshots.paired(
@@ -107,6 +108,125 @@ final class LocalNotificationRulesTests: XCTestCase {
             XCTAssertTrue(snapshot.reflectsToday(now: now, calendar: calendar), "今日のものではある(完了だけが不明)")
         }
     }
+
+    // MARK: - 組み立てに使った「今日」(dateLocal。issue #72)
+
+    func testDateLocalMakesTheCompletionCertainEvenBeforeTheSettleHour() {
+        // 新しいサーバーは、組み立てに使った「今日」を dateLocal に載せる。0:20 に組み立てても、完了がどの日のものかは確か
+        let early = Clock.date(2026, 10, 15, 0, 20)
+        let snapshot = NotificationSnapshots.paired(
+            updatedAt: early, dateLocal: "2026-10-15", meDone: true, partnerDone: false
+        )
+        let now = Clock.date(2026, 10, 15, 0, 25)
+        XCTAssertEqual(snapshot.dateLocal, "2026-10-15")
+        XCTAssertEqual(
+            snapshot.completionOnItsOwnDay(calendar: calendar),
+            TodayCompletion(me: true, partner: false),
+            "dateLocal があれば、時刻ではなく日付で解釈する(0:00〜1:00 も「不明」にしない)"
+        )
+        XCTAssertTrue(snapshot.reflectsToday(now: now, calendar: calendar))
+        XCTAssertEqual(
+            snapshot.todayCompletion(now: now, calendar: calendar),
+            TodayCompletion(me: true, partner: false)
+        )
+    }
+
+    func testDateLocalMakesACheckinRightAfterMidnightCancelTodaysReminder() {
+        // 受け入れ条件(issue #72): 0:00〜1:00 に自分でチェックインしたら、その日のリマインドが取り消される。
+        // サーバーは 0:20 に組み立てた snapshot に dateLocal = その日 を載せる(クライアントが送った日付 = 今日)
+        let early = Clock.date(2026, 10, 15, 0, 20)
+        let snapshot = NotificationSnapshots.paired(
+            updatedAt: early, dateLocal: "2026-10-15", meDone: true, partnerDone: false
+        )
+        XCTAssertEqual(
+            LocalNotificationCancellation.staleIDsForToday(
+                snapshot: snapshot, now: Clock.date(2026, 10, 15, 0, 21), calendar: calendar
+            ),
+            ["lien.local.reminder.2026-10-15"],
+            "済んでいるのに、その日のリマインドが残らない(アプリを開き直すまで待たない)"
+        )
+        // ふたりそろっていれば、その日のストリーク危機も要らない
+        var both = snapshot
+        both.todayPartnerDone = true
+        XCTAssertEqual(
+            Set(LocalNotificationCancellation.staleIDsForToday(
+                snapshot: both, now: Clock.date(2026, 10, 15, 0, 21), calendar: calendar
+            )),
+            ["lien.local.reminder.2026-10-15", "lien.local.streak-risk.2026-10-15"]
+        )
+    }
+
+    func testDateLocalOfThePreviousDayIsNeverReadAsTodaysCompletion() {
+        // 14 日 23:58 に圏外で押したチェックインが 15 日 0:20 に届くと、サーバーは 14 日を「今日」として組み立てる
+        // (dateLocal = 14 日)。これを 15 日の完了と取り違えない
+        let arrival = Clock.date(2026, 10, 15, 0, 20)
+        let queuedFromYesterday = NotificationSnapshots.paired(
+            updatedAt: arrival, dateLocal: "2026-10-14", meDone: true, partnerDone: true, streak: 24
+        )
+        let now = Clock.date(2026, 10, 15, 0, 25)
+        XCTAssertFalse(queuedFromYesterday.reflectsToday(now: now, calendar: calendar), "14 日の snapshot")
+        XCTAssertNil(queuedFromYesterday.todayCompletion(now: now, calendar: calendar))
+        XCTAssertEqual(
+            LocalNotificationCancellation.staleIDsForToday(snapshot: queuedFromYesterday, now: now, calendar: calendar),
+            [],
+            "昨日の完了を理由に、今日の分を取り消さない"
+        )
+        XCTAssertEqual(
+            queuedFromYesterday.completionOnItsOwnDay(calendar: calendar),
+            TodayCompletion(me: true, partner: true),
+            "その snapshot の日(14 日)の完了としては確か"
+        )
+        XCTAssertEqual(
+            queuedFromYesterday.daysSinceSnapshotDay(now: now, calendar: calendar), 1,
+            "いまのローカル日から見て 1 日前"
+        )
+    }
+
+    func testDateLocalIsReadInTheDevicesTimeZone() {
+        // dateLocal はサーバーが組み立てに使った日付そのもの。端末のタイムゾーンが違えば「今日」との一致も変わる
+        let instant = Clock.date(2026, 10, 15, 0, 20) // 東京の 15 日 0:20 = ロサンゼルスの 14 日 8:20
+        let snapshot = NotificationSnapshots.paired(
+            updatedAt: instant, dateLocal: "2026-10-15", meDone: true
+        )
+        XCTAssertTrue(snapshot.reflectsToday(now: instant, calendar: Clock.calendar(Clock.tokyo)))
+        XCTAssertFalse(
+            snapshot.reflectsToday(now: instant, calendar: Clock.calendar(Clock.losAngeles)),
+            "ロサンゼルスではまだ 14 日: 15 日の完了ではない"
+        )
+    }
+
+    func testAnUnreadableDateLocalFallsBackToTheTimeRule() {
+        // 形が違う・存在しない日付の dateLocal は、キーが無い古いサーバーと同じ道に落とす(壊れた値で取り消しを誤らない)
+        for raw in ["2026-10-15T00:00:00Z", "2026-1-5", "", "20261015", "2026-02-31"] {
+            var snapshot = NotificationSnapshots.paired(
+                updatedAt: Clock.date(2026, 10, 15, 0, 20), meDone: true
+            )
+            snapshot.dateLocal = raw
+            XCTAssertNil(snapshot.serverDay(calendar: calendar), raw)
+            XCTAssertEqual(
+                snapshot.snapshotDay(calendar: calendar), calendar.startOfDay(for: snapshot.updatedAt),
+                "\(raw): updatedAt の日に戻る"
+            )
+            XCTAssertNil(
+                snapshot.completionOnItsOwnDay(calendar: calendar),
+                "\(raw): 0:20 の snapshot なので、時刻の規則で「不明」(古いサーバーと同じ)"
+            )
+        }
+    }
+
+    func testDayKeyRoundTripsThroughTheCalendar() {
+        let tokyo = Clock.calendar(Clock.tokyo)
+        for key in ["2026-10-15", "2026-01-01", "2024-02-29"] {
+            let date = LocalNotificationID.date(fromDayKey: key, calendar: tokyo)
+            XCTAssertNotNil(date, key)
+            XCTAssertEqual(date.map { LocalNotificationID.dayKey(for: $0, calendar: tokyo) }, key)
+        }
+        // 存在しない日・形が違う日は nil(暦が繰り上げた日を、その日と取り違えない)
+        for key in ["2026-02-31", "2026-13-01", "2026-00-10", "2026-1-5", "2026-10-15T00:00:00Z", ""] {
+            XCTAssertNil(LocalNotificationID.date(fromDayKey: key, calendar: tokyo), key)
+        }
+    }
+
 
     func testTheSettleHourFollowsTheDevicesTimeZone() {
         // 同じ瞬間でも、端末のタイムゾーンの 0:20 かどうかで決まる(東京の 15 日 0:20 は、ロサンゼルスでは 14 日 8:20)
