@@ -258,6 +258,7 @@ private struct SnapshotContent: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(LienColors.shareAccent)
+            }
             // お休みチケットの残数バッジ(§3.6 / T19a #19)。0枚でも出す。nil(ソロ・キー欠落)は出さない
             if let ticketBalance = viewModel.ticketBalance {
                 TicketBalanceBadge(balance: ticketBalance)

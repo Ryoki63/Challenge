@@ -29,6 +29,7 @@ final class ContractFixtureTests: XCTestCase {
         XCTAssertEqual(snapshot.schemaVersion, PairSnapshot.currentSchemaVersion)
         XCTAssertEqual(snapshot.pairId, pairID)
         XCTAssertEqual(snapshot.updatedAt, fixedDate, "小数秒つき ISO8601 (…:00.000Z) を復元できる")
+        XCTAssertEqual(snapshot.dateLocal, "2026-06-11", "組み立てに使った「今日」(JST 17:30 なので確定後の今日)")
         XCTAssertEqual(snapshot.streakCurrent, 6)
         XCTAssertEqual(snapshot.streakBest, 6)
         XCTAssertFalse(snapshot.todayMeDone)
@@ -73,7 +74,10 @@ final class ContractFixtureTests: XCTestCase {
         XCTAssertNil(snapshot.myPromiseTitle)
         XCTAssertNil(snapshot.ticketBalance)
         XCTAssertEqual(AppRouter.phase(hasSession: true, snapshot: snapshot), .promiseSetup)
-        XCTAssertEqual(snapshot, PairSnapshot.emptySolo(updatedAt: fixedDate), "スタブ構成の空 snapshot と同じ形")
+        // スタブ構成の空 snapshot と同じ形(サーバーが載せる dateLocal だけが違う)
+        var expected = PairSnapshot.emptySolo(updatedAt: fixedDate)
+        expected.dateLocal = "2026-06-11"
+        XCTAssertEqual(snapshot, expected, "スタブ構成の空 snapshot と同じ形")
     }
 
     func testSnapshotDecodingToleratesUnknownServerKeys() throws {
@@ -117,6 +121,33 @@ final class ContractFixtureTests: XCTestCase {
         XCTAssertEqual(both.plantStageFloor, 7)
         XCTAssertEqual(both.plantNextStageAt, 14)
         XCTAssertEqual(GrowthGauge.text(for: both), "ふたりそろって あと7回で よりそい", "段階に入った直後(0回)は『0回そろったよ』と言わない")
+    }
+
+    func testEverySnapshotFixtureCarriesTheDayTheServerBuiltItFor() throws {
+        // サーバーは、どの snapshot にも組み立てに使った「今日」(dateLocal)を載せる(issue #72)。
+        // アプリはそれで完了フラグを解釈する(0:00〜1:00 の「不明」扱いをしない)
+        let calendar = NotificationClock.calendar()
+        for name in ["snapshot.paired", "snapshot.solo", "snapshot.empty"] {
+            let snapshot = try ContractFixtures.decode(SnapshotResponse.self, from: name).snapshot
+            XCTAssertEqual(snapshot.dateLocal, "2026-06-11", name)
+            XCTAssertTrue(snapshot.reflectsToday(now: fixedDate, calendar: calendar), name)
+            XCTAssertNotNil(snapshot.completionOnItsOwnDay(calendar: calendar), name)
+        }
+        // snapshot を返すほかの応答も同じ契約(checkin / checkin-cancel / nudge / invite-accept)
+        XCTAssertEqual(
+            try ContractFixtures.decode(CheckinResponse.self, from: "checkin.paired").snapshot.dateLocal, "2026-06-11"
+        )
+        XCTAssertEqual(
+            try ContractFixtures.decode(CheckinCancelResponse.self, from: "checkin-cancel.ok").snapshot.dateLocal,
+            "2026-06-11"
+        )
+        XCTAssertEqual(
+            try ContractFixtures.decode(NudgeResponse.self, from: "nudge.ok").snapshot.dateLocal, "2026-06-11"
+        )
+        XCTAssertEqual(
+            try ContractFixtures.decode(InviteAcceptResponse.self, from: "invite-accept.ok").snapshot.dateLocal,
+            "2026-06-11"
+        )
     }
 
     func testTicketBalanceFixturesMatchTheServerContract() throws {

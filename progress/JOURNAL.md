@@ -371,6 +371,54 @@
 - 残り: mkt-lead 承認 → mkt-review(景表法・誇大表現・体験していない機能)→ 10/21 の承認後に知人連絡(10/22)・X 投稿(10/23)。G4 で contactEmail が決まったら置換、G0 後にストア URL を確定
 - 結果: PR を作成(レビュー待ち)。送信・投稿はしていない。Issue は閉じない
 
+## 2026-10-20 14:40 (mkt-exec) — MK5 #78 計測設計(UTM・App Analytics・週次 SQL)
+- 着手: worktree `Challenge-78`。issue #78 の完了条件(チャネル別 UTM 命名規則 / App Analytics の指標一覧 / KPI.md の SQL と組み合わせた週次の見方 / SDK を入れない代替案)を、`products/lien/marketing/measurement.md` にまとめる。D6(分析 SDK なし)・#30 の App Privacy と整合させる
+- 方針: 標準 UTM は App Store に渡らないため、DL のチャネル attribution は Apple のキャンペーンリンク(`pt`/`ct`/`mt`)を正とし、UTM は将来の Web 計測用の予約として同じ命名を定義する。アプリ側の変更・SDK・計測専用テーブルは足さない
+- 成果: `products/lien/marketing/measurement.md` を作成。§2 にチャネル別の `ct` 命名規則(X / ティザー / 紹介)と UTM 対応、§3 に ASC Analytics の指標一覧としきい値、§4 に KPI.md と組み合わせた週次シート・分母一覧・補助 SQL、§5/§6 に SDK を入れない代替案と #30 の App Privacy との整合を書いた。docs/KPI.md §2.8 と docs/STRUCTURE.md からリンクを追加
+- 判断: 標準 UTM は App Store の campaign 計測に使われないため、`ct` を正とし、UTM は将来の Web 計測用の対応表にした。公開日(10/31)は ASC の Campaigns が出る前で `ct` を発行できないため「タグなし」とし、0 ではなく null で記録する運用にした
+- 検証: 相対リンク7件の解決 OK / `ct` 例11件が `[a-z0-9_]`・30文字以内 / `pglast` で KPI.md の SQL に補助 SQL を差し替えた全文を構文解析 OK(2 statements)/ marketing tools の unittest 24件 OK / `git diff --check` OK
+- 結果: コミット `322cc4d` を push し、PR #101 を作成(https://github.com/Ryoki63/Challenge/pull/101)。マージはせず、mkt-review の判断待ち
+- CI: PR #101 の `lien-ci` 全5ジョブ(deno test / e2e / ops / plant assets / store metadata)が緑
+- 追記: 表記の定義(ASC / DL / D1・D7・D30)を `0db7a0d` で追加。最終 CI も全5ジョブ緑
+
+## 2026-10-20 14:25 (mkt-exec) — #75 MK2 X 開発ストーリー10本+公開日告知セット(下書き)
+- 着手: worktree `Challenge-75`(ブランチ `consilium/75-mk2-x-10`)。Issue #75 の受入条件は「marketing/x/ に日付つき投稿案(日次10本+公開日・翌日・1週間後)」「各投稿に本文140字目安・添付画像・根拠・リンク先」「約束はひとつだけ/罰を使わない原則」「mkt-lead 承認+mkt-review レビュー済みのものに status:ready 相当」「日付を断定しない」
+- 前提確認: 公開目標 10/31・審査提出 10/27 は決定済みだが、App Store の公開日は審査結果に依存するため、本文では日付を断定せず「近日公開/公開しました(公開確認後)」で書く。投稿・外部送信は本タスクの範囲外(下書きのみ)
+- 置き場所: リポジトリ直下に `marketing/` は無く、Lien のマーケ資産は `products/lien/marketing/`(既存の review-notes 等も `marketing/...` と略記)。Issue の `marketing/x/` はこの配下と解釈し、`products/lien/marketing/x/` に置く
+- 根拠の範囲: CONCEPT §2/§5/§7、REQUIREMENTS §0/§3.2〜§3.13/§4/§7、GROWTH §4。v1.0 に無い機能(課金・アルバム無制限・Apple連携)は書かない。競合名(Pairy)はストア方針(TASKPLAN §9.4)に合わせて出さない
+- 成果物: `products/lien/marketing/x/` に投稿案13本（10/21〜10/30 の日次10本 + 10/31 公開日 + 11/01 公開翌日 + 11/07 1週間後）。各ファイルに本文（140字以内）・添付画像・代替テキスト・根拠（docs の節/実装パス）・リンク先・数値の根拠・投稿メモ・承認チェック
+- 判断: 10/21〜10/31 の11日間を「日次10本（10/21〜10/30）+ 10/31 公開日告知」で埋めた（10/31 を日次に数えると11本になり、受入条件の「日次10本 + 公開日」と重複するため）。公開日は審査結果に依存するので、本文では日付を断定せず「近日公開/公開しました（公開確認後）」の2文面を用意
+- 判断: 実機スクリーンショットが無い（`screenshots/` は旧画風の SVG 下絵のみ）ため、UI を見せる7本は「指定:」にして撮影条件（Frame 番号）を明記。既存アート6点はそのまま投稿できる形でパスを指定。**旧画風の下絵は使わない**
+- 判断: 「status: ready 相当の印」は mkt-exec では付けない（役職分離）。`review.md` に承認台帳（mkt-lead / mkt-review の2欄）を用意し、両方 ok になるまで `status: ready` にできないよう検査で固定した
+- 追加: `x/tools/check_posts.py`（13本の静的検査: 140字・禁止語8語+誇大表現・競合名・日付断定・数値の根拠・節の実在・画像の実在・承認前 ready の禁止）と `x/tools/test_check_posts.py`（35件）。`.github/workflows/lien-ci.yml` の store-metadata ジョブに2ステップ追加
+- 検証: `python3 x/tools/check_posts.py` = OK 13本 / unittest 35件 OK / 既存の `verify_metadata.py` OK・unittest 24件 OK（回帰なし）/ YAML の構文とステップ追加を確認
+- 結果: **PR #99 作成**（https://github.com/Ryoki63/Challenge/pull/99）。CI `lien-ci` run 39375076692 は全ジョブ success（store-metadata に追加した2ステップも実行され、`OK: 13 本` と unittest 35 件を確認）。`status: ready` は mkt-lead 承認 + mkt-review レビュー待ちのため付けていない（検査で固定）。issue は承認待ちとして開いたまま
+
+## 2026-10-20 14:05 (mkt-lead) — MK1 #74 公開前後 30 日の獲得計画
+- 着手: Issue #74。worktree `Challenge-74` / ブランチ `consilium/74-mk1-30-10-21-11-30`(origin/main `fdf1ef5`)。作業前に origin の対象ブランチ・PR を確認(重複なし)
+- 置き場所の判断: Issue の完了条件は「docs/GROWTH.md か marketing/plan.md」。`docs/GROWTH.md` は**植物の成長ルール**(プロダクト仕様)で獲得計画の置き場ではないため、`marketing/plan.md` を新設する。MK2(#75)の `marketing/x/`・MK5(#78)の `marketing/measurement.md` と同じく、マーケの新しい文書はリポジトリ直下の `marketing/` に置く(既存アセットは `products/lien/marketing/`)
+- 事実確認(計画に書く前に読む): KPI ゲートは TASKPLAN §5(500 DL / 40% / D30 25%)、率の定義と分母は KPI.md §4、DL の出どころは KPI.md §2-8(ASC App Analytics のみ)。**D30 は式 `started_on + 31 <= 今日` により 11/30 時点で分母 0**(公開 10/31 のコホートは 12/1 から)。11/30 に判定できるのは 2 項目だけ
+- 予算: 追加支出の上限は 30,000 円。固定費(Apple 年会費 12,800 円・Supabase Pro 約 3,750 円)を足しても収まる範囲に、広告枠を 10,000 円で抑える設計にする
+- 成果: `marketing/plan.md`(344 行)。6 区間(W-0〜W4)・週次カレンダー・チャネル 3 つ・予算・広告の上限と停止条件・週次の指標(分母つき)・KPI ゲートとの整合・未達時の動き・公開日がずれた場合の読み替え・書いてはいけないこと・承認の流れ。ルート `marketing/` を新設したので `docs/STRUCTURE.md` にも役割を追記(ストア文言は `products/lien/marketing/` のまま)
+- 設計上の判断: ①30,000 円は「使ってよい額」ではなく「失ってよい額」なので、既定はオーガニック 0 円・広告は最大 10,000 円の非常口にした ②固定費(Apple 12,800 + Supabase Pro 約 3,750)を足しても 26,550 円で上限内 ③しきい値は 40% / 50% の 2 本だけに統一(広告の停止と §8 の立て直しで同じ基準を使う)④キーワードは v1.1 提出(11/9)でしか変えられない 1 回きりの機会なので、広告は 1 週ずらして切り分ける ⑤測れないもの(シェア画像・招待発行率・ティザー PV)は 0 ではなく null と明記
+- 検証: リンク 13 本すべて解決 / 曜日の記載 23 か所すべて一致 / 表の列数 0 不整合 / DL 配分の合計 = 500 / 予算 26,550 ≤ 30,000 / しきい値 63・45 の計算一致 / `git diff --check` OK / `verify_metadata.py` OK(99/100 字・変更なし)/ unittest 24 件 OK。**deno はこの Mac に無い**ため ops テストと CI は push 後に確認する
+- レビュー前の自己点検で直した点: KPI の SQL の節番号(§4→§3)/ 公開前の本数(10 日→11 日)/ 広告の停止条件と §8 のしきい値を 40%・50% の 2 本に統一(別々の基準を持たない)/ 「同じ週に 2 つ以上変えない」と「キーワード差し替え + 広告」の矛盾を、広告を 1 週ずらすことで解消 / 罰を使わない原則の根拠を GROWTH §3.1 から CONCEPT §5-1 に修正 / ティザーの解析タグは #76 の判断であることを明記
+- 結果: **PR #98 作成**(https://github.com/Ryoki63/Challenge/pull/98)。7 commit・docs のみ(+365 行)。CI(lien-ci)5 ジョブすべて success(head `69ea55f`)。受入条件のうち **mkt-review の承認が残り**なので、issue は閉じず、レビュー役職の判断を待つ
+- 補記: 独立レビューのサブエージェントを 1 体起動したが、長時間応答が返らなかったため中断した(成果物には未反映)。代わりに、リンク・曜日・算数・表の列数・節の実在を機械的に検査し、引用した数値と分母はすべて KPI.md §4 / TASKPLAN §5 と突き合わせ済み
+- 追記: 2 体目の独立検証(対象を `marketing/plan.md` と KPI.md §4・TASKPLAN §5 に絞ったもの)が完了。A〜E すべて一致、**受入条件は満たす**との判定。①§6.1 の分母が KPI.md §4 の母数条件と同値(D7=+8日・D30=+31日・招待=結果確定・つながり=作成+7日)②11/30 の D30 分母 0 は `started_on + 31 <= 11/30 ⇒ started_on <= 10/30` で正しい ③500/40%/25% は改変なし ④DL 合計 500・予算 26,550 ≤ 30,000 ⑤受入条件の記載節は §3・§4・§5・§6・§5.1・§11
+
+## 2026-10-20 13:05 (eng-exec) — #72 B5: snapshot に dateLocal を載せる(0:00〜1:00 の完了不明扱いの解消)
+- 着手: worktree `Challenge-72`(origin/main `fdf1ef5`、作業前に対象ブランチ・PR が無いことを確認)。Issue の受入条件5つと、DESIGN §3.4/§4.2・REQUIREMENTS §3.12・README §12 を読んだ
+- 判断(TASKPLAN §9 の直列): snapshot の形を変える順は GS → T19 → T33 → T35。**#72 は T19 の直後・T33 の前**に入れる。v1.0 の通知の修正で、キーの追加だけ・migration 無し。T33 は v1.1 の別ブランチ、T35 は v1.2 以降なので、後ろに置くと v1.0 に間に合わない
+- サーバー: `_shared/snapshot.ts` の `PairSnapshot` に `dateLocal`(組み立てに使った「今日」)を追加。`buildPairSnapshot` は `todayLocal` をそのまま、`buildSoloSnapshot` は入力に `todayLocal` を足して載せる(`loadSnapshotForUser` が解決済みの「今日」を渡す)。既存のキーは変えない(schemaVersion は 1 のまま)
+- クライアント: `PairSnapshot.dateLocal`(省略可 `String?`。デコードで "YYYY-MM-DD" だけ通し、崩れた値は nil)。`snapshotDay(calendar:)` / `daysSinceSnapshotDay(now:calendar:)` を足し、`reflectsToday` と `completionOnItsOwnDay` と `StreakRiskPlan.target` が**完了の日**を `dateLocal` で決める。キーが無い古いサーバーの snapshot だけ従来の時刻判定(1:00 まで不明)に落ちる
+- 効果: 0:00〜1:00 に自分でチェックインした人の、その日のリマインドがその場で取り消される(`staleIDsForToday`)。前の日の日付で組み立てられた snapshot(キューで 0:07 に届いた 23:58 のチェックイン)は、今日の完了として読まない
+- 契約: `contracts/*.json` を再生成(15 ファイルに `dateLocal` の1行だけ。`--check` 一致)。`contracts/README.md` に経緯を追記
+- 検証: deno `397 passed`(新規4)/ contracts `--check` 22 件一致 + tools 3 passed / e2e unit 65 passed / ops 77 passed / iOS `check.sh test` = **84 classes・1085 tests 0 failed** / `check.sh views` 112 ファイル OK / `check.sh widget` 18 ファイル OK
+- **main が赤かった(2件。この PR で直した/報告する)**: ①`HomeViewModel.presentShareImage()` と `HomeView` の `if viewModel.canShareRecord {` の閉じ括弧が #85(T22)で落ちており、**main は iOS ビルドが通らない**(lien-ios の main の run が failure。`HomeView.swift:513/526/609`・`HomeViewModel.swift:282/389/399/410`)。→ この PR で括弧2つを戻した(挙動の変更なし)。②`StringsReviewTests` が 44 件赤 — #83(T18 履歴)と #85(T22 シェア)が `docs/STRINGS-REVIEW.md` を更新していない(43 単位が未記載)。→ 同じ判定基準で追記レビューし、§7.20〜§7.22 と集計(297 → 340 件)を追加した(文言は変えていない)
+- 残: レビュー(eng-review)。デプロイは関数を一括で(DESIGN §3.4 の互換性。アプリの解釈より先にサーバーを出さない — 順序はどちらでも壊れないが、まとめて出す)
+- 結果: PR を作成(マージしない)
+
 ## 2026-10-20 14:20 (ux-exec) — MK3 #76 公開前ティザーページと法務ページの生成・配備の仕組み
 - 着手: origin/main(fdf1ef5)から `consilium/76-mk3-github-pages`。まず Issue 本文と関連(#79・#80・#42・TASKPLAN §9.2)・`SupportLinks.swift`・`marketing/store_metadata/ja` を確認
 - 前提の確認: **Issue 本文が「配備先の repo と URL は eng-lead が決め、この Issue に書く」としているが、#76 にそのコメントが無い**。一方でアプリの `SupportLinks.webBaseURL` は `https://ryoki63.github.io/Challenge`、法務は `.../lien/legal/{terms,privacy}.html` を指しており(DESIGN §7・web/invite のコメントも同じ)、配信パスは実装側で既に一意。この土台に合わせて作り、URL の正式決定と初回の Pages 有効化(Settings > Pages > Source = GitHub Actions)は人間に残した

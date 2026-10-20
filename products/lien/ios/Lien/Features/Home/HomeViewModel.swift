@@ -218,6 +218,8 @@ final class HomeViewModel {
     /// ホームの「シェア画像をつくる」
     func presentShareImage() {
         shareImage?.presentManual()
+    }
+
     /// ホームのチケット残数バッジに出す値(nil = バッジを出さない — T19a #19 / DESIGN §3.4)。
     /// **0 はそのまま 0 を返してバッジを出す**(0枚でも罰なし — REQUIREMENTS §3.5)。
     /// ソロ(ペア共有の在庫を持たない)・キーが無い古い snapshot・null・負の値(契約は 0 以上)は nil
