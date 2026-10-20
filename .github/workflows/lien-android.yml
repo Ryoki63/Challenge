@@ -2,6 +2,7 @@ name: lien-android
 
 on:
   push:
+    branches: [main]
     paths:
       - "products/lien/android/**"
       - ".github/workflows/lien-android.yml"

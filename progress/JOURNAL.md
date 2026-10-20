@@ -607,3 +607,5 @@
 - 00:54 並列作業: Android雛形/専用CIの限定workerを1名起動。親は設計/Issue分解を担当（書込範囲非重複）。新規SDK契約への同意は行わず、必要なら既設SDKを持つCIでビルドを検証する。既存mainの直近lien-ci=39427686022、lien-ios=39424980235はsuccess（別SHAなので今回の変更の検証とは区別）。
 - 01:02 タスク契約: T-AND-1〜11 を #134〜#144 として起票し、依存・受入条件・変更許可範囲・ロールバック・人日を本文に記載。共有サーバーを変える #138/#139 に difficulty:high を付け、iOS優先とcritical_reviewを明記。BACKLOGに実Issueリンクを追記した。#121のassigneeは自分に設定済み。
 - 01:02 検査: contracts/tools/generate.ts --check は22 fixture一致、contracts/tools の Deno test は3件PASS。Android workflowの公式Actions固定SHAは各リリースtagと一致した。Androidのコンパイル・test・lintはまだ結果未確定。設計/雛形/CIを1名の独立レビュワーが確認中。
+- 01:07 提出途中: コード31a17bcを指定ブランチへpushしdraft PR #145を作成。独立レビュー1回はP1/P2ブロッカーなし。lien-ci #39454196823は全6ジョブ成功。Android CI #39454196872はassembleDebugとJUnit3件が成功、lintで失敗（成功扱いしない）。
+- 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。

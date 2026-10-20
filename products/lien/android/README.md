@@ -10,16 +10,16 @@ Kotlin + Jetpack Compose の最小 Android 足場です。日本語の静的な 
 | 項目 | バージョン |
 | --- | --- |
 | JDK | Eclipse Temurin 17.0.18+8 |
-| Gradle / wrapper | 8.13 |
+| Gradle / wrapper source | 8.14.6 / 8.13.0 |
 | Android Gradle Plugin | 8.11.1 |
 | Kotlin / Compose compiler plugin | 2.2.20 |
-| Compose BOM | 2025.09.01 |
-| Activity Compose | 1.11.0 |
+| Compose BOM | 2026.09.00 |
+| Activity Compose | 1.13.0 |
 | JUnit | 4.13.2 |
 | compileSdk / targetSdk / minSdk | 36 / 36 / 26 |
 | Android SDK Build Tools | 35.0.0 |
 
-AGP 8.11.1 は Kotlin 2.2.20 の公式な互換範囲内であり、API 36・Gradle 8.13・
+AGP 8.11.1 は Kotlin 2.2.20 の公式な互換範囲内であり、API 36・Gradle 8.14.6・
 JDK 17 に対応します。BOM 管理の Compose ライブラリは BOM の固定バージョンで解決し、
 動的バージョンや `+` は使いません。
 
@@ -56,6 +56,7 @@ Windows の場合は `gradlew.bat` を使用し、同じ環境変数を設定し
 Gradle・Maven の公開依存関係の初回取得にはネット接続が必要です。
 秘密情報、アカウント、`.env`、公開・本番用資格情報は不要です。
 通常の Android debug キーだけが隔離した Android user home に生成されます。
+アプリの cloud backup / device transfer は旧・新両形式の除外ルールで無効化しています。
 リリース署名・配信・ストア提出は設定していません。
 
 ## 検証と出力
@@ -75,7 +76,8 @@ JUnit は文字列モデルだけを検証し、画面の描画・日本語フ�
 ## CI
 
 `.github/workflows/lien-android.yml` は Android ディレクトリと同 workflow の変更だけで
-push / pull request 時に起動し、手動起動にも対応します。ubuntu-24.04、commit SHA 固定の
+main push / pull request 時に起動し、手動起動にも対応します。feature push と PR の
+二重ビルドを避けています。ubuntu-24.04、commit SHA 固定の
 公式 GitHub Actions、JDK 17 を使い、上記の3タスクを実行します。
 runner の既載 SDK / 既存ライセンスだけを `.local/sdk` にコピーし、SDK や承認済み
 ライセンスが無ければ受諾せずに失敗します。`sdkmanager --licenses` は実行しません。
@@ -89,21 +91,23 @@ APK と test / lint レポートを artifact として7日間保存します。
 JAR は公式 checksum と照合済みで、CI でも同じハッシュを照合します。
 
 ```text
-Gradle 8.13 bin ZIP SHA-256:
-20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78
+Gradle 8.14.6 bin ZIP SHA-256:
+7988ed071b2a07900e2ec715fca15c6ab72bce6db433af301fa7fa7e9407bd24
 
 Gradle 8.13 wrapper JAR SHA-256:
 81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f
 ```
 
 配布 ZIP は wrapper の `distributionSha256Sum` でも検証されます。
+wrapper のブートストラップは 8.13.0 の公式ファイルを維持し、起動する Gradle 配布版を
+8.14.6 に固定しています。両者のバージョンは同一である必要はありません。
 
 ## 公式資料
 
 - AGP 8.11 / 8.11.1: <https://developer.android.com/build/releases/agp-8-11-0-release-notes>
 - Kotlin / AGP / Gradle 互換表: <https://kotlinlang.org/docs/gradle-configure-project.html>
 - Compose BOM: <https://developer.android.com/develop/ui/compose/bom>
-- BOM 2025.09.01 の正本: <https://dl.google.com/dl/android/maven2/androidx/compose/compose-bom/2025.09.01/compose-bom-2025.09.01.pom>
+- BOM 2026.09.00 の正本: <https://dl.google.com/dl/android/maven2/androidx/compose/compose-bom/2026.09.00/compose-bom-2026.09.00.pom>
 - Gradle checksums: <https://gradle.org/release-checksums/>
 - Wrapper ソース: <https://github.com/gradle/gradle/tree/v8.13.0/gradle/wrapper>
 - Ubuntu runner SDK 一覧: <https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md>
