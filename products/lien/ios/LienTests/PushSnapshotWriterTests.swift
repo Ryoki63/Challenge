@@ -107,6 +107,23 @@ final class PushSnapshotWriterTests: XCTestCase {
         XCTAssertEqual(temp.store.loadSnapshot(), changed)
     }
 
+    func testPushCannotApplyWhilePersistedSessionCleanupIsPending() throws {
+        let temp = TempStore()
+        defer { temp.cleanup() }
+        let snapshot = SnapshotFactory.paired()
+        try temp.store.saveSnapshot(snapshot)
+        try temp.store.beginSessionCleanup()
+        var incoming = snapshot
+        incoming.updatedAt = snapshot.updatedAt.addingTimeInterval(5)
+        let writer = PushSnapshotWriter(store: temp.store, reloadWidgets: { XCTFail("消去待ちはreloadしない") })
+        XCTAssertNil(try writer.receive(payload(incoming)))
+        XCTAssertEqual(temp.store.loadSnapshot(), snapshot)
+        try temp.store.eraseAll()
+        XCTAssertTrue(temp.store.sessionCleanupIsPending())
+        try temp.store.finishSessionCleanup()
+        XCTAssertFalse(temp.store.sessionCleanupIsPending())
+    }
+
     func testPushCannotRestoreErasedAccountOrInitializeMissingSession() throws {
         let temp = TempStore()
         defer { temp.cleanup() }
@@ -115,7 +132,7 @@ final class PushSnapshotWriterTests: XCTestCase {
         let snapshot = SnapshotFactory.paired()
         XCTAssertNil(try writer.receive(payload(snapshot)))
         try temp.store.saveSnapshot(snapshot)
-        temp.store.eraseAll()
+        try temp.store.eraseAll()
         var delayed = snapshot
         delayed.updatedAt = delayed.updatedAt.addingTimeInterval(5)
         XCTAssertNil(try writer.receive(payload(delayed)))

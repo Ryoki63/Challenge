@@ -122,7 +122,7 @@ final class AppGroupStoreTests: XCTestCase {
         try store.savePendingOps([PendingOp.checkin(dateLocal: "2026-06-11", photoPath: nil)])
         try Data("jpeg".utf8).write(to: store.photoThumbFileURL)
 
-        store.eraseAll()
+        try store.eraseAll()
 
         XCTAssertNil(store.loadSnapshot())
         XCTAssertNil(store.loadPendingOps([PendingOp].self))
@@ -131,16 +131,27 @@ final class AppGroupStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.photoThumbFileURL.path))
     }
 
-    func testEraseAllSucceedsWhenThereIsNothingToErase() {
+    func testEraseAllSucceedsWhenThereIsNothingToErase() throws {
         // コンテナが無い・ファイルが無くても落ちない(オンボのまま呼ばれても安全)
-        store.eraseAll()
-        store.eraseAll()
+        try store.eraseAll()
+        try store.eraseAll()
+        XCTAssertNil(store.loadSnapshot())
+    }
+
+    func testEraseAllPropagatesCoordinationFailure() throws {
+        try Data("not a container".utf8).write(to: tempDir)
+        XCTAssertThrowsError(try store.eraseAll())
+        XCTAssertEqual(try Data(contentsOf: tempDir), Data("not a container".utf8))
+
+        try FileManager.default.removeItem(at: tempDir)
+        try store.saveSnapshot(makeSnapshot())
+        XCTAssertNoThrow(try store.eraseAll())
         XCTAssertNil(store.loadSnapshot())
     }
 
     func testStoreIsUsableAfterErasing() throws {
         try store.saveSnapshot(makeSnapshot(streak: 5))
-        store.eraseAll()
+        try store.eraseAll()
         try store.saveSnapshot(makeSnapshot(streak: 9))
         XCTAssertEqual(store.loadSnapshot()?.streakCurrent, 9, "消したあとも、次のアカウントの記録を書ける")
     }
@@ -168,7 +179,7 @@ final class AppGroupStoreTests: XCTestCase {
     func testAReadableSnapshotIsNotUnreadable() throws {
         try store.saveSnapshot(makeSnapshot())
         XCTAssertFalse(store.snapshotIsPresentButUnreadable())
-        store.eraseAll()
+        try store.eraseAll()
         XCTAssertFalse(store.snapshotIsPresentButUnreadable(), "消したあとは「無い」")
     }
 

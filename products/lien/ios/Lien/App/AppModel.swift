@@ -86,6 +86,7 @@ final class AppModel {
     private var sessionMonitor = SessionHealthMonitor()
     /// 端末の記録を消してサインアウトしている最中(同期と二重の後始末を止める)
     private var isEndingSession = false
+    private var localCleanupPending = false
     /// セッションが消えたように見えたときの、読み直しの回数と間隔(Keychain の読み出しが一瞬失敗しただけで記録を消さない)
     private let sessionRecheck: (count: Int, interval: TimeInterval)
     /// セッションが消えたかの確認の最中か(重複して走らせない)
@@ -113,6 +114,9 @@ final class AppModel {
         self.sessionRecheck = sessionRecheck
         let pendingOps = services.pendingOps
         let gate = SyncGate()
+        let cleanupPending = services.store?.sessionCleanupIsPending() ?? false
+        self.localCleanupPending = cleanupPending
+        gate.isOpen = !cleanupPending
         self.syncGate = gate
         self.synchronizer = SnapshotSynchronizer(
             client: services.snapshotClient,
@@ -132,6 +136,10 @@ final class AppModel {
     /// アプリ起動時(RootView の .task)。既存セッションの復元で保留中だった APNs 登録を送り、
     /// セッションがあればサーバーと同期する
     func start() async {
+        if localCleanupPending {
+            await endSession(unregisterPush: false)
+            return
+        }
         Task { await services.pushTokenSync.sessionDidChange() }
         // 端末にある snapshot で、ローカル通知の予約を先に合わせる(サーバーとの同期を待たない。サインアウトの途中で
         // 終了して予約が残っていたときも、ここで片づく)
@@ -147,6 +155,10 @@ final class AppModel {
 
     /// フォアグラウンド復帰時(DESIGN §4: アプリ本体は復帰時に必ず GET /snapshot で自己修復する)
     func sceneDidBecomeActive() async {
+        if localCleanupPending {
+            await endSession(unregisterPush: false)
+            return
+        }
         Task { await services.pushTokenSync.flush() }
         if phase == .onboarding {
             // 起動時にセッションが読めずオンボのまま立ち上がった端末が、アンロック後に前面へ来た場合の回復
@@ -166,6 +178,10 @@ final class AppModel {
     /// 可視 push は NSE が snapshot を書くが、アプリ本体の表示・phase 更新はここで追従する。
     /// サイレント push(取消・約束変更・ペア更新)はこの同期が主経路になる
     func remoteNotificationReceived() async {
+        if localCleanupPending {
+            await endSession(unregisterPush: false)
+            return
+        }
         if phase == .onboarding {
             // バックグラウンド起動のプロセスが、アンロック後に受けた push でセッションの復元に気づく場合
             guard restoreSessionIfAvailable() else { return }
@@ -240,7 +256,7 @@ final class AppModel {
     /// 同時に1本だけ。走行中に呼ばれたら、終わった直後に1回だけ取り直す
     func refresh() async {
         // 端末の記録を消している最中は同期しない(古いアカウントの snapshot を書き戻さない)
-        guard !isEndingSession else { return }
+        guard !isEndingSession, !localCleanupPending else { return }
         guard !isRefreshing else {
             rerunRequested = true
             return
@@ -432,13 +448,13 @@ extension AppModel: AccountOperating {
             try await client.deleteAccount()
         } catch {
             if await accountIsAlreadyGone(after: error) {
-                await endSession(unregisterPush: false)
+                guard await endSession(unregisterPush: false) else { throw CocoaError(.fileWriteUnknown) }
                 return
             }
             Task { await refresh() }
             throw error
         }
-        await endSession(unregisterPush: false)
+        guard await endSession(unregisterPush: false) else { throw CocoaError(.fileWriteUnknown) }
     }
 
     /// 削除の失敗が、実は「すでにアカウントが無い」ことの現れか。認証サーバーが確かに「ユーザー/セッションが居ない」と答えたときだけ true
@@ -473,8 +489,9 @@ extension AppModel: AccountOperating {
     /// 端末の後始末(アカウントの削除・サインアウト・セッション無効のあと):
     /// 走っている同期の完了を待ち → push の登録を外し(または端末の記録だけ捨て)→ サインアウト →
     /// App Group の記録(snapshot・未送信キュー・相手の写真のサムネ)を消す → ウィジェットを更新 → オンボーディングへ
-    private func endSession(unregisterPush: Bool) async {
-        guard !isEndingSession else { return }
+    @discardableResult
+    private func endSession(unregisterPush: Bool) async -> Bool {
+        guard !isEndingSession else { return false }
         isEndingSession = true
         syncGate.isOpen = false // 走っている同期の結果は、書かずに捨てる
         rerunRequested = false
@@ -489,15 +506,31 @@ extension AppModel: AccountOperating {
         } else {
             await services.pushTokenSync.forgetLocalRecord()
         }
-        await services.auth.signOut()
         services.pendingOps?.invalidate() // 送信の最中だった再送が、消したあとにキューを書き戻さない
-        services.store?.eraseAll()
+        do {
+            try services.store?.beginSessionCleanup()
+            try services.store?.eraseAll()
+        } catch {
+            localCleanupPending = true
+            isEndingSession = false
+            return false
+        }
+        await services.auth.signOut()
         // 植物の体験の記録(段階アップの演出を見せた段階・最後のチェックイン日など)も、前のアカウントのものを持ち越さない(PB #57)
         services.plantMemory?.reset()
         // シェア画像の「もう出したか」の記録と、自分のニックネームの控えも持ち越さない(T22)
         shareImage.reset()
         // ローカル通知の設定を消し、予約も配信済みも残さない(前のアカウントの約束のリマインドが、サインアウト後に鳴らないように — issue #16)
         await services.reminders?.reset()
+
+        do {
+            try services.store?.finishSessionCleanup()
+        } catch {
+            localCleanupPending = true
+            isEndingSession = false
+            return false
+        }
+        localCleanupPending = false
 
         sessionMonitor.reset()
         sessionLost = false
@@ -511,5 +544,6 @@ extension AppModel: AccountOperating {
 
         syncGate.isOpen = true
         isEndingSession = false
+        return true
     }
 }

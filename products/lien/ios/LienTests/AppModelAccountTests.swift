@@ -271,6 +271,28 @@ final class AppModelAccountTests: XCTestCase {
 
     // MARK: アカウントの削除
 
+    func testDeleteAccountDoesNotReportSuccessWhenLocalCleanupFails() async throws {
+        let harness = try await makeHarness()
+        defer { harness.temp.cleanup() }
+        try FileManager.default.removeItem(at: harness.temp.directory)
+        try Data("unavailable".utf8).write(to: harness.temp.directory)
+
+        do {
+            try await harness.model.deleteAccount()
+            XCTFail("後始末の失敗を削除完了として返さない")
+        } catch {
+            XCTAssertEqual((error as? CocoaError)?.code, .fileWriteUnknown)
+        }
+        XCTAssertNotNil(harness.auth.currentUserID)
+        XCTAssertEqual(harness.account.deleteCount, 1)
+
+        try FileManager.default.removeItem(at: harness.temp.directory)
+        await harness.model.remoteNotificationReceived()
+        XCTAssertNil(harness.auth.currentUserID)
+        assertLocalDataIsErased(harness)
+        XCTAssertEqual(harness.account.deleteCount, 1, "後始末だけを再試行する")
+    }
+
     func testDeleteAccountErasesTheDeviceAndReturnsToOnboarding() async throws {
         let h = try await makeHarness()
         defer { h.temp.cleanup() }
@@ -440,6 +462,42 @@ final class AppModelAccountTests: XCTestCase {
         assertLocalDataIsErased(h)
         XCTAssertEqual(h.model.phase, .onboarding)
         XCTAssertEqual(h.account.deleteCount, 0, "サインアウトはアカウントを消さない")
+    }
+
+    func testSignOutKeepsSessionUntilCoordinatedCleanupCanRetry() async throws {
+        let harness = try await makeHarness()
+        defer { harness.temp.cleanup() }
+        try FileManager.default.removeItem(at: harness.temp.directory)
+        try Data("unavailable".utf8).write(to: harness.temp.directory)
+
+        await harness.model.signOut()
+        XCTAssertNotNil(harness.auth.currentUserID)
+        XCTAssertEqual(harness.model.phase, .paired)
+        let fetchCount = harness.sync.callCount
+        await harness.model.refresh()
+        XCTAssertEqual(harness.sync.callCount, fetchCount)
+
+        try FileManager.default.removeItem(at: harness.temp.directory)
+        await harness.model.sceneDidBecomeActive()
+        XCTAssertNil(harness.auth.currentUserID)
+        XCTAssertEqual(harness.model.phase, .onboarding)
+        assertLocalDataIsErased(harness)
+    }
+
+    func testNewModelResumesPersistedCleanupBeforeFetchingSnapshot() async throws {
+        let harness = try await makeHarness()
+        defer { harness.temp.cleanup() }
+        try harness.store.beginSessionCleanup()
+        let restarted = AppModel(services: harness.model.services)
+        let fetchCount = harness.sync.callCount
+        await restarted.refresh()
+        XCTAssertEqual(harness.sync.callCount, fetchCount)
+        await restarted.start()
+        XCTAssertNil(harness.auth.currentUserID)
+        XCTAssertNil(harness.store.loadSnapshot())
+        XCTAssertFalse(harness.store.sessionCleanupIsPending())
+        XCTAssertEqual(restarted.phase, .onboarding)
+        XCTAssertEqual(harness.sync.callCount, fetchCount)
     }
 
     func testSignOutStillCompletesWhenStoppingPushFails() async throws {

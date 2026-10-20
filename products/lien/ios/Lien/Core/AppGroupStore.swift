@@ -26,6 +26,7 @@ struct AppGroupStore {
     static let photoThumbFileName = "photo_thumb.jpg"
     static let notificationPrefsFileName = "notification_prefs.json"
     static let snapshotSyncFileName = "snapshot_sync.json"
+    static let sessionCleanupFileName = "session_cleanup.json"
 
     /// App Group ID を Info.plist から引くキー。
     /// 実体は Config/Base.xcconfig の LIEN_APP_GROUP_ID(project.yml が全ターゲットの Info.plist に埋め込む)
@@ -98,6 +99,7 @@ struct AppGroupStore {
 
     func applyPushSnapshot(_ snapshot: PairSnapshot) throws -> (snapshot: PairSnapshot?, changed: Bool) {
         try coordinateSnapshotWrite {
+            guard !sessionCleanupIsPending() else { return (nil, false) }
             guard let previous = loadSnapshot() else { return (nil, false) }
             if FileManager.default.fileExists(atPath: pendingOpsFileURL.path) {
                 guard let data = try? Data(contentsOf: pendingOpsFileURL),
@@ -198,17 +200,35 @@ struct AppGroupStore {
 
     /// 端末に置いた記録をすべて消す(snapshot・未送信キュー・相手の写真のサムネ・ローカル通知の設定)。
     /// ウィジェットは次の reload で空の表示になる(呼び出し側が reload する)。ファイルが無くても成功する
-    func eraseAll(fileManager: FileManager = .default) {
-        let eraseFiles = {
-            for url in [snapshotFileURL, pendingOpsFileURL, photoThumbFileURL, notificationPrefsFileURL,
-                        containerURL.appendingPathComponent(Self.snapshotSyncFileName)] {
-                try? fileManager.removeItem(at: url) // 無いファイルの削除エラーは無視する
+    func sessionCleanupIsPending() -> Bool {
+        FileManager.default.fileExists(atPath: containerURL.appendingPathComponent(Self.sessionCleanupFileName).path)
+    }
+
+    func beginSessionCleanup() throws {
+        try coordinateSnapshotWrite {
+            try writeAtomically(Data("{}".utf8), to: containerURL.appendingPathComponent(Self.sessionCleanupFileName))
+        }
+    }
+
+    func finishSessionCleanup() throws {
+        try coordinateSnapshotWrite {
+            let marker = containerURL.appendingPathComponent(Self.sessionCleanupFileName)
+            if FileManager.default.fileExists(atPath: marker.path) {
+                try FileManager.default.removeItem(at: marker)
             }
         }
-        do {
-            try coordinateSnapshotWrite(eraseFiles)
-        } catch {
-            eraseFiles()
+    }
+
+    func eraseAll(fileManager: FileManager = .default) throws {
+        try coordinateSnapshotWrite {
+            for url in [snapshotFileURL, pendingOpsFileURL, photoThumbFileURL, notificationPrefsFileURL,
+                        containerURL.appendingPathComponent(Self.snapshotSyncFileName)] {
+                do {
+                    try fileManager.removeItem(at: url)
+                } catch let error as CocoaError where error.code == .fileNoSuchFile {
+                    continue
+                }
+            }
         }
     }
 

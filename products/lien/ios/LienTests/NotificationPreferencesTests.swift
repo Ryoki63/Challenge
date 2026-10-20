@@ -119,7 +119,7 @@ final class NotificationPreferencesTests: XCTestCase {
         let store = AppGroupNotificationPreferencesStore(store: temp.store)
         store.save(NotificationPreferences(reminder: .daily(hour: 8, minute: 0), streakRiskEnabled: false))
 
-        temp.store.eraseAll()
+        try temp.store.eraseAll()
 
         XCTAssertNil(temp.store.loadSnapshot())
         XCTAssertEqual(store.load(), NotificationPreferences())

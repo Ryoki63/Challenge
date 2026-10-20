@@ -151,7 +151,7 @@ final class SnapshotRecoveryTests: XCTestCase {
         XCTAssertEqual(outcome, .applied(client.snapshot))
         XCTAssertEqual(client.requests.count, 2)
         XCTAssertEqual(reloads.value, 1)
-        temp.store.eraseAll()
+        try temp.store.eraseAll()
         XCTAssertNil(SnapshotCheckpoint.load(from: temp.store))
     }
 
