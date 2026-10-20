@@ -12,7 +12,9 @@ enum RevenueCatConfig {
     static func apiKey(bundle: Bundle = .main) -> String? {
         guard
             let value = bundle.object(forInfoDictionaryKey: apiKeyInfoPlistKey) as? String,
-            !Config.isUnset(value)
+            !Config.isUnset(value),
+            // Secrets.example.xcconfig をコピーしただけで実値を入れていない状態を Live にしない
+            !value.contains("YOUR_REVENUECAT_PUBLIC_SDK_KEY")
         else { return nil }
         return value
     }
