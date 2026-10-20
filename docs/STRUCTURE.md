@@ -94,6 +94,7 @@ Lien のドキュメント群。**矛盾したら REQUIREMENTS → DESIGN → CO
 | `KPI.md` | KPI の SQL(D6: 分析 SDK を入れず DB から出す)。両者継続・ペア成立率・つつき→チェックイン率・名前付け率・段階到達率。毎週金曜の `/status` で手元から実行する(読み取りのみ。テストデータは OPS.md §8 の台帳で除外) |
 | `REVIEW-2026-10-12.md` | 4か月の中断から再開した時点の、残タスクの洗い出しと方針レビュー。決定パッケージ D1〜D6(§1)・日程(§3)・進捗(§7) |
 | `E2E-M1.md` | M1(ペア成立→約束→チェックイン→ストリーク→つつく→通知)の実機 E2E チェックリストとランブック(T20) |
+| `android/PLAN-ANDROID.md` | Android 版の全体計画(Issue #119)。逆算日程・テスター 12 人×14 日の比較・コスト・リスク。`android/DEPENDENCIES-ANDROID.md` は #119〜#127 の依存関係 1 枚、`android/decisions/` は判断カード |
 | `STRUCTURE.md` | 本書。リポジトリ構成ガイド |
 
 ### marketing/ — 獲得計画・投稿・計測
