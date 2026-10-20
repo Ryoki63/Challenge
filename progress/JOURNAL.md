@@ -797,3 +797,8 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 02:26 — #139 T-AND-6 UUID push / FCM / APNs (eng-exec)
+- 着手: 指定worktree / consilium/139-t-and-6-android-uuid-fcm-apns / origin=Ryoki63/Challengeを確認。開始時のtracked/untracked差分なし。git pull --rebaseはAlready up to date、HEADは7991bc55088b9ccff9b335410a88f726910f8b04。対象ブランチの既存PRなし、Issue #139のassigneeは未設定。実装前の依存ゲート確認のみ行う。
+- 依存ゲート: gh issue view 138でOPEN・closedAt=null・status:in-progressを確認。最新コメントは2026-10-21 02:23 JSTのeng-exec着手記録。#138を参照するPR検索の結果は親設計のPR #145のみで、#138自体の完了・マージは確認できない。契約の「完了・マージ確認後のみ着手」を満たさないため、push adapter・配送10経路・テスト・設計書は変更しない。
+- 結果: 依存未成立でBLOCKED。Issue #139へマーカー付き停止理由を投稿（issuecomment-6296935757）。全要件の実装は未着手、関連テスト・deno check・契約生成検査・lien-ci/lien-ios・独立レビュー/critical_reviewは未実施（実装前ゲートで停止）。監査ログのみのため型/lint/buildは対象外、git diff --checkとJOURNAL追記限定を提出前に検査する。実装PR・DONE追記・Issue close・本番操作は行わない。再開条件は#138完了および対応PRのmainマージ確認。
