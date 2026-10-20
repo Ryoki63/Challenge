@@ -39,6 +39,18 @@ enum SnapshotClientError: Error, Equatable {
 protocol SnapshotClient: AnyObject {
     /// GET /snapshot — 自分視点の最新 PairSnapshot
     func fetchSnapshot() async throws -> PairSnapshot
+    func fetchChanges(etag: String?) async throws -> SnapshotChanges
+}
+
+enum SnapshotChanges {
+    case snapshot(PairSnapshot, etag: String?)
+    case unchanged(confirmedAt: Date)
+}
+
+extension SnapshotClient {
+    func fetchChanges(etag: String?) async throws -> SnapshotChanges {
+        .snapshot(try await fetchSnapshot(), etag: nil)
+    }
 }
 
 // MARK: - live 実装(URLSession。supabase-swift 非依存)
@@ -63,24 +75,41 @@ final class EdgeFunctionSnapshotClient: SnapshotClient {
     }
 
     func fetchSnapshot() async throws -> PairSnapshot {
+        guard case .snapshot(let snapshot, _) = try await fetchChanges(etag: nil) else {
+            throw SnapshotClientError.server(code: "invalid_response")
+        }
+        return snapshot
+    }
+
+    func fetchChanges(etag: String?) async throws -> SnapshotChanges {
         var request = try await transport.functionRequest("snapshot", method: "GET")
         request.timeoutInterval = Self.requestTimeout
-        let result: (data: Data, status: Int)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue(etag, forHTTPHeaderField: "If-None-Match")
+        let result: (data: Data, response: HTTPURLResponse)
         do {
-            result = try await transport.send(request)
+            result = try await transport.sendResponse(request)
         } catch {
             throw SnapshotClientError.network
         }
-        guard result.status == 200 else {
+        if result.response.statusCode == 304, etag != nil {
+            guard let header = result.response.value(forHTTPHeaderField: "X-Lien-Snapshot-Confirmed-At"),
+                  let milliseconds = Double(header), milliseconds.isFinite else {
+                throw SnapshotClientError.server(code: "invalid_response")
+            }
+            return .unchanged(confirmedAt: Date(timeIntervalSince1970: milliseconds / 1000))
+        }
+        guard result.response.statusCode == 200 else {
             if let code = EdgeFunctionTransport.errorCode(in: result.data) {
                 throw SnapshotClientError(serverCode: code)
             }
-            throw SnapshotClientError.server(code: "http_\(result.status)")
+            throw SnapshotClientError.server(code: "http_\(result.response.statusCode)")
         }
         do {
-            return try PairSnapshot.makeJSONDecoder()
+            let snapshot = try PairSnapshot.makeJSONDecoder()
                 .decode(SnapshotResponse.self, from: result.data)
                 .snapshot
+            return .snapshot(snapshot, etag: result.response.value(forHTTPHeaderField: "ETag"))
         } catch {
             throw SnapshotClientError.server(code: "invalid_response")
         }

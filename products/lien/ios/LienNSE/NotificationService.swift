@@ -25,7 +25,7 @@
 import UserNotifications
 import WidgetKit
 
-/// 通知を出す(contentHandler を呼ぶ)のは deliveryLock で 1 回に絞る。そのほかの状態は didReceive で一度だけ書き、
+/// 通知を出す(contentHandler を呼ぶ)のは deliveryGate で 1 回に絞る。そのほかの状態は didReceive で一度だけ書き、
 /// 以降は読むだけなので、別のスレッド(ローカル通知の合わせ込みの完了・時間切れ)から deliver を呼んでよい
 final class NotificationService: UNNotificationServiceExtension, @unchecked Sendable {
     private var contentHandler: ((UNNotificationContent) -> Void)?
@@ -33,8 +33,7 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
     private var originalContent: UNNotificationContent?
 
     /// 通知を出す(contentHandler を呼ぶ)のは 1 回だけ。ローカル通知の合わせ込みの完了待ちと時間切れが重なっても、二重に呼ばない
-    private let deliveryLock = NSLock()
-    private var hasDelivered = false
+    private let deliveryGate = NotificationDeliveryGate()
 
     /// ローカル通知の合わせ込みを待つ最長の時間(秒)。通常は数十ミリ秒。通知センターの応答が遅いときも、
     /// 相手の通知をこれ以上遅らせない(30 秒の期限まで待たない)
@@ -67,31 +66,20 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
     }
 
     private func deliver() {
-        deliveryLock.lock()
-        let handler = hasDelivered ? nil : contentHandler
-        hasDelivered = true
-        deliveryLock.unlock()
-        guard let handler, let content = bestAttemptContent ?? originalContent else { return }
+        guard deliveryGate.claim(), let handler = contentHandler,
+              let content = bestAttemptContent ?? originalContent else { return }
         handler(content)
     }
 
     /// userInfo["lien"]["snapshot"] を検証付きで App Group へ書き、ウィジェットを reload する。
     /// 書けた snapshot を返す(欠落・検証失敗は nil)。失敗しても通知表示を優先して握りつぶす(自己修復前提 — DESIGN §4)
     private func updateSharedSnapshot(from userInfo: [AnyHashable: Any]) -> PairSnapshot? {
-        guard
-            let lien = userInfo["lien"] as? [String: Any],
-            let snapshotObject = lien["snapshot"],
-            JSONSerialization.isValidJSONObject(snapshotObject),
-            let data = try? JSONSerialization.data(withJSONObject: snapshotObject),
-            let store = AppGroupStore.standard()
-        else { return nil }
+        guard let store = AppGroupStore.standard() else { return nil }
 
         do {
-            // saveSnapshotData はデコード検証付き: 壊れたペイロードで正常な snapshot を潰さない
-            let snapshot = try store.saveSnapshotData(data)
-            // reload のトリガーは NSE とアプリ本体のみ(WidgetKit の reload 予算 — DESIGN §3.5)
-            WidgetCenter.shared.reloadAllTimelines()
-            return snapshot
+            return try PushSnapshotWriter(store: store, reloadWidgets: {
+                WidgetCenter.shared.reloadAllTimelines()
+            }).receive(userInfo)
         } catch {
             // 書き込み・検証失敗時も通知は表示する(上の呼び出し側が deliver する)
             return nil

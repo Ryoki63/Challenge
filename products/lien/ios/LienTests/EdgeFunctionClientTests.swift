@@ -160,6 +160,51 @@ final class EdgeFunctionSnapshotClientTests: XCTestCase {
         EdgeFunctionSnapshotClient(baseURL: baseURL, tokenProvider: tokenProvider, session: makeSession())
     }
 
+    func testChangedSnapshotReturnsServerETagForNextSync() async throws {
+        let client = makeClient()
+        StubURLProtocol.responseHeaders = ["ETag": "W/\"revision-2\""]
+        reply(200, #"{"snapshot":\#(snapshotJSON)}"#)
+        let result = try await client.fetchChanges(etag: "W/\"revision-1\"")
+        guard case .snapshot(let snapshot, let etag) = result else { return XCTFail("変更は200のsnapshot") }
+        XCTAssertEqual(snapshot.myPromiseTitle, "筋トレ")
+        XCTAssertEqual(etag, "W/\"revision-2\"")
+        XCTAssertEqual(StubURLProtocol.captured.first?.header("If-None-Match"), "W/\"revision-1\"")
+    }
+
+    func testConditionalFetchSendsCheckpointAndAccepts304() async throws {
+        let client = makeClient()
+        StubURLProtocol.responseHeaders = ["X-Lien-Snapshot-Confirmed-At": "10000"]
+        reply(304, "")
+        let result = try await client.fetchChanges(etag: "revision-1")
+        guard case .unchanged(let confirmedAt) = result else { return XCTFail("304 は変更なし") }
+        XCTAssertEqual(confirmedAt, Date(timeIntervalSince1970: 10))
+        let request = try XCTUnwrap(StubURLProtocol.captured.first)
+        XCTAssertEqual(request.header("If-None-Match"), "revision-1")
+        XCTAssertEqual(request.request.cachePolicy, .reloadIgnoringLocalCacheData)
+    }
+
+    func test304WithoutCheckpointIsRejected() async throws {
+        let client = makeClient()
+        reply(304, "")
+        do {
+            _ = try await client.fetchSnapshot()
+            XCTFail("初回取得の304で成功してしまった")
+        } catch {
+            XCTAssertEqual(error as? SnapshotClientError, .server(code: "http_304"))
+        }
+    }
+
+    func test304WithoutServerConfirmationTimeIsRejected() async throws {
+        let client = makeClient()
+        reply(304, "")
+        do {
+            _ = try await client.fetchChanges(etag: "revision-1")
+            XCTFail("確認時刻のない304は順序を保証できない")
+        } catch {
+            XCTAssertEqual(error as? SnapshotClientError, .server(code: "invalid_response"))
+        }
+    }
+
     func testFetchSnapshotRequestAndEnvelopeDecoding() async throws {
         let client = makeClient()
         reply(200, #"{"snapshot":\#(snapshotJSON)}"#)
