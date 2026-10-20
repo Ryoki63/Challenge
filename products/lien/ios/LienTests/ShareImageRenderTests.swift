@@ -291,6 +291,14 @@ final class ShareImageRenderTests: XCTestCase {
         try assertGolden(ShareImageGolden(snapshots: snapshots))
     }
 
+    /// 初回の生成に頼らず、指紋のファイルがリポジトリにコミットされていること
+    func testTheGoldenSnapshotFileIsCommitted() {
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: ShareImageGoldenFile.url().path),
+            "LienTests/ShareImageSnapshots.json がありません。CI の artifact から指紋をコミットしてください"
+        )
+    }
+
     // MARK: 文字・植物・アプリ名が実際に描かれている
 
     func testTheStreakNamesPlantAndAppNameAreRendered() throws {
