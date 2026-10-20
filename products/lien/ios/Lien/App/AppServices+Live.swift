@@ -38,7 +38,13 @@ extension AppServices {
         guard let config = loadedConfig else {
             return stub(store: store, pushAuthorizer: pushAuthorizer, reloadWidgets: reloadWidgets)
         }
-        return live(config: config, store: store, pushAuthorizer: pushAuthorizer, reloadWidgets: reloadWidgets)
+        return live(
+            config: config,
+            store: store,
+            pushAuthorizer: pushAuthorizer,
+            reloadWidgets: reloadWidgets,
+            revenueCatAPIKey: RevenueCatConfig.apiKey(bundle: bundle)
+        )
     }
 
     static func live(
@@ -47,7 +53,8 @@ extension AppServices {
         pushAuthorizer: PushAuthorizing,
         session: URLSession = .shared,
         photoSession: URLSession? = nil,
-        reloadWidgets: @escaping () -> Void
+        reloadWidgets: @escaping () -> Void,
+        revenueCatAPIKey: String? = nil
     ) -> AppServices {
         let supabase = SupabaseService(config: config)
         let tokenProvider: () async throws -> String = { try await supabase.accessToken() }
@@ -90,6 +97,16 @@ extension AppServices {
             ),
             loader: URLSessionPartnerPhotoLoader(session: photoSession)
         )
+
+        // 課金(T33)。RevenueCat SDK が無い環境(macOS の下見)では利用不可の実装にする。
+        // CI(iOS)では canImport が真になり、API キーがあれば RevenueCat を使う
+        #if canImport(RevenueCat)
+        let purchases: PurchasesClient = revenueCatAPIKey.map {
+            RevenueCatPurchasesClient(apiKey: $0)
+        } ?? UnavailablePurchasesClient()
+        #else
+        let purchases: PurchasesClient = UnavailablePurchasesClient()
+        #endif
 
         return AppServices(
             isLive: true,
@@ -157,7 +174,9 @@ extension AppServices {
                 tokenProvider: tokenProvider,
                 currentUserID: { supabase.currentUserID },
                 session: session
-            )
+            ),
+            // 課金(T33)。API キーが無いビルドは偽の価格を出さない(利用不可の実装)
+            purchases: purchases
         )
     }
 }

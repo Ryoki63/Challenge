@@ -2,6 +2,8 @@
 // 成長ルール v2 の新キー3つ(plantGrownDays / plantStageFloor / plantNextStageAt)は省略可: 無いとき nil(ゲージを出さない)、
 // あるときは値を読み、書き出して読み戻しても一致する(PB #57)。
 // お休みチケットの残数(ticketBalance)も省略可: 無い・null・型違いは nil(バッジを出さない)、0 は 0 のまま保持する(T19a #19)
+// 組み立てに使った「今日」(dateLocal。issue #72)も省略可: 無い・null・日付として読めない値は nil のまま持ち(古いサーバーと同じ)、
+// あるときは値を読み、書き出して読み戻しても一致する
 
 import XCTest
 @testable import Lien
@@ -316,6 +318,61 @@ final class PairSnapshotTests: XCTestCase {
         XCTAssertNil(decoded.ticketBalance)
     }
 
+    // MARK: - 組み立てに使った「今日」(dateLocal。省略可 — issue #72 / DESIGN §3.4)
+
+    /// dateLocal つきの JSON(新しいサーバーの形)
+    private func withDateLocalJSON(_ raw: String) -> String {
+        designExampleJSON.replacingOccurrences(
+            of: "\"updatedAt\": \"2026-06-11T08:30:00Z\",",
+            with: "\"updatedAt\": \"2026-06-11T08:30:00Z\", \"dateLocal\": \(raw),"
+        )
+    }
+
+    func testDecodeWithoutDateLocalLeavesItNil() throws {
+        // キーが無い古いサーバー・古いキャッシュ: nil のまま持ち、updatedAt から保守的に判定する
+        let snapshot = try decode(designExampleJSON)
+        XCTAssertNil(snapshot.dateLocal)
+        XCTAssertEqual(snapshot.updatedAt, Date(timeIntervalSince1970: 1_781_166_600), "updatedAt はそのまま読める")
+    }
+
+    func testDecodeDateLocal() throws {
+        let snapshot = try decode(withDateLocalJSON("\"2026-06-11\""))
+        XCTAssertEqual(snapshot.dateLocal, "2026-06-11")
+        XCTAssertEqual(snapshot.updatedAt, Date(timeIntervalSince1970: 1_781_166_600))
+    }
+
+    func testDecodeNullDateLocalAsNil() throws {
+        XCTAssertNil(try decode(withDateLocalJSON("null")).dateLocal, "null はキーが無いのと同じ")
+    }
+
+    func testWrongTypedOrMalformedDateLocalIsIgnoredWithoutBreakingTheSnapshot() throws {
+        // 日付として読めない値は nil にして、古いサーバーと同じ道に落とす(snapshot 全体は壊さない)
+        for raw in ["\"2026-06-11T08:30:00Z\"", "\"2026-6-11\"", "\"\"", "\"20260611\"", "20260611"] {
+            let snapshot = try decode(withDateLocalJSON(raw))
+            XCTAssertNil(snapshot.dateLocal, raw)
+            XCTAssertEqual(snapshot.streakCurrent, 23, raw)
+            XCTAssertTrue(snapshot.todayMeDone, raw)
+        }
+    }
+
+    func testEncodeDecodeRoundTripWithDateLocal() throws {
+        let original = try decode(withDateLocalJSON("\"2026-06-11\""))
+        let data = try PairSnapshot.makeJSONEncoder().encode(original)
+        let decoded = try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: data)
+        XCTAssertEqual(decoded, original)
+        XCTAssertEqual(decoded.dateLocal, "2026-06-11")
+    }
+
+    func testEncodeDoesNotInventDateLocal() throws {
+        // キーが無い snapshot を書き出して、日付のキーを勝手に足さない(サーバーの dateLocal を捏造しない)
+        let snapshot = try decode(designExampleJSON)
+        let text = try XCTUnwrap(
+            String(data: try PairSnapshot.makeJSONEncoder().encode(snapshot), encoding: .utf8)
+        )
+        XCTAssertFalse(text.contains("dateLocal"), text)
+        XCTAssertEqual(try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: Data(text.utf8)), snapshot)
+    }
+
     // MARK: - エンコード(往復)
 
     func testEncodeDecodeRoundTrip() throws {
@@ -372,5 +429,31 @@ final class PairSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.resettingForNewDay().ticketBalance, 1)
         snapshot.ticketBalance = 0
         XCTAssertEqual(snapshot.resettingForNewDay().ticketBalance, 0, "0 を nil に落とさない")
+    }
+
+
+    // MARK: - ペアのプラン pairPlan(省略可 — T33 / REQUIREMENTS §3.14)
+
+    func testDecodePairPlan() throws {
+        XCTAssertEqual(try decode(designExampleJSON).pairPlan, .free, "キーが無い古いサーバーは free")
+        let premium = designExampleJSON.replacingOccurrences(
+            of: "\"hasPartnerPhotoToday\": false",
+            with: "\"hasPartnerPhotoToday\": false, \"pairPlan\": \"premium\""
+        )
+        XCTAssertEqual(try decode(premium).pairPlan, .premium)
+        let unknown = designExampleJSON.replacingOccurrences(
+            of: "\"hasPartnerPhotoToday\": false",
+            with: "\"hasPartnerPhotoToday\": false, \"pairPlan\": \"platinum\""
+        )
+        XCTAssertEqual(try decode(unknown).pairPlan, .free, "未知の値は free(課金していない側に倒す)")
+    }
+
+    func testEncodePairPlanRoundTrip() throws {
+        var snapshot = try decode(designExampleJSON)
+        snapshot.pairPlan = .premium
+        let data = try PairSnapshot.makeJSONEncoder().encode(snapshot)
+        let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+        XCTAssertTrue(text.contains("\"pairPlan\":\"premium\""), text)
+        XCTAssertEqual(try PairSnapshot.makeJSONDecoder().decode(PairSnapshot.self, from: data).pairPlan, .premium)
     }
 }

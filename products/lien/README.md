@@ -31,7 +31,10 @@ products/lien/
 ├── assets/
 │   ├── plant/               # 植物「タネの子」の SVG レイヤー34点+PlantAssets.xcassets+生成スクリプト(tools/)。規則は mapping.md
 │   └── icon/
-├── web/invite/              # 招待用静的ページ(GitHub Pages)
+├── web/                     # GitHub Pages に配信する静的サイト(#76)
+│   ├── site/                #   配信物(ティザー・法務・招待)。ツールで生成する
+│   ├── tools/build_site.py  #   md→html とサイトの組み立て(標準ライブラリのみ)
+│   └── invite/              #   招待ページの原本(T11。site/lien/i/ に複製される)
 └── marketing/               # ASO文言・スクショ・privacy-policy.md・terms.md
 ```
 

@@ -12,12 +12,13 @@
 import { normalizePushEnv } from "./apns.ts";
 import { DEFAULT_TIMEZONE, type SnapshotUserRow } from "./snapshot.ts";
 
-/** users から読む列(push_token と push_env は必ず一緒) */
-export const USER_COLUMNS = "id, nickname, timezone, push_token, push_env";
+/** users から読む列(push_token と push_env は必ず一緒。premium_until は snapshot の pairPlan 用 — T33) */
+export const USER_COLUMNS =
+  "id, nickname, timezone, push_token, push_env, premium_until";
 
 /** pair_members から相手の users を結合して読む select(`users` の列は USER_COLUMNS と同じ) */
 export const PARTNER_SELECT =
-  "user_id, users!inner(id, nickname, timezone, push_token, push_env)";
+  "user_id, users!inner(id, nickname, timezone, push_token, push_env, premium_until)";
 
 /** USER_COLUMNS で読んだ users 行(DB の列名のまま) */
 export interface UserDbRow {
@@ -26,6 +27,8 @@ export interface UserDbRow {
   timezone: string | null;
   push_token: string | null;
   push_env: string | null;
+  /** users.premium_until(ISO8601 | null)。省略 = 読んでいない(古い select) */
+  premium_until?: string | null;
 }
 
 /** DB の行 → SnapshotUserRow。nickname / timezone の null は既定値に、push_env は想定外の値を null に直す */
@@ -36,5 +39,6 @@ export function toSnapshotUser(row: UserDbRow): SnapshotUserRow {
     timezone: row.timezone ?? DEFAULT_TIMEZONE,
     pushToken: row.push_token ?? null,
     pushEnv: normalizePushEnv(row.push_env),
+    premiumUntil: row.premium_until ?? null,
   };
 }

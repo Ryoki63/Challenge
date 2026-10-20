@@ -5,8 +5,11 @@
 - 実施日: 2026-10-20
 - 実施: eng-exec（T27 本体）
 - 検査: `LienTests/StringsReviewTests.swift`（罰なし lint・`StringsCatalog`・本ログの網羅）を CI `lien-ios` で毎回実行
-- 対象: 340 件（OK 334 / 修正 6 / 保留 0）
-- 内訳: 340 単位（`StringsCatalog` の全出力を確認。関数型の文言は代表値で展開し、全通りを機械検査）
+AD
+- 対象: 369 件（OK 363 / 修正 6 / 保留 0）
+- 内訳: 369 単位（`StringsCatalog` の全出力を確認。関数型の文言は代表値で展開し、全通りを機械検査）
+- 追記（2026-10-20・issue #72 の検証中）: T27 の本体（#27・PR #86）のあとに足された 43 単位（`Tickets.balance` / 履歴 T18 #18 / シェア画像 T22 #22）を、同じ判定基準で追記レビューした（§7.20〜§7.22）。文言は変えていない（すべて OK）
+
 
 ## 1. 結論
 
@@ -144,7 +147,7 @@
 - 夜9時の通知は「あと3時間。ふたりの◯日を、いっしょに守ろう🌱」。損失をちらつかせず、前向きな呼びかけにした（GROWTH §6.6 で案 A/B と比較済み）。
 - 「あと3時間」は保険（お休みチケット）の訴えの核なので残す。現状維持。
 
-## 7. 全文言のレビュー（297 単位）
+## 7. 全文言のレビュー（340 単位）
 
 - 「単位」は `StringsCatalog` の名前から引数部・添字を落としたもの。関数型の文言は代表値で1行にし、全通りを機械検査で確認している。
 - 判定は `OK`（そのまま採用）/ `修正`（この PR で変更）/ `保留`（今回は変えない）。`保留` は 0。
@@ -639,78 +642,81 @@
 | `Session.restart` | はじめからやり直す | OK | やり直す（端末の記録を消す） |
 | `Session.later` | あとで | OK | あとで |
 
-### 7.20 お休みチケット（T19a #19。T27 のあとに追加）
 
-- 対象は 1 単位。ホームの残数バッジ。
-- 0枚でもバッジを消さない（罰なし — REQUIREMENTS §3.5）。「残り0枚」を責める言い方にしない。
+### 7.20 お休みチケットの残数（残数バッジ — T19a #19）
 
-| 名前 | 文言（代表） | 判定 | メモ |
-|---|---|---|---|
-| `Tickets.balance` | お休みチケット 残り0枚 | OK | 事実だけを出す。0枚でも隠さない（代表値。全4通りを機械検査） |
-
-### 7.21 カレンダー（T18 #18。T27 のあとに追加）
-
-- 対象は 19 単位。1か月の履歴と読み上げ。
-- 画面に文字を出すのは凡例と月の見出しだけ。`noRecord` / `beforePair` / `future` / `todayPending` は VoiceOver の読み上げだけに使う。
-- 途切れた日を「失敗」「サボり」と呼ばない。無彩色の点だけにして、言葉では責めない（REVIEW-2026-10-12 §4.2）。
+- 対象は 1 単位。ホームの残数バッジ（表示と VoiceOver で同じ文言）。
+- 0 枚も事実として出す（0 枚でもバッジを出す — REQUIREMENTS §3.5・§3.6）。減ったこと自体には触れず、責める語・急かす語を足さない。
+- 枚数は半角の数字。単位は「枚」。
 
 | 名前 | 文言（代表） | 判定 | メモ |
 |---|---|---|---|
-| `History.title` | ふたりの記録 | OK | 画面の題名。ホームの「ふたりの記録」と同じ言葉 |
-| `History.openButtonLabel` | ふたりの記録を開く | OK | ホームの導線（VoiceOver） |
-| `History.previousMonth` | 前の月 | OK | 月の移動（VoiceOver） |
-| `History.nextMonth` | 次の月 | OK | 月の移動（VoiceOver） |
-| `History.weekdaySymbols` | 日 / 月 / 火 / 水 / 木 / 金 / 土 | OK | 日曜はじまり。Calendar.lienHistory と揃える（全7通り） |
-| `History.bothDone` | ふたり達成 | OK | 凡例・読み上げ |
-| `History.meOnly` | じぶんだけ | OK | 凡例・読み上げ |
-| `History.partnerOnly` | あいてだけ | OK | 凡例・読み上げ |
-| `History.restTicket` | お休み | OK | 凡例・読み上げ。休んだ日を責めない |
-| `History.noRecord` | 記録なし | OK | 読み上げのみ（画面には点だけ） |
-| `History.beforePair` | ペアになる前 | OK | 読み上げのみ |
-| `History.future` | これから | OK | 読み上げのみ |
-| `History.todayPending` | 今日 | OK | 読み上げのみ |
-| `History.loadFailed` | 記録を読み込めませんでした。通信状態を確認して、もう一度お試しください | OK | 通信エラーの定型。ユーザーの責任にしない |
-| `History.retry` | もう一度 | OK | 再試行 |
-| `History.empty` | ペアになると、ふたりの記録がのこります | OK | ソロの空状態。責めない |
-| `History.monthTitle` | 2025年1月 | OK | 月の見出し（代表値。全6通りを機械検査） |
-| `History.dayTitle` | 10月1日 | OK | 日の読み上げ（代表値。全3通り） |
-| `History.dayAccessibility` | 10月5日、ふたり達成 | OK | VoiceOver は「日付、印」（代表値。全8通り） |
+| `Tickets.balance` | お休みチケット 残り0枚 | OK | ホームの残数バッジ / 代表値（0 枚）。0 枚でも出す。罰なし（§3.5） |
 
-### 7.22 シェア画像（T22 #22。T27 のあとに追加）
+### 7.21 ふたりの記録（カレンダー履歴 — T18 #18）
 
-- 対象は 23 単位。シェア画像のシートと、画像の中の文言。
-- 画像に入るのは植物・2人のニックネーム・ふたりの記録の日数・開始日・アプリ名だけ。チェックインの写真は入れない（REQUIREMENTS §3.13 / privacy-policy §3）。
-- 「ストーリーズ」「正方形」は画像の形の説明で、開発者ことばではない。
+- 対象は 18 単位。月の見出し・曜日・凡例・読み上げ・空状態。
+- 用語は「ふたりの記録」（§2-4）。「ストリーク」は使わない。凡例の「じぶんだけ」「あいてだけ」は事実で、責める語を足さない。
+- `noRecord` / `beforePair` / `future` / `todayPending` は画面に文字を出さない（VoiceOver の読み上げだけ）。記号に頼らず、状態を言葉で伝える（§2-7）。
+- `weekdaySymbols` は日曜はじまり（`Calendar.lienHistory` の `firstWeekday = 1` と揃える）。
+- `loadFailed` は「何が起きたか」＋「どうすればよいか」（§2-2）。`retry` は既存の `Settings.retry`（もう一度ためす）より短い形だが、再試行の意味は同じで、責めない。
+- `empty` は誘いの文（ペアになると記録がのこる）。まだ無いことを責めない。
+
+| 名前 | 文言（代表） | 判定 | メモ |
+|---|---|---|---|
+| `History.title` | ふたりの記録 | OK | 画面の題名。用語は「ふたりの記録」（ストリークではない） |
+| `History.openButtonLabel` | ふたりの記録を開く | OK | ホームからの導線の VoiceOver |
+| `History.previousMonth` | 前の月 | OK | 月を戻す |
+| `History.nextMonth` | 次の月 | OK | 月を進める |
+| `History.weekdaySymbols` | 日 | OK | 曜日（日曜はじまり） / 代表値。7 種すべて確認 |
+| `History.bothDone` | ふたり達成 | OK | 凡例・読み上げ。ストリークの語を使わない |
+| `History.meOnly` | じぶんだけ | OK | 凡例・読み上げ。事実で、責めない |
+| `History.partnerOnly` | あいてだけ | OK | 凡例・読み上げ。事実で、相手を責めない |
+| `History.restTicket` | お休み | OK | お休みチケットで守った日。罰の語を足さない |
+| `History.noRecord` | 記録なし | OK | 画面には出さず VoiceOver だけ。事実 |
+| `History.beforePair` | ペアになる前 | OK | ペア成立前の日。事実 |
+| `History.future` | これから | OK | 未来の日。急かさない |
+| `History.todayPending` | 今日 | OK | 確定前の今日。事実 |
+| `History.loadFailed` | 記録を読み込めませんでした。通信状態を確認して、もう一度お試しください | OK | 何が起きたか＋どうすればよいか（§2-2）。記録は失われない |
+| `History.retry` | もう一度 | OK | 再試行。短い形（`Settings.retry` は「もう一度ためす」） |
+| `History.empty` | ペアになると、ふたりの記録がのこります | OK | 空状態。誘いの文で、責めない |
+| `History.monthTitle` | 2025年1月 | OK | 月の見出し / 代表値 |
+| `History.dayTitle` | 10月1日 | OK | 日を選んだときの見出し / 代表値 |
+| `History.dayAccessibility` | 10月5日、ふたり達成 | OK | VoiceOver（名前＋状態 — §2-7） / 代表値。全 5 種を確認 |
+
+### 7.22 シェア画像（T22 #22）
+
+- 対象は 24 単位。シェアのシートと、画像の中に描く文言。
+- 画像に**チェックインの写真を含めない**ことを `privacyNote` で明示する（REQUIREMENTS §3.13。プライバシーの約束）。
+- 画像の中は「ふたりの記録」「N日」。ストリークの語を使わない（§2-4）。名前が無いときは「あなた」「あいて」— 2 人の名前を並べる文脈なので、ウィジェットの「じぶん」ではなく「あなた」を使う。
+- エラーは「何が起きたか」＋「どうすればよいか」（§2-2）。写真・記録が消えるとは書かない。
+- 「閉じる」「もう一度ためす」は既存の表記に揃える。
 
 | 名前 | 文言（代表） | 判定 | メモ |
 |---|---|---|---|
 | `Share.title` | シェア画像 | OK | シートの題名 |
-| `Share.createButton` | シェア画像をつくる | OK | ホームの導線 |
-| `Share.subtitle` | ふたりの記録を、画像にして残せます | OK | シートの説明 |
-| `Share.formatPickerLabel` | 画像の形 | OK | 形の切り替え |
-| `Share.formatStory` | ストーリーズ(9:16) | OK | 縦。数字は半角 |
-| `Share.formatSquare` | 正方形(1:1) | OK | 正方形 |
-| `Share.loading` | 画像をつくっています… | OK | 待ち時間。失敗とは言わない |
-| `Share.shareButton` | シェアする | OK | 共有 |
-| `Share.closeButton` | 閉じる | OK | 閉じる（統一） |
-| `Share.retry` | もう一度ためす | OK | つくるのを再試行 |
-| `Share.unavailableMessage` | シェアできる記録がまだありません | OK | 記録が無いとき。責めない |
-| `Share.errorMessage` | シェア画像を準備できませんでした。通信状態を確認して、もう一度お試しください | OK | 通信エラーの定型 |
-| `Share.privacyNote` | チェックインの写真は入りません | OK | 何が入らないかを先に言う |
-| `Share.streakCaption` | ふたりの記録 | OK | 画像の中 |
-| `Share.dayUnit` | 日 | OK | 画像の中の単位 |
-| `Share.meFallbackName` | あなた | OK | 名前が無いとき（画像の中） |
-| `Share.partnerFallbackName` | あいて | OK | 名前が無いとき（画像の中） |
-| `Share.milestoneBody` | この記録を、画像にして残そう | OK | 節目のお祝い。急かさない |
-| `Share.names` | ゆうき と ゆうき | OK | 画像の中の2人の名前（代表値。全3通り） |
-| `Share.previewLabel` | ゆうきとゆうきの30日のシェア画像 | OK | 共有シートの VoiceOver（代表値。全3通り） |
-| `Share.startedOn` | 2026年10月20日 21:00から | OK | 開始日。Asia/Tokyo で表記（代表値。全2通り） |
-| `Share.milestoneTitle` | 🎉 ふたりで0日! | OK | 節目の見出し（代表値。全4通り） |
-| `Share.sharePreviewTitle` | 0日の記録 | OK | 共有シートの題名（代表値。全4通り） |
-
-> 追記（2026-10-20・ux-exec / #80 の作業中）: T18(#18)・T19a(#19)・T22(#22) が T27 のあとに `Strings.swift` へ文言を足したため、
-> ログの網羅検査（`testReviewLogCoversEveryStringsCatalogEntry`）が main で赤になっていた。追加された 43 単位を、
-> §2 の判定基準で確認して追記した。文言そのものは変えていない（既存の 291 件の判定も変えていない）。
+| `Share.createButton` | シェア画像をつくる | OK | ホームの導線。動作の言葉 |
+| `Share.subtitle` | ふたりの記録を、画像にして残せます | OK | 何ができるかの説明 |
+| `Share.formatPickerLabel` | 画像の形 | OK | 形の選択の見出し |
+| `Share.formatStory` | ストーリーズ(9:16) | OK | 縦。括弧は半角（§2-5） |
+| `Share.formatSquare` | 正方形(1:1) | OK | 正方形。括弧は半角（§2-5） |
+| `Share.loading` | 画像をつくっています… | OK | 生成中。進行形で、待たせていることを責めない |
+| `Share.shareButton` | シェアする | OK | 共有シートを開く |
+| `Share.closeButton` | 閉じる | OK | 閉じる（統一 — §2-5） |
+| `Share.retry` | もう一度ためす | OK | 再試行。既存の表記に揃える |
+| `Share.unavailableMessage` | シェアできる記録がまだありません | OK | 空状態。事実で、責めない |
+| `Share.errorMessage` | シェア画像を準備できませんでした。通信状態を確認して、もう一度お試しください | OK | 何が起きたか＋どうすればよいか。記録は失われない |
+| `Share.privacyNote` | チェックインの写真は入りません | OK | 写真を含めないことの明示（§3.13） |
+| `Share.streakCaption` | ふたりの記録 | OK | 画像の中の見出し。ストリークの語を使わない |
+| `Share.dayUnit` | 日 | OK | 画像の中の日数の単位 |
+| `Share.meFallbackName` | あなた | OK | 名前が無いとき。2 人の名前を並べる文脈 |
+| `Share.partnerFallbackName` | あいて | OK | 名前が無いとき。相手を責めない |
+| `Share.milestoneBody` | この記録を、画像にして残そう | OK | 節目のお祝い。誘いの文 |
+| `Share.names` | ゆうき と ゆうき | OK | 画像の中の 2 人の名前 / 代表値。全 3 通りを確認 |
+| `Share.previewLabel` | ゆうきとゆうきの30日のシェア画像 | OK | 共有シートの VoiceOver / 代表値 |
+| `Share.startedOn` | 2026年10月20日 21:00から | OK | 画像の中の開始日 / 代表値 |
+| `Share.milestoneTitle` | 🎉 ふたりで0日! | OK | 節目のお祝い。数字は半角（§2-5） / 代表値。全 4 通りを確認 |
+| `Share.sharePreviewTitle` | 0日の記録 | OK | 共有シートの題名 / 代表値 |
 
 ## 8. このログの検査（CI）
 
@@ -718,9 +724,11 @@
 
 | テスト | 検査内容 |
 |---|---|
-| `testReviewLogCoversEveryStringsCatalogEntry` | `StringsCatalog` の全 340 単位が、このログの表に**ちょうど1回**出ていること。文言を足してログを忘れると落ちる |
+AD
+| `testReviewLogCoversEveryStringsCatalogEntry` | `StringsCatalog` の全 369 単位が、このログの表に**ちょうど1回**出ていること。文言を足してログを忘れると落ちる |
 | `testReviewLogTextsMatchStringsCatalog` | 表の文言が現在の `Strings.swift` と一致すること（1件の単位は完全一致、関数型は代表値が含まれること）。文言を変えてログを忘れると落ちる |
-| `testReviewLogSummaryMatchesVerdicts` | 冒頭の「340 件（OK 334 / 修正 6 / 保留 0）」が、表の判定の数と一致すること |
+| `testReviewLogSummaryMatchesVerdicts` | 冒頭の「369 件（OK 363 / 修正 6 / 保留 0）」が、表の判定の数と一致すること |
+
 | `testUserFacingStringsAvoidDeveloperJargon` | 画面の文言に「ストリーク」「アーカイブ」「セッション」などの開発者ことばが戻らないこと |
 | `testCloseLabelsAreConsistent` | 閉じるボタンの文言が「閉じる」に揃っていること |
 | `testNetworkErrorMessagesAreIdentical` | 通信エラーの文言が7箇所で同じであること |
@@ -742,3 +750,42 @@
 - §6.1 の初回同期失敗時の画面（eng-lead / T30 の判断）。
 - T30 の審査チェックリストで、実際の画面（スクリーンショット）と文言の最終確認。
 - 実機の VoiceOver で、植物・ウィジェット・通知の読み上げを確認（T20）。
+
+## 11. プレミアム（課金）の文言 — T33
+
+- 追加日: 2026-10-20（T33 / REQUIREMENTS §3.14）
+- 3文脈（節目・アルバム30日超・チケット切れ）で見出しと説明を出し分ける。価格・トライアル日数は offerings から表示し、コードに書かない。
+- 押し売りしない: 閉じる（「あとで」）と復元を常に置き、罰・恥・煽りの語を使わない。
+
+| 名前 | 文言（代表） | 判定 | メモ |
+|---|---|---|---|
+| `Paywall.title` | プレミアム | OK | 課金の名前。画面の見出し |
+| `Paywall.closeButton` | あとで | OK | 押し売りしない。常に閉じられる |
+| `Paywall.benefitsTitle` | ペアのふたりに、できること | OK | 特典の見出し。ふたりに効くことを先に言う |
+| `Paywall.benefits` | 写真アルバムに制限がない | OK | 特典の代表（配列の先頭）。REQUIREMENTS §3.14 のプレミアム特典 |
+| `Paywall.monthlyPrefix` | 月額 | OK | 価格の見出し。価格そのものは StoreKit の表示 |
+| `Paywall.yearlyPrefix` | 年額 | OK | 価格の見出し。年額を推す |
+| `Paywall.recommended` | おすすめ | OK | 年額のバッジ。煽らない |
+| `Paywall.trialNote` | 17日間 無料で試せます | OK | トライアル日数は offerings から。代表 17 日（G6 で最終化） |
+| `Paywall.purchaseButton` | このプランにする | OK | 購入ボタン。選んだプランであることを言う |
+| `Paywall.purchasing` | 購入しています… | OK | 購入中の表示 |
+| `Paywall.restoreButton` | 購入を復元する | OK | 復元。機種変更・再インストール用 |
+| `Paywall.restoring` | 復元しています… | OK | 復元中の表示 |
+| `Paywall.appliedByPartner` | 相手がすでにプレミアムなので、このペアは適用済みです。購入は不要です | OK | 誤課金防止（REQUIREMENTS §3.14）。責めない |
+| `Paywall.purchaseDone` | プレミアムがはじまりました | OK | 購入完了 |
+| `Paywall.restoreDone` | 購入を復元しました | OK | 復元成功 |
+| `Paywall.restoreNotFound` | 復元できる購入が見つかりませんでした | OK | 復元するものが無い。事実のみ |
+| `Paywall.unavailable` | いまは購入できません。準備ができたらお知らせします | OK | G6 前・API キー未設定。偽の価格を出さない |
+| `Paywall.errorMessage` | 購入を完了できませんでした。時間をおいて、もう一度お試しください | OK | 通信・ストアの失敗。次の一歩 |
+| `Paywall.cancelled` | 購入をキャンセルしました | OK | 利用者が閉じたとき（画面には出さない想定） |
+| `Paywall.pending` | 購入の確認を待っています。完了するとプレミアムがはじまります | OK | Ask to Buy など。保留を説明する |
+| `Paywall.legalNote` | 料金は App Store のアカウントに請求されます。自動更新は、購入後いつでも設定から止められます | OK | 特商法・自動更新の説明。G6 で最終確認 |
+| `Paywall.terms` | 利用規約 | OK | 法務ページへのリンク |
+| `Paywall.privacy` | プライバシーポリシー | OK | 法務ページへのリンク |
+| `Paywall.milestoneHeadline` | 30日、ふたりで続いたね | OK | 節目の文脈。代表 30 日 |
+| `Paywall.milestoneMessage` | この記録も写真も、これから先も残せるように。プレミアムで、ふたりの場所がもう少し広がります | OK | 節目の文脈。押し売りしない |
+| `Paywall.albumHeadline` | 30日より前の写真も、残しておける | OK | アルバム30日超の文脈（T21） |
+| `Paywall.albumMessage` | プレミアムなら、写真アルバムに制限がありません。ふたりで重ねた日を、ずっと見返せます | OK | アルバム30日超の文脈 |
+| `Paywall.ticketEmptyHeadline` | チケットがなくなっても、続けられる | OK | チケット切れの文脈。罰・恥を出さない |
+| `Paywall.ticketEmptyMessage` | プレミアムなら、お休みチケットが毎月5枚。ペアのふたりで使えます | OK | チケット切れの文脈。事実のみ |
+
