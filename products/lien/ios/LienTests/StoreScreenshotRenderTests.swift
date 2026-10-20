@@ -296,8 +296,9 @@ final class StoreScreenshotRenderTests: XCTestCase {
                     let screen = try await renderScreen(scene: frame.scene, size: size)
                     XCTAssertEqual(screen.width, size.width, "\(sizeKey)/\(frame.id): 画面の幅")
                     XCTAssertEqual(screen.height, size.height, "\(sizeKey)/\(frame.id): 画面の高さ")
+                    // 画面そのものは白地に細い線のことがある(カレンダーは 0.015 程度)。真っ白・真っ黒(0.0)だけを止める
                     XCTAssertGreaterThan(
-                        try StorePixels(screen).drawnRatio(), 0.08,
+                        try StorePixels(screen).drawnRatio(), 0.005,
                         "\(sizeKey)/\(frame.id): 画面がほぼ空(実描画に失敗している)"
                     )
 
