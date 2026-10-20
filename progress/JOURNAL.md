@@ -609,3 +609,6 @@
 - 10/20 23:14 JST 追記: #4 に保留コードの挙動、#8 に T0/T1 と S ウィジェットの見え方、§2.1 につまずき時の対処、§3 に総合判定/起票 Issue、§5 に ATT/プライバシー確認を追加。写真は PhotosPicker のためフルアクセス許可の手順を削除。
 - 10/20 23:15 JST 検証: 12項目の合計30分、期待値/証拠の空欄なし、内部リンク実在、`Strings.swift` の実文言と一致、`git diff --check` 無出力を確認。
 - 10/20 23:16 JST 参照修正: `products/lien/ios/README.md` の E2E §1.2 参照を新 §1 へ更新（E2E は TestFlight 配布前提を明記）。次: commit/push/PR、qa-review。
+- 10/20 23:16 JST 自己点検: 待機「最大1分」と「60秒待つ」の矛盾、写真の全画面閲覧、#5の両端末演出、旧①〜⑫との番号対応、復帰時のPASS条件を修正。commit `18e94df` として push。
+- 10/20 23:17 JST 検証: PR #128 の CI 6ジョブ（deno / e2e / ops / pages / plant / store metadata）がすべて pass。iOS ワークフローは docs のみのパスフィルタで未起動。実機E2Eは未実施。
+- 10/20 23:17 JST レビュー: qa-review に独立レビューを依頼。結果を受けて must-fix を反映し、PR/Issue に PASS を記録する。
