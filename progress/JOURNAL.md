@@ -797,3 +797,12 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 02:24 — #140 Android FCM・worker・token同期 (eng-exec)
+- 着手: 指定 worktree / consilium/140-t-and-7-android-fcm-worker-tok で依存ゲートを確認。開始時 tracked/untracked とも clean、HEAD=7991bc55088b9ccff9b335410a88f726910f8b04。既存の当該ブランチPRは0件。Issue #140 は OPEN / assigneeなし（HQの status:in-progress は着手許可とは扱わない）。
+- 02:24 依存確認: GitHub APIで #134・#135・#137・#138・#139・#122 の全6件が OPEN、closedAt=null と確認。契約の「完了・マージ確認後のみ着手」を満たさないため、Androidコードの調査・実装・build/test/lint、依存仕様の代替実装には進まない。
+- 方針: #140 の依存ゲートだけを記録し、eng-leadへ依存完了後の再開を引き継ぐ。iOS・共有Supabase・契約fixture・secret・.envは読み書きしない。他Issueの承認待ちを本タスクで再開しない。JOURNAL既存記録は変更しない。
+- 02:26 【承認待ち】: Issue #140 に依存全6件のOPEN状態、推奨する再投入条件、質問1件をマーカー付きで投稿（issuecomment-6296942251）。needs-approval / human-gate を付与し、IssueはOPENのまま。HQ管理のstatus:*は変更しない。
+- 同期: origin/mainをfetchし、HEADとFETCH_HEADが7991bc55088b9ccff9b335410a88f726910f8b04で一致。公開履歴の変更・rebaseは不要。指定ブランチのみへ監査ログをcommit/pushする。
+- 検証区分: 実装要件は未着手。build / JVM test / lint / emulator / instrumentation / 認可後実機 / 独立コードレビューは未実施（依存ゲート未達・コード変更なしのため対象外）。通知動作・本番疎通の合格証拠はない。ログ変更の機械検査は git diff --check と追記専用・変更ファイル限定検査で行う。
+- 結果: BLOCKED（依存完了待ち）。コード差分なし、実装PRなし、DONE追記なし、Issue closeなし、マージなし。残作業は依存6件の完了/対応成果物マージと担当確認後の実装・関連検証・独立レビュー・PR提出。
