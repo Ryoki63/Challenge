@@ -298,6 +298,18 @@
 - 次(第4波): ios-serial(#16 通知 縮小版 → #17 ウィジェット S+ロック → #18 履歴 → #19 チケット残数 → #22 シェア画像)∥ backend(#19 サーバー側 ticketBalance+#68 写真の削除+バケット制限 → #16 サーバー側 節目の通知)∥ docs
 - 第4波 起動(Workflow wf_61db8718-7fe): ios-serial(仕上げ=#59/#57 の改善提案 → #16 通知 縮小版 → #17 ウィジェット S/M/ロック → #18 履歴 → #19 チケット残数 → #22 シェア画像+節目のお祝い)∥ backend(#19 サーバー側 ticketBalance+#68 取消時の写真削除+バケット制限)∥ docs #69(文書の追随+KPI の SQL+#63 の判断材料)。判断: 節目の通知は v1.0 では出さずアプリ内のお祝い+シェア誘導にする(サーバー側の通知設定が v1.1 のため、オフにできない通知を作らない=D3 の帰結)
 
+## 2026-10-20 09:55 — T19a(#19) iOS: チケット残数バッジ
+- 着手: Issue #19 の iOS 残分を実装する。範囲は D3(2026-10-12)・TASKPLAN §9 の T19a = snapshot の `ticketBalance` を読む `PairSnapshot` + ホームの残数バッジ(0枚でも表示)。**お休み宣言 UI / rest-declare は 1.0.1 のため作らない**(Issue 本文の古い計画より D3 と TASKPLAN §9 を優先)。
+- サーバー側(ticketBalance)は 2026-10-13 に完了済み。契約フィクスチャにも `snapshot.paired=2` / `snapshot.solo=null` が入っていることを確認。
+- 作業場所: worktree `/Users/kojimaryoki/.consilium/wt/Challenge-19`、ブランチ `consilium/19-t19-ui`。origin に対象ブランチ・既存 PR は無し(重複作業なし)。
+- 検証予定: `products/lien/ios/scripts/macos-check/check.sh test PairSnapshotTests HomeViewModelTests ContractFixtureTests StringsReviewTests` と `views`。Xcode は無いためフルのシミュレータ CI は push 後に GitHub Actions で確認する。
+- 実装: `PairSnapshot.ticketBalance: Int?`(キー欠落・null・型違いは nil、0 は有効値、エンコードは null を明示) / `HomeViewModel.ticketBalance`(ペア成立かつ 0 以上のときだけ返す。ソロ・負の値は nil)/ `TicketBalanceBadge`(ホームのストリーク直下。0枚でも表示、アイコン+「お休みチケット 残り○枚」)/ `Strings.Tickets`。`HomeView` は nil のときバッジごと出さない。
+- テスト: PairSnapshot の欠落/null/型違い/0/往復/翌日リセット、HomeViewModel の 2・0・nil・ソロ・負・空状態、契約フィクスチャ(snapshot/checkin/invite-accept/nudge/plant-name/pair-dissolve/push)の値、StringsCatalog、0枚バッジの実描画(白紙でない)。既存の全テストに回帰なし。
+- 検証: `scripts/macos-check/check.sh all` = module 74 ファイル・**998 tests / 0 failures / 20152 assertions**、views 103 ファイル、widget 18 ファイルとも OK(既存の ISO8601DateFormatter の Swift 6 警告のみ。この変更では増えていない)。フルのシミュレータ CI は push 後。
+- CI(正本): **lien-ios run 39351451628 success**(12m44s・commit d229f32)。`Executed 1075 tests, with 0 failures` / `** TEST SUCCEEDED **`。新規の `TicketBalanceBadgeRenderTests` 2件、`PairSnapshotTests` / `HomeViewModelTests` / `ContractFixtureTests` の ticketBalance テストがログ上で passed。lien-ci run 39351451853 も success(サーバー側の変更なし)。
+- 目視: CI artifact `plant-render-sheets` の `ticket_01_balances.png` / `ticket_zero_large.png` / `ticket_zero_accessibility5.png` を取得して確認。0枚でもバッジが表示され、最大の文字サイズ(accessibility5)でも折り返して欠けない。
+- 結果: **PR #84 作成**(https://github.com/Ryoki63/Challenge/pull/84)。お休み宣言 UI / rest-declare は D3・TASKPLAN §9 のとおり v1.0.1 の対象なので実装していない。レビュー役職(eng-review)の判断待ちで、issue は閉じない。
+
 ## 2026-10-20 12:15 (HQ/eng-exec — #29 T29 フィードバック反映) — 実フィードバック未着のため着手不可(blocked)
 - 着手: Issue #29。受入条件は本文の1点のみ —「フィードバック内容をJOURNALに記録し、修正をリリースビルドに反映」。追加の受入条件は無い
 - 事実確認(読み取りのみ。2026-10-20 12:15 JST):
