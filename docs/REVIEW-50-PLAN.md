@@ -47,3 +47,9 @@ eng-lead 確認担当による独立レビュー1回は **PASS（受入条件4�
 - 同 SHA の [lien-ci run 39475450784](https://github.com/Ryoki63/Challenge/actions/runs/39475450784) は **6ジョブすべて success**。Deno は419＋3＋65＋17＋84件、Python は64＋52＋27＋47件、計778件が成功(各スイートの実行件数の合計、重複する検証目的の数ではない)。契約フィクスチャ22件と生成物の一致検査も成功。
 - `lien-ios` は文書のみで paths 対象外のため起動していない。iOSビルド成功とは扱わない。`lien-release` は手動起動していない。
 - 本証跡と JOURNAL を追記した後の最終 SHA は別コミットになるため、その通常 CI の結果・ローカル／リモート一致は PR／Issue の提出コメントに記録する。実機・署名・配布の未検証境界は変わらない。
+
+### 対象外の既存 workflow 失敗（全 workflow 緑とは報告しない）
+
+- 証跡追記 SHA `5c85be4318b2edae03afb8b7c21fda12fb07dbd4` の [lien-ci run 39475675050](https://github.com/Ryoki63/Challenge/actions/runs/39475675050) も6ジョブ success。ただし PR checks に表示されない `.github/workflows/lien-play.yml` の [run 39475672760](https://github.com/Ryoki63/Challenge/actions/runs/39475672760) は failure、jobs API は `total_count=0`。テスト・ビルドが実行されて失敗したとは確認していない。
+- 同期元 main SHA `7991bc55088b9ccff9b335410a88f726910f8b04` の [run 39463901466](https://github.com/Ryoki63/Challenge/actions/runs/39463901466) にも同じ failure がある。main と今回 branch の当該 workflow blob は両方 `433168bf3f675e580f05f58bb178532cb28cf5c9` で一致し、今回の変更はない。`gh run view` は workflow file issue の可能性を表示するが、詳細原因は未取得（null）。構文原因と断定しない。
+- 文書整合の受入・独立レビュー・関連 lien-ci は PASS だが、リポジトリ全 workflow の成功は未達。今回の明示的な文書限定契約を越えて workflow を修正せず、PR／Issue に対象外の既存不具合として引き継ぐ。マージ判断はレビュー担当に残す。
