@@ -206,7 +206,7 @@ def print_values(fields):
     headings = {
         "name.txt": "App 情報 > 名前",
         "subtitle.txt": "App 情報 > サブタイトル",
-        "keywords.txt": "App 情報 > キーワード",
+        "keywords.txt": "バージョン情報 > キーワード",
         "promotional_text.txt": "バージョン情報 > プロモーションテキスト",
         "description.txt": "バージョン情報 > 説明",
         "release_notes.txt": "バージョン情報 > このバージョンの新機能",
