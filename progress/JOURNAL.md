@@ -473,3 +473,7 @@
 - 承認確認: #75 に 18:31 JST のオーナー返信「投稿文ok!あとはアカウントのブランディング考えないと」がある。一方、原稿13本は `draft`、mkt-review の完了記録は未確認。computer-operator がレビューや ready 化を代行せず、投稿許可と正式レビューを区別する。
 - 排他確認: #79 の assignee は空。Consilium の役職割当は受領しているが、GitHub assignee による排他は未成立。status ラベルは変更しない。
 - ブラウザ確認: Computer Use で新規タブ `https://x.com/i/flow/signup` を開こうとしたが `Browser is not available: iab`。続けて接続ブラウザ一覧を確認し `[]`。X のページはまだ開けておらず、アカウント作成・入力・投稿・認証操作・予約登録は未実行。ネイティブ操作経路の利用可否を次に確認する。
+- 節目(20:03 JST): ネイティブの Chrome に新規 X 登録タブを作成できた。実際の X ドメインに「メールアドレスまたはユーザー名」の空欄と Google/Apple/電話番号の認証経路が表示されたため、契約どおり入力前に停止。連絡先を推測・転用せず、アカウントは未作成、投稿も無し。
+- 証跡: ブラウザ外枠と既存タブ情報を除外し、登録パネルだけを `products/lien/marketing/x/evidence/2026-10-20-x-signup-required.png` に保存(20:02 JST)。1320×1256、SHA-256 `30b0e430525a8e19ce858e57fa28dae97525ccad243301eb8a2897159c07a7ac`。画像を目視確認し、入力欄は空、個人情報・認証情報無し。登録成功の証拠とは扱わない。
+- 検証: `PYTHONDONTWRITEBYTECODE=1 python3 products/lien/marketing/x/tools/check_posts.py` = OK 13本、`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s products/lien/marketing/x/tools -p 'test_*.py'` = 35 tests OK。原稿・承認台帳・コード・設定は未変更。型チェック・アプリ build・独立レビューは実行ログと証跡だけの変更のため対象外。
+- 【承認待ち】: オーナーに開いた Chrome の登録タブで認証・作成確定まで自身で実施してもらい、公開 @ハンドルとログイン済みタブだけを返信してもらう1件の引継ぎを依頼する。mkt-review・ready 化と担当割当の整理は orchestrator に引き継ぐ。投稿 URL・24時間後の反応は引き続き理由付き null、予約・定期実行は未登録。
