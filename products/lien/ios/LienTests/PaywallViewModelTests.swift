@@ -182,6 +182,22 @@ final class PaywallViewModelTests: XCTestCase {
         XCTAssertEqual(purchased, [], "適用済みのペアでは購入しない")
     }
 
+    func testAlreadyPremiumDoesNotPurchaseAgain() async {
+        let entitlements = EntitlementStore(
+            premiumUntil: Date().addingTimeInterval(86_400)
+        )
+        let client = MockPurchasesClient(premiumUntil: Date().addingTimeInterval(86_400))
+        let model = makeModel(client: client, entitlements: entitlements)
+
+        await model.load()
+        await model.purchase()
+
+        XCTAssertTrue(entitlements.hasOwnSubscription)
+        XCTAssertFalse(model.canPurchase, "すでにプレミアムなら購入ボタンを押させない")
+        let purchased = await client.purchasedPackageIDs
+        XCTAssertEqual(purchased, [], "二重購入しない")
+    }
+
     // MARK: - 復元
 
     func testRestoreFindsAPurchase() async {

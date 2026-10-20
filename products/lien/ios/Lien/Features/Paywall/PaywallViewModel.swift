@@ -68,7 +68,12 @@ final class PaywallViewModel {
     }
 
     var canPurchase: Bool {
-        !isPurchasing && !isAppliedByPartner && !didPurchase && selectedPackage != nil
+        // すでに自分の購読が有効なら、二重に購入させない(相手の購読で適用済みの場合も同じ)
+        !isPurchasing
+            && !isAppliedByPartner
+            && !didPurchase
+            && !entitlements.hasOwnSubscription
+            && selectedPackage != nil
     }
 
     var purchaseButtonTitle: String {
