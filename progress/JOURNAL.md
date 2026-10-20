@@ -595,3 +595,7 @@
 - 独立レビュー: 修正箇所と生成器変更を1人が確認し高優先指摘なし。画像来歴/バイト一致/キャプションSHAも確認。正式mkt-review役職の承認は代行しない。`web/evidence/review-2026-10-20.md` に判定と境界を記録。
 - 表示確認: ローカルChrome 393px/1440pxで横はみ出しなし、フォーム0、画像3枚読み込み/寸法/リンク一致、法務2ページHTTP 200。PNG2枚と検査JSONを `web/evidence/` に保存し目視。初回はChrome内部UIのtargetへ接続してmetrics overrideが非対応、type=pageに絞って成功。本番/実機表示とは扱わない。
 - 関連静的検査: `deno test --allow-read products/lien/scripts/ops/marketing_docs_static_test.ts` 型チェック+8件PASS。法務原文は未変更。公開に必要な値は4項目へ絞り、Xの再指定や公開許可の取り直しは求めない。
+- 提出: 追補PR #116 https://github.com/Ryoki63/Challenge/pull/116 を作成し、指定ブランチへpush。main取り込み後も50件/生成物11件一致PASS。acac060時点のCIはlien-ciの6ジョブPASS、iOS build+testはpendingで未評価。公開前ゲートexit 1は別途の未達として保持し、CIのpages job成功を公開許可とは扱わない。
+- 【承認待ち】#76 comment 6291397238 に制定日・公開事業者名・公開サポートメール・管轄裁判所をまとめて指定するか保留するかの質問を1つ投稿し、needs-approval/human-gateを付与。正式mkt-review評価は引継ぎ事項。ローカル確認用HTTPサーバとChromeを終了。
+- 提出チェック: ローカル関連50テストPASS / Deno型検査・8テストPASS / 静的build11件PASS / 生成物一致PASS / 直接表示確認PASS / diff検査PASS / 独立レビュー1回・高優先指摘なし。Python専用型検査・lint設定なし、今回独自のiOS変更なしのためローカルiOS buildは対象外。全要件・残TODOゼロは未達(正式文言承認と公開・本番確認が残る)。
+- 結果: **BLOCKED(法務公開用4項目の具体値待ち)**。PR #116を未マージで提出、Issue #76はOPEN維持。公開・ストア申請・SNS投稿・本番データ変更は実行していない。
