@@ -354,3 +354,5 @@
 - 成果: `products/lien/marketing/measurement.md` を作成。§2 にチャネル別の `ct` 命名規則(X / ティザー / 紹介)と UTM 対応、§3 に ASC Analytics の指標一覧としきい値、§4 に KPI.md と組み合わせた週次シート・分母一覧・補助 SQL、§5/§6 に SDK を入れない代替案と #30 の App Privacy との整合を書いた。docs/KPI.md §2.8 と docs/STRUCTURE.md からリンクを追加
 - 判断: 標準 UTM は App Store の campaign 計測に使われないため、`ct` を正とし、UTM は将来の Web 計測用の対応表にした。公開日(10/31)は ASC の Campaigns が出る前で `ct` を発行できないため「タグなし」とし、0 ではなく null で記録する運用にした
 - 検証: 相対リンク7件の解決 OK / `ct` 例11件が `[a-z0-9_]`・30文字以内 / `pglast` で KPI.md の SQL に補助 SQL を差し替えた全文を構文解析 OK(2 statements)/ marketing tools の unittest 24件 OK / `git diff --check` OK
+- 結果: コミット `322cc4d` を push し、PR #101 を作成(https://github.com/Ryoki63/Challenge/pull/101)。マージはせず、mkt-review の判断待ち
+- CI: PR #101 の `lien-ci` 全5ジョブ(deno test / e2e / ops / plant assets / store metadata)が緑
