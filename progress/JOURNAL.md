@@ -601,3 +601,6 @@
 ## 2026-10-21 00:02 — Issue #120 Android v1.0 要件整理
 - 着手: Android v1.0 の iOS 差分・範囲・ウィジェット/通知/課金方針を調査し、受入条件に沿う要件表を作成する。
 - 同期で発生したこと: 作業記録の追記後、未コミット変更があるため `git pull --rebase` は拒否された。記録を保ったまま先にコミットし、再同期する。
+- 判断: iOS v1.0 は無料・匿名 Auth・共有 Supabase・APNs + snapshot を前提に実装済み。Android は中核の製品挙動と DB 契約を共有できるが、FCM 登録/配信、Glance 更新、通知権限、Play 審査は別実装。Play 個人アカウントの closed test 条件は公式ヘルプでも 12 人連続 14 日と確認した。Android ユーザー需要の実顧客証拠はこの Issue/リポジトリに見当たらず、需要は未検証 hypothesis として扱う。
+- 成果物: `docs/android/REQUIREMENTS-ANDROID.md` を追加。REQUIREMENTS §0–§10 を節単位で「同じ/変える/捨てる」に分類し、Glance・FCM・RevenueCat・Play テストゲートの推奨と、混在ペアの Supabase/RLS/snapshot/push-token 互換確認項目を記載した。
+- 検証: `git diff --check` はエラーなし。Android 実装は変更していないためアプリ build/test は対象外。内容の独立レビューを実施中。
