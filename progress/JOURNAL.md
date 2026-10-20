@@ -597,3 +597,12 @@
 - 発見: T33 でペイウォールが main に入った。`REVENUECAT_API_KEY` が公開ビルドに入ると、商品設定（T37 / G6・〜11/1）より先に「購入できないペイウォール」が出て、10/31 の「いまは全部、無料で使えます」と矛盾する。review.md §5-7 に、公開ビルドのキーを G4 で確認するよう記録（マーケ側では直せない）
 - 検証: `check_posts.py` OK（13本 + branding）/ unittest **52件** OK / `verify_metadata.py` OK・unittest 24件 OK（回帰なし）
 - 結果: 追補の PR を作成（マージしない）。`status: ready` は mkt-review 待ちのため付けない
+
+## 2026-10-21 01:20 (qa-lead) — #123 Android テスト計画・端末マトリクス
+- 着手: 指定 worktree / `consilium/123-and-qa-android`。開始時の tracked 差分なし。Issue #123 の受入条件4項目を確認し、#120 / #121 / #137 / #138 / #139 / #140 / #143 / #144、PR #132 の Android 要件差分、PR #131 の PMO 計画、REQUIREMENTS / DESIGN / E2E-M1 / contracts を突合した。
+- 判断: テスト対象を Android 10〜16（API 29〜36）、推奨 `minSdk 29` / `targetSdk 36` / `compileSdk 36` とした。Google Play の 2026-08-31 以降の API 36 要件と、Android 13+ の通知権限、Android 14 の正確なアラーム既定拒否、16 KB page size を確認。最小構成は E29 / E36 / P36（stock）/ P-OEM（OEM）/ I17（iPhone）の5構成。E31/E33/E34/E35-16K と実機追加は RC 前後とした。
+- 成果物: `docs/android/TESTPLAN-ANDROID.md`。ウィジェット14件（W-01〜W-14）、FCM 18件（F-01〜F-18、F-10b 含む）、Doze 10件（D-01〜D-10）、iOS⇄Android 23件（X-01〜X-23）、Android 回帰12件（C-01〜C-12）、セキュリティ12件（S-01〜S-12）を記載。CI は unit/contract/lint/assemble を毎 PR、instrumentation を API 36、API 29/33 を nightly/RC とし、実 FCM・OEM 電池・実 launcher・性能・Play pre-launch は実機/Play Console に分離した。
+- 未確定（null）: Android 実機と iPhone の確保状況、最終 minSdk、FCM 検証環境、複数端末/provider の token モデル、正確なローカル通知の許容幅、16 KB native の有無、Play Data safety / アカウント削除 Web 導線。実機なしでは「公開可」を出さない。
+- 検証: 24 テーブルの列数一致、ローカル相対リンクの実在、公式 URL 16件の到達（HEAD 非対応の Play Help 3件は GET 200）、`git diff --check` clean。文書のみの変更で Android のビルド・テストは対象外（`products/lien/android` は #121 作成中で未存在）。
+- 次の一手: PR を作成し、lien-ci の結果を確認する。実機確保は #124 / PMO と調整する。マージはしない。
+- 時刻訂正: 上の見出し「01:20」は実際の着手・記録時刻「01:11 JST」の誤記。内容は変更しない。
