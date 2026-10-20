@@ -265,7 +265,7 @@ App Group コンテナ直下 `pair_snapshot.json`。スキーマ(schemaVersion =
   3. 1 で拾った全リテラルが `StringsCatalog.all` に載っていること(カタログの陳腐化防止)。**`Strings.swift` に文言を足したら、`StringsCatalog.all` にも1行足す**(忘れるとこのテストが落ちる)
   - **サーバーとの整合検査**: アプリ側の禁止ワード(`PunishmentFreeLint.bannedWords`)は `messages_test.ts` の `BANNED_PATTERN` の語をそのまま移したもので、`testBannedWordsMatchServerSide` が `messages_test.ts` を読んで両者が一致することを検査する(サーバー側に語が足されたのにアプリ側が古いままだと落ちる。`BANNED_PATTERN` が単純な語の並びでなくなったときも落ちる)
   - 機械チェックは補助にすぎない(責めるニュアンスは語では捕まらない)。全文言の目視レビューは T27 本体で行う
-- **全文言の目視レビュー(T27 本体・2026-10-20・#27)**: `docs/STRINGS-REVIEW.md` に、`StringsCatalog` の全 297 単位の判定(OK 291 / 修正 6)と、空状態 14・エラー文言 33 の点検を記録した。`StringsReviewTests` の `testReviewLog*` が、全単位がログにあること・ログの文言が `Strings.swift` とずれていないこと・集計が判定と一致することを CI で検査する。**`Strings.swift` に文言を足したら、`StringsCatalog.all` と `docs/STRINGS-REVIEW.md` の両方に足す**(忘れるとどちらかが落ちる)
+- **全文言の目視レビュー(T27 本体・2026-10-20・#27)**: `docs/STRINGS-REVIEW.md` に、`StringsCatalog` の全 297 単位(2026-10-20 時点)の判定(OK 291 / 修正 6)と、空状態 14・エラー文言 33 の点検を記録した。`StringsReviewTests` の `testReviewLog*` が、全単位がログにあること・ログの文言が `Strings.swift` とずれていないこと・集計が判定と一致することを CI で検査する。**`Strings.swift` に文言を足したら、`StringsCatalog.all` と `docs/STRINGS-REVIEW.md` の両方に足す**(忘れるとどちらかが落ちる)
 - 色・余白・フォントは DesignSystem の定数のみ。View 内に直書きしない
 
 ## 4. プッシュ → ウィジェット更新パイプライン(M0 の検証対象)
