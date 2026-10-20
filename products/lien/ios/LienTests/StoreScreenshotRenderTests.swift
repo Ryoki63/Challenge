@@ -3,8 +3,9 @@
 // 目的: D1(v4「タネの子」)に合わせた App Store 用画像を、実際の画面から作る。
 // 実機の無い CI でも「実際の画面と違う画像」を作らないために、次の2段階で描く(どちらも ImageRenderer)。
 //
-//   1. アプリの本物の View(HomeView / HistoryView / WidgetRootView / ShareImageCardView)を、
+//   1. アプリの本物の View(ホームの中身 SnapshotContent / HistoryView / WidgetRootView / ShareImageCardView)を、
 //      端末と同じポイント数(6.7in = 430×932 / 6.1in = 393×852)・3倍で描く
+//      (ImageRenderer は ScrollView を描けないため、ScrollView の外側だけを外して同じ中身を描く — issue #80)
 //      → ios/build/store-screens/raw/<size>/<id>.png(証拠。コミットはしない)
 //   2. 1 を StoreScreenshotFrameView の端末枠に差し込み、キャプションと合成する
 //      → ios/build/store-screens/<size>/<id>.png(コミットする完成画像)
@@ -277,6 +278,27 @@ final class StoreScreenshotRenderTests: XCTestCase {
         var composed: [String: [String: CGImage]] = [:]
         var files: [String: [String: String]] = [:]
 
+        // ImageRenderer は、同じ run loop の中で続けて描くと「1枚前の結果」や空の画像を返すことがある。
+        // 2026-10-20 の CI では 01 が空・02 が 01 のコピー・04 が 03 のコピーになった。1枚ごとに run loop を
+        // 回し(settle)、最初の1回は捨てる(warm-up)ことで、12枚とも独立に描く
+        await settle()
+        _ = Self.render(Color.white, points: catalog.sizes[sizeOrder[0]]?.pointSize ?? CGSize(width: 430, height: 932))
+
+        // 診断: ImageRenderer 自体が描けているかをログに残す(空のときは run loop の問題か、View の問題かを切り分ける)。
+        // 画像は raw/ に置くだけで、完成画像には使わない
+        await settle()
+        if let text = Self.render(Text("Lien"), points: CGSize(width: 430, height: 200)) {
+            print("STORE-DIAG text=\(String(format: "%.3f", (try? StorePixels(text).drawnRatio()) ?? -1))")
+        }
+        await settle()
+        if let scroll = Self.render(
+            ScrollView { VStack(spacing: 8) { Text("スクロール"); Color.green.frame(height: 200) } },
+            points: CGSize(width: 430, height: 932)
+        ) {
+            print("STORE-DIAG scroll=\(String(format: "%.3f", (try? StorePixels(scroll).drawnRatio()) ?? -1))")
+            try write(scroll, to: output.appendingPathComponent("raw/_diag_scroll.png"))
+        }
+
         for sizeKey in sizeOrder {
             guard let size = catalog.sizes[sizeKey] else {
                 failures.append("\(sizeKey): captions.json にサイズが無い")
@@ -284,6 +306,7 @@ final class StoreScreenshotRenderTests: XCTestCase {
             }
             for frame in catalog.frames {
                 do {
+                    await settle()
                     let screen = try await renderScreen(scene: frame.scene, size: size)
                     XCTAssertEqual(screen.width, size.width, "\(sizeKey)/\(frame.id): 画面の幅")
                     XCTAssertEqual(screen.height, size.height, "\(sizeKey)/\(frame.id): 画面の高さ")
@@ -292,6 +315,7 @@ final class StoreScreenshotRenderTests: XCTestCase {
                         "\(sizeKey)/\(frame.id): 画面がほぼ空(実描画に失敗している)"
                     )
 
+                    await settle()
                     let image = try renderFrame(frame, size: size, screen: screen)
                     XCTAssertEqual(image.width, size.width)
                     XCTAssertEqual(image.height, size.height)
@@ -302,7 +326,9 @@ final class StoreScreenshotRenderTests: XCTestCase {
 
                     try write(screen, to: output.appendingPathComponent("raw/\(sizeKey)/\(frame.id).png"))
                     try write(image, to: output.appendingPathComponent("\(sizeKey)/\(frame.id).png"))
-                    composed[sizeKey, default: [:]][frame.id] = image
+                    if sizeKey == sizeOrder[0] {
+                        composed[sizeKey, default: [:]][frame.id] = image
+                    }
                     files[frame.id, default: [:]][sizeKey] = "\(sizeKey)/\(frame.id).png"
                 } catch {
                     failures.append("\(sizeKey)/\(frame.id): \(error.localizedDescription)")
@@ -373,11 +399,11 @@ final class StoreScreenshotRenderTests: XCTestCase {
     private func sceneView(_ scene: String, size: StoreScreenshotCatalog.Size) async throws -> AnyView {
         switch scene {
         case "home_both":
-            return try homeView(StoreDemo.paired(me: true, partner: true))
+            return try homeView(StoreDemo.paired(me: true, partner: true), size: size)
         case "home_waiting":
-            return try homeView(StoreDemo.paired(me: false, partner: true))
+            return try homeView(StoreDemo.paired(me: false, partner: true), size: size)
         case "home_solo":
-            return try homeView(StoreDemo.solo(), onInvite: {})
+            return try homeView(StoreDemo.solo(), size: size, onInvite: {})
         case "widget":
             return widgetScene(size: size)
         case "history":
@@ -389,8 +415,15 @@ final class StoreScreenshotRenderTests: XCTestCase {
         }
     }
 
-    /// ホーム。App Group の代わりに一時ディレクトリへ snapshot を置き、本物の HomeView に読ませる
-    private func homeView(_ snapshot: PairSnapshot, onInvite: (() -> Void)? = nil) throws -> AnyView {
+    /// ホーム。App Group の代わりに一時ディレクトリへ snapshot を置き、本物の HomeViewModel に読ませる。
+    /// 画面は HomeView の中身(SnapshotContent)を、HomeView と同じ余白(24pt)で描く。
+    /// **ScrollView は付けない**(ImageRenderer が ScrollView を描けず、空の画像になる — 2026-10-20 の CI で確認)。
+    /// スクロール位置が先頭のときの見た目と同じで、システムのナビゲーションバーは他のフレームと同じく描かない
+    private func homeView(
+        _ snapshot: PairSnapshot,
+        size: StoreScreenshotCatalog.Size,
+        onInvite: (() -> Void)? = nil
+    ) throws -> AnyView {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("lien-store-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -399,7 +432,16 @@ final class StoreScreenshotRenderTests: XCTestCase {
 
         let model = HomeViewModel(store: store, checkinService: LocalEchoCheckinService())
         model.load()
-        return AnyView(HomeView(viewModel: model, onInvite: onInvite))
+        return AnyView(
+            VStack(spacing: 0) {
+                SnapshotContent(viewModel: model, snapshot: snapshot, onInvite: onInvite, moderation: nil)
+                    .padding(LienSpacing.l)
+                Spacer(minLength: 0)
+            }
+            .frame(width: size.pointWidth, height: size.pointHeight, alignment: .top)
+            .background(Color.white)
+            .environment(\.colorScheme, .light)
+        )
     }
 
     /// ウィジェット(実寸の実描画)。システムの壁紙・アイコンは描かない
@@ -445,7 +487,8 @@ final class StoreScreenshotRenderTests: XCTestCase {
             now: { StoreDemo.now }
         )
         await model.load()
-        return AnyView(HistoryView(viewModel: model))
+        // ImageRenderer は ScrollView を描けないので、スクロールの器を外して同じ中身を描く
+        return AnyView(HistoryView(viewModel: model, scrolls: false).background(Color.white))
     }
 
     /// シェア画像。アプリが実際に書き出す 9:16 のカード(1080×1920)を、画面の上に置く
@@ -476,6 +519,12 @@ final class StoreScreenshotRenderTests: XCTestCase {
     }
 
     // MARK: 描画と保存
+
+    /// ImageRenderer に run loop を1回まわさせる。続けて描くと、前の描画結果や空の画像が返ることがある(CI で発生)
+    private func settle() async {
+        await Task.yield()
+        try? await Task.sleep(nanoseconds: 80_000_000)
+    }
 
     private static func render<V: View>(_ view: V, points: CGSize) -> CGImage? {
         let renderer = ImageRenderer(content: view.frame(width: points.width, height: points.height))

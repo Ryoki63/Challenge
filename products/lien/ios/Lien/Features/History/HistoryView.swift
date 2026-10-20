@@ -13,6 +13,8 @@ import SwiftUI
 @MainActor
 struct HistoryView: View {
     @State private var viewModel: HistoryViewModel
+    /// スクロールできる器を付けるか(ストア用スクリーンショットでは false)
+    private var scrolls = true
 
     private static let columnCount = 7
 
@@ -28,24 +30,36 @@ struct HistoryView: View {
         ))
     }
 
-    /// テスト・プレビュー用(状態を組み立て済みの ViewModel を渡す)
-    init(viewModel: HistoryViewModel) {
+    /// テスト・プレビュー用(状態を組み立て済みの ViewModel を渡す)。
+    /// scrolls = false は、ストア用スクリーンショットの実描画用(ImageRenderer は ScrollView を描けない — issue #80)。
+    /// 画面の中身は同じで、スクロールできる器を付けるかどうかだけが変わる
+    init(viewModel: HistoryViewModel, scrolls: Bool = true) {
         _viewModel = State(initialValue: viewModel)
+        self.scrolls = scrolls
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: LienSpacing.l) {
-                monthHeader
-                content
+        Group {
+            if scrolls {
+                ScrollView { contentBody }
+            } else {
+                contentBody
             }
-            .padding(LienSpacing.l)
         }
         .navigationTitle(Strings.History.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await viewModel.load() }
+    }
+
+    /// 画面の中身(月の見出し + グリッド)。ScrollView の有無に関係なく同じ
+    private var contentBody: some View {
+        VStack(spacing: LienSpacing.l) {
+            monthHeader
+            content
+        }
+        .padding(LienSpacing.l)
     }
 
     // MARK: 月の見出し
