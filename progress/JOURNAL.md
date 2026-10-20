@@ -466,3 +466,22 @@
 - 画像12枚 + 一覧は b5265f9 の版と SHA-256 で**完全一致**(main の課金導線はスクショでは nil のため、画面の見た目は変わらない)。manifest と README の来歴だけ更新
 - main が赤だった2件を補修(どちらもテストの期待値のみ): deno 型検査は #97 の `todayLocal` 必須化に `snapshot_test.ts` の pairPlan ケースが未追随、`SNAPSHOT_KEYS` は #96 の `pairPlan` 追加で22個なのに期待値21
 - 検証: `verify_screenshots.py` OK / unittest 36 OK / `lien-ci` #39392331252 success / `lien-ios` #39389661638(attempt 2) success
+
+## 2026-10-20 18:14 (eng-exec) — E3 #93 通知・ウィジェットの取りこぼし対策
+- 着手前確認: 指定 worktree / ブランチ `consilium/93-e3-nse`、追跡・未追跡差分なし。HEAD と origin/main は `13f057030a1e63fefe295bb0fc5e6519b343e652` で一致。対象リモートブランチ・既存 PR はなし。
+- 排他確認: `gh issue view 93 --repo Ryoki63/Challenge --json assignees` は `assignees: []`。認証ユーザーは `Ryoki63`。役職タスクは受領済みだが、AGENTS.md の「着手前に自分が assignee か確認する」を満たせないため、実装・テスト・ビルドは開始しない。
+- 承認返信確認: `needs-approval` Issue の bot を除く最新コメントを確認し、人間の返信に該当する未処理コメントはなし。他タスクは変更していない。
+- 【承認待ち】Issue #93 の排他担当割当を依頼する。推奨: `Ryoki63` を assignee に設定して本 worktree の eng-exec を再開。別担当が稼働中なら本タスクを待機。
+- 結果: blocked。受入条件4項目はすべて未検証。コード・テスト・設定・secret は変更していない。担当割当後、NSE → App Group、起動時差分補完、リトライ・重複防止テスト、lien-ios CI の順で進める。
+
+## 2026-10-20 19:10 (eng-exec) — E3 #93 承認後の実装再開
+- 着手: オーナーの「実行しちゃってください／担当は任せます」をタスク契約で確認。Issue #93 の assignee に認証本人 `Ryoki63` を設定・再取得し排他割当を確認、着手コメントを投稿した。
+- 同期確認: `git fetch origin main` 後、HEAD と origin/main の追加差分なし。既存 PR・対象リモートブランチなし。作業前差分は前回停止時の JOURNAL 追記のみで、その内容は保持する。指定ブランチを使い、rebase・main 直接 push・マージは行わない。
+- 検証計画: 既存 NSE・共有ストア・起動同期を調査 → 必要な最小変更と回帰テスト → 独立レビュー1回 → ローカル検査と lien-ios CI → PR/Issue に証拠を記録。ローカルは Command Line Tools のみで `xcodebuild` 不可のため、iOS ビルド/実行は CI で検証する。
+- 調査/判断: NSE 保存と起動 GET /snapshot は既存。ただし push の重複/逆順で無条件上書き・reload、同期失敗の自動再試行なし、差分取得なし。既存の「状態は snapshot が正」を維持し、差分は HTTP ETag による条件付き GET(内容が同じなら 304、違えば最新状態)で実装する。イベント履歴/DB migration/新しい通知は追加しない。
+- 互換性: PairSnapshot/プッシュの JSON キーは変更しない。条件ヘッダなしの旧アプリには従来の 200 応答。共有ストアはプロセス間の read-compare-write を調停し、重複/逆順と競合取得を抑止する。リトライは1回だけ(最大2試行)、認証エラーは自動再試行しない。G1 の p50/実機 NSE 実行と写真 DL(T17b)は今回の完了根拠に含めない。
+- 19:33 検証節目: `deno test` 全419件、snapshot の局所11件、契約フィクスチャ一致とツールテスト3件、releaseスクリプト130件、snapshot/index.ts の `deno check` が PASS。Swift ローカル型検査は SDK 明示でも既定でもホストの `SwiftBridging` 重複定義で失敗(2回)したため、以降ローカルコンパイラは再試行せず CI の Xcode を使う。独立レビュー1件を並行で実施中。
+- 19:38 検証方針更新: 既存 `scripts/macos-check/check.sh` に、このホストの SwiftBridging 重複を SDK 非変更の VFS overlay で解消する専用手順があることを確認。同じ直接型検査の3回目ではなく、この既存補助テストを出力先も worktree 内に限定して実施する。iOS/NSE 本体の成否は引き続き lien-ios を正本とする。
+- 19:42 検証/修正: 専用補助検査で Lien module 89ファイルの build が通過。追加 NSE テストの同期 closure に MainActor 専用の既存 ReloadCounter を使った隔離違反を検出したため、そのテストだけローカル Int カウンタへ修正した(製品の actor 制約は変えない)。同じテストスイートを再確認する。
+- 19:45 検証節目: 専用補助検査の全1126テスト/26578 assertionsが PASS。旧SHAの lien-ios はテスト修正前のためキャンセルを要求し、修正後に新規実行する。ETag の200応答取得と、再起動時に前回ETagから取りこぼした最新状態を回復する回帰テストも追加する。
+- 19:44 記録時刻の訂正: 上の「19:45」は入力時刻の誤記で、実際の1126件PASS確認・2件追加は19:43以前。追加後は全1128テスト/26587 assertionsが PASS。過去行は編集せず本行で訂正する。

@@ -409,3 +409,24 @@ v1.0 のウィジェットは1つ(kind `LienWidget`)で、4つのファミリー
 - **実機/シミュレータでの見た目は CI(lien-ios)と T20 で確認する**(このタスクでは実サーバー・実機の操作は行っていない)
 - 既知の制限: ペア解消後はホームの導線を出さない(相手の行は RLS で読めないため。自分の履歴の専用導線は別タスク)。
   チケットで守られた日は、凡例どおり「お休み」の印だけで、どちらがチェックインしたかは出さない(issue #18 の実装計画の `DayMark` に合わせる)
+
+## 15. 通知・ウィジェットの取りこぼし補完(issue #93 E3)
+
+- NSE は `PushSnapshotWriter` で `lien.snapshot` を検証し、App Group に保存する。同じ/古い push と表示の変わらない更新ではウィジェットを再 reload しない。未送信チェックインがあるときはローカル状態を保護する。`NotificationDeliveryGate` は通常終了と期限切れが競合しても contentHandler を1回に限定する。
+- 起動・前面復帰の既存 `AppModel` → `SnapshotSynchronizer` が補完の入口。`snapshot_sync.json` に前回保存できた snapshot と ETag を置き、ローカル状態が一致するときだけ条件付き GET を送る。304 は再表示なし、200 は最新状態を保存する。途中のイベント全件を再生する API ではない。
+- ネットワーク・サーバー応答・保存の失敗は250ms後に1回だけ再試行する。認証エラーやセッション終了は再試行/適用しない。失敗した状態で同期位置を進めず、サインアウト時には同期位置も消す。サーバー未更新で ETag が無い場合は従来どおり全状態の GET で動く。
+- `PushSnapshotWriterTests` は重複・逆順・保存失敗後の再受信・未送信操作・contentHandler 競合を検証する。`SnapshotRecoveryTests` は再起動の条件付き取得、リトライ上限、保存失敗、競合更新、セッション終了を検証する。`EdgeFunctionClientTests` と `supabase/functions/snapshot/response_test.ts` が HTTP の条件付き取得・受信者分離・日付跨ぎを検証する。
+
+再現コマンド(リポジトリ直下。補助テストの出力も worktree 内に限定):
+
+```sh
+MACOS_CHECK_OUT="$PWD/products/lien/ios/build/e3-macos-check" \
+  bash products/lien/ios/scripts/macos-check/check.sh test
+(cd products/lien/supabase/functions && deno test)
+deno check products/lien/supabase/functions/snapshot/index.ts
+deno run --allow-read products/lien/contracts/tools/generate.ts --check
+python3 -m unittest discover -s products/lien/ios/scripts -p 'test_*.py' -v
+```
+
+- iOS/NSE の実ビルドと XCTest は `lien-ios` CI を正本とする。macos-check は UIKit/NSE 本体を動かさない補助検査。
+- 残: APNs → NSE → ウィジェットの実機 p50≦60秒は G1 / T20。NSE 自体が起動されない場合・保存できない場合は次回起動/前面復帰で補完する。写真サムネ DL(T17b)、OS による push 配送/WidgetKit 更新の保証、バックエンドの本番反映は本タスクの検証済み事項に含めない。
