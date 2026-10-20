@@ -1,0 +1,75 @@
+{
+  "captionsSHA256" : "80653bf1e9fc24b309ceb75652c85bd70339056fabe5314533aaea0712dc1df1",
+  "catalogUpdated" : "2026-10-20",
+  "catalogVersion" : 1,
+  "frames" : [
+    {
+      "files" : {
+        "6.1in" : "6.1in/01_home_both.png",
+        "6.7in" : "6.7in/01_home_both.png"
+      },
+      "id" : "01_home_both",
+      "scene" : "home_both"
+    },
+    {
+      "files" : {
+        "6.1in" : "6.1in/02_home_waiting.png",
+        "6.7in" : "6.7in/02_home_waiting.png"
+      },
+      "id" : "02_home_waiting",
+      "scene" : "home_waiting"
+    },
+    {
+      "files" : {
+        "6.1in" : "6.1in/03_widget.png",
+        "6.7in" : "6.7in/03_widget.png"
+      },
+      "id" : "03_widget",
+      "scene" : "widget"
+    },
+    {
+      "files" : {
+        "6.1in" : "6.1in/04_history.png",
+        "6.7in" : "6.7in/04_history.png"
+      },
+      "id" : "04_history",
+      "scene" : "history"
+    },
+    {
+      "files" : {
+        "6.1in" : "6.1in/05_share.png",
+        "6.7in" : "6.7in/05_share.png"
+      },
+      "id" : "05_share",
+      "scene" : "share"
+    },
+    {
+      "files" : {
+        "6.1in" : "6.1in/06_home_solo.png",
+        "6.7in" : "6.7in/06_home_solo.png"
+      },
+      "id" : "06_home_solo",
+      "scene" : "home_solo"
+    }
+  ],
+  "generatedAt" : "2026-10-20T16:33:35+09:00",
+  "provenance" : {
+    "commit" : "b5265f9a85632265477d3943209799359cf5d5fa",
+    "repository" : "Ryoki63/Challenge",
+    "runAttempt" : "1",
+    "runId" : "39385881488",
+    "workflow" : "lien-ios"
+  },
+  "sizes" : {
+    "6.1in" : {
+      "device" : "iPhone 15 Pro(393×852pt @3x)",
+      "height" : 2556,
+      "width" : 1179
+    },
+    "6.7in" : {
+      "device" : "iPhone 15 Pro Max(430×932pt @3x)",
+      "height" : 2796,
+      "width" : 1290
+    }
+  }
+}
