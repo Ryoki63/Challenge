@@ -74,6 +74,15 @@ jobs:
       - name: Pin Swift packages (Package.resolved)
         run: scripts/pin-packages.sh
 
+      # ストア用スクリーンショット(issue #80)の来歴。StoreScreenshotRenderTests が manifest.json に取り込む。
+      # 画像がどのコミット・どの実行から作られたかを G4 で辿れるようにする(テストは iOS シミュレータで動くため、
+      # 環境変数ではなくファイルで渡す)
+      - name: Record CI provenance (store screenshots)
+        run: |
+          mkdir -p build/store-screens
+          printf '{"commit":"%s","runId":"%s","runAttempt":"%s","workflow":"lien-ios","repository":"%s"}\n' \
+            "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_REPOSITORY" > build/store-screens/ci.json
+
       # シミュレータの起動を、ビルド・テストから切り離して所要を見えるようにする(issue #66)。
       # Build & test が 10〜13 分に伸びたとき、ログには「ビルドが終わってからテストが始まるまでの 2〜8 分の空白」があった。
       # xcodebuild が自分でシミュレータを起動して待っていた時間で、ステップの内訳には出てこなかった。
@@ -140,6 +149,30 @@ jobs:
         with:
           name: plant-render-sheets-xcresult
           path: ${{ runner.temp }}/plant-render-xcresult/
+          if-no-files-found: warn
+          retention-days: 30
+
+      # ---- ストア用スクリーンショット(issue #80 / MK7)
+      # StoreScreenshotRenderTests が、本物の View を実寸で描いた画面(raw/)と、キャプションと合成した完成画像
+      # (6.7in/ 6.1in/)、並べた一覧(contact-sheet-6.7in.png)、来歴(manifest.json)を build/store-screens/ に書く。
+      # 完成画像を marketing/screenshots/ にコミットする(手順は marketing/screenshots/README.md)
+      - name: List store screenshots
+        if: always()
+        run: |
+          echo "--- ios/build/store-screens/"; ls -R build/store-screens 2>&1 || true
+          {
+            echo "### ストア用スクリーンショット(issue #80)"
+            echo "artifact: \`store-screenshots\`(完成画像 6.7in/6.1in + raw/ + manifest.json + contact-sheet)"
+            echo
+            ls -1 build/store-screens/6.7in 2>/dev/null | sed 's/^/- /' || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload store screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: store-screenshots
+          path: products/lien/ios/build/store-screens/
           if-no-files-found: warn
           retention-days: 30
 
