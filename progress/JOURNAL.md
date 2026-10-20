@@ -632,3 +632,7 @@
 - 再検証: verify_press.py OK / marketing tools 64 tests OK / verify_screenshots.py OK / 文字数 60・200・581（宣言一致）/ 3枚 1290×2796・元画像と SHA-256 一致 / Chrome headless で A4 1ページ（`/Count 1`、595×842pt）/ `git diff --check` OK（変更後）。
 - 次: 修正版の再レビュー結果を確認し、PASS なら PR #117 に記録。Blocker 3 は G4 #42 の実値が入るまで外部掲載不可のため、needs_owner に1件で残す。
 - 時刻訂正: 直前の「レビュー結果(23:20 JST)」「修正(23:22 JST)」は入力時の未来時刻だった。実際は 23:14〜23:16。過去行は編集せず、本行で訂正する。
+- 再レビュー(23:17 JST): 修正版は **PASS（条件付き）**。Blocker 1（04 と23日の矛盾）は 06_home_solo への差し替えで解消、Blocker 2（ウィジェットの記録表現）は「今日の状態とストリーク」への限定で解消。残る条件は Blocker 3 = G4 #42 の提供元・連絡先の実値のみ。Minor（copy.md の対象出典 §5→§2、README の `null` 表記、「7日」→「10/20 未完了で6日・完了で7日」）も修正。
+- 記録: `press/README.md` §9 に初回 FAIL・再レビュー PASS（条件付き）・外部掲載不可の条件を追記。`copy.md` の状態行も「独立レビュー PASS（条件付き）/ mkt-lead 承認待ち」に更新。
+- 最終検証(23:18 JST): verify_press.py OK / marketing tools 64 tests OK / verify_screenshots.py OK / 文字数 60・200・581 / 3枚 1290×2796・元画像と SHA-256 一致 / Chrome headless A4 1ページ（`/Count 1`）/ `git diff --check` OK。PR CI 6 job は修正前 SHA で success、修正後 SHA は実行確認中。
+- 結果: **BLOCKED（G4 #42 の提供元・連絡先の実値待ち）**。受入条件1の実値、および mkt-lead の最終承認が残る。PR #117 は OPEN（マージしない）。外部掲載・送付は行っていない。

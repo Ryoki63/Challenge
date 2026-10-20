@@ -33,7 +33,7 @@
 | 対象 | 恋人・夫婦・友達・家族など、習慣を一緒に続けたいふたり | `docs/CONCEPT.md` §2 |
 | 画面 | v4「タネの子」の実画面 3 枚 | `../screenshots/README.md`（MK7 / issue #80） |
 
-- **実績値は無い**。利用者数・ダウンロード数・順位・受賞は、公開前で取得できないため `null`（0 ではない）。紹介文にもファクトシートにも書かない。
+- **実績値は無い**。利用者数・ダウンロード数・順位・受賞は、公開前で取得できないため未取得（0 ではない）。紹介文にもファクトシートにも書かない。
 - 将来の価格案（月700円 / 年2,400円）は v1.1 の `docs/CONCEPT.md` §6 の案であり、v1.0 の紹介素材には使わない。
 - 公開日は審査結果で動くため、本文では断定しない。
 
@@ -107,3 +107,9 @@ cd products/lien/marketing/press
 - 提供元・連絡先の未確定: 提供元は [`../legal/CHECKLIST-G4.md`](../legal/CHECKLIST-G4.md) §1・[`../legal/terms.html`](../legal/terms.html) 冒頭、連絡先は同チェックリスト §1・[`../../ios/Lien/Core/SupportLinks.swift`](../../ios/Lien/Core/SupportLinks.swift)
 - 画面: [`../screenshots/README.md`](../screenshots/README.md)（MK7 / issue #80）、[`../screenshots/captions.json`](../screenshots/captions.json)
 - 公開目標: [`docs/TASKPLAN.md`](../../../../docs/TASKPLAN.md) §9.2
+
+## 9. レビュー記録
+
+- 2026-10-20 23:14 JST: mkt-review 観点の独立レビュー（読み取り専用）**FAIL**。Blocker 3件 = ①`04_history.png` の10/13途切れと02/05の23日ストリークの矛盾、②200/600字の「ウィジェットでふたりの記録」が REQUIREMENTS §3.10 を超える、③提供元・連絡先が G4 未確定のトークン。Minor = 対象の出典（CONCEPT §2 が正）、`（null）` の内部用語。
+- 2026-10-20 23:17 JST: 修正版の再レビュー **PASS（条件付き）**。Blocker ①は 04 を 06_home_solo に差し替えて解消、②は「今日の状態とストリーク」に限定して解消。残る条件は ③ G4 #42 の提供元・連絡先の実値確定のみ。
+- したがって、この資料は **G4 #42 の値が入るまで外部掲載・送付しない**。確定後に §4 の手順でトークンを置換し、mkt-lead の承認を得る。
