@@ -636,3 +636,5 @@
 - 記録: `press/README.md` §9 に初回 FAIL・再レビュー PASS（条件付き）・外部掲載不可の条件を追記。`copy.md` の状態行も「独立レビュー PASS（条件付き）/ mkt-lead 承認待ち」に更新。
 - 最終検証(23:18 JST): verify_press.py OK / marketing tools 64 tests OK / verify_screenshots.py OK / 文字数 60・200・581 / 3枚 1290×2796・元画像と SHA-256 一致 / Chrome headless A4 1ページ（`/Count 1`）/ `git diff --check` OK。PR CI 6 job は修正前 SHA で success、修正後 SHA は実行確認中。
 - 結果: **BLOCKED（G4 #42 の提供元・連絡先の実値待ち）**。受入条件1の実値、および mkt-lead の最終承認が残る。PR #117 は OPEN（マージしない）。外部掲載・送付は行っていない。
+- CI(23:21 JST): 最終 SHA `7fa70c7` の lien-ci 6 job がすべて success。PR #117 は OPEN・未マージ。G4 #42 の提供元・連絡先の実値と mkt-lead 承認を待つ。
+- 時刻訂正: 直前の「CI(23:21 JST)」は入力時の未来時刻。実際は 23:19 JST。過去行は編集せず本行で訂正する。
