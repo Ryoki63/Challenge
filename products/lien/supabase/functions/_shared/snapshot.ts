@@ -15,6 +15,10 @@
 //   - ペアのプラン(2026-10-20・T33 / REQUIREMENTS §3.14): pairPlan = メンバーの users.premium_until から導出
 //       (どちらかが未来なら premium。ソロは free。キーは省略せず必ず出す)
 //   - ストリーク導出: docs/DESIGN.md §5.4(確定は close-day。表示はプレビュー値)
+//   - 組み立てに使った「今日」(dateLocal。2026-10-20・issue #72): サーバーは checkin / checkin-cancel / nudge の
+//     snapshot を、クライアントが送った日付を「今日」として組み立てる(翌日の 1:00 まで有効 — resolveTodayLocal)。
+//     そのため「その snapshot の完了フラグがどの日のものか」は updatedAt からは決まらない。dateLocal に
+//     **組み立てに使った「今日」**をそのまま載せ、クライアントが完了をその日付で解釈できるようにする
 //
 // 設計:
 //   - snapshot は**受信者視点**でサーバーが組み立てる(me/partner をクライアントで反転しない — §3.4)
@@ -48,6 +52,14 @@ export interface PairSnapshot {
   pairId: string | null;
   /** ISO8601 */
   updatedAt: string;
+  /**
+   * この snapshot を組み立てるのに使った「今日」(date_local "YYYY-MM-DD")。`todayMeDone` / `todayPartnerDone` は
+   * **この日の**完了(issue #72)。checkin / checkin-cancel / nudge はクライアントが送った日付を「今日」として
+   * 組み立てる(翌日の 1:00 まで有効 — CLOSE_DAY_SETTLE_HOUR)ので、`updatedAt` の日付とは 1 日ずれることがある。
+   * クライアントはこの日付で完了を解釈する(0:00〜1:00 の「不明」扱いをしない)。古いサーバーはこのキーを
+   * 出さない(アプリは無いキーを nil として扱い、updatedAt から保守的に判定する — DESIGN §3.4 の互換性)
+   */
+  dateLocal: string;
   streakCurrent: number;
   streakBest: number;
   todayMeDone: boolean;
@@ -413,6 +425,7 @@ export function buildPairSnapshot(input: BuildPairSnapshotInput): PairSnapshot {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     pairId: input.pairId,
     updatedAt: input.updatedAtIso,
+    dateLocal: input.todayLocal,
     streakCurrent,
     streakBest: Math.max(best, streakCurrent),
     todayMeDone: input.todayMeDone,
@@ -441,17 +454,22 @@ export function buildPairSnapshot(input: BuildPairSnapshotInput): PairSnapshot {
 /**
  * ソロ状態(ペア未成立)の snapshot。鉢は土だけ=クライアントは pairId=null で土を描画。
  * 植物の進み具合は 0 / 0 / null(ゲージを出さない — GROWTH §5.1)。お休みチケットの残数も null
- * (ペア共有の在庫なので、ペアが無ければ持ち主がいない。バッジを出さない)
+ * (ペア共有の在庫なので、ペアが無ければ持ち主がいない。バッジを出さない)。
+ * todayLocal は組み立てに使った「今日」(dateLocal。ソロでも載せる — クライアントが完了をその日付で解釈する)
  */
 export function buildSoloSnapshot(input: {
   updatedAtIso: string;
+  /** 組み立てに使った「今日」(date_local) */
+  todayLocal: string;
   todayMeDone: boolean;
   myPromise: PromiseSummary | null;
 }): PairSnapshot {
+  assertDateLocal(input.todayLocal);
   return {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     pairId: null,
     updatedAt: input.updatedAtIso,
+    dateLocal: input.todayLocal,
     streakCurrent: 0,
     streakBest: 0,
     todayMeDone: input.todayMeDone,
@@ -619,6 +637,7 @@ export interface SnapshotRepo {
  * 未指定なら now をユーザーの timezone で date_local 化する。
  * ただし override の日がすでに確定済み(翌日の 1:00 を過ぎている)なら捨てて、本当の今日を使う
  * (resolveTodayLocal。close-day の後にキューから届いた昨日付けの checkin に、先取りの +1 を見せない)。
+ * 解決した「今日」は snapshot の **dateLocal** に載せる(クライアントはそれで完了を解釈する。issue #72)。
  * ※ ペアは国内(同一TZ)前提(REQUIREMENTS §3.4。時差ペアの厳密対応は v2+)
  */
 export async function loadSnapshotForUser(
@@ -646,6 +665,7 @@ export async function loadSnapshotForUser(
   if (!pair) {
     return buildSoloSnapshot({
       updatedAtIso,
+      todayLocal,
       todayMeDone: myCheckin !== null,
       myPromise,
     });

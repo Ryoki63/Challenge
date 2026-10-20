@@ -359,6 +359,60 @@ final class ReminderPlanTests: XCTestCase {
         XCTAssertEqual(risks(plan(snapshot: snapshot, now: Clock.date(2026, 10, 15, 8, 0))), [])
     }
 
+    // MARK: - 組み立てに使った「今日」(dateLocal。issue #72)
+
+    func testACheckinRightAfterMidnightTrustedThroughDateLocalDropsTodaysReminder() {
+        // 受け入れ条件(issue #72): 0:00〜1:00 に自分でチェックインしたら、その日のリマインドが取り消される。
+        // サーバーは 0:20 に組み立てた snapshot に、組み立てに使った「今日」(15 日)を載せる
+        let snapshot = NotificationSnapshots.paired(
+            updatedAt: Clock.date(2026, 10, 15, 0, 20), dateLocal: "2026-10-15", meDone: true, streak: 23
+        )
+        let planned = plan(snapshot: snapshot, now: Clock.date(2026, 10, 15, 0, 21))
+
+        XCTAssertEqual(
+            reminders(planned).first?.id, "lien.local.reminder.2026-10-16",
+            "自分は済み: 今日(15 日)の分は予約しない。dateLocal が無いと同じ snapshot でも 15 日の分が残る(上のテスト)"
+        )
+        XCTAssertEqual(reminders(planned).count, 13)
+        XCTAssertEqual(risks(planned).map(\.id), ["lien.local.streak-risk.2026-10-15"], "相手がまだ: 今夜の分は残る")
+        XCTAssertEqual(
+            risks(planned).first?.body, Strings.LocalNotification.streakRiskMeDone(partnerName: "ゆうき", days: 23),
+            "誰が済んだかが分かるので「自分は済み」の言い方(「どちらも未完」にしない)"
+        )
+    }
+
+    func testBothDoneRightAfterMidnightTrustedThroughDateLocalMovesTheRiskToTomorrow() {
+        let snapshot = NotificationSnapshots.paired(
+            updatedAt: Clock.date(2026, 10, 15, 0, 20), dateLocal: "2026-10-15",
+            meDone: true, partnerDone: true, streak: 24
+        )
+        let planned = plan(snapshot: snapshot, now: Clock.date(2026, 10, 15, 0, 21))
+
+        XCTAssertEqual(reminders(planned).first?.id, "lien.local.reminder.2026-10-16")
+        XCTAssertEqual(risks(planned).map(\.id), ["lien.local.streak-risk.2026-10-16"], "ふたりそろった: 明日の分")
+    }
+
+    func testAQueuedCheckinFromYesterdayKeepsTodaysReminderEvenWithDateLocal() {
+        // 受け入れ条件の裏側: 14 日 23:58 に圏外で押したチェックインが 15 日 0:20 に届いた(サーバーは 14 日を「今日」
+        // として組み立てる)。dateLocal が 14 日なので、15 日の完了と取り違えない
+        let snapshot = NotificationSnapshots.paired(
+            updatedAt: Clock.date(2026, 10, 15, 0, 20), dateLocal: "2026-10-14",
+            meDone: true, partnerDone: true, streak: 24
+        )
+        let planned = plan(snapshot: snapshot, now: Clock.date(2026, 10, 15, 0, 25))
+
+        XCTAssertEqual(reminders(planned).first?.id, "lien.local.reminder.2026-10-15", "15 日のリマインドは残る")
+        XCTAssertEqual(reminders(planned).count, 14)
+        XCTAssertEqual(
+            risks(planned).map(\.id), ["lien.local.streak-risk.2026-10-15"],
+            "昨日(14 日)ふたりそろっていた: 昨日までの記録が続いているので、今夜の分を入れる"
+        )
+        XCTAssertEqual(
+            risks(planned).first?.body, Strings.LocalNotification.streakRiskNeither(days: 24),
+            "今日の完了は分からない: どちらも未完の言い方"
+        )
+    }
+
     // MARK: - 日付またぎ
 
     func testTheWindowAndTheDoneFlagRollOverAtMidnight() {
