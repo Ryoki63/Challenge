@@ -637,3 +637,34 @@
 - 指示: 既存 PR の同じブランチを維持し、レビューの3 blocker（DECISION-AND-002 の Supabase 月数、A 案の iOS 保護期間重複、G12 日本向け URL）を修正して再提出する。新規 PR は作らない。
 - 修正: DECISION-AND-002 の Supabase 閾値を 4 か月（31,550 円）/3 か月（27,800 円）に訂正。A の Play 登録・支払・本人確認・端末確認とテスター打診を iOS 保護期間後の 11/1〜11/5 に移し、11/5 を越えた場合の D3・後続ゲート再計算、テスト日数を圧縮せずずらす規則を追記。PLAN、両判断カード、DEPENDENCIES、README の A 日程を同期。G12 を日本指定の公式 URL に統一。
 - 根拠確認: Google Play Console の公式日本向けページを開き、Sole proprietor は Opening/Closing Notification of a Private Business で organization として確認可能との記載を確認（行 67）。
+
+## 2026-10-21 00:02 — Issue #120 Android v1.0 要件整理
+- 着手: Android v1.0 の iOS 差分・範囲・ウィジェット/通知/課金方針を調査し、受入条件に沿う要件表を作成する。
+- 同期で発生したこと: 作業記録の追記後、未コミット変更があるため `git pull --rebase` は拒否された。記録を保ったまま先にコミットし、再同期する。
+- 判断: iOS v1.0 は無料・匿名 Auth・共有 Supabase・APNs + snapshot を前提に実装済み。Android は中核の製品挙動と DB 契約を共有できるが、FCM 登録/配信、Glance 更新、通知権限、Play 審査は別実装。Play 個人アカウントの closed test 条件は公式ヘルプでも 12 人連続 14 日と確認した。Android ユーザー需要の実顧客証拠はこの Issue/リポジトリに見当たらず、需要は未検証 hypothesis として扱う。
+- 成果物: `docs/android/REQUIREMENTS-ANDROID.md` を追加。REQUIREMENTS §0–§10 を節単位で「同じ/変える/捨てる」に分類し、Glance・FCM・RevenueCat・Play テストゲートの推奨と、混在ペアの Supabase/RLS/snapshot/push-token 互換確認項目を記載した。
+- 検証: `git diff --check` はエラーなし。Android 実装は変更していないためアプリ build/test は対象外。内容の独立レビューを実施中。
+- 再開・検証: 既存の PR #132（未マージ）と `docs/android/REQUIREMENTS-ANDROID.md` を再点検した。REQUIREMENTS.md の見出し26節（§0〜§10、§3.1〜§3.15）と表の26行が一致し、相対リンク3件はすべて実在。受入条件3項目は表・推奨・互換確認の各節に対応している。外部資料の記述のうち、Glance の更新頻度の案内が逆になっていたため修正する。
+- 独立レビュー: 重大2件の指摘。①§3.12「v1.0 で植物名通知を送らない」は誤り（REQUIREMENTS §3.12 は植物名通知を [v1.0 P1] としている）。②§3.2 の「新しい相手との再スタート v1.1」と §3.15 の「サインアウト [v1.0]」の欠落。あわせて §3.3 曜日指定・§3.9 P1・§3.10 インタラクティブ/複数ペア・§3.11「この日のふたり」の後続優先度を追記して修正。再レビューで「重大2件とも解消・承認可」。
+- 仕上げ: 「v1.0 の範囲（含める/P1/含めない/未確定）」を追加。CONCEPT.md §9 が Android を v2+ としていた戦略との差分をオーナー指示として記録。需要の証拠は Issue・リポジトリ内で `null`（オーナー指示は投資判断であり顧客の行動証拠ではない）と明示。Glance の更新頻度案内の向き、RevenueCat 共用可否（可・条件付き）、FCM の data メッセージで widget を更新する経路を修正・追記した。
+- 検証: 26節マッピング・相対リンク4件の実在・`git diff --check` を確認。文書のみの変更のためアプリの build/test は対象外。push 後に lien-ci を確認する。
+- CI: push `9c4f04d` の lien-ci run 39446913929 は6ジョブすべて success（deno / ops / e2e / pages / plant layers / store metadata）。文書のみの変更のためアプリの build/test は対象外。
+- 結果: PR #132 を更新（未マージ・レビュー待ち）。受入条件3項目（節ごとの仕分け表・v1.0 範囲の推奨・混在ペアのデータ互換確認）を満たす成果物を提出した。Issue #120 はレビュー完了まで開いたままにする。
+
+## 2026-10-21 00:40 (product-lead) — Issue #120 再開・外部資料の再確認
+- 着手: 既存ブランチ（REQUIREMENTS-ANDROID.md・PR #132 オープン）を再点検。完了条件3項目（仕分け26節・v1.0範囲の推奨・混在ペアのデータ互換）は文書上そろうことを確認。
+- 検証: 表26行と REQUIREMENTS §0〜§10 の節が一致。相対リンク4件の実在。iOS 側の事実（招待8文字・72時間・1回限り、push_env の APNs 用、ウィジェット4ファミリ）と文書が一致。
+- 修正（断定の取り下げ）: 本セッションで公式本文を取得できなかった2点を「要再確認（hypothesis）」に改めた。①Glance の定期更新の上限（1時間に1回）②Play の 12人×14日の本文（前回は照合済みと書いていたが、今回は再確認できず）。あわせて FCM と Google Analytics の関係（§7）も未確認として残した。
+- 判断: 推奨の方向（Glance・FCM・Play Billing+RevenueCat 共用は条件付き）は変えない。確認できない条文は断定せず、実装・Play 判断の前に公式資料で確かめる前提に留めた。
+- 取得の制約: developer.android.com・support.google.com・firebase.google.com の該当ページは本セッションでは本文が切り詰められて届いた（HTTP 200 だが本文不足）。
+- 残り: PR #132 のレビュー（未マージ）。Play の条件の確定と組織アカウントの扱いは #119（AND-PMO）の判断事項。
+- 00:31 記録時刻の訂正: 上の「00:40」「00:45」は見積もりの誤記。実時刻は 00:31 JST（TZ=Asia/Tokyo の date で確認）。過去行は編集せず本行で訂正する。
+- 00:33 一次資料の再確認: Supabase 匿名認証の本文で、匿名ユーザーは authenticated ロール・JWT の is_anonymous で RLS 区別・端末間の記録共有は不可、を確認（文書の「UUID を OS 間で共有しない」と整合）。RevenueCat Identifying Customers の本文で、App User ID はプロジェクト単位・大文字小文字区別・同一 ID は全プラットフォームで権限を共有、を確認。Android 通知権限の本文は取得できず（未確認のまま）。
+
+## 2026-10-21 00:43 (product-lead) — Issue #120 再開・一次資料の再照合
+- 着手: PR #132 の未コミット差分を確認。Issue の排他担当が空欄だったため、直接依頼された本作業の担当 `Ryoki63` を Issue #120 に設定し、readback で確認した。
+- 範囲: 受入成果物は前回提出済み。今回は公式資料を一次確認して残っていた仮説表示を直し、PR #132 に反映する。PR は未マージのままレビュー待ちとし、Issue も閉じない。
+- 一次資料確認: Glance `updatePeriodMillis` は最大30分に1回、WorkManager は例として15分間隔。Android 13+ の `POST_NOTIFICATIONS` 実行時許可、Android 8+ の通知チャンネル、FCM 通知メッセージのバックグラウンド処理と data-only callback の区別、Play の対象個人アカウントにおける12人・14日連続 opt-in、Analytics が FCM 自体ではなく Console delivery reports / BigQuery export に必要な点を公式資料で確認。
+- 未確認のまま残す事項: 実際の Play developer account 種別・作成日、組織アカウントの適用条件、実機での更新/通知達成値、Android の実顧客需要。対象値は取得していないため `null`。
+- 独立レビュー: 外部仕様の変更箇所を別レビュワーが再確認。Android 8+ の通知チャンネル要件は targetSdk 26+ 条件を補うよう指摘され、その範囲表現に限定して修正。他の対象記述は公式資料と整合し、相互矛盾なしとの評価。
+- 最終ローカル確認: REQUIREMENTS の番号節26件と Android 分類表26行が順序一致。文書内相対リンク6件がすべて実在。`git diff --check` pass。コード/テスト対象に変更なし。
