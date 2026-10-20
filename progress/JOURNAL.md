@@ -472,3 +472,7 @@
 - 承認確認: #32 のオーナー返信「それで良い」(2026-10-20 18:36 JST)は PR #90 の通年訴求・キーワード99字・「約束」重複維持と、G0 承認後に人間が ASC 投入する提案への同意。文言の再承認は求めない。
 - 依存確認: G0 #38 は OPEN で Apple Developer 加入完了の証跡なし。G4 #42 は OPEN だが 2026-10-20 18:48 JST にオーナー返信「それでOK!」あり。ASC 設定済みとは扱わず、投入手順・承認記録と残る人間操作を照合する。
 - 同期: PR #90 の head は origin から削除済みで pull --ff-only は同期不可。履歴を書き換えず origin/main を merge。CI は main の既存検査をすべて保持し、JOURNAL は両側の記録を保持して今回の記録だけ末尾へ置いた。
+- 変更: ASC-ENTRY と alternatives に #32 / #42 の承認原文と時刻を記録。#42 の返信は旧候補に対するものなので、通年版の採用根拠は #32 と明記。文言の再承認・ASC の代理操作・審査提出を行わず、人間の保存・再読み込み確認と証跡返却を次の工程にした。
+- 発見・修正: `verify_metadata.py --print` の見出しだけが「App 情報 > キーワード」のままだった。既存の ASC-ENTRY に合わせ「バージョン情報 > キーワード」へ修正し、回帰テスト1件を追加。承認済み `ja/*.txt` は main と差分なし。
+- ローカル検証: marketing で `PYTHONDONTWRITEBYTECODE=1 python3 tools/verify_metadata.py --print` = OK / keywords 99/100字、`python3 -m unittest discover -s tools -p 'test_*.py' -v` = 37件 PASS(メタデータ25件・スクショ12件)、`python3 tools/verify_screenshots.py` = 各6枚 OK。変更 Python 2ファイルは AST 構文検査 PASS、`git diff --check` PASS。
+- 適用外: iOS/バックエンド変更なしのため iOS ビルド・型チェックは対象外。Python の専用型チェック/lint/build 設定はなく、関連テスト・AST・CLI 実行・差分検査で確認。独立レビュー1回を依頼済み(結果待ち)。ASC の受入条件は未達のためタスク全体を done にしない。
