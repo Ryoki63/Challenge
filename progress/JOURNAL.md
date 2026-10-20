@@ -329,3 +329,14 @@
 - 検証(ローカル): supabase functions `deno test` 393 passed / 契約フィクスチャ 22 件一致 / ops `deno test --allow-read` 76 passed(新規8件を含む)/ e2e unit 65 passed + `deno check` / review-demo 17 passed + `deno check` / store metadata OK / `git diff --check` OK / 秘密の混入なし
 - 残り: G0 承認後の内部 TestFlight(10/23)で §1.1・§1.4・§1.5 の手順を実ビルドで再現 → §8 のチェックを埋める。提出日(10/27)に相手役の招待コードを2つ発行して ASC の Notes for Review に記入。Support URL/Privacy URL の Pages 公開と連絡先は G4(#42)
 - 補記(2026-10-20 12:55): この記録は PR #88 のマージ解決(7fba989)で `progress/JOURNAL.md` から落ちていたため、追記として復元した。内容はコミット `08191a1` の記録のまま(検証の ops は当時 76。その後、マニフェストのトラッキング検査を1件足して 77 になり、CI で確認済み)
+
+## 2026-10-20 12:42 (eng-exec) — T32 #32 ASO 初期設定(キーワード・説明文)の本編
+- 着手: 2026-10-12 の T32準備(store_metadata/ja の確定値化+verify_metadata.py+CI ジョブ)の続き。完了条件「ASC にキーワード・説明文設定完了」のうち、リポジトリ側で確定できる部分を終わらせ、残りを G4 後の ASC 投入だけにする
+- 前提の変化: 2026-10-12 の確定値は「次の需要の山=1月の新年需要」に合わせていたが、10-20 のオーナー決定で公開 10/31・審査提出 10/27 に前倒しした。キーワードはバージョン提出と同時にしか変更できないため、季節外れの「新年」「正月」で初回の索引枠を使うと11〜12月は戻せない → 通年訴求に再調整(退避値は alternatives.md §8.3)
+- 変更: keywords 81→99字(新年/正月を外し、朝活・早起き・筋トレ・勉強・ダイエット・遠距離を追加)/ promotional_text を季節非依存に(「広告なし」は v1.0 の事実)/ description の末尾節を「◆ 思い立った日が、はじまりの日」に、ウィジェット節を「自分と相手の今日の○×」に(REQUIREMENTS §3.10 との一致)
+- 検査の追加: issue #32 の「検証」が「表示名との語重複なし」を verify_metadata.py で検査すると書いていたが実装されていなかった。表示名・サブタイトルとの重複/キーワード同士の包含重複/Pairy 語の不在 を追加。単体テスト `tools/test_verify_metadata.py` 24件(赤になる例を固定)を新設し、CI の store-metadata ジョブで実行
+- Pairy 語: Issue の表題は「Pairy 関連語」だが、TASKPLAN §9.4 の T32「Pairy 語は全廃」が後。全廃のまま(機械検査で担保)。戻すなら G4 でリスク承認
+- 成果: `store_metadata/ASC-ENTRY.md`(ASC の画面→ファイルの対応・貼り付け手順・入力後の証跡チェック)。残るのは G0 の Apple 承認 → ASC アプリレコード → G4 承認 → このシートどおりの投入
+- 判明: issue の進め方コメント手順7は「App 情報に keywords」としているが、キーワード欄はバージョンページ側。手順書は実画面の構成に合わせ、ずれを ASC-ENTRY.md に注記した
+- 未解決: 表示名「ふたりの約束」とサブタイトル「約束はひとつだけ」の「約束」重複(§2 の不採用理由と矛盾)。推奨は現状維持、代替案つきで alternatives.md §8.5 に記載
+- 結果: 検証(verify_metadata.py / unittest 24件)緑。PR を作成し、ASC 投入は G4 の人間判断待ちとして issue は閉じない
