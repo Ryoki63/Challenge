@@ -196,7 +196,12 @@ final class AccountClientTests: XCTestCase {
 
         let snapshot = try await stub.dissolvePair()
 
-        let server = try ContractFixtures.decode(PairDissolveResponse.self, from: "pair-dissolve.ok").snapshot
+        var server = try ContractFixtures.decode(PairDissolveResponse.self, from: "pair-dissolve.ok").snapshot
+        // スタブは端末で組み立てるので、サーバーが載せる「組み立てに使った今日」(dateLocal。issue #72)は持たない
+        // (アプリは時刻から保守的に判定する)。それ以外の形はサーバーと同じ
+        XCTAssertEqual(server.dateLocal, "2026-06-11", "サーバーは dateLocal を載せる")
+        XCTAssertNil(snapshot.dateLocal)
+        server.dateLocal = nil
         XCTAssertEqual(snapshot, server, "スタブの解消後の形は、サーバーの実ハンドラの出力と同じ")
     }
 
