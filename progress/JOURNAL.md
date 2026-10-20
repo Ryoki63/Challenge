@@ -783,3 +783,12 @@
 - 検証: Python unittest **15件 PASS**（RS256 の実署名を openssl で検証、track body、AAB 検査、失敗時 cleanup、commit 順）。ローカル HTTP サーバーで OAuth→edit→bundle upload→track→commit の5呼び出し、dry-run の4呼び出し（edit 削除込み）を確認。workflow YAML parse OK、`bash -n` 12ブロック OK、`git diff --check` OK、docs の外部リンク 18件 HTTP 200、ローカルリンク欠落なし。
 - 残課題: Android 雛形は #121 / #145 が未マージのため、本ブランチでは build/publish を detect job でスキップ（PR の CI は scripts job のみ）。`versionCode` を CI 実行番号から反映する実装、最終 `applicationId`、課金/通報/写真権限などデータセーフティ §6 の未確定項目は引き渡し。
 - 結果: 変更を commit / push し、PR を作成する（マージ・Play 登録・ストア申請・アップロードは行わない）。
+
+## 2026-10-21 02:05 (eng-exec) — #135 共有契約DTO・HTTP・snapshot保存: 依存ゲート確認
+- 着手: 指定 worktree / `consilium/135-t-and-2-android-dto-http-snaps` で契約の着手条件だけを確認。開始時の tracked/untracked 差分なし、HEAD `d300f7da193b33f79955e38bab0fcbe8226e9d38`。当該リモートブランチ・既存PRはなし。Issue #135 の assignee は空で、コード作業には着手していない。
+- 確認: `gh issue view 121 --repo Ryoki63/Challenge --json number,title,state,closedAt` は OPEN / closedAt null。`gh pr view 145 --repo Ryoki63/Challenge --json number,state,isDraft,mergedAt,headRefName,headRefOid,url,statusCheckRollup` は OPEN / draft / mergedAt null、head `f6c516605004c611570ec046922258538f04f1e7`。Android debug build + unit tests + lint のチェックは FAILURE。これは依存PRの結果であり、本タスクの検証結果ではない。
+- 判断: 契約の「#121 完了・マージ確認後のみ着手」を満たさないため、DTO・HTTP・snapshot実装、依存ブランチの取り込み、製品/UX/QA判断の代替は行わない。ローカルの `docs/android/ARCHITECTURE-ANDROID.md` と `products/lien/android/gradlew` も不在。
+- 【承認待ち】: #121 のCI修復・レビュー・マージを先に完了し、その後 #135 を再実行する方針を推奨。#135 にマーカー付き承認待ちコメントと `needs-approval,human-gate` を付け、Issueは開いたまま引き渡す。`status:*` ラベルは変更しない。
+- 通知: https://github.com/Ryoki63/Challenge/issues/135#issuecomment-6296566395 に承認待ちコメントを投稿し、`needs-approval,human-gate` の付与を確認。botによるモバイル通知の到達は未検証。
+- 検証: `git diff --check` PASS。全要件の実装・Androidテスト件数・型チェック・lint・build・emulator/instrumentation・独立コードレビュー・本タスクCIは未実施（依存ゲートで実装前に停止。テスト件数は null、0件成功ではない）。通常の監査ノート追記のみのため、ノートに独立レビューや無関係なテストは追加しない。
+- 結果: BLOCKED。#135 の実装は未完了、PR未作成、Issue未close、mainへのpush/マージなし。監査記録のみ指定ブランチにcommit/pushして引き渡す。再開条件は #121 完了・設計/雛形PRマージの確認、またはeng-leadによる正式な契約改定。
