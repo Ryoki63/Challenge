@@ -1,8 +1,9 @@
 # プレス向けスクリーンショット 3 枚（v4「タネの子」）
 
 Issue #94 のファクトシートに添える 3 枚。MK7（issue #80）で作った **6.7インチのストア用画像**から、
-紹介内容に対応する 3 枚を複製したもの。画像は本物の SwiftUI View を CI のシミュレータで描き、
+紹介内容に対応する 3 枚（01 / 02 / 05）を複製したもの。画像は本物の SwiftUI View を CI のシミュレータで描き、
 キャプションと合成している。手描きのモックや実在しない画面は入っていない。画面内の記録は固定のデモデータで、実在の利用者の記録ではない。
+03_widget.png は v1.0.1 の M ウィジェットを含むため、このフォルダでは使わない（`docs/REQUIREMENTS.md` §3.10）。
 
 ## 1. 3 枚
 
@@ -10,7 +11,7 @@ Issue #94 のファクトシートに添える 3 枚。MK7（issue #80）で作�
 |---|---|---|---|---|---|
 | 1 | `01_home_both.png` | 1290×2796 | `08b2adda101e8fa0a38d42a8d77337778579f1e7a70abe8343fee2cc63b7503f` | ホーム（ふたり達成・植物・23日・チケット2枚） | 約束は、ひとつだけ。 |
 | 2 | `02_home_waiting.png` | 1290×2796 | `3abf7503f664ca8e0ff36e401f83a2f3c7cdbdb8e7fe747bb8a76db7ed7ffcbd` | ホーム（相手だけ完了 →「ゆうきが待ってるよ」） | 相手の今日が、ひと目でわかる。 |
-| 3 | `03_widget.png` | 1290×2796 | `c880b8b85330665dffd2605ad6f70d6cadcc319ed0fe77fa85af2f943f24664a` | ウィジェット（中・小）の実描画 | ホーム画面でも、ふたりの今日。 |
+| 3 | `05_share.png` | 1290×2796 | `20d5eda9a6adf1ff3032557023d5856d3fe7c2b0bbf1c8a1c96a1f5b57f06e4a` | シェア画像（9:16）の実描画 | 記録は、かたちに残せる。 |
 
 - 3 枚とも PNG・アルファなし（color type 2）。6.7インチのストア要件 1290×2796 を満たす。
 - 元ファイルは [`../../screenshots/6.7in/`](../../screenshots/6.7in/) の同名ファイル。SHA-256 が一致することを `tools/verify_press.py` が検査する。
@@ -23,12 +24,13 @@ Issue #94 のファクトシートに添える 3 枚。MK7（issue #80）で作�
 | 画風 | v4「タネの子」 |
 | 生成方法 | `LienTests/StoreScreenshotRenderTests` が本物の View を 430×932pt・3倍で `ImageRenderer` 描画 → キャプションと合成 |
 | 生成 CI | `lien-ios` #39389661638（2026-10-20、attempt 2） |
-| 生成 commit | `c308e5c`（`../../screenshots/manifest.json` の `provenance.commit`） |
+| 生成 commit | `c308e5c`（`../../screenshots/manifest.json` の `provenance.commit`）。PR ブランチ上の生成時 commit で、main には squash マージのため含まれない。画像は `13f0570` の元画像と SHA-256 が一致する |
 | キャプションの正本 | [`../../screenshots/captions.json`](../../screenshots/captions.json) |
 | 元の設計・手順 | [`../../screenshots/README.md`](../../screenshots/README.md) |
 
 **描いていないもの**: ステータスバー・ナビゲーションバー（OS が描く）、壁紙・他のアプリのアイコン、
 実装に無い画面・機能。表示される記録は固定のデモデータ（あおい / ゆうき、筋トレ / ランニング、記録23日、植物は段階3「みどり」）。
+本フォルダの3枚は v1.0 の画面だけで、M ウィジェット（v1.0.1）は使わない。
 
 ## 3. ファクトシートでの使い方
 
@@ -36,7 +38,7 @@ Issue #94 のファクトシートに添える 3 枚。MK7（issue #80）で作�
 
 1. ホーム（ふたり達成）
 2. ホーム（相手が待っている）
-3. ウィジェット
+3. シェア画像
 
 画像の `alt` には、画面の内容を短く書く（`fact-sheet.html` を参照）。画像内のコピーと、`copy.md` の主張が矛盾しないことを mkt-review が確認する。
 
@@ -50,10 +52,11 @@ cd products/lien/marketing
 # 2. プレス用に複製する
 cp screenshots/6.7in/01_home_both.png    press/screenshots/01_home_both.png
 cp screenshots/6.7in/02_home_waiting.png press/screenshots/02_home_waiting.png
-cp screenshots/6.7in/03_widget.png       press/screenshots/03_widget.png
+cp screenshots/6.7in/05_share.png        press/screenshots/05_share.png
 # 3. 検査する（寸法・アルファなし・元画像との SHA-256 一致）
 python3 tools/verify_press.py
 ```
 
 - 画像だけ差し替えて `fact-sheet.html` のキャプションを変えないと、内容がずれる。キャプションも直す。
 - 画像を加工（トリミング・色変更・文字の足し算）しない。ストア用の完成画像をそのまま使う。
+- `03_widget.png` は v1.0.1 の M を含むため複製しない。v1.0 で使うのは S ウィジェットだけで、プレス3枚は 01 / 02 / 05。

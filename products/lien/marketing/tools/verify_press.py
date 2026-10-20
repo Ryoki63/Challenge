@@ -52,10 +52,11 @@ REQUIRED_SECTIONS = (
     "画面イメージ",
 )
 
+# プレスに使う v1.0 の3枚。03_widget.png は v1.0.1 の M を含むため使わない（REQUIREMENTS §3.10）
 SCREENSHOTS = (
     "01_home_both.png",
     "02_home_waiting.png",
-    "03_widget.png",
+    "05_share.png",
 )
 
 EXPECTED_WIDTH = 1290

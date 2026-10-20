@@ -80,7 +80,7 @@ def fact_sheet_html():
 <h2>画面イメージ（v4）</h2>
 <img src="screenshots/01_home_both.png" alt="ホーム（ふたり達成）">
 <img src="screenshots/02_home_waiting.png" alt="ホーム（相手が待っている）">
-<img src="screenshots/03_widget.png" alt="ウィジェット">
+<img src="screenshots/05_share.png" alt="シェア画像">
 <p>出典: docs/REQUIREMENTS.md、docs/CONCEPT.md、legal/terms.html。</p>
 </body>
 </html>
@@ -103,7 +103,7 @@ def screenshots_readme_text():
 
 - [ホーム](01_home_both.png)
 - [相手待ち](02_home_waiting.png)
-- [ウィジェット](03_widget.png)
+- [シェア画像](05_share.png)
 """
 
 
@@ -253,14 +253,14 @@ class PressKitTest(unittest.TestCase):
         self.assertTrue(any("script / iframe / form" in error for error in errors), errors)
 
     def test_fact_sheet_img_alt_missing(self):
-        html = fact_sheet_html().replace(' alt="ウィジェット"', "")
+        html = fact_sheet_html().replace(' alt="シェア画像"', "")
         (self.root / "fact-sheet.html").write_text(html, encoding="utf-8")
         errors = self.errors()
         self.assertTrue(any("alt が空" in error for error in errors), errors)
 
     def test_fact_sheet_img_missing(self):
         html = fact_sheet_html().replace(
-            '<img src="screenshots/03_widget.png" alt="ウィジェット">', ""
+            '<img src="screenshots/05_share.png" alt="シェア画像">', ""
         )
         (self.root / "fact-sheet.html").write_text(html, encoding="utf-8")
         errors = self.errors()
@@ -285,9 +285,9 @@ class PressKitTest(unittest.TestCase):
         self.assertTrue(any("と同じ画像" in error for error in errors), errors)
 
     def test_screenshot_missing(self):
-        (self.root / "screenshots" / "03_widget.png").unlink()
+        (self.root / "screenshots" / "05_share.png").unlink()
         errors = self.errors()
-        self.assertTrue(any("screenshots/03_widget.png がありません" in error for error in errors), errors)
+        self.assertTrue(any("screenshots/05_share.png がありません" in error for error in errors), errors)
 
     def test_screenshot_extra(self):
         (self.root / "screenshots" / "04_extra.png").write_bytes(png_bytes(1290, 2796))
