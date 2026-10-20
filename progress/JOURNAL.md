@@ -640,3 +640,4 @@
 - 検証: PyYAML で DECISION-AND-001/002 を parse。日本指定 G12 URL の3文書一致と旧URL不在、A の 11/1〜11/5 同期、予算算術（3か月 27,800 円 / 4か月 31,550 円）、遅延時にテストを圧縮しない記述を確認。Google 公式日本ページで個人事業主条項を確認。独立レビューは3指摘すべて PASS、新規矛盾なし。`git diff --check` OK。
 - 提出: commit `964cc6e` を既存 branch に push。既存 PR #131 を更新（新規 PR なし）。CI run `39461555659` は 6/6 jobs success。ローカル HEAD と origin branch は `964cc6eb3b7245ed9e4277563f70f0f17ec27222` で一致。
 - 結果: PR #131 は OPEN のまま。レビュー反映まで完了し、マージ・Issue close は行っていない。アカウント選択 A/B/C と予算会計は owner 判断待ち。Play 登録・支払い・D-U-N-S 申請・ストア申請は未実施。
+- 最終整合: 検証結果追記 commit `0a50244` も origin の同じ branch に push 済み。最終確認で HEAD と origin branch はともに `0a50244167ce85e7f0d6b46a7778358192665e87`、tracked/untracked の変更なし。既存 PR #131 は OPEN、CI 6/6 pass。
