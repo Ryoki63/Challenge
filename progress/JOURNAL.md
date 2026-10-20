@@ -797,3 +797,12 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 02:44 (eng-exec) — T-AND-10 #143 Android設定の着手ゲート確認
+- 着手: 指定worktreeと `consilium/143-t-and-10-android`、差分なし、originが `Ryoki63/Challenge` であることを確認。指定remoteブランチ・既存PRはなし。Issue #143はOPEN・assignees空、02:39の担当着手コメントあり。実装の着手許可とは分けて記録する。
+- 同期: `git fetch origin main && git merge --ff-only origin/main` は Already up to date。HEADとremote mainは `7991bc55088b9ccff9b335410a88f726910f8b04`。mainへの書込・rebase・他worktreeの操作は行わない。
+- 依存確認: `gh issue view` で必須依存 #134/#135/#136/#120/#122 がすべてOPEN・closedAt=null。#134/#135/#136はneeds-approval/human-gateで、最新の非botコメントもエージェントマーカー付きの承認待ち。#120のPR #132はMERGEDだがIssueはOPEN、#122のAND-UX PR検索は該当なし。完了とマージの両方を満たしたとは扱わない。
+- 判断: Issue本文の「完了・マージ確認後のみ着手」に従い実装しない。ARCHITECTURE-ANDROID §10の依存も一致。#120/#122/#123の製品・UX・QA判断を代替せず、iOS・共有契約・Supabase・secret/.envには触れない。割当外の承認待ちIssueは再開しない。
+- 【承認待ち】: Issue #143へ依存未達の根拠と再投入時期の質問1点を投稿（comment 6297308477、末尾 `<!-- lien-agent -->`）。`needs-approval,human-gate` を付与し、OPENのまま停止する。通知botによる配送・モバイル到達は未検証で、コメント/ラベル設定とは区別する。
+- 提出前判定: 全要件の実装=未実施（依存ゲート未達）。Androidテスト/型チェック/lint/build・emulator/instrumentation・UI/widget/通知実測・独立コードレビュー=対象外（コード未変更・実装未着手）でありPASSではない。動作確認はGitHub依存状態と同期、差分/追記専用性の機械検査のみ。残作業は受入条件の全実装・検証・独立レビュー・PR提出。
+- 結果: blocked。変更は本監査ログへの追記だけで、DONE追記・Issue close・main直接push・自己マージは行わない。指定ブランチへ監査ログをcommit/pushして引き継ぐ。実装PRは作成せず、依存5件の完了・マージ後に改めて実装する。
