@@ -260,5 +260,123 @@ class ReleasePostTest(unittest.TestCase):
         self.assertEqual(cp.validate_post("2026-10-31.md", text, ledger), [])
 
 
+def branding_text(
+    name="`Lien(リアン)｜約束はひとつだけ`",
+    name2="`リアン｜ふたりの約束`",
+    handle="`@lien_app`",
+    handle2="`@lien_futari`",
+    bio="`約束は、ひとつだけ。毎日1タップ。近日公開。`",
+    bio2="`約束は、ひとつだけ。ふたりで使う習慣アプリ。2人で続ける。近日公開。`",
+    status="draft",
+    thread=("できることは3つだけ。1タップで終わる。", "広告も、解析もありません。"),
+    basis="docs/CONCEPT.md §2",
+    numbers="1 = 1日1タップ / 2 = 2人 / 3 = 3つ",
+    lead=" ",
+    review=" ",
+):
+    """branding.md の検査用テキストを組み立てる。"""
+    lines = [
+        "# X アカウントのブランディング案",
+        "",
+        "- status: %s" % status,
+        "- 根拠: %s" % basis,
+        "- 数値の根拠: %s" % numbers,
+        "- 表示名 A（推奨）: %s" % name,
+        "- 表示名 B: %s" % name2,
+        "- @handle A（推奨）: %s" % handle,
+        "- @handle B: %s" % handle2,
+        "- bio A（推奨）: %s" % bio,
+        "- bio B: %s" % bio2,
+        "",
+        "## 6. 固定ポスト（スレッド）",
+        "",
+    ]
+    for i, body in enumerate(thread, 1):
+        lines.append("### リプライ%d" % i)
+        lines.append("")
+        for part in body.split("\n"):
+            lines.append("> " + part)
+        lines.append("")
+    lines += [
+        "## 承認",
+        "",
+        "- [%s] mkt-lead（方針整合）" % lead,
+        "- [%s] mkt-review（景表法）" % review,
+        "",
+    ]
+    return "\n".join(lines)
+
+
+class BrandingTest(unittest.TestCase):
+    def test_valid_branding(self):
+        self.assertEqual(cp.validate_branding(branding_text()), [])
+
+    def test_display_name_over_limit(self):
+        errors = cp.validate_branding(branding_text(name="`Lien(リアン)｜%s`" % ("あ" * 50)))
+        self.assertTrue(any("50" in e for e in errors), errors)
+
+    def test_display_name_fullwidth_parens(self):
+        errors = cp.validate_branding(branding_text(name="`Lien（リアン）｜約束はひとつだけ`"))
+        self.assertTrue(any("全角" in e for e in errors), errors)
+
+    def test_recommended_name_must_match_store(self):
+        errors = cp.validate_branding(branding_text(name="`リアン｜約束はひとつだけ`"))
+        self.assertTrue(any("Lien(リアン)" in e for e in errors), errors)
+
+    def test_handle_too_long(self):
+        errors = cp.validate_branding(branding_text(handle="`@lien_app_japan12`"))
+        self.assertTrue(any("@handle" in e for e in errors), errors)
+
+    def test_handle_invalid_char(self):
+        errors = cp.validate_branding(branding_text(handle="`@lien-app`"))
+        self.assertTrue(any("@handle" in e for e in errors), errors)
+
+    def test_bio_over_limit(self):
+        errors = cp.validate_branding(branding_text(bio="`ひとつだけ。近日公開。%s`" % ("あ" * 160)))
+        self.assertTrue(any("160" in e for e in errors), errors)
+
+    def test_bio_needs_tagline(self):
+        errors = cp.validate_branding(branding_text(bio="`毎日1タップの習慣アプリ。近日公開。`"))
+        self.assertTrue(any("ひとつだけ" in e for e in errors), errors)
+
+    def test_bio_needs_release_state(self):
+        errors = cp.validate_branding(branding_text(bio="`約束は、ひとつだけ。毎日1タップ。`"))
+        self.assertTrue(any("近日公開" in e for e in errors), errors)
+
+    def test_bio_banned_word(self):
+        errors = cp.validate_branding(branding_text(bio="`約束は、ひとつだけ。必ず続く。近日公開。`"))
+        self.assertTrue(any("誇大" in e for e in errors), errors)
+
+    def test_bio_date_assertion(self):
+        errors = cp.validate_branding(branding_text(bio="`約束は、ひとつだけ。10月31日に公開。`"))
+        self.assertTrue(any("日付" in e for e in errors), errors)
+
+    def test_bio_numeral_without_basis(self):
+        errors = cp.validate_branding(
+            branding_text(bio="`約束は、ひとつだけ。3秒で終わる。近日公開。`", numbers="1 = 1日1タップ")
+        )
+        self.assertTrue(any("数値の根拠" in e for e in errors), errors)
+
+    def test_thread_body_over_140(self):
+        errors = cp.validate_branding(branding_text(thread=("あ" * 141, "広告はありません。")))
+        self.assertTrue(any("140" in e for e in errors), errors)
+
+    def test_thread_needs_two_bodies(self):
+        errors = cp.validate_branding(branding_text(thread=("3つだけ。",)))
+        self.assertTrue(any("2本未満" in e for e in errors), errors)
+
+    def test_missing_basis_ref(self):
+        errors = cp.validate_branding(branding_text(basis="なんとなく"))
+        self.assertTrue(any("参照がありません" in e for e in errors), errors)
+
+    def test_ready_without_approvals(self):
+        errors = cp.validate_branding(branding_text(status="ready"))
+        self.assertTrue(any("承認のチェック" in e for e in errors), errors)
+
+    def test_ready_with_approvals(self):
+        text = branding_text(status="ready", lead="x", review="x")
+        self.assertEqual(cp.validate_branding(text), [])
+
+
 if __name__ == "__main__":
     unittest.main()
