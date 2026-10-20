@@ -5,8 +5,8 @@
 - 実施日: 2026-10-20
 - 実施: eng-exec（T27 本体）
 - 検査: `LienTests/StringsReviewTests.swift`（罰なし lint・`StringsCatalog`・本ログの網羅）を CI `lien-ios` で毎回実行
-- 対象: 297 件（OK 291 / 修正 6 / 保留 0）
-- 内訳: 297 単位（`StringsCatalog` の 580 出力を確認。関数型の文言は代表値で展開し、全通りを機械検査）
+- 対象: 340 件（OK 334 / 修正 6 / 保留 0）
+- 内訳: 340 単位（`StringsCatalog` の全出力を確認。関数型の文言は代表値で展開し、全通りを機械検査）
 
 ## 1. 結論
 
@@ -639,15 +639,88 @@
 | `Session.restart` | はじめからやり直す | OK | やり直す（端末の記録を消す） |
 | `Session.later` | あとで | OK | あとで |
 
+### 7.20 お休みチケット（T19a #19。T27 のあとに追加）
+
+- 対象は 1 単位。ホームの残数バッジ。
+- 0枚でもバッジを消さない（罰なし — REQUIREMENTS §3.5）。「残り0枚」を責める言い方にしない。
+
+| 名前 | 文言（代表） | 判定 | メモ |
+|---|---|---|---|
+| `Tickets.balance` | お休みチケット 残り0枚 | OK | 事実だけを出す。0枚でも隠さない（代表値。全4通りを機械検査） |
+
+### 7.21 カレンダー（T18 #18。T27 のあとに追加）
+
+- 対象は 19 単位。1か月の履歴と読み上げ。
+- 画面に文字を出すのは凡例と月の見出しだけ。`noRecord` / `beforePair` / `future` / `todayPending` は VoiceOver の読み上げだけに使う。
+- 途切れた日を「失敗」「サボり」と呼ばない。無彩色の点だけにして、言葉では責めない（REVIEW-2026-10-12 §4.2）。
+
+| 名前 | 文言（代表） | 判定 | メモ |
+|---|---|---|---|
+| `History.title` | ふたりの記録 | OK | 画面の題名。ホームの「ふたりの記録」と同じ言葉 |
+| `History.openButtonLabel` | ふたりの記録を開く | OK | ホームの導線（VoiceOver） |
+| `History.previousMonth` | 前の月 | OK | 月の移動（VoiceOver） |
+| `History.nextMonth` | 次の月 | OK | 月の移動（VoiceOver） |
+| `History.weekdaySymbols` | 日 / 月 / 火 / 水 / 木 / 金 / 土 | OK | 日曜はじまり。Calendar.lienHistory と揃える（全7通り） |
+| `History.bothDone` | ふたり達成 | OK | 凡例・読み上げ |
+| `History.meOnly` | じぶんだけ | OK | 凡例・読み上げ |
+| `History.partnerOnly` | あいてだけ | OK | 凡例・読み上げ |
+| `History.restTicket` | お休み | OK | 凡例・読み上げ。休んだ日を責めない |
+| `History.noRecord` | 記録なし | OK | 読み上げのみ（画面には点だけ） |
+| `History.beforePair` | ペアになる前 | OK | 読み上げのみ |
+| `History.future` | これから | OK | 読み上げのみ |
+| `History.todayPending` | 今日 | OK | 読み上げのみ |
+| `History.loadFailed` | 記録を読み込めませんでした。通信状態を確認して、もう一度お試しください | OK | 通信エラーの定型。ユーザーの責任にしない |
+| `History.retry` | もう一度 | OK | 再試行 |
+| `History.empty` | ペアになると、ふたりの記録がのこります | OK | ソロの空状態。責めない |
+| `History.monthTitle` | 2025年1月 | OK | 月の見出し（代表値。全6通りを機械検査） |
+| `History.dayTitle` | 10月1日 | OK | 日の読み上げ（代表値。全3通り） |
+| `History.dayAccessibility` | 10月5日、ふたり達成 | OK | VoiceOver は「日付、印」（代表値。全8通り） |
+
+### 7.22 シェア画像（T22 #22。T27 のあとに追加）
+
+- 対象は 23 単位。シェア画像のシートと、画像の中の文言。
+- 画像に入るのは植物・2人のニックネーム・ふたりの記録の日数・開始日・アプリ名だけ。チェックインの写真は入れない（REQUIREMENTS §3.13 / privacy-policy §3）。
+- 「ストーリーズ」「正方形」は画像の形の説明で、開発者ことばではない。
+
+| 名前 | 文言（代表） | 判定 | メモ |
+|---|---|---|---|
+| `Share.title` | シェア画像 | OK | シートの題名 |
+| `Share.createButton` | シェア画像をつくる | OK | ホームの導線 |
+| `Share.subtitle` | ふたりの記録を、画像にして残せます | OK | シートの説明 |
+| `Share.formatPickerLabel` | 画像の形 | OK | 形の切り替え |
+| `Share.formatStory` | ストーリーズ(9:16) | OK | 縦。数字は半角 |
+| `Share.formatSquare` | 正方形(1:1) | OK | 正方形 |
+| `Share.loading` | 画像をつくっています… | OK | 待ち時間。失敗とは言わない |
+| `Share.shareButton` | シェアする | OK | 共有 |
+| `Share.closeButton` | 閉じる | OK | 閉じる（統一） |
+| `Share.retry` | もう一度ためす | OK | つくるのを再試行 |
+| `Share.unavailableMessage` | シェアできる記録がまだありません | OK | 記録が無いとき。責めない |
+| `Share.errorMessage` | シェア画像を準備できませんでした。通信状態を確認して、もう一度お試しください | OK | 通信エラーの定型 |
+| `Share.privacyNote` | チェックインの写真は入りません | OK | 何が入らないかを先に言う |
+| `Share.streakCaption` | ふたりの記録 | OK | 画像の中 |
+| `Share.dayUnit` | 日 | OK | 画像の中の単位 |
+| `Share.meFallbackName` | あなた | OK | 名前が無いとき（画像の中） |
+| `Share.partnerFallbackName` | あいて | OK | 名前が無いとき（画像の中） |
+| `Share.milestoneBody` | この記録を、画像にして残そう | OK | 節目のお祝い。急かさない |
+| `Share.names` | ゆうき と ゆうき | OK | 画像の中の2人の名前（代表値。全3通り） |
+| `Share.previewLabel` | ゆうきとゆうきの30日のシェア画像 | OK | 共有シートの VoiceOver（代表値。全3通り） |
+| `Share.startedOn` | 2026年10月20日 21:00から | OK | 開始日。Asia/Tokyo で表記（代表値。全2通り） |
+| `Share.milestoneTitle` | 🎉 ふたりで0日! | OK | 節目の見出し（代表値。全4通り） |
+| `Share.sharePreviewTitle` | 0日の記録 | OK | 共有シートの題名（代表値。全4通り） |
+
+> 追記（2026-10-20・ux-exec / #80 の作業中）: T18(#18)・T19a(#19)・T22(#22) が T27 のあとに `Strings.swift` へ文言を足したため、
+> ログの網羅検査（`testReviewLogCoversEveryStringsCatalogEntry`）が main で赤になっていた。追加された 43 単位を、
+> §2 の判定基準で確認して追記した。文言そのものは変えていない（既存の 291 件の判定も変えていない）。
+
 ## 8. このログの検査（CI）
 
 `StringsReviewTests.swift` が、このログと `Strings.swift` のずれを CI で検出する。
 
 | テスト | 検査内容 |
 |---|---|
-| `testReviewLogCoversEveryStringsCatalogEntry` | `StringsCatalog` の全 297 単位が、このログの表に**ちょうど1回**出ていること。文言を足してログを忘れると落ちる |
+| `testReviewLogCoversEveryStringsCatalogEntry` | `StringsCatalog` の全 340 単位が、このログの表に**ちょうど1回**出ていること。文言を足してログを忘れると落ちる |
 | `testReviewLogTextsMatchStringsCatalog` | 表の文言が現在の `Strings.swift` と一致すること（1件の単位は完全一致、関数型は代表値が含まれること）。文言を変えてログを忘れると落ちる |
-| `testReviewLogSummaryMatchesVerdicts` | 冒頭の「297 件（OK 291 / 修正 6 / 保留 0）」が、表の判定の数と一致すること |
+| `testReviewLogSummaryMatchesVerdicts` | 冒頭の「340 件（OK 334 / 修正 6 / 保留 0）」が、表の判定の数と一致すること |
 | `testUserFacingStringsAvoidDeveloperJargon` | 画面の文言に「ストリーク」「アーカイブ」「セッション」などの開発者ことばが戻らないこと |
 | `testCloseLabelsAreConsistent` | 閉じるボタンの文言が「閉じる」に揃っていること |
 | `testNetworkErrorMessagesAreIdentical` | 通信エラーの文言が7箇所で同じであること |
