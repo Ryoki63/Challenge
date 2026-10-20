@@ -160,6 +160,27 @@ final class EdgeFunctionSnapshotClientTests: XCTestCase {
         EdgeFunctionSnapshotClient(baseURL: baseURL, tokenProvider: tokenProvider, session: makeSession())
     }
 
+    func testConditionalFetchSendsCheckpointAndAccepts304() async throws {
+        let client = makeClient()
+        reply(304, "")
+        let result = try await client.fetchChanges(etag: "revision-1")
+        guard case .unchanged = result else { return XCTFail("304 は変更なし") }
+        let request = try XCTUnwrap(StubURLProtocol.captured.first)
+        XCTAssertEqual(request.header("If-None-Match"), "revision-1")
+        XCTAssertEqual(request.request.cachePolicy, .reloadIgnoringLocalCacheData)
+    }
+
+    func test304WithoutCheckpointIsRejected() async throws {
+        let client = makeClient()
+        reply(304, "")
+        do {
+            _ = try await client.fetchSnapshot()
+            XCTFail("初回取得の304で成功してしまった")
+        } catch {
+            XCTAssertEqual(error as? SnapshotClientError, .server(code: "http_304"))
+        }
+    }
+
     func testFetchSnapshotRequestAndEnvelopeDecoding() async throws {
         let client = makeClient()
         reply(200, #"{"snapshot":\#(snapshotJSON)}"#)
