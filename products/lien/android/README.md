@@ -13,7 +13,7 @@ Kotlin + Jetpack Compose の最小 Android 足場です。日本語の静的な 
 | Gradle / wrapper source | 8.14.6 / 8.13.0 |
 | Android Gradle Plugin | 8.11.1 |
 | Kotlin / Compose compiler plugin | 2.2.20 |
-| Compose BOM | 2026.09.00 |
+| Compose BOM | 2025.09.01 |
 | Activity Compose | 1.13.0 |
 | JUnit | 4.13.2 |
 | compileSdk / targetSdk / minSdk | 36 / 36 / 26 |
@@ -107,7 +107,24 @@ wrapper のブートストラップは 8.13.0 の公式ファイルを維持し�
 - AGP 8.11 / 8.11.1: <https://developer.android.com/build/releases/agp-8-11-0-release-notes>
 - Kotlin / AGP / Gradle 互換表: <https://kotlinlang.org/docs/gradle-configure-project.html>
 - Compose BOM: <https://developer.android.com/develop/ui/compose/bom>
-- BOM 2026.09.00 の正本: <https://dl.google.com/dl/android/maven2/androidx/compose/compose-bom/2026.09.00/compose-bom-2026.09.00.pom>
+- BOM 2025.09.01 の正本: <https://dl.google.com/dl/android/maven2/androidx/compose/compose-bom/2025.09.01/compose-bom-2025.09.01.pom>
 - Gradle checksums: <https://gradle.org/release-checksums/>
 - Wrapper ソース: <https://github.com/gradle/gradle/tree/v8.13.0/gradle/wrapper>
 - Ubuntu runner SDK 一覧: <https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md>
+
+## 現時点の検証状態（2026-10-21）
+
+- 初回コード `31a17bc` の CI #39454196872 は APK 生成・Android JUnit3件に成功、
+  lint4件で失敗しました。Android12+ backupルール不足1件と依存更新通知3件です。
+- 修正版 `e1bdcc8` の CI #39455407685 は Compose BOM 2026.09.00 が選ぶ
+  Compose 1.12.1 の要求（compileSdk37 / AGP9.1.0）を満たさず失敗しました。
+- BOM を 2025.09.01 / Compose1.9.2（公式AAR: minCompileSdk35 / minAGP8.6.0）へ
+  戻しました。Gradle8.14.6・Activity1.13.0・backupルール追加は維持しています。
+- 失敗2回で停止する運用規定に従い、この最終組合せの再ビルドは実行していません。
+  `GradleDependency` の Compose更新通知が `warningsAsErrors` により再びエラーになる
+  見込みが残ります。実CIの緑・最終APK生成・lint成功とは扱わないでください。
+- 次の担当は互換範囲と依存更新チェック方針を確認し、最小修正後に
+  `assembleDebug testDebugUnitTest lintDebug` を実行してください。lint抑止・baseline・
+  SDKライセンス自動受諾・iOSへの変更で回避してはいけません。
+- PR #145 は draft のまま。独立レビューの全体1回と変更部分1回を実施済みで、
+  上記互換性P1を検出。互換BOMへの復帰後の独立再レビューは未実施です。

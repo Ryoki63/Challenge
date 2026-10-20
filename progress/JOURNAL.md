@@ -609,3 +609,5 @@
 - 01:02 検査: contracts/tools/generate.ts --check は22 fixture一致、contracts/tools の Deno test は3件PASS。Android workflowの公式Actions固定SHAは各リリースtagと一致した。Androidのコンパイル・test・lintはまだ結果未確定。設計/雛形/CIを1名の独立レビュワーが確認中。
 - 01:07 提出途中: コード31a17bcを指定ブランチへpushしdraft PR #145を作成。独立レビュー1回はP1/P2ブロッカーなし。lien-ci #39454196823は全6ジョブ成功。Android CI #39454196872はassembleDebugとJUnit3件が成功、lintで失敗（成功扱いしない）。
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
+- 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
+- 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
