@@ -30,10 +30,24 @@
     border-left: 4px solid #7aa874;
     padding-left: .6rem;
   }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: .92rem;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: .5rem .6rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: #eef3ec; }
   ul, ol { padding-left: 1.4rem; }
   li { margin: .3rem 0; }
   .meta { color: #555; font-size: .92rem; }
   .placeholder { background: #fff3c4; padding: 0 .2em; border-radius: 3px; }
+  .backlink { font-size: .9rem; margin: 0 0 1rem; }
+  .backlink a { color: #3f6b4f; }
   footer {
     text-align: center;
     font-size: .85rem;
@@ -42,13 +56,17 @@
   }
   @media (prefers-color-scheme: dark) {
     body { background: #1c1c1e; color: #e6e6e6; }
+    th { background: #2e352c; }
+    th, td { border-color: #555; }
     .meta { color: #aaa; }
     .placeholder { background: #5c5320; }
+    .backlink a { color: #9ecfae; }
   }
 </style>
 </head>
 <body>
 <main>
+<p class="backlink"><a href="https://ryoki63.github.io/Challenge/">Lien</a> ／ 利用規約</p>
 <h1>Lien 利用規約</h1>
 <p class="meta">
 制定日: <span class="placeholder">【要記入: G4: 制定日】</span><br>

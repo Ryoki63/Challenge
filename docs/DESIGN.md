@@ -42,7 +42,7 @@ products/lien/
 ├── assets/
 │   ├── plant/               # 植物「タネの子」の SVG レイヤー34点+PlantAssets.xcassets+生成スクリプト(tools/)。規則は mapping.md
 │   └── icon/
-├── web/invite/              # 招待用静的ページ(GitHub Pages)
+├── web/                     # GitHub Pages に配信する静的サイト(#76。site/ を配信し、ツールで生成)
 └── marketing/               # ASO文言・スクショ・privacy-policy.md・terms.md
 ```
 

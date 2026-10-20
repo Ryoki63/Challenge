@@ -28,14 +28,21 @@
 
 ## 3. 公開作業
 
-- [ ] GitHub Pages の公開URLを確定する(例: `https://<user>.github.io/<repo>/lien/legal/privacy.html` / `terms.html`)。`web/invite/`(T11)と同じホスティングに載せる場合は配置パスを調整
+- [ ] GitHub Pages の公開URLを確定する。**#76(MK3)で配備の仕組みを作った**ので、URL はアプリの `SupportLinks.webBaseURL` に合わせて次の2つ(リポジトリは `Ryoki63/Challenge`)
+      - `https://ryoki63.github.io/Challenge/lien/legal/privacy.html`
+      - `https://ryoki63.github.io/Challenge/lien/legal/terms.html`
+      - ティザーが `https://ryoki63.github.io/Challenge/`、招待が `.../lien/i/`。配信するのは `products/lien/web/site/` だけ
+      - 初回だけ Settings > Pages > Build and deployment > Source を「GitHub Actions」にする(人間の作業)
+- [ ] 公開前チェックを通す: `cd products/lien/web && python3 tools/build_site.py --check-publishable`
+      (§1 の4項目が未記入のあいだは、ここで止まる。プレースホルダ付きのページは配信されない)
 - [ ] privacy.html / terms.html をブラウザ(iPhone Safari 含む)で開き、表示崩れ・文字化けがないことを確認
 - [ ] App Store Connect の「プライバシーポリシーURL」に privacy.html のURLを設定
 - [ ] アプリの設定画面(§3.15)のリンク先URLを設定(T23 実装側に反映)
 
 ## 4. 改定時の運用ルール
 
-- md(`marketing/privacy-policy.md` / `marketing/terms.md`)が原稿の正。**改定時は md と html を必ず同時に更新**する
+- md(`marketing/privacy-policy.md` / `marketing/terms.md`)が原稿の正。**HTML は `products/lien/web/tools/build_site.py` が生成する。手で編集しない**
+- 改定したら `cd products/lien/web && python3 tools/build_site.py` で再生成してコミットする(md と html の食い違いは `lien-ci` の `pages-site` が止める)
 - 改定したら冒頭の「制定日」の下に「改定日: YYYY年M月D日」を追記する
 - 重要な変更(課金導入=v1.1 の特商法表記追加など)はアプリ内で事前告知する(規約第11条・ポリシー第13条)
 
