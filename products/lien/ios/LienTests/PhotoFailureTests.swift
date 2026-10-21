@@ -237,4 +237,40 @@ final class PhotoFailureTests: XCTestCase {
         XCTAssertEqual(viewModel.snapshot?.streakCurrent, 24)
         XCTAssertEqual(store.loadSnapshot()?.streakCurrent, 24, "成功時だけ保存する")
     }
+
+    /// 保存だけが失敗した場合(アップロード成功後)の境界。VM は画面を更新して操作を続け、
+    /// ディスクの旧 snapshot は保持する(次回起動/フォアグラウンド復帰の GET /snapshot で自己修復する設計 — DESIGN §4)。
+    func testSnapshotSaveFailureAfterUploadKeepsOldDiskStateAndStaysUsable() async throws {
+        let tempDir = makeTempDir("PhotoFailure-VMReadOnly")
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o755], ofItemAtPath: tempDir.path
+            )
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let store = AppGroupStore(containerURL: tempDir)
+        let baseline = makeSnapshot(hasPartnerPhotoToday: true, streakCurrent: 23)
+        try store.saveSnapshot(baseline)
+
+        let service = FlakyPhotoService()
+        let viewModel = HomeViewModel(store: store, checkinService: service, reloadWidgets: {})
+        viewModel.load()
+        let before = try Data(contentsOf: store.snapshotFileURL)
+
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o555], ofItemAtPath: tempDir.path
+        )
+        await viewModel.attachPhoto(try makeValidJPEG())
+
+        XCTAssertEqual(viewModel.snapshot?.streakCurrent, 24, "画面は更新される")
+        XCTAssertNotNil(viewModel.photoAttachedNote)
+        XCTAssertNil(viewModel.photoErrorMessage, "保存失敗は既存設計どおり画面エラーにしない")
+        XCTAssertFalse(viewModel.isAttachingPhoto, "操作不能にならない")
+        XCTAssertTrue(viewModel.canAttachPhoto, "再試行の導線は残る")
+        XCTAssertEqual(
+            try Data(contentsOf: store.snapshotFileURL), before,
+            "ディスクの旧 snapshot(約束・履歴・旧写真 marker)は保持される"
+        )
+    }
 }
