@@ -237,8 +237,14 @@ final class AppModel {
         Task { await refresh() }
     }
 
-    /// 招待ディープリンク(lien://invite/<token> / 静的ページ URL)。招待以外・不正形式は無視する
+    /// ウィジェットのホーム復帰と招待ディープリンク。その他・不正形式は無視する
     func handleDeepLink(_ url: URL) {
+        if url == WidgetHomeLink.url {
+            pendingInviteToken = nil
+            showsSettings = false
+            showsPairing = false
+            return
+        }
         guard phase != .paired, let token = DeepLinkHandler.inviteToken(from: url) else { return }
         pendingInviteToken = token
         applyPendingInvite()

@@ -10,7 +10,7 @@
 // 内側の余白(S / M は 16pt)は、システムの既定のまま(contentMarginsDisabled はしない)。寸法は WidgetMetrics が、その内側から決める。
 //
 // 表示原則(REQUIREMENTS §3.10): 自分が未完なら自分側をグレー、相手が先に完了していたら「(相手)が待ってるよ」。
-// タップ動作: ウィジェット→アプリのホーム直行(OS の既定の起動。ホームがアプリの最初の画面)。
+// タップ動作: ウィジェット→lien://home→アプリのホーム直行(開いていた設定・招待シートを閉じる)。
 
 import SwiftUI
 import WidgetKit
@@ -27,18 +27,21 @@ struct LienWidgetEntryView: View {
             layout: layout,
             imageStyle: .widgetFullColor
         )
-        switch layout {
-        case .small, .medium:
-            root.containerBackground(.background, for: .widget)
-        case .lockCircular:
-            ZStack {
-                AccessoryWidgetBackground()
-                root
+        Group {
+            switch layout {
+            case .small, .medium:
+                root.containerBackground(.background, for: .widget)
+            case .lockCircular:
+                ZStack {
+                    AccessoryWidgetBackground()
+                    root
+                }
+                .containerBackground(for: .widget) { Color.clear }
+            case .lockInline:
+                root.containerBackground(for: .widget) { Color.clear }
             }
-            .containerBackground(for: .widget) { Color.clear }
-        case .lockInline:
-            root.containerBackground(for: .widget) { Color.clear }
         }
+        .widgetURL(WidgetHomeLink.url)
     }
 }
 
