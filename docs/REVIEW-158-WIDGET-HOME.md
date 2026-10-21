@@ -60,7 +60,10 @@ URL配線、全familyへの適用、暖/冷起動、pending招待と同期、通
 
 ## 残検証と引渡し
 
-- iOS無署名build/XCTest: 提出SHAの `lien-ios` CIで確認する。
+- iOS無署名build/XCTest: コードSHA `1ef04c0184f5727637497e330a19e20f37ec2c44` の `lien-ios` run `39532151011` attempt 2がsuccess。iPhone 17 / iOS 26.5、1,231 tests / 0 failures / `TEST SUCCEEDED`。release scriptのPython試験も130件PASS。初回は同じ1,231件が成功したが20分上限でジョブcancelledとなり、再実行1回だけでジョブ全体successを確認した。
+- `lien-ci` run `39532151022`: コードSHAの全6ジョブsuccess。
+- 既存の別件: 変更していない `lien-play.yml` はrun `39532149899` がjobs=0でfailure。直前2runもfailure。PRのiOS/共通7チェックはPASSだが、リポジトリ全workflowが緑とは報告しない。
+- CI通過後の追記はこの記録・JOURNAL・DONEだけとし、実装ファイルは検証済みコードSHAから変更しない。PRは #159、マージしない。
 - 実機4familyのタップ、OSのscene restoration、実際のsheet dismissal: 未確認。`products/lien/ios/README.md` §13に手順を追加した。
 - 画面の描画は変更せず、実タップのスクリーンショットは未取得。CI画像もOSタップの証拠とは扱わない。
 - mainへの直接push、PRマージ、ストア提出、課金、本番データ操作は実施しない。レビュー役職へPRで引き渡す。

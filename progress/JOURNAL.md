@@ -809,3 +809,9 @@
 - 11:14 検証節目: focusedのAppModelTests/SnapshotSynchronizerTests/DeepLinkHandlerTests/WidgetSourceTestsは77件・373 assertions・0 failures、90ファイルのFoundationモジュールbuild成功。全macOS試験とView/Widget型検査を実行中。独立eng-reviewを1名に依頼し、親は試験と提出準備を担当する。
 - 11:16 検証節目: 全macOS 1146件/26700 assertions PASS、View123ファイル・Widget19ファイル型検査PASS。PairSnapshotの既存Swift6 concurrency warning2箇所のみ。修正前の保持モジュールで新規モデル回帰8件を実行し5FAIL/3PASSを確認、修正後は全件PASS。独立eng-reviewは具体的指摘なし。docs/REVIEW-158-WIDGET-HOME.mdへ受入条件対応・コマンド・境界を記録した。
 - 提出ゲート（ローカル）: 実装PASS／関連・全macOS試験PASS／View・Widget型検査PASS／diff --check PASS／独立レビューPASS／残実装TODOなし。専用lintは設定なしのため対象外（静的テストは実施）。iOS実ビルド/XCTestは提出SHAのCI待ち、実機タップは未確認であり完了ゲートと分ける。これから指定ブランチへcommit/pushしPRを作成する。
+- 提出: 実装コミット1ef04c0184f5727637497e330a19e20f37ec2c44を指定ブランチへpush、PR #159をOPENで作成した。main直接push・マージは未実施。lien-ci #39532151022は6ジョブsuccess。
+- CI初回: lien-ios #39532151011はiPhone17/iOSシミュレータの無署名build・XCTest 1231件/0 failures、TEST SUCCEEDEDを記録。しかし20分上限超過のannotationがあり、ジョブconclusion=cancelled（全体成功ではない）。失敗ジョブだけ1回再実行。2回目も失敗した場合は3回目を行わず未完了で返す。
+- CI別件: 変更していないlien-play.ymlはpush直後にjob0件でfailure。直前2runも同じfailureであり今回のiOS修正範囲外として変更しない。これを緑と報告しない。実機タップ/scene restorationは引き続き未確認。
+- 12:58 CI最終確認: lien-ios #39532151011 attempt2は12:23:54 JSTにジョブ全体success。iPhone17/iOS26.5の無署名build・XCTest1231件/0 failures・TEST SUCCEEDED、release script130件PASSをログで確認した。lien-ci6ジョブもsuccess。PR #159はOPEN/CLEANでレビュー役職へ渡す（未マージ）。
+- 最終ゲート: 全実装要件PASS（モデル・ソース範囲）／macOS1146件とiOS1231件PASS／View・Widget型検査PASS／iOS build PASS／diff --check PASS／独立レビュー1回指摘なし／残実装TODOなし。専用lintは設定なしで対象外（既存静的試験PASS）。実機OSタップ・scene restoration・実操作スクリーンショットは未確認、README手順でQAへ渡す。既存lien-play failureは別件として残し全workflow緑とはしない。
+- 結果: コード検証とPR提出まで完了。コードSHA1ef04c0を変更せず検証記録のみ追記・commit/pushする。Issueはマージ前のため開いたまま、statusラベルはHQ管理に委ねる。main直接push・マージ・ストア提出・本番操作はなし。
