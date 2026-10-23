@@ -802,3 +802,4 @@
 着手。担当状態と隔離QA経路を確認し、修正コミット・合成fixtureで別ペア非表示と同一ペア取得を検証する。
 - 14:03 #151 は PR #152 / SHA `949cddc37d9253108906fa57c314a5b88b35f71b` で修正済みだが未マージ。GitHub側のCI 6ジョブPASSを確認し、専用 `.qa-pr152` detached worktree に対象SHAを固定。Deno PGlite認可試験を独立実行し、合成AB/CD/DEで旧漏えい再現→migration適用後の別ペア遮断・現役CD相手行の取得など8 step全PASS。`deno check`/`lint`/`fmt --check`/`git diff --check` もPASS。Supabase接続・実JWT・本番データなし。
 - 14:05 QA証拠を `products/lien/supabase/tests/evidence/issue-160-pr152.md` と raw Deno出力へ保存。独立worktreeを除去済み。追加欠陥なし、PR #152は未マージのため本番反映とは区別する。
+- 14:18 PR #161 を作成・提出。PR SHA `bd8d54720a0cdb1326429232858f7ba826be254b` のCI全6ジョブPASSを確認。branch/remote SHA一致、worktree clean。#160 のQA受入5項目を、#152候補SHAでの独立確認・証拠保存・PR提出まで完了（本番適用は対象外）。
