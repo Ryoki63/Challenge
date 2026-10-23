@@ -1,0 +1,13 @@
+running 1 test from ./products/lien/supabase/tests/auth_boundaries.test.ts
+reactions RLS isolates visible checkins after re-pairing ...
+  legacy policy reproduces the synthetic cross-pair leak ... ok (6ms)
+  new partner cannot read the other pair's reaction ... ok (2ms)
+  visible partner checkin includes a previous sender's same-day reaction ... ok (2ms)
+  partner checkins before the new pair stay private ... ok (2ms)
+  sender retains their own reaction on the old pair's checkin ... ok (3ms)
+  checkin owner can read received reactions after dissolution ... ok (2ms)
+  unrelated active pair still sees only its own reactions ... ok (2ms)
+  dissolving the current pair removes access to partner checkins ... ok (2ms)
+reactions RLS isolates visible checkins after re-pairing ... ok (773ms)
+
+ok | 1 passed (8 steps) | 0 failed (783ms)

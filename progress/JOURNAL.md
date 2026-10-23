@@ -797,3 +797,8 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-23 14:02 — #160 #151 リアクション可視境界の独立QA
+着手。担当状態と隔離QA経路を確認し、修正コミット・合成fixtureで別ペア非表示と同一ペア取得を検証する。
+- 14:03 #151 は PR #152 / SHA `949cddc37d9253108906fa57c314a5b88b35f71b` で修正済みだが未マージ。GitHub側のCI 6ジョブPASSを確認し、専用 `.qa-pr152` detached worktree に対象SHAを固定。Deno PGlite認可試験を独立実行し、合成AB/CD/DEで旧漏えい再現→migration適用後の別ペア遮断・現役CD相手行の取得など8 step全PASS。`deno check`/`lint`/`fmt --check`/`git diff --check` もPASS。Supabase接続・実JWT・本番データなし。
+- 14:05 QA証拠を `products/lien/supabase/tests/evidence/issue-160-pr152.md` と raw Deno出力へ保存。独立worktreeを除去済み。追加欠陥なし、PR #152は未マージのため本番反映とは区別する。
