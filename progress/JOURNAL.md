@@ -797,3 +797,32 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 05:35 JST — MK6 #79 日程訂正の受領・実行前照合 (computer-operator)
+- 着手: Consilium 指定 worktree `Challenge-79` / branch `consilium/79-mk6-x` のみで作業。開始時 tracked/untracked とも clean、#79 は OPEN / assignee Ryoki63 / status:in-progress、human-gate と needs-approval は既に外れていた。今回の担当者はラベル変更していない。
+- 同期: `git pull --rebase` は上流の同名ブランチ削除により失敗。公開済み履歴を書き換えず `git merge origin/main` を選択。JOURNAL の競合2箇所は main 側の追加記録をすべて保持し、競合マーカーだけを除去。既存原稿が draft だったのは古いブランチの状態であり、main の ready・両承認記録を取り込んだ。
+- 照合中: #79 の本人による訂正要求 comment-6300601004 と既存10/21 08:00指示 comment-6291197767、会社側の明示指定された #264 / PR #278 / PRレビュー2件だけを参照する。別worktree・親ディレクトリ・Drive・認証情報は変更しない。
+- 時刻境界: 実時計は2026-10-21 05:31:47 JSTから開始。10/21 08:00は未来。今すぐの投稿、10/22への独断変更、予約・定期実行の登録、24時間後反応の推定は行っていない。
+- 05:42 照合: HQ PR #230/#232の「承認」はいずれもhq-agentマーカー付きのPR受入レビューであり、本人の日時変更ではない。#79 comment-6300601004が既存10/21 08:00計画を基準と明示するため、その日時・はじまり原稿・@lien_promiseを受領。#264 / PR #278 / main第2版は10/22表記が残り、mkt-leadの訂正未了として区別した。
+- 現物確認: main取込後の10/21原稿はready・台帳ok/ok・両チェック済み、本文104字/weighted192。アイコンは実在。既存の承認時刻22:10とmerge22:07の不整合は未解決として記録。原稿や承認は変更していない。
+- 画面: Chromeのx.com/lien_promiseでログインアカウント一致・0 postsを確認。Premium案内が表示されているので、課金操作・投稿欄・画像アップロード・Post・予約へ進まない。プロフィール部分のみ切出した証跡PNGを保存し、元の表示へ戻した。私的タブ等をファイル保存せず、認証情報を取得しない。
+- 検証節目: 投稿チェック13本OK、unittest52件OK。画像処理sharpの読込が2方法とも失敗したため3回目は試さず、既存Pillowで証跡を切出し。1128×1623 / 497176 bytes、目視・EXIF/XMP無しを確認。投稿/予約/24h観測は未実行。08:00セッション確保はnull、mkt-lead/orchestratorへ整合と実行体制を引継ぐ。
+- 独立レビュー1回: 記録・証跡・指定一次記録4件の照合PASS、blocker/majorなし。投稿成功のレビューとは区別。全体再レビューは行わない。
+- 【承認待ち】: #79 comment-6301085214で受領と「推奨:既存10/21 08:00の手動実行セッション確保 / 代替:実行保留」の1問を記録し、needs-approval/human-gateとOPENをreadbackで確認。#264 comment-6301096423 / PR #278 comment-6301096821へ誤帰属・日程・受領・実行体制未確保を返した。会社側ファイルは未変更、statusラベルは不変更、端末通知の到達は未確認。
+- 完了チェック: 全要件は未達（実投稿/24h観測が未来・未実行）、関連テスト52件PASS、投稿静的検査13本PASS、原稿/台帳/画像main一致、JOURNAL両履歴とlog接頭辞の保持・証跡hash/メタデータ・secret/連絡先パターンスキャン・diff --checkはPASS。型/lint/app-buildはコード非変更のため対象外。残作業をゼロとはしない。
+- 結果: **BLOCKED**。受領・根拠照合・ログイン/既投稿確認・証跡・通知まで実施。指定時刻の担当確保、会社側の整合修正、実投稿と24時間後計測が残る。branchをpushしてPR提出し、main直接push・Issue close・PR merge・新規予約登録はしない。
+
+## 2026-10-21 05:57 JST — MK6 #79 オーナー返信後の実行経路確認 (computer-operator)
+- 着手: 指定worktree/branchのみで再開。開始時clean、assignee Ryoki63、#79 OPEN/status:in-progress、PR #154 OPEN/HEAD 1868581を確認。オーナー返信 comment-6301197894 は既存10/21 08:00計画の担当確保を指示しており、二択質問は繰り返さない。
+- 時刻: ローカル実時計2026-10-21 05:57:21 +0900。08:00は未来であり前倒し投稿・翌日移動をしない。投稿/24h反応は未実施。親・別worktree・Drive・secretは変更/取得しない。
+- 同期確認: originをfetchしHEADはorigin/mainに対し7 ahead/0 behind。既存PRを再利用し、main直接push・merge・Issue closeはしない。実行可能なブラウザと手順を確認し、セッション確保は実際の経路が確認できるまでnullとする。
+- 06:00 節目: DOM版Chromeは未接続だが、cuaのネイティブChromeで指定x.com/lien_promiseを選択できた。アカウントメニュー@lien_promise・0 posts・0 Following/Followersを確認。Premium案内は操作せず、通常の投稿欄へ到達した。認証・購入画面には進んでいない。
+- 06:03–06:05 操作障害: 承認済み本文104字（5行）をそのまま入力し画面一致を確認。画像のファイル選択パネルで指定worktreeの絶対パスを入力したが、1回目は末尾「4.png」、setValueによる2回目は完全パス表示後にReturnで「/」へ変わった。画像選択完了に到達せず、同操作の3回目は行わない。別フォルダの画像・履歴からの代用もしない。
+- 06:06 中止の確認: Escape・閉じる・Cmd+.でもパネル終了を確認できなかった。現在は「フォルダへ移動」パネルが開いたまま、パス「/」。本文は背後の未送信欄に入力済み、画像/代替テキスト未設定、下書き保存未確認。投稿ボタン・予約・購入・認証は未操作。画面を元へ戻せたとは報告しない。
+- 証跡: evidence/2026-10-21-x-file-picker-stalled.png を保存・目視確認。停止パネルのみで、個人情報・他タブ・認証情報は含まない。これは画像選択障害の証跡であり、投稿成功/セッション確保の証跡ではない。
+- 技術引継ぎ: README §7で予約投稿は禁止。接続済みツールに時刻指定でこのネイティブセッションを再開する機能は確認できず、プラグイン検索も未接続サービスのみ。OS/HQ設定・他worktreeを変更せず、08:00実行の保証を捏造しない。オーナーへ同じ判断を再質問せず、ops/orchestratorへ具体的な入力/中止異常と時刻セッション未確保を渡す。
+- 検証節目: check_posts.py 13本OK、unittest 52件OK、初回原稿/承認台帳/アイコンはorigin/mainと完全一致。git pull --rebaseは着手ログ追記後の未commit変更により拒否され、履歴変更なし。fetch済みmainの取込漏れ0を確認済み。コード・原稿の変更なし。
+- 06:09 検証補正: 証跡PNGにEXIFメタデータが残っていたため、画像内容は変えずEXIFを除去。除去後の920×366・EXIF/XMPなしを確認。失敗した初回検査をPASSへ読み替えず、修正箇所だけ再検査する。
+- 提出前ゲート: 全要件の実装/受入は未達（日次投稿・URL/投稿後画像・24h観測なし）。関連検査13本/テスト52件PASS、追記のみ・変更範囲・追加文secret/連絡先パターン検査・diff --check PASS。型/lint/app-build/追加独立レビューは対象外（記録・証跡のみ、コード・業務判断・承認原稿非変更）。残作業ゼロとはしない。
+- 技術復旧依頼は#155を実際に作成し、role:ops-exec/app:APP-001/agent:W・OPENをreadback確認。補助BACKLOGにも未完了の依頼を追記。#155の担当受諾/開始時刻/ジョブIDは未確認。#79への再質問・needs-approval再付与は行わない。
+- 結果: **failed（画像選択2回失敗）/未投稿・受入未達**。停止パネルを残した実状態、08:00担当未確保、未送信本文/下書き保存未確認をops/orchestratorへ渡す。指定branchへcommit/pushし既存PR #154を更新する。main直接push・merge・Issue close・DONEへの完了記録はしない。
