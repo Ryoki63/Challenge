@@ -797,3 +797,13 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 02:43 — Issue #144 T-AND-11 Android 統合検証の着手前ゲート確認 (eng-exec)
+- 着手: 指定 worktree / `consilium/144-t-and-11-android-qa` / origin を確認。統合実装の着手前に依存 Issue の完了・マージ条件を照合する。初期作業ツリーは clean、HEAD と origin/main は `7991bc55088b9ccff9b335410a88f726910f8b04`。対象ブランチのリモート ref と既存 PR は未作成。
+- 依存確認: GitHub GraphQL で #136 / #137 / #138 / #139 / #140 / #141 / #142 / #143 / #123 の全9件を照会し、全件 OPEN、closedAt=null、closing PR の参照は空配列。#123 の成果物 PR #146 は 2026-10-21 01:55:20 JST に MERGED だが、Issue の完了は未確認であり契約の全依存完了条件を満たさない。他8件のマージは確認できていない。
+- 判断: Issue #144 本文および `docs/android/ARCHITECTURE-ANDROID.md` §10 の「依存完了・マージ確認後のみ着手」を優先する。製品/UX/QA 判断の代替、未実装機能を対象とする統合試験の作成、staging 接続、iOS/共有 Supabase/契約正本の変更は行わない。Issue #144 の assignees は空配列で、排他割当も未確認。
+- 追加照合: #123 は review:approved、PR #146 の merge commit `5a6c91b17a6915e7748b8fb40d9a02a5caaab157` は現 HEAD の祖先。QA計画の存在・マージと、全9依存 Issue の完了を区別する。対象8実装の指定ブランチ/表題に対応する PR は直近100件の取得範囲では見つからず、全履歴での不存在は断定しない。`git pull --rebase origin main` は Already up to date。
+- 検証区分: 今回は着手前ゲート確認と監査記録だけ。Android build / JVM / lint / emulator / UI・widget・通知の実測 / staging混在 / iOS回帰 / 署名は未実施（結果=null、依存未完了のため）。挙動を変えない監査記録につき独立コードレビューは対象外。#144の必須ビルド・統合試験・独立レビューは将来の実装着手後に残る。
+- 結果: BLOCKED。依存完了・マージ確認とHQの排他割当が揃うまで待機する推奨案を、Issue #144 のマーカー付き承認待ちコメント1件に集約する。監査ログのみ指定ブランチへ commit/push し draft PR で引き渡す。DONE追記・Issue close・main直接push・自己マージ・公開はしない。
+- 通知: Issue #144 の承認待ちコメント `https://github.com/Ryoki63/Challenge/issues/144#issuecomment-6297320364` を投稿し、`needs-approval,human-gate` ラベルを付与済み。`status:*` はHQ管理のため変更していない。監査記録の `git diff --check` は PASS（無出力）。受入条件4項目はすべて未達のまま、テスト件数・CI結果は=null（未実施）。
+- 提出: 監査記録 commit `8c47910f626a779a7c982c44ec8647a9934b4b9d` を指定ブランチへ通常pushし、draft PR #148 `https://github.com/Ryoki63/Challenge/pull/148` を作成済み。02:46 JST の readback で OPEN / draft、差分は JOURNAL のみ、作業ツリー clean、Issue OPEN と承認待ち2ラベルを確認。自動起動した既存 lien-ci run `39468944834` はこのSHAで4ジョブSUCCESS・2ジョブ実行中だった（最終結果ではない）。Android検証の代替にはしない。今回の提出は BLOCKED の引渡しであり #144 の完了ではない。
