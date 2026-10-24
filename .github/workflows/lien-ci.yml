@@ -32,6 +32,9 @@ jobs:
       - name: Run deno test
         run: deno test
 
+      - name: Synthetic PostgreSQL RLS boundaries (no Supabase connection)
+        run: deno test --config ../tests/deno.json --frozen --allow-read --allow-env=NODE_ENV ../tests/
+
       # 契約フィクスチャ(products/lien/contracts/*.json)がサーバー実装の現在の出力と一致するか。
       # 上の `deno test` は contracts/tools を含まないので別に回す。ずれたまま放置すると、iOS の
       # ContractFixtureTests が古い形を前提にデコードを検証し続ける(contracts/README.md)。

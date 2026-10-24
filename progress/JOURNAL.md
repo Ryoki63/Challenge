@@ -797,3 +797,18 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 04:07 — #151 reactions SELECT の別ペア情報漏えい修正
+- 着手: 指定 worktree / consilium/151-sec-reactions-rls で開始。開始時 clean、同名 remote branch・既存 PR なし。origin/main と pull --rebase で同期（Already up to date）。main への直接 push・マージ・本番操作はしない。
+- 契約確認: Issue #151 は OPEN / status:in-progress、開始時 assignee なし。受入は別ペア行の遮断・現役ペア内の対照維持・合成データのみ。承認待ち一覧に #151 はない。他 Issue は対象外。
+- 調査節目: reactions_select_pair が from_user のみ参照する原因を確認。一方、本文にある supabase/tests/auth_boundaries.test.ts は現在の checkout に存在しないため、履歴・既存検証構成を確認し、受入を満たす合成 PGlite テストを用意する。
+- 04:17 設計・実装: 初期 migration は変更せず、0009 で既存 SELECT policy を ALTER。「本人が送信 OR RLS で読める checkins が存在」のみ許可する。checkins→security definer helper→pair_members/pairs の一方向参照で reactions に戻らないため、helper の追加や RLS 判定の複製は不要。DESIGN §5.2 とテスト手順にも範囲を明記。
+- 04:17 検証節目: PGlite 0.5.10 / pgcrypto で実 0001 を適用。合成 AB/DE→CD の再現データで旧 policy の漏えいを確認し、0009 適用後の遮断・現役相手の対照・成立日前・送信者本人・受信チェックイン本人・別ペア・解消後の7 step が PASS（1 test）。実 authenticated / BYPASSRLS=false を毎照会前に確認。本番接続・実 JWT・secret 読み書きなし。初回の実行設定と fixture の NOT NULL 欠落は修正済みで、型検査や権限を緩める回避はしていない。
+- 04:17 次の検証: 関連サーバーテスト・契約検査・新規テストの型/lint/format と独立レビュー1回を実施し、指定ブランチを push して CI / PR で提出する。
+- 04:13 記録訂正: 直前3行の「04:17」は転記誤り。実時刻は04:11前後（実装と初回PASS）〜04:12（関連検査完了）。内容の事実は維持し、この行で訂正する。
+- 04:13 関連検証結果: Edge Functions 419件、契約テスト3件、ops静的検査84件、RLS 1件/7step が全PASS。契約fixture22件一致。新規テストの deno check / lint / fmt --check と git diff --check もPASS。独立レビュー1名は評価中。型抑止・skipは追加していない。SQL migration適用が今回のDBビルド検証であり、iOS/Androidは変更なしのためビルド対象外。
+- 04:17 提出・レビュー節目: af9fedf をpushし draft PR #152 を作成。lien-ci #39481501671 の全6ジョブ（新規RLS含む）が成功。独立レビュー1回はSQLへの指摘なし、テストにP2指摘1件（本人送信/本人所有だけでも対照PASS）。同日DE→CDの相手checkinにEから送信された行を加え、読めるcheckin経由のみで許可される分岐を補強する。
+- 04:17 変更外のCI異常: lien-play.yml の run #39481499553 は failure / jobsなし / ログなし。親mainの7991bc5でも #39463901466 が同じ failure、当該workflowは今回未変更。無関係な修正はせずPR/結果に既存異常として分離して報告する。
+- 04:17 記録訂正: 直前2行の04:17も記入時刻の転記誤りで実時刻は04:15前後。追加対照後は1 test/8stepがPASS、lint/fmt/diffもPASS。独立レビュワーにはP2該当箇所だけ再確認を依頼済み。今回の残TODOはレビュー判定と最終pushのCI確認のみ。
+- 04:18 結果: PR #152（https://github.com/Ryoki63/Challenge/pull/152）へ修正を提出。2772d28 の lien-ci #39482112795 は全6ジョブ成功、Linuxで419件＋RLS 1件/8step＋契約fixture22件一致をログ確認。独立レビューP2は限定再確認で解消、本人所有checkin限定の誤実装では新stepが失敗することも独立確認済み。
+- 04:18 提出前チェック: 受入3項目PASS／関連テスト全PASS／型PASS／lint・format・diffPASS／DB build＝実0001→0009適用PASS／iOS・Android buildは変更なしのため対象外／残TODOゼロ（マージ判断と本番migration適用は本タスク対象外）。無関係なlien-play.ymlの既存failureは未解消としてPRにも記録。Issueはレビュー役職へ引き渡すためOPENのまま、main直push・マージ・本番変更なし。
