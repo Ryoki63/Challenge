@@ -92,7 +92,7 @@ struct RootView: View {
             Text(Strings.Session.lostMessage)
         }
         .onOpenURL { url in
-            // 招待リンクの受け口(DESIGN §3.6)。招待以外・不正形式は無視する
+            // ホーム復帰・招待リンクの受け口(DESIGN §3.6 / REQUIREMENTS §3.10)
             model.handleDeepLink(url)
         }
         .task { await model.start() }

@@ -478,6 +478,130 @@ final class AppModelTests: XCTestCase {
         await waitUntil { h.client.callCount >= 1 } // 成立後の突き合わせ同期(投げ捨てた Task)の完了待ち
     }
 
+    func testHomeDeepLinkDismissesSettingsInSoloAndPaired() async throws {
+        for snapshot in [SnapshotFactory.solo(), SnapshotFactory.paired()] {
+            let harness = try await makeHarness(local: snapshot, server: .success(snapshot))
+            defer { harness.temp.cleanup() }
+            let phase = harness.model.phase
+            harness.model.presentSettings()
+            XCTAssertTrue(harness.model.showsSettings)
+
+            harness.model.handleDeepLink(URL(string: "lien://home")!)
+            await harness.model.sceneDidBecomeActive()
+
+            XCTAssertEqual(harness.model.phase, phase)
+            XCTAssertFalse(harness.model.showsSettings)
+            XCTAssertFalse(harness.model.showsPairing)
+            XCTAssertEqual(harness.store.loadSnapshot(), snapshot)
+        }
+    }
+
+    func testHomeDeepLinkDismissesManuallyPresentedPairing() async throws {
+        let harness = try await makeHarness(local: SnapshotFactory.solo())
+        defer { harness.temp.cleanup() }
+        harness.model.presentPairing()
+        XCTAssertTrue(harness.model.showsPairing)
+
+        await harness.model.sceneDidBecomeActive()
+        harness.model.handleDeepLink(URL(string: "lien://home")!)
+
+        XCTAssertEqual(harness.model.phase, .solo)
+        XCTAssertFalse(harness.model.showsPairing)
+        XCTAssertFalse(harness.model.showsSettings)
+    }
+
+    func testHomeDeepLinkClearsPendingInviteSoRefreshDoesNotReopenPairing() async throws {
+        let harness = try await makeHarness(local: SnapshotFactory.solo())
+        defer { harness.temp.cleanup() }
+        harness.model.handleDeepLink(inviteURL("AbCd2345"))
+        XCTAssertTrue(harness.model.showsPairing)
+
+        harness.model.handleDeepLink(URL(string: "lien://home")!)
+        await harness.model.refresh()
+
+        XCTAssertNil(harness.model.pendingInviteToken)
+        XCTAssertFalse(harness.model.showsPairing)
+        XCTAssertEqual(harness.model.phase, .solo)
+
+        harness.model.handleDeepLink(inviteURL("EfGh6789"))
+        XCTAssertEqual(harness.model.pendingInviteToken, "EfGh6789")
+        XCTAssertTrue(harness.model.showsPairing)
+    }
+
+    func testHomeDeepLinkBeforeStartupPreservesSoloAndPairedHomes() async throws {
+        for snapshot in [SnapshotFactory.solo(), SnapshotFactory.paired()] {
+            let harness = try await makeHarness(local: snapshot, server: .success(snapshot))
+            defer { harness.temp.cleanup() }
+            let phase = harness.model.phase
+
+            harness.model.handleDeepLink(URL(string: "lien://home")!)
+            await harness.model.start()
+
+            XCTAssertEqual(harness.model.phase, phase)
+            XCTAssertFalse(harness.model.showsSettings)
+            XCTAssertFalse(harness.model.showsPairing)
+        }
+    }
+
+    func testHomeDeepLinkDoesNotBypassOnboardingWithoutSession() async throws {
+        let harness = try await makeHarness(signedIn: false, local: SnapshotFactory.paired())
+        defer { harness.temp.cleanup() }
+        harness.model.handleDeepLink(inviteURL("AbCd2345"))
+
+        harness.model.handleDeepLink(URL(string: "lien://home")!)
+        await harness.model.start()
+
+        XCTAssertEqual(harness.model.phase, .onboarding)
+        XCTAssertNil(harness.model.pendingInviteToken)
+        XCTAssertFalse(harness.model.showsPairing)
+        XCTAssertEqual(harness.client.callCount, 0)
+    }
+
+    func testHomeDeepLinkWithoutPromiseStaysInSetupAndDiscardsPendingInvite() async throws {
+        let harness = try await makeHarness(
+            local: SnapshotFactory.noPromise(), server: .success(SnapshotFactory.noPromise())
+        )
+        defer { harness.temp.cleanup() }
+        harness.model.handleDeepLink(inviteURL("AbCd2345"))
+        harness.model.presentSettings()
+
+        harness.model.handleDeepLink(URL(string: "lien://home")!)
+        await harness.model.start()
+
+        XCTAssertEqual(harness.model.phase, .promiseSetup)
+        XCTAssertNil(harness.model.pendingInviteToken)
+        XCTAssertFalse(harness.model.showsSettings)
+        XCTAssertFalse(harness.model.showsPairing)
+    }
+
+    func testOrdinaryForegroundActivationKeepsPresentedSheets() async throws {
+        let settings = try await makeHarness(local: SnapshotFactory.paired(), server: .success(SnapshotFactory.paired()))
+        defer { settings.temp.cleanup() }
+        settings.model.presentSettings()
+        await settings.model.sceneDidBecomeActive()
+        XCTAssertTrue(settings.model.showsSettings)
+
+        let pairing = try await makeHarness(local: SnapshotFactory.solo())
+        defer { pairing.temp.cleanup() }
+        pairing.model.presentPairing()
+        await pairing.model.sceneDidBecomeActive()
+        XCTAssertTrue(pairing.model.showsPairing)
+    }
+
+    func testUnrelatedURLsDoNotDismissSettingsOrPairing() async throws {
+        let harness = try await makeHarness(local: SnapshotFactory.solo())
+        defer { harness.temp.cleanup() }
+        harness.model.handleDeepLink(inviteURL("AbCd2345"))
+        harness.model.presentSettings()
+
+        for rawURL in ["https://home", "other://home", "lien://homepage", "lien://home/extra", "lien://home?t=AbCd2345"] {
+            harness.model.handleDeepLink(try XCTUnwrap(URL(string: rawURL)))
+            XCTAssertTrue(harness.model.showsSettings, rawURL)
+            XCTAssertTrue(harness.model.showsPairing, rawURL)
+            XCTAssertEqual(harness.model.pendingInviteToken, "AbCd2345", rawURL)
+        }
+    }
+
     // MARK: ディープリンク(招待コード)
 
     private func inviteURL(_ token: String) -> URL {

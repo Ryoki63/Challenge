@@ -36,6 +36,22 @@ final class WidgetSourceTests: XCTestCase {
 
     // MARK: - ファミリー
 
+    func testAllWidgetFamiliesShareTheHomeDeepLink() throws {
+        let source = try code("LienWidget/LienWidgetEntryView.swift")
+        XCTAssertTrue(source.contains("Group {"))
+        XCTAssertTrue(source.contains(".widgetURL(WidgetHomeLink.url)"))
+        XCTAssertEqual(source.components(separatedBy: ".widgetURL(").count - 1, 1)
+        XCTAssertTrue(source.contains("}\n        .widgetURL(WidgetHomeLink.url)"))
+        XCTAssertEqual(WidgetHomeLink.url.absoluteString, "lien://home")
+        XCTAssertNil(DeepLinkHandler.inviteToken(from: WidgetHomeLink.url))
+    }
+
+    func testRootViewForwardsURLsToTheAppModel() throws {
+        let source = try code("Lien/App/RootView.swift")
+        XCTAssertTrue(source.contains(".onOpenURL { url in"))
+        XCTAssertTrue(source.contains("model.handleDeepLink(url)"))
+    }
+
     func testTheWidgetSupportsExactlyTheFourV10Families() throws {
         let source = try code("LienWidget/LienWidgetBundle.swift")
         let block = try XCTUnwrap(

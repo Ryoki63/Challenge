@@ -797,3 +797,21 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-21 11:09 — #158 ウィジェットのタップをホーム直行にする（eng-exec）
+
+- 着手: 指定worktree・ブランチconsilium/158-bug-iosを確認。tracked/untracked差分なし、origin mainとHEADは7991bc5。git pull --rebase origin mainはAlready up to date。対象ブランチのremote/既存PRなし。Issueの着手コメントとassignee Ryoki63を確認した。
+- 範囲: ウィジェット4種の明示ホームURLとAppModelのホーム復帰、招待・安全な初期ルートの回帰試験。mainへの直接push・マージ・ストア送信・secret/.env操作は行わない。承認待ち一覧は確認したが別Issueは今回の単一タスク範囲外として変更しない。
+- 検証環境: macOSのCommand Line Tools / Swift 6.1.2のみ。xcodebuildはXcode未選択で実行不可。既存macos-checkをworktree内の出力先で使い、iOSビルド/XCTestはPR CIで確認する。実機のOSタップ/scene restorationは別の検証状態として記録する。
+- 11:17 設計・実装節目: 共有WidgetHomeLink.urlを4ファミリーの外側へ一度だけ適用し、AppModelでURL完全一致時だけ設定/招待シートと保留招待を解除する。通常のscene復帰・招待パーサー・認証/約束に基づくphase導出は変更しない。RootViewの既存onOpenURLを利用し追加の遷移状態は持たない。
+- 試験準備: 回帰8メソッドとウィジェット/RootView配線2メソッドを追加。最初の絞込コマンドはSnapshotFactoryをファイル名と誤指定し、モジュールbuild成功後に対象ファイル不在で停止（テスト結果ではない）。既存TestSupportの自動同梱を確認し、正しい指定で検証する。
+- 11:14 記録訂正: 直前の「11:17」は記載時の誤記。実際の設計・実装節目は11:13以前（11:13:36のdate確認）であり、未来の作業実施を示すものではない。
+- 11:14 検証節目: focusedのAppModelTests/SnapshotSynchronizerTests/DeepLinkHandlerTests/WidgetSourceTestsは77件・373 assertions・0 failures、90ファイルのFoundationモジュールbuild成功。全macOS試験とView/Widget型検査を実行中。独立eng-reviewを1名に依頼し、親は試験と提出準備を担当する。
+- 11:16 検証節目: 全macOS 1146件/26700 assertions PASS、View123ファイル・Widget19ファイル型検査PASS。PairSnapshotの既存Swift6 concurrency warning2箇所のみ。修正前の保持モジュールで新規モデル回帰8件を実行し5FAIL/3PASSを確認、修正後は全件PASS。独立eng-reviewは具体的指摘なし。docs/REVIEW-158-WIDGET-HOME.mdへ受入条件対応・コマンド・境界を記録した。
+- 提出ゲート（ローカル）: 実装PASS／関連・全macOS試験PASS／View・Widget型検査PASS／diff --check PASS／独立レビューPASS／残実装TODOなし。専用lintは設定なしのため対象外（静的テストは実施）。iOS実ビルド/XCTestは提出SHAのCI待ち、実機タップは未確認であり完了ゲートと分ける。これから指定ブランチへcommit/pushしPRを作成する。
+- 提出: 実装コミット1ef04c0184f5727637497e330a19e20f37ec2c44を指定ブランチへpush、PR #159をOPENで作成した。main直接push・マージは未実施。lien-ci #39532151022は6ジョブsuccess。
+- CI初回: lien-ios #39532151011はiPhone17/iOSシミュレータの無署名build・XCTest 1231件/0 failures、TEST SUCCEEDEDを記録。しかし20分上限超過のannotationがあり、ジョブconclusion=cancelled（全体成功ではない）。失敗ジョブだけ1回再実行。2回目も失敗した場合は3回目を行わず未完了で返す。
+- CI別件: 変更していないlien-play.ymlはpush直後にjob0件でfailure。直前2runも同じfailureであり今回のiOS修正範囲外として変更しない。これを緑と報告しない。実機タップ/scene restorationは引き続き未確認。
+- 12:58 CI最終確認: lien-ios #39532151011 attempt2は12:23:54 JSTにジョブ全体success。iPhone17/iOS26.5の無署名build・XCTest1231件/0 failures・TEST SUCCEEDED、release script130件PASSをログで確認した。lien-ci6ジョブもsuccess。PR #159はOPEN/CLEANでレビュー役職へ渡す（未マージ）。
+- 最終ゲート: 全実装要件PASS（モデル・ソース範囲）／macOS1146件とiOS1231件PASS／View・Widget型検査PASS／iOS build PASS／diff --check PASS／独立レビュー1回指摘なし／残実装TODOなし。専用lintは設定なしで対象外（既存静的試験PASS）。実機OSタップ・scene restoration・実操作スクリーンショットは未確認、README手順でQAへ渡す。既存lien-play failureは別件として残し全workflow緑とはしない。
+- 結果: コード検証とPR提出まで完了。コードSHA1ef04c0を変更せず検証記録のみ追記・commit/pushする。Issueはマージ前のため開いたまま、statusラベルはHQ管理に委ねる。main直接push・マージ・ストア提出・本番操作はなし。
