@@ -323,7 +323,7 @@ v1.0 のウィジェットは1つ(kind `LienWidget`)で、4つのファミリー
 
 **数字はストリークだけ**(GROWTH §5.4。進み具合のバーに数字も文も付けない)。ストリークが 0 のときは「0日」を出さない(罰なし)。進み具合のバーは、snapshot の新キー3つ(`plantGrownDays` / `plantStageFloor` / `plantNextStageAt`)から「区間の中での位置」(`PlantProgress`)を作る。新しいキーが無い・値が食い違うときは出さず、最後の段階(次の段階が無い)はいっぱいにする。
 
-### 構成(WidgetKit に触るのは `LienWidget/` だけ)
+### 構成(WidgetKit の `TimelineProvider`・`WidgetBundle`・`WidgetFamily` に触るのは `LienWidget/` だけ)
 
 | 何 | どこ |
 |---|---|
@@ -331,7 +331,7 @@ v1.0 のウィジェットは1つ(kind `LienWidget`)で、4つのファミリー
 | **何を見せるか**(snapshot → 3つの状態(データ無し・ソロ・ペア)× 植物の状態・ストリーク・2人の状態・バーの長さ・「待ってるよ」・円形の葉・読み上げ文)— 純粋関数 | `Lien/Core/Widget/WidgetContent.swift` |
 | **タイムラインの計画**(今 + 翌日 0:00。前の日に作られた snapshot の「今日」は「まだ」として描く)— 純粋関数 | `Lien/Core/Widget/WidgetTimelinePlan.swift` |
 | 寸法(S の植物と右の列・M の植物・円形の葉の切り抜き範囲)— 純粋な計算 | `Lien/Core/Widget/WidgetMetrics.swift` |
-| ビュー(S / M / 円形 / インライン / 部品 / 色合い表示の装飾)。WidgetKit のファミリーは持たない(`WidgetLayout` を受け取る) | `Lien/Core/Widget/Views/` |
+| ビュー(S / M / 円形 / インライン / 部品 / 色合い表示の装飾)。WidgetKit のファミリーは持たない(`WidgetLayout` を受け取る)。`widgetAccentable` などの修飾子のために WidgetKit を import するが、型検査・テストは macOS / iOS のどちらでも走る | `Lien/Core/Widget/Views/` |
 | 植物の各レイヤーの Image に付ける装飾の差し込み口(`PlantImageStyle`。既定は何もしない) | `Lien/Core/DesignSystem/PlantCharacterView.swift` |
 
 `Lien/Core/Widget/` は `project.yml` が LienWidget にフォルダごと入れる(アプリ本体にも入る — LienTests が単体テストと一覧画像の描画をするため)。ファイルを足しても `project.yml` は直さない。
@@ -347,16 +347,22 @@ v1.0 のウィジェットは1つ(kind `LienWidget`)で、4つのファミリー
 - **VoiceOver**: ウィジェット全体で1つの要素。ホーム S / M は植物の読み上げ文(`PlantVoiceOver` — 「みどり、わかば。あなた: 完了、ゆうき: まだ。ふたりそろって あと2回で よりそい」)に、ストリークと「待ってるよ」を足す。円形は「ゆうき: 完了」、インラインは「ふたりの記録: 23日」
 - **メモリ**: 全レイヤーを重ねる(ベクターのまま)。S の植物は約 68×91pt(標準の機種)・M は約 95×126pt。目安は S サイズで1レイヤー約1MB・10枚前後(GROWTH §9.5)。収まらないと分かったときの代案は、ウィジェット用だけ「段階 × 葉の状態」を1枚に合成した画像を持つこと(`PlantCharacterView` の差し替えで局所化できる)。**実機で確かめる(T20)**
 
+### 既知の制約(v1.0)
+
+- **日付が変わって 1:00 までに作られた snapshot の完了は、前の日のことかもしれない**(サーバーは checkin などの snapshot を、クライアントが送った日付を「今日」として組み立てる。たとえば 23:58 に圏外で押したチェックインが 0:07 に届く)。ローカル通知(§12)は、その間の完了を「不明」として扱うが、ウィジェットは**ホームと同じく、そのまま描く**(「不明」にすると、0:30 に自分でチェックインした人の葉が閉じたままに見える)。0:00 のエントリで葉は閉じるので、前の日の完了が見えつづけるのは、その時間帯にそれが届いて、次に snapshot が更新されるまでの間だけ。サーバーが snapshot に日付(`dateLocal`)を載せれば、両方とも解消する
+- ウィジェットは**自分では取りに行かない**。アプリを開かず、相手の push も届かない(通知をオフにしている・機内モードなど)間は、App Group の snapshot のまま(前の日のものなら、今日の分は「まだ」。ストリーク・段階は最後に分かった値)
+- ホーム M の**相手の写真は v1.0.1(T17b)**。円形の進み具合のリングも v1.0.1(GROWTH §5.4)
+
 ### テスト・手元の下見・一覧画像
 
 - 単体テスト(macOS の下見でも走る): `WidgetContentTests`(状態の導出)/ `WidgetTimelinePlanTests`(日付またぎ・前の日の snapshot・タイムゾーン・夏時間)/ `WidgetLayoutTests`(寸法・円形の切り抜き)/ `WidgetSourceTests`(ファミリー4つ・`imageStyle` を必ず渡す・共有ファイルの依存・日本語の文言を直書きしない・自分では reload しない)/ `AppGroupStoreTests`(`snapshotFileIsLocked`)/ `StringsReviewTests`(新しい文言)
 - 実描画(iOS のみ): `WidgetRenderTests` — どの状態・大きさ・文字サイズ・ライト/ダークでも**内側の余白(システムの 16pt)に描き込まない**・進み具合のバーが内容の長さどおりに塗られる / 新しいキーが無いときは出ない・ダークでプレートが敷かれる・円形の葉が測った範囲に収まり円の縁に付かず、開閉が形で見分けられる
-- 一覧画像(lien-ios の artifact `plant-render-sheets` の `widget_*.png`): `widget_01_small_light` / `_02_small_dark`(S の状態16通り)・`_03_medium_light` / `_04_medium_dark`(M)・`_05_lock_screen`(円形とインライン)・`_06_small_sizes` / `_07_medium_sizes`(機種の大きさ × 文字の大きさ)。システムが足す内側の余白・背景・円形の背景・単色化は近似(`WidgetRenderSupport.swift`)
+- 一覧画像(lien-ios の artifact `plant-render-sheets` の `widget_*.png`): `widget_01_small_light` / `_02_small_dark`(S の状態16通り)・`_03_medium_light` / `_04_medium_dark`(M)・`_05_lock_screen`(円形とインライン)・`_06_small_sizes` / `_07_medium_sizes`(機種の大きさ × 文字の大きさ)。システムが足す内側の余白・背景・円形の背景・単色化は近似(`WidgetRenderSupport.swift`。台紙は `WidgetRenderSheets.swift`)
 - `scripts/macos-check/check.sh widget`: LienWidget ターゲットを、`project.yml` の sources のとおりに集めて macOS の SDK で型検査する(ロック画面の accessory 系ファミリーは macOS に無いので、型検査用のコピーでだけ別のファミリーに読み替える)
 
 ### 確認できていること・できていないこと
 
-- **CI(シミュレータ)と手元の macOS で確認済み**: 上のテスト一式 / 手元で macOS 向けに描いた一覧(iPhone SE・標準・Pro Max の大きさ、標準と xxLarge の文字)/ ライト・ダーク・ロック画面の見え方(エージェントの目視。承認は人が artifact の画像を見て行う)
+- **CI(シミュレータ)と手元の macOS で確認済み**: 上のテスト一式 / 手元で macOS 向けに描いた一覧(iPhone SE・標準・Pro Max の大きさ、標準と xxLarge の文字)/ ライト・ダーク・ロック画面の見え方(エージェントの目視。CI の artifact の画像でも見られる)
 - **実機でしか確認できない(T20)**:
   1. **メモリ**: ホーム S / M・ロック画面の各ウィジェットが、全レイヤーを重ねても収まるか(拡張が強制終了されない・空白にならない)。収まらなければ上の代案
   2. **色合い(accented)表示**(iOS 18 以降。ホーム画面を長押し → 編集 → カスタマイズ → 色合い): 植物が色を保つか(花の着色・背面プレート・文字・バーの塗りの色)

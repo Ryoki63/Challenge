@@ -57,14 +57,14 @@ exclude_from_module() {
 
 # 走らせないテスト(LienTests/ のファイル名)。理由:
 #   AppServicesTests / ConfigTests : AppServices+Live.swift(supabase-swift)を使う
-#   PlantRenderTests / PlantLayersTests / HomeRenderChecksTests / NotificationSettingsRenderTests / WidgetRenderTests(と、その道具 WidgetRenderSupport): アセットカタログ・SwiftUI の描画・UIKit のウィンドウと色・XCTAttachment を使う
+#   PlantRenderTests / PlantLayersTests / HomeRenderChecksTests / NotificationSettingsRenderTests / WidgetRenderTests(と、その台紙・道具 WidgetRenderSheets / WidgetRenderSupport): アセットカタログ・SwiftUI の描画・UIKit のウィンドウと色・XCTAttachment を使う
 #   ShareImageRenderTests : シェア画像の実描画(ImageRenderer・アセットカタログ・XCTAttachment)。T22
 #   StoreScreenshotRenderTests(と、その枠 StoreScreenshotFrames): ストア用スクリーンショットの実描画。画面の View
 #     (HomeView / HistoryView / WidgetRootView / ShareImageCardView)を実寸で描くので、module だけでは型が足りない。issue #80
 #   DeviceTokenStoreTests : AppDelegate.swift(UIKit)を使う
 #   QRCodeGeneratorTests : QRCodeGenerator.swift(UIImage)を使う
 #   SmokeTests : アプリ本体のバンドルの前提
-EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSupport ShareImageRenderTests PaywallRenderTests StoreScreenshotRenderTests StoreScreenshotFrames DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
+EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSheets WidgetRenderSupport ShareImageRenderTests PaywallRenderTests StoreScreenshotRenderTests StoreScreenshotFrames DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
 
 is_excluded_test() {
   local name="$1" e

@@ -25,153 +25,6 @@ import UIKit
 import XCTest
 @testable import Lien
 
-// MARK: - 一覧の台紙
-
-/// 一覧の台紙(タイトル+ライト / ダークの背景)
-private struct WidgetSheet<Content: View>: View {
-    let title: String
-    let dark: Bool
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-            content
-        }
-        .padding(16)
-        .background(dark ? Color(white: 0.32) : Color(white: 0.9))
-        .environment(\.colorScheme, dark ? .dark : .light)
-    }
-}
-
-private func chunked<T>(_ items: [T], by size: Int) -> [[T]] {
-    stride(from: 0, to: items.count, by: size).map { Array(items[$0..<min($0 + size, items.count)]) }
-}
-
-/// ホーム S / M の状態の一覧(Lazy な入れ物は ImageRenderer で描けないことがあるので、行と列を素直に並べる)
-private struct HomeStatesSheet: View {
-    let title: String
-    let layout: WidgetLayout
-    let size: CGSize
-    let dark: Bool
-    let columns: Int
-
-    var body: some View {
-        WidgetSheet(title: title, dark: dark) {
-            VStack(alignment: .leading, spacing: 14) {
-                ForEach(Array(chunked(WidgetSamples.homeStates, by: columns).enumerated()), id: \.offset) { _, row in
-                    HStack(alignment: .top, spacing: 14) {
-                        ForEach(row.indices, id: \.self) { index in
-                            WidgetCell(item: row[index], layout: layout, size: size, dark: dark)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// ウィジェット1つ+ラベル
-private struct WidgetCell: View {
-    let item: WidgetSamples.Item
-    let layout: WidgetLayout
-    let size: CGSize
-    let dark: Bool
-    var textSize: DynamicTypeSize = .large
-    var caption: String?
-
-    var body: some View {
-        VStack(spacing: 4) {
-            WidgetTestFrame(
-                content: WidgetContent(snapshot: item.snapshot), layout: layout, size: size, dark: dark, textSize: textSize
-            )
-            Text(caption ?? item.label)
-                .font(.system(size: 9))
-                .foregroundStyle(dark ? Color.white.opacity(0.75) : Color.black.opacity(0.65))
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(width: size.width)
-        }
-    }
-}
-
-/// ロック画面: 暗い壁紙に、円形(白黒の近似と、色のまま)とインライン
-private struct LockScreenSheet: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("ロック画面 — 円形(上: 単色化の近似 / 下: 色のまま)とインライン")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-            circles(monochrome: true)
-            circles(monochrome: false)
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(WidgetSamples.lockStates.indices, id: \.self) { index in
-                    HStack(spacing: 8) {
-                        WidgetLockInline(content: WidgetContent(snapshot: WidgetSamples.lockStates[index].snapshot))
-                        Text(WidgetSamples.lockStates[index].label)
-                            .font(.system(size: 9))
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .background(
-            LinearGradient(
-                colors: [Color(red: 0.1, green: 0.16, blue: 0.3), Color(red: 0.25, green: 0.12, blue: 0.3)],
-                startPoint: .top, endPoint: .bottom
-            )
-        )
-        .environment(\.colorScheme, .dark)
-    }
-
-    private func circles(monochrome: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            ForEach(WidgetSamples.lockStates.indices, id: \.self) { index in
-                VStack(spacing: 4) {
-                    WidgetLockCircle(content: WidgetContent(snapshot: WidgetSamples.lockStates[index].snapshot), monochrome: monochrome)
-                    Text(WidgetSamples.lockStates[index].label)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .frame(width: 76)
-                }
-            }
-        }
-    }
-}
-
-/// 機種の大きさ × 文字の大きさ(最大の文字サイズは、WidgetRootView の上限(xxLarge)で止まる)
-private struct WidgetSizesSheet: View {
-    let title: String
-    let layout: WidgetLayout
-    let sizes: [CGSize]
-    private let textSizes: [(String, DynamicTypeSize)] = [("標準", .large), ("xxLarge", .xxLarge), ("最大(accessibility5 = xxLarge で止まる)", .accessibility5)]
-    private let items: [WidgetSamples.Item] = [WidgetSamples.homeStates[2], WidgetSamples.homeStates[3], WidgetSamples.homeStates[6]]
-
-    var body: some View {
-        WidgetSheet(title: title, dark: false) {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(textSizes.indices, id: \.self) { textIndex in
-                    HStack(alignment: .top, spacing: 12) {
-                        ForEach(sizes.indices, id: \.self) { sizeIndex in
-                            VStack(spacing: 8) {
-                                ForEach(items.indices, id: \.self) { itemIndex in
-                                    WidgetCell(
-                                        item: items[itemIndex], layout: layout, size: sizes[sizeIndex], dark: false,
-                                        textSize: textSizes[textIndex].1,
-                                        caption: "\(Int(sizes[sizeIndex].width))×\(Int(sizes[sizeIndex].height)) \(textSizes[textIndex].0) — \(items[itemIndex].label)"
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 // MARK: - テスト
 
 @MainActor
@@ -232,11 +85,11 @@ final class WidgetRenderTests: XCTestCase {
     func testRenderTheWidgetContactSheets() throws {
         let small = CGSize(width: 158, height: 158)
         let medium = CGSize(width: 338, height: 158)
-        try save("widget_01_small_light", HomeStatesSheet(title: "ホーム S(158×158)— ライト", layout: .small, size: small, dark: false, columns: 4))
-        try save("widget_02_small_dark", HomeStatesSheet(title: "ホーム S(158×158)— ダーク", layout: .small, size: small, dark: true, columns: 4))
-        try save("widget_03_medium_light", HomeStatesSheet(title: "ホーム M(338×158。相手の写真は v1.0.1)— ライト", layout: .medium, size: medium, dark: false, columns: 2))
-        try save("widget_04_medium_dark", HomeStatesSheet(title: "ホーム M(338×158)— ダーク", layout: .medium, size: medium, dark: true, columns: 2))
-        try save("widget_05_lock_screen", LockScreenSheet())
+        try save("widget_01_small_light", WidgetStatesSheet(title: "ホーム S(158×158)— ライト", layout: .small, size: small, dark: false, columns: 4))
+        try save("widget_02_small_dark", WidgetStatesSheet(title: "ホーム S(158×158)— ダーク", layout: .small, size: small, dark: true, columns: 4))
+        try save("widget_03_medium_light", WidgetStatesSheet(title: "ホーム M(338×158。相手の写真は v1.0.1)— ライト", layout: .medium, size: medium, dark: false, columns: 2))
+        try save("widget_04_medium_dark", WidgetStatesSheet(title: "ホーム M(338×158)— ダーク", layout: .medium, size: medium, dark: true, columns: 2))
+        try save("widget_05_lock_screen", WidgetLockScreenSheet())
         try save("widget_06_small_sizes", WidgetSizesSheet(title: "ホーム S — 機種の大きさ × 文字の大きさ", layout: .small, sizes: smallSizes))
         try save("widget_07_medium_sizes", WidgetSizesSheet(title: "ホーム M — 機種の大きさ × 文字の大きさ", layout: .medium, sizes: mediumSizes))
     }
