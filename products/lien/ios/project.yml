@@ -57,6 +57,9 @@ targets:
         # App Store Connect は AppIcon(1024 単一サイズ・アルファなし)が無いアップロードを弾く(ITMS-90022 / 90713)。
         # 画像は Lien/Assets.xcassets/AppIcon.appiconset(正本: ../assets/icon/icon_1024.png — v4 空色)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # ブランドのセージグリーン(#3D6B52)。未指定だと .borderedProminent・Toggle・Link・選択状態が
+        # iOS 既定の青になり、Web サイト・シェア画像(shareAccent)と色が食い違う
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     info:
       path: Lien/Info.plist
       properties:

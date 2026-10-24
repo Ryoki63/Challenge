@@ -23,18 +23,56 @@ struct OnboardingView: View {
         ))
     }
 
+    /// 組み立て済みの ViewModel で描く(プレビュー・描画テスト・特定ステップの確認用)
+    init(viewModel: OnboardingViewModel) {
+        _viewModel = State(initialValue: viewModel)
+    }
+
     var body: some View {
-        Group {
-            switch viewModel.step {
-            case .concept:
-                ConceptPage(onStart: { viewModel.advanceFromConcept() })
-            case .nickname:
-                NicknamePage(viewModel: viewModel)
-            case .notification:
-                NotificationPage(viewModel: viewModel)
+        VStack(spacing: 0) {
+            // 3ステップのうちどこにいるかを常に出す(何画面あるか分からないと、先が見えず離脱する)
+            OnboardingStepIndicator(step: viewModel.step)
+                .padding(.top, LienSpacing.m)
+            Group {
+                switch viewModel.step {
+                case .concept:
+                    ConceptPage(onStart: { viewModel.advanceFromConcept() })
+                case .nickname:
+                    NicknamePage(viewModel: viewModel)
+                case .notification:
+                    NotificationPage(viewModel: viewModel)
+                }
             }
         }
         .animation(.default, value: viewModel.step)
+    }
+}
+
+// MARK: - ステップの目印
+
+/// 3つの点で現在地を示す。読み上げは「3ステップ中1」。
+private struct OnboardingStepIndicator: View {
+    let step: OnboardingViewModel.Step
+
+    private var index: Int {
+        switch step {
+        case .concept: 0
+        case .nickname: 1
+        case .notification: 2
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: LienSpacing.xs) {
+            ForEach(0..<3, id: \.self) { i in
+                Capsule()
+                    .fill(i == index ? Color.accentColor : Color.secondary.opacity(0.25))
+                    .frame(width: i == index ? 20 : 6, height: 6)
+                    .animation(.easeInOut(duration: 0.2), value: index)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Strings.Onboarding.stepIndicator(index + 1))
     }
 }
 
@@ -44,29 +82,45 @@ private struct ConceptPage: View {
     let onStart: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "leaf.circle")
-                .font(.system(size: 64))
-                .foregroundStyle(.green)
-            Text(Strings.Onboarding.conceptTitle)
-                .font(.title2.bold())
-            Text(Strings.Onboarding.conceptBody)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Spacer()
-            Text(Strings.Onboarding.conceptNote)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Button(action: onStart) {
-                Text(Strings.Onboarding.conceptStart)
-                    .frame(maxWidth: .infinity)
+        // 文字を大きくする設定でも切れないよう、スクロールできる器に入れる
+        ScrollView {
+            VStack(spacing: LienSpacing.m) {
+                // アプリの主役はタネの子。SF Symbols の葉ではなく、本物の絵を最初に見せる
+                PlantCharacterView(
+                    state: PlantCharacterState(stage: 3, meOpen: true, partnerOpen: true, expression: .happy)
+                )
+                .frame(width: 150, height: 200) // 3:4
+
+                Text(Strings.Onboarding.conceptTitle)
+                    .font(.title2.bold())
+                    .multilineTextAlignment(.center)
+                Text(Strings.Onboarding.conceptBody)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .frame(maxWidth: .infinity)
+            // 画面の高さいっぱいに広げて中身を縦中央に置く(上に寄ると、下の余白だけが間延びする)
+            .containerRelativeFrame(.vertical, alignment: .center)
+            .padding(.horizontal, LienSpacing.l)
+            .padding(.bottom, LienSpacing.m)
         }
-        .padding(24)
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: LienSpacing.s) {
+                Text(Strings.Onboarding.conceptNote)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button(action: onStart) {
+                    Text(Strings.Onboarding.conceptStart)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+            .padding(.horizontal, LienSpacing.l)
+            .padding(.bottom, LienSpacing.m)
+        }
     }
 }
 
@@ -77,27 +131,28 @@ private struct NicknamePage: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: LienSpacing.l) {
                 Text(Strings.Onboarding.profileTitle)
                     .font(.title2.bold())
-                    .padding(.top, 32)
+                    .padding(.top, LienSpacing.l)
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: LienSpacing.s) {
                     TextField(Strings.Onboarding.nicknamePlaceholder, text: $viewModel.nickname)
                         .textFieldStyle(.roundedBorder)
                         .submitLabel(.done)
                     if let message = nicknameErrorMessage {
                         Text(message)
                             .font(.footnote)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(LienColors.gentleAlert)
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: LienSpacing.s) {
                     Text(Strings.Onboarding.avatarTitle)
                         .font(.headline)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 8) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: LienSpacing.s) {
                         ForEach(Strings.Onboarding.avatarPalette, id: \.self) { emoji in
+                            let selected = viewModel.avatarEmoji == emoji
                             Button {
                                 viewModel.avatarEmoji = emoji
                             } label: {
@@ -105,24 +160,46 @@ private struct NicknamePage: View {
                                     .font(.title2)
                                     .frame(width: 44, height: 44)
                                     .background(
-                                        viewModel.avatarEmoji == emoji
-                                            ? Color.accentColor.opacity(0.2)
+                                        selected
+                                            ? Color.accentColor.opacity(0.18)
                                             : Color.clear,
-                                        in: RoundedRectangle(cornerRadius: 8)
+                                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    )
+                                    // 選択が色だけだと分かりにくいので、枠でも示す
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .strokeBorder(
+                                                selected ? Color.accentColor : Color.clear,
+                                                lineWidth: 1.5
+                                            )
                                     )
                             }
                             .buttonStyle(.plain)
+                            .accessibilityAddTraits(selected ? .isSelected : [])
                         }
                     }
                 }
 
                 // 規約への明示の同意(チェック)。同意ボタン(下の「同意してはじめる」)はチェックが入るまで押せない
                 ConsentSection(isAgreed: $viewModel.agreedToTerms)
-
+            }
+            .padding(.horizontal, LienSpacing.l)
+            .padding(.bottom, LienSpacing.m)
+        }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: LienSpacing.s) {
+                // 押せない理由を、押せないあいだだけ書く(無効なボタンだけ置くと、なぜ進めないか分からない)
+                if let blockedReason {
+                    Text(blockedReason)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
                 if let errorMessage = viewModel.submitErrorMessage {
                     Text(errorMessage)
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(LienColors.gentleAlert)
+                        .multilineTextAlignment(.center)
                 }
 
                 Button {
@@ -144,9 +221,19 @@ private struct NicknamePage: View {
                 Text(Strings.Onboarding.anonymousStartNote)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
-            .padding(24)
+            .padding(.horizontal, LienSpacing.l)
+            .padding(.bottom, LienSpacing.m)
         }
+    }
+
+    /// 送信できない理由(無ければ nil)。ボタンの無効化だけに頼らない
+    private var blockedReason: String? {
+        if viewModel.trimmedNickname.isEmpty { return Strings.Onboarding.nicknameRequiredHint }
+        if viewModel.nicknameError != nil { return nil }
+        if !viewModel.agreedToTerms { return Strings.Onboarding.consentRequiredHint }
+        return nil
     }
 
     /// 8字超は即時に示す。空欄エラーは「空白だけ入力」のときのみ表示する
@@ -214,34 +301,43 @@ private struct NotificationPage: View {
     let viewModel: OnboardingViewModel
 
     var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "bell.badge")
-                .font(.system(size: 56))
-                .foregroundStyle(.tint)
-            Text(Strings.Onboarding.notificationTitle)
-                .font(.title2.bold())
-            Text(Strings.Onboarding.notificationBody)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Spacer()
-            Button {
-                Task { await viewModel.requestNotifications() }
-            } label: {
-                Text(Strings.Onboarding.notificationAllow)
-                    .frame(maxWidth: .infinity)
+        ScrollView {
+            VStack(spacing: LienSpacing.m) {
+                Image(systemName: "bell.badge")
+                    .font(.system(size: 56))
+                    .foregroundStyle(.tint)
+                    .padding(.top, LienSpacing.xl)
+                Text(Strings.Onboarding.notificationTitle)
+                    .font(.title2.bold())
+                    .multilineTextAlignment(.center)
+                Text(Strings.Onboarding.notificationBody)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(viewModel.isRequestingNotifications)
-
-            Button(Strings.Onboarding.notificationLater) {
-                viewModel.skipNotifications()
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, LienSpacing.l)
         }
-        .padding(24)
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: LienSpacing.s) {
+                Button {
+                    Task { await viewModel.requestNotifications() }
+                } label: {
+                    Text(Strings.Onboarding.notificationAllow)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(viewModel.isRequestingNotifications)
+
+                Button(Strings.Onboarding.notificationLater) {
+                    viewModel.skipNotifications()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, LienSpacing.l)
+            .padding(.bottom, LienSpacing.m)
+        }
     }
 }

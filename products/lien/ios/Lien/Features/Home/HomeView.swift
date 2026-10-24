@@ -83,6 +83,12 @@ struct HomeView: View {
                 .padding(.horizontal, LienSpacing.l)
             #endif
         }
+        // 主役の「できた!」はスクロールの外に固定する(植物の高さ・文字の大きさで位置が動かない)
+        .safeAreaInset(edge: .bottom) {
+            if viewModel.snapshot != nil {
+                HomeActionBar(viewModel: viewModel, onShowPaywall: showPaywall)
+            }
+        }
         // 植物の全画面の演出(段階アップ・おかえり — PB #57)。ホームの上に重ねる。ナビゲーションバーも隠して全画面に見せる
         .overlay { celebrationOverlay }
         .hidesNavigationBar(viewModel.plantExperience.presentation != nil)
@@ -273,22 +279,15 @@ struct SnapshotContent: View {
                 }
             }
 
+            // 記録は1行に畳む(3行の中央揃えブロックは、植物と主役のボタンの間で視線を割っていた)
             if viewModel.showsStreak {
-                StreakArea(current: snapshot.streakCurrent, best: snapshot.streakBest)
+                StreakLine(current: snapshot.streakCurrent, best: snapshot.streakBest)
             }
 
-            // シェア画像(任意タイミング — REQUIREMENTS §3.13 / T22)。ペア成立中で記録があるときだけ
-            if viewModel.canShareRecord {
-                Button {
-                    viewModel.presentShareImage()
-                } label: {
-                    Label(Strings.Share.createButton, systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(LienColors.shareAccent)
-            }
-            // お休みチケットの残数バッジ(§3.6 / T19a #19)。0枚でも出す。nil(ソロ・キー欠落)は出さない
+            // ふたりの今日(状態の文脈)
+            TodayArea(viewModel: viewModel, snapshot: snapshot, moderation: moderation)
+
+            // 記録の付属情報は最下部に控えめに置く(お休みチケットの残数 — §3.6 / T19a #19。0枚でも出す)
             if let ticketBalance = viewModel.ticketBalance {
                 // 0枚のときは、タップでペイウォール(チケット切れの文脈)を開ける(T33)
                 TicketBalanceBadge(
@@ -296,37 +295,67 @@ struct SnapshotContent: View {
                     onTap: ticketBalance == 0 ? { onShowPaywall?(.ticketEmpty) } : nil
                 )
             }
-
-            TodayArea(viewModel: viewModel, snapshot: snapshot, moderation: moderation)
-
-            // チェックイン+写真添付+当日取消(T14 — Features/Checkin/CheckinFlowView.swift)
-            CheckinFlowView(viewModel: viewModel)
-
-            // 相手未完のときだけ出す「つつく」ボタン(1日3回まで — §3.7 / T15)。
-            // Live 構成は LiveNudgeReactService(実 Edge Functions)、Stub 構成は LocalEchoCheckinService の
-            // モック適合で能力検出される(AppServices — issue #55。ソロでは viewModel.canNudge が false)
-            NudgeArea(viewModel: viewModel)
         }
     }
 }
 
-// MARK: - ストリーク(§3.5。最高記録は永続表示 =「ふたりの財産」)
+// MARK: - 画面下に固定する操作の帯
+//
+// 主役の「できた!」は、スクロールの位置に関係なく**いつも同じ場所**に置く。
+// 以前はスクロールの中ほど(画面の 84% の位置)にあり、植物の高さや文字の大きさで毎回動いた。
+// 補助の操作(つつく・リアクション・シェア)は、その上に1行だけ。
+// 帯は半透明の材質で敷き、下を内容が流れても読めるようにする。
 
-private struct StreakArea: View {
+@MainActor
+struct HomeActionBar: View {
+    let viewModel: HomeViewModel
+    var onShowPaywall: ((PaywallContext) -> Void)? = nil
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 帯の上端の細い区切り。ダークモードの .bar は背景とほぼ同じ明るさで、
+            // 下を内容が流れたときに帯の始まりが見えなくなる
+            Rectangle()
+                .fill(Color.primary.opacity(0.12))
+                .frame(height: 0.5)
+
+            VStack(spacing: LienSpacing.s) {
+                SecondaryActionRow(viewModel: viewModel, onShowPaywall: onShowPaywall)
+                // 主役の1タップ(チェックイン+写真添付+当日取消 — T14)
+                CheckinFlowView(viewModel: viewModel)
+            }
+            .padding(.horizontal, LienSpacing.l)
+            .padding(.top, LienSpacing.s)
+            .padding(.bottom, LienSpacing.s)
+        }
+        .background(.bar)
+    }
+}
+
+// MARK: - ストリーク(§3.5。最高記録は永続表示 =「ふたりの財産」)
+//
+// 1行に畳む。以前は「ふたりの記録 / 🔥 23日 / 最高記録 40日」の3行中央揃えで、
+// 植物と主役のボタンの間にあって視線を割っていた。数字だけを強く、ほかは小さく添える。
+
+private struct StreakLine: View {
     let current: Int
     let best: Int
 
     var body: some View {
-        VStack(spacing: LienSpacing.xs) {
+        HStack(spacing: LienSpacing.xs) {
             Text(Strings.Home.streakCaption)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("🔥 " + Strings.Home.streakDays(current))
-                .font(.title2.bold())
+            Text(Strings.Home.streakDays(current))
+                .font(.headline.monospacedDigit())
+            Text("・")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Text(Strings.Home.streakBestNote(best))
-                .font(.footnote)
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -385,15 +414,16 @@ private struct TodayArea: View {
 
             // 相手が今日添えた写真(§3.11 / PV #59)。写真が無い日・取得に失敗したときは何も出ない
             PartnerPhotoArea(model: viewModel.partnerPhoto, partnerName: snapshot.partnerName)
-
-            // 相手の今日のチェックインにスタンプ1つ(§3.8 / T15)
-            ReactionArea(viewModel: viewModel)
         }
     }
 }
 
 /// 1人分の今日の状態チップ。未完 = グレー(自分未完 = 自分側グレー — §3.10。
-/// ウィジェットの StatusChip と同じく未完側を落とす)
+/// ウィジェットの StatusChip と同じく未完側を落とす)。
+///
+/// 縦4行(名前 / 絵文字 / 約束 / 印)をやめ、横1行(絵文字 / 名前と約束 / 印)にした。
+/// 未完の表現も、チップ全体の不透明度(0.55)から**背景と印の色**に変えた。
+/// 全体を薄くすると、名前も約束も一緒に薄くなって読みにくくなるため。
 private struct TodayChip: View {
     let ownerLabel: String
     let emoji: String?
@@ -401,29 +431,91 @@ private struct TodayChip: View {
     let done: Bool
 
     var body: some View {
-        VStack(spacing: LienSpacing.xs) {
-            Text(ownerLabel)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+        HStack(spacing: LienSpacing.s) {
             Text(emoji ?? "・")
-                .font(.title2)
-            Text(title ?? Strings.Home.promiseUnsetLabel)
-                .font(.footnote)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .font(.title3)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(ownerLabel)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(title ?? Strings.Home.promiseUnsetLabel)
+                    .font(.footnote.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: 0)
             Image(systemName: done ? "checkmark.circle.fill" : "circle")
                 .font(.body)
                 .foregroundStyle(done ? LienColors.done : LienColors.pending)
+                .accessibilityHidden(true)
         }
-        .frame(maxWidth: .infinity)
-        .padding(LienSpacing.s)
+        .padding(.horizontal, LienSpacing.s)
+        .padding(.vertical, LienSpacing.xs + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(LienColors.chipBackground)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(done ? LienColors.chipDoneBackground : LienColors.chipBackground)
         )
-        .opacity(done ? 1.0 : 0.55)
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - 補助の操作(つつく・リアクション・シェア)
+//
+// 全幅の .bordered ボタンを縦に並べると、主役の「できた!」と強さが並んでしまう。
+// 補助は1行の小さなボタンにまとめ、文言もアイコン+短い語にする。メッセージは行の上に1つだけ出す。
+
+@MainActor
+private struct SecondaryActionRow: View {
+    let viewModel: HomeViewModel
+    let onShowPaywall: ((PaywallContext) -> Void)?
+
+    var body: some View {
+        if hasAnyAction || message != nil {
+            VStack(spacing: LienSpacing.xs) {
+                if let message {
+                    Text(message.text)
+                        .font(.footnote)
+                        .foregroundStyle(message.isError ? LienColors.gentleAlert : LienColors.done)
+                        .multilineTextAlignment(.center)
+                }
+                HStack(spacing: LienSpacing.s) {
+                    NudgeArea(viewModel: viewModel, compact: true)
+                    ReactionArea(viewModel: viewModel, compact: true)
+                    if viewModel.canShareRecord {
+                        Button {
+                            viewModel.presentShareImage()
+                        } label: {
+                            Label(Strings.Share.shortButton, systemImage: "square.and.arrow.up")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .tint(LienColors.shareAccent)
+                    }
+                }
+                .font(.footnote)
+            }
+        }
+    }
+
+    private var hasAnyAction: Bool {
+        viewModel.canNudge || viewModel.isSendingNudge
+            || viewModel.canReact || viewModel.isSendingReaction
+            || viewModel.canShareRecord
+    }
+
+    /// つつく・リアクションの結果は、行の上に1つだけ出す(2つ並べると同じ強さの行が2本できる)
+    private var message: (text: String, isError: Bool)? {
+        if let message = viewModel.nudgeErrorMessage ?? viewModel.reactionErrorMessage {
+            return (message, true)
+        }
+        if let note = viewModel.nudgeSentNote ?? viewModel.reactionSentNote {
+            return (note, false)
+        }
+        return nil
     }
 }
 
@@ -432,25 +524,31 @@ private struct TodayChip: View {
 @MainActor
 private struct NudgeArea: View {
     let viewModel: HomeViewModel
+    /// 補助の行に並べるときは、メッセージを出さずボタンだけを小さく描く(親が文言をまとめる)
+    var compact = false
     @State private var showsSheet = false
 
     var body: some View {
         if viewModel.canNudge || viewModel.isSendingNudge {
             VStack(spacing: LienSpacing.xs) {
-                nudgeMessageArea
+                if !compact { nudgeMessageArea }
                 Button {
                     showsSheet = true
                 } label: {
                     Group {
                         if viewModel.isSendingNudge {
                             ProgressView()
+                        } else if compact {
+                            Label(Strings.Nudge.button, systemImage: "hand.tap")
+                                .frame(maxWidth: .infinity)
                         } else {
                             Text(Strings.Nudge.button)
+                                .frame(maxWidth: .infinity)
                         }
                     }
-                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(compact ? .small : .regular)
                 .disabled(!viewModel.canNudge)
             }
             .sheet(isPresented: $showsSheet) {
@@ -480,25 +578,31 @@ private struct NudgeArea: View {
 @MainActor
 private struct ReactionArea: View {
     let viewModel: HomeViewModel
+    /// 補助の行に並べるときは、メッセージを出さずボタンだけを小さく描く(親が文言をまとめる)
+    var compact = false
     @State private var showsSheet = false
 
     var body: some View {
         if viewModel.canReact || viewModel.isSendingReaction {
             VStack(spacing: LienSpacing.xs) {
-                reactionMessageArea
+                if !compact { reactionMessageArea }
                 Button {
                     showsSheet = true
                 } label: {
                     Group {
                         if viewModel.isSendingReaction {
                             ProgressView()
+                        } else if compact {
+                            Label(Strings.Reaction.button, systemImage: "heart")
+                                .frame(maxWidth: .infinity)
                         } else {
                             Text(Strings.Reaction.button)
+                                .frame(maxWidth: .infinity)
                         }
                     }
-                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(compact ? .small : .regular)
                 .disabled(!viewModel.canReact)
             }
             .sheet(isPresented: $showsSheet) {

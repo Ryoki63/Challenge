@@ -254,14 +254,20 @@ private struct HistoryDayCell: View {
 
 // MARK: - 印(セルと凡例で共有)
 
-/// カレンダーの印。無彩色の中立表現だけを使う(達成=濃い点、お休み=細いカプセル、途切れ=薄い点)
+/// カレンダーの印。無彩色の中立表現だけを使う(達成=濃い帯、片方=点、お休み=細いカプセル、途切れ=薄い点)
+///
+/// ふたり達成は2つの点から**塗りの帯**に変えた。点2つは 5pt で、凡例を見ないと
+/// 「達成」と「片方だけ」の区別がつかなかった。帯にすると、月を眺めたときに
+/// 続いた期間が模様として読める(凡例に頼らない)。
 private struct HistoryMarkView: View {
     let mark: DayMark
 
     var body: some View {
         switch mark {
         case .bothDone:
-            dots(me: true, partner: true)
+            Capsule()
+                .fill(LienColors.historyMark)
+                .frame(width: 16, height: 6)
         case .meOnly:
             dots(me: true, partner: false)
         case .partnerOnly:
@@ -269,7 +275,7 @@ private struct HistoryMarkView: View {
         case .restTicket:
             Capsule()
                 .strokeBorder(LienColors.pending, lineWidth: 1)
-                .frame(width: 14, height: 8)
+                .frame(width: 16, height: 6)
         case .noRecord:
             Circle()
                 .fill(LienColors.pending.opacity(0.3))
@@ -280,7 +286,7 @@ private struct HistoryMarkView: View {
                 .frame(width: 8, height: 8)
         case .beforePair, .future:
             Color.clear
-                .frame(width: 14, height: 8)
+                .frame(width: 16, height: 6)
         }
     }
 
@@ -295,7 +301,7 @@ private struct HistoryMarkView: View {
     private func dot(_ filled: Bool) -> some View {
         Circle()
             .fill(filled ? LienColors.historyMark : Color.clear)
-            .frame(width: 5, height: 5)
+            .frame(width: 6, height: 6)
             .overlay {
                 if !filled {
                     Circle()

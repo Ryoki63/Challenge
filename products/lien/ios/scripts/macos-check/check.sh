@@ -64,7 +64,7 @@ exclude_from_module() {
 #   DeviceTokenStoreTests : AppDelegate.swift(UIKit)を使う
 #   QRCodeGeneratorTests : QRCodeGenerator.swift(UIImage)を使う
 #   SmokeTests : アプリ本体のバンドルの前提
-EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSheets WidgetRenderSupport ShareImageRenderTests PaywallRenderTests StoreScreenshotRenderTests StoreScreenshotFrames DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
+EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSheets WidgetRenderSupport ShareImageRenderTests PaywallRenderTests StoreScreenshotRenderTests StoreScreenshotFrames UIReviewRenderTests DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
 
 is_excluded_test() {
   local name="$1" e

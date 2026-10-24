@@ -6,7 +6,7 @@
 - 実施: eng-exec（T27 本体）
 - 検査: `LienTests/StringsReviewTests.swift`（罰なし lint・`StringsCatalog`・本ログの網羅）を CI `lien-ios` で毎回実行
 AD
-- 対象: 369 件（OK 363 / 修正 6 / 保留 0）
+- 対象: 373 件（OK 367 / 修正 6 / 保留 0）
 - 内訳: 369 単位（`StringsCatalog` の全出力を確認。関数型の文言は代表値で展開し、全通りを機械検査）
 - 追記（2026-10-20・issue #72 の検証中）: T27 の本体（#27・PR #86）のあとに足された 43 単位（`Tickets.balance` / 履歴 T18 #18 / シェア画像 T22 #22）を、同じ判定基準で追記レビューした（§7.20〜§7.22）。文言は変えていない（すべて OK）
 
@@ -184,6 +184,7 @@ AD
 
 | 名前 | 文言（代表） | 判定 | メモ |
 |---|---|---|---|
+| `Onboarding.stepIndicator` | 3ステップ中1 | OK | 3画面の目印の読み上げ。先の見通しを示す |
 | `Onboarding.conceptTitle` | ふたりで、ひとつの約束 | OK | タグライン |
 | `Onboarding.conceptBody` | 大切な人と約束をひとつだけ決めて、⏎毎日そっと続けていくアプリです。 | OK | オンボ1。改行を含む |
 | `Onboarding.conceptNote` | ひとりで始めて、あとから相手を招待できます | OK | オンボ1。ひとり開始の案内 |
@@ -192,6 +193,8 @@ AD
 | `Onboarding.nicknamePlaceholder` | ニックネーム(8文字まで) | OK | 上限（8文字）を明示 |
 | `Onboarding.nicknameEmptyError` | ニックネームを入力してね | OK | 入力エラー。責めない |
 | `Onboarding.nicknameTooLongError` | ニックネームは8文字までです | OK | 上限エラー。事実だけ |
+| `Onboarding.nicknameRequiredHint` | ニックネームを入れると、次へ進めます | OK | 無効ボタンの理由。責めない |
+| `Onboarding.consentRequiredHint` | 利用規約とプライバシーポリシーへの同意が必要です | OK | 無効ボタンの理由。事実だけ |
 | `Onboarding.avatarTitle` | アイコンをえらんでね | OK | オンボ2 |
 | `Onboarding.profileSubmit` | 同意してはじめる | OK | 規約への同意が入るまで無効 |
 | `Onboarding.anonymousStartNote` | 登録なしですぐ始められます。機種変更やアプリの入れ直しでは、記録を引き継げない場合があります。 | OK | DESIGN §10。機種変更の注意（T24 の代替） |
@@ -696,6 +699,7 @@ AD
 |---|---|---|---|
 | `Share.title` | シェア画像 | OK | シートの題名 |
 | `Share.createButton` | シェア画像をつくる | OK | ホームの導線。動作の言葉 |
+| `Share.shortButton` | シェア | OK | 補助の行に並べる短いラベル |
 | `Share.subtitle` | ふたりの記録を、画像にして残せます | OK | 何ができるかの説明 |
 | `Share.formatPickerLabel` | 画像の形 | OK | 形の選択の見出し |
 | `Share.formatStory` | ストーリーズ(9:16) | OK | 縦。括弧は半角（§2-5） |

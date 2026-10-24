@@ -7,15 +7,39 @@
 import SwiftUI
 import UIKit
 
+/// ライト / ダークで色を変える。macOS の型検査(scripts/macos-check)では UIKit が無いので、ライトの色に固定する
+private func dynamicColor(
+    light: (red: Double, green: Double, blue: Double, alpha: Double),
+    dark: (red: Double, green: Double, blue: Double, alpha: Double)
+) -> Color {
+    #if canImport(UIKit)
+    return Color(uiColor: UIColor { trait in
+        let c = trait.userInterfaceStyle == .dark ? dark : light
+        return UIColor(red: c.red, green: c.green, blue: c.blue, alpha: c.alpha)
+    })
+    #else
+    return Color(red: light.red, green: light.green, blue: light.blue, opacity: light.alpha)
+    #endif
+}
+
 enum LienColors {
-    /// 完了状態のチェック・植物のアクセント
-    static let done = Color.green
+    /// 完了状態のチェック・植物のアクセント。ブランドのセージグリーン(Web サイト・シェア画像と同じ色)。
+    /// 既定の Color.green は彩度が高く、クリームの背景の上で浮いていた
+    static let done = dynamicColor(
+        light: (0.239, 0.420, 0.322, 1),
+        dark: (0.561, 0.780, 0.659, 1)
+    )
     /// 未完了状態(自分未完 = グレー — REQUIREMENTS §3.10)
     static let pending = Color.gray
     /// エラー文言(責めないトーンの暖色 — 既存画面の .orange を踏襲)
     static let gentleAlert = Color.orange
     /// 今日の状態チップの背景
     static let chipBackground = Color(uiColor: .secondarySystemBackground)
+    /// 今日の状態チップの背景(完了側)。チップ全体を薄くせずに、完了/未完を見分けるための淡い緑
+    static let chipDoneBackground = dynamicColor(
+        light: (0.239, 0.420, 0.322, 0.10),
+        dark: (0.561, 0.780, 0.659, 0.16)
+    )
     /// 相手の写真を全画面で見るときの背景(写真の周りを暗くする)
     static let photoBackdrop = Color.black
     /// 全画面の写真に重ねる操作(閉じるボタン・読み込み中の表示)の色

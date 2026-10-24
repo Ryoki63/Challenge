@@ -425,6 +425,10 @@ final class StoreScreenshotRenderTests: XCTestCase {
                     .padding(LienSpacing.l)
                 Spacer(minLength: 0)
             }
+            // 主役のボタンは画面下に固定(HomeView の safeAreaInset と同じ)
+            .safeAreaInset(edge: .bottom) {
+                HomeActionBar(viewModel: model)
+            }
             .frame(width: size.pointWidth, height: size.pointHeight, alignment: .top)
             .background(Color.white)
             .environment(\.colorScheme, .light)

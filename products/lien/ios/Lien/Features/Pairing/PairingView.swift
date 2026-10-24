@@ -142,7 +142,11 @@ private struct IssuedInviteContent: View {
             }
 
             Text(Strings.Pairing.expiresNote(
-                invite.expiresAt.formatted(date: .abbreviated, time: .shortened)
+                // アプリの文言は日本語のみ。端末の言語が英語だと、日付だけ「Oct 28, 2026 at 5:56」と別言語で出るので、
+                // 表示用の書式は ja_JP に固定する(端末の地域設定で時刻の並びは変えない)
+                invite.expiresAt.formatted(
+                    Date.FormatStyle(date: .abbreviated, time: .shortened, locale: Locale(identifier: "ja_JP"))
+                )
             ))
             .font(.caption)
             .foregroundStyle(.secondary)

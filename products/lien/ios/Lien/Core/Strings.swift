@@ -51,6 +51,11 @@ enum Strings {
 
     /// オンボーディング3画面(REQUIREMENTS §3.1, §6 / T10)
     enum Onboarding {
+        /// 3ステップの目印の読み上げ(何画面あるかを先に伝える)
+        static func stepIndicator(_ index: Int) -> String {
+            "3ステップ中\(index)"
+        }
+
         // ページ1: コンセプト
         static let conceptTitle = "ふたりで、ひとつの約束"
         static let conceptBody = "大切な人と約束をひとつだけ決めて、\n毎日そっと続けていくアプリです。"
@@ -62,6 +67,10 @@ enum Strings {
         static let nicknamePlaceholder = "ニックネーム(8文字まで)"
         static let nicknameEmptyError = "ニックネームを入力してね"
         static let nicknameTooLongError = "ニックネームは8文字までです"
+        /// 送信ボタンが押せない理由(未入力)。無効なボタンだけだと、なぜ進めないか分からない
+        static let nicknameRequiredHint = "ニックネームを入れると、次へ進めます"
+        /// 送信ボタンが押せない理由(同意のチェックが未)
+        static let consentRequiredHint = "利用規約とプライバシーポリシーへの同意が必要です"
         static let avatarTitle = "アイコンをえらんでね"
         /// 規約への同意ボタンを兼ねる(同意のチェックが入るまで押せない — 下の consent*)
         static let profileSubmit = "同意してはじめる"
@@ -500,6 +509,8 @@ enum Strings {
         static let title = "シェア画像"
         /// ホームの任意タイミングの導線(REQUIREMENTS §3.13)
         static let createButton = "シェア画像をつくる"
+        /// ホームの補助の行に並べるときの短いラベル(全幅ボタンをやめたため)
+        static let shortButton = "シェア"
         static let subtitle = "ふたりの記録を、画像にして残せます"
         static let formatPickerLabel = "画像の形"
         static let formatStory = "ストーリーズ(9:16)"

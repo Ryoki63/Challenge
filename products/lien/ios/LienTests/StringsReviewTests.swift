@@ -127,6 +127,7 @@ enum StringsCatalog {
         }
 
         // Onboarding
+        add("Onboarding.stepIndicator", Strings.Onboarding.stepIndicator(1))
         add("Onboarding.conceptTitle", Strings.Onboarding.conceptTitle)
         add("Onboarding.conceptBody", Strings.Onboarding.conceptBody)
         add("Onboarding.conceptNote", Strings.Onboarding.conceptNote)
@@ -135,6 +136,8 @@ enum StringsCatalog {
         add("Onboarding.nicknamePlaceholder", Strings.Onboarding.nicknamePlaceholder)
         add("Onboarding.nicknameEmptyError", Strings.Onboarding.nicknameEmptyError)
         add("Onboarding.nicknameTooLongError", Strings.Onboarding.nicknameTooLongError)
+        add("Onboarding.nicknameRequiredHint", Strings.Onboarding.nicknameRequiredHint)
+        add("Onboarding.consentRequiredHint", Strings.Onboarding.consentRequiredHint)
         add("Onboarding.avatarTitle", Strings.Onboarding.avatarTitle)
         add("Onboarding.profileSubmit", Strings.Onboarding.profileSubmit)
         add("Onboarding.anonymousStartNote", Strings.Onboarding.anonymousStartNote)
@@ -289,6 +292,7 @@ enum StringsCatalog {
         // Share(シェア画像 — REQUIREMENTS §3.13 / T22)
         add("Share.title", Strings.Share.title)
         add("Share.createButton", Strings.Share.createButton)
+        add("Share.shortButton", Strings.Share.shortButton)
         add("Share.subtitle", Strings.Share.subtitle)
         add("Share.formatPickerLabel", Strings.Share.formatPickerLabel)
         add("Share.formatStory", Strings.Share.formatStory)
