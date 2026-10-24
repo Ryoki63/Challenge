@@ -797,3 +797,25 @@
 - 01:11 失敗原因と修正: lintの4件はGradle/Compose BOM/Activityの更新通知3件とAndroid12+ dataExtractionRules不足1件。抑止やbaselineは使わず、固定依存を8.14.6/2026.09.00/1.13.0へ更新（公式配布checksum・AAR互換metadata確認）、cloud backup/device transferを全domain除外する旧新XMLを追加。自動生成の同一SHA PR検査は取消し、main push/PRだけの起動へ絞って二重消費を防ぐ。修正箇所だけ独立再確認し、実CIで再検証する。
 - 01:16 2回目失敗: Android CI #39455407685 は checkDebugAarMetadata で失敗。限定独立レビューでもP1検出: BOM2026.09.00が選ぶCompose1.12.1はcompileSdk37/AGP9.1.0必須で、今回の36/8.11.1と非互換。Activityだけのmetadata確認では足りなかった。lien-ci #39455400208は全6ジョブ成功（サーバー419・契約3・ops84・E2E純粋65・審査demo17件等）。
 - 01:16 停止判断: 同じビルド操作を2回失敗したため3回目は実行しない。公式AARでminCompile35/minAGP8.6を確認したBOM2025.09.01/Compose1.9.2へ戻し、SDK/AGP拡大を避けた。ただし最終組合せは未検証、Compose更新通知とwarningsAsErrorsの衝突も未解決。READMEに失敗run・復帰内容・次の確認を明記し、draft PR #145で未完了提出する。DONE追記・Issue close・マージ・公開はしない。
+
+## 2026-10-20 21:20 (eng-exec) — PLAN #50 契約と現行計画の照合
+- 着手: 指定 worktree / `consilium/50-plan-2026-06-11-wave-4-11`。開始時の tracked/untracked 変更なし。HEAD と origin/main は `13f057030a1e63fefe295bb0fc5e6519b343e652`、同名のリモートブランチ・既存 PR はなし。Issue #50 の assignees は空。
+- 照合: Issue 本文は 2026-06-11 の Wave 計画で、受入条件・今回の成果物の完了判定がない。2026-10-20 のオーナー返信はクラウドビルドとエージェント QA の進め方への承認だが、今回のタスク契約では受入条件は本文だけを正とし、欠けている場合は eng-lead への確認が必須。
+- 現状差分: `docs/TASKPLAN.md` §9.2 / §9.6 は 10/24 機能凍結・10/27 審査提出・10/31 公開と外部テスト省略を記録済み。一方、§9.6 末尾には #50 の Xcode 代替・テスター案が未決として残る。`.github/workflows/lien-release.yml` は存在するため、10/12 の提案コメントの「main にはない」は現時点の実装状態ではない。クラウド署名・実機・外部配布の成功はこの照合では検証していない。
+- 方針: 受入条件を推測して TASKPLAN・workflow・QA コードを変更せず、eng-lead に #50 の受入条件と担当の確定を依頼する。#28 / #20 / #41 の作業の取り込み・重複実装、ストア操作、認証情報操作は行わない。
+- 【承認待ち】: Issue #50 に eng-lead 向けの質問1件(推奨A=文書整合のみ / B=実装を含む契約の明文化)を投稿: https://github.com/Ryoki63/Challenge/issues/50#issuecomment-6290668375 。`needs-approval,human-gate` の付与に成功。通知の到達自体は未確認。
+- 検証: `git diff --check` PASS。Issue の本文・直近5コメント・assignees・ラベル、同名 remote branch / PR の有無、現行 TASKPLAN と release workflow の存在を直接照合。変更は本 JOURNAL の末尾追記だけのため、テスト・型チェック・lint・build・独立レビューは対象外(挙動・業務計画の変更なし)。全要件の実装は未着手であり PASS としない。
+- 結果: BLOCKED。受入条件と担当の確定待ち。Issue は open のまま。承認待ちで実装を止めたため、commit・push・PR 作成は未実施。監査ログは指定 worktree 内に保持する。再開時は最新 main・担当・既存 PR を再確認する。
+
+## 2026-10-21 03:22 (eng-exec) — PLAN #50 文書整合の再開
+- 着手: オーナーの 2026-10-21 03:07 JST 返信(実際の投稿時刻は 2026-10-20T18:07:42Z)による推奨 A「文書整合のみ」を受け、指定 worktree / branch で再開。既存の未コミット JOURNAL 追記は前回の監査記録として保持する。同名 remote branch / PR はまだない。main は `7991bc5` へ進んでいるため同期してから文書を照合する。
+- 分担: 受入条件と担当の確定を eng-lead 確認担当に依頼。実装担当は同期・既存 #28/#20/#41 と TASKPLAN の照合を進め、独立レビューはこの確認担当に集約する。コード・workflow・署名・配布・本番操作は対象外。
+- 同期: `git pull --rebase --autostash origin main` で `7991bc5` へ fast-forward。JOURNAL の末尾同士だけ競合したため upstream の全記録と前回・今回の追記を両方保持して解消した。過去記録の本文は変更しない。
+- 契約確定: eng-lead 確認担当が既承認 A から受入条件4点と対象外を確定。#50 本文冒頭へ反映し、旧本文はそのまま過去計画として保持した。gh login=Ryoki63 を確認し、#50 に単独assign・再取得済み。他 Issue の担当は変えない。着手コメント: https://github.com/Ryoki63/Challenge/issues/50#issuecomment-6298091295 。
+- 照合・編集: §9.6 の Xcode 代替／テスター案の未決記述を承認済へ更新し、§9.7 に既存 #28/#20/#41/#105/#106 の担当・証跡・未検証境界を整理。補助 BACKLOG にも同じ古い着手条件が残っていたため2行を整合。#128/#129 の手順書はマージ済みだが #105/#106 はopen、無署名 archive successは過去SHAであることを分離した。新規コード・workflow・日程・担当変更なし。
+- 03:30 検証: 文書機械検査 PASS(4ファイル範囲・JOURNAL upstream完全保持・§9.2無変更・ローカルリンク・表・secret値形式不在・Issueと担当)。既存release runのsigned archive/uploadはskippedと再確認。外部通信を遮断したChromeのローカルプレビュー2枚を目視し、表7行/5行・横overflowなし。表示検査初回はコマンド転記ミス(SyntaxError)で失敗、修正後1回で成功。独立レビュー依頼済み、結果を待つ。
+- 独立レビュー: eng-lead確認担当 `01a15a8c-7dd5-7c81-a42f-3271e93cc91b` の1回はPASS。本文受入条件4点すべてPASS・must-fix0件・未解決なし。担当・日程維持、提案承認と配布実行の区別、BACKLOG2行の整合範囲、JOURNAL履歴保持を確認した。
+- 提出前ゲート: 全要件の文書反映 PASS／出典照合 PASS／表示確認 PASS／差分検査 PASS／独立レビュー PASS／今回範囲の残TODO0。アプリテスト・型・lint・buildは文書のみのため対象外。通常CIはpush後のSHAで確認する。指定branchへcommit/pushしPR提出、mainへの直接push・マージ・Issue closeは行わない。
+- 03:32 提出・CI: 実装commit `8755d02` を指定branchへpushし PR #150 https://github.com/Ryoki63/Challenge/pull/150 を作成。local/remote SHA一致、PR OPEN・MERGEABLE。同SHAのlien-ci run `39475450784` は6ジョブsuccess(Deno588件・Python190件、計778件、失敗0)。iOSは文書paths対象外で未起動、releaseは未起動。
+- 結果: 文書整合・独立レビュー・実装SHAの通常CIまでPASS、追加実装・署名・配布・実機操作なし。証跡追記を小さく別commitしてpushし、その最終SHAのCIと提出状態をPR/Issueコメントへ記録してレビューへ引き継ぐ。Issueはopenのまま、human-gateや未検証範囲を達成扱いにしない。
+- 03:35 CI境界の追加確認: 証跡追記SHA `5c85be4` の lien-ci run `39475675050` も6ジョブsuccess。ただし全Actions一覧では lien-play run `39475672760` がfailure・jobs0件。同期元main `7991bc5` のrun `39463901466` もfailureで、workflow blob `433168bf3f675e580f05f58bb178532cb28cf5c9` はmain/branch一致。詳細原因は未取得(null)、テスト/ビルド失敗や今回の回帰と断定しない。関連CIのPASSを全workflow緑と言い換えず、文書限定契約の外の既存不具合としてPR/Issueへ引継ぐ。workflow修正・再実行・署名・配布は行わない。
