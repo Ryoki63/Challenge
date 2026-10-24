@@ -22,7 +22,7 @@ enum SupportLinks {
     /// 運営者への連絡先メールアドレス。**G4 で確定するまで空**。
     /// 空のあいだ、通報・お問い合わせのメールは宛先なしの下書きとして開く(宛先は利用者が入れる)。
     /// 確定したら、marketing/terms.md・privacy-policy.md の連絡先欄と同じアドレスにする
-    static let contactEmail = ""
+    static let contactEmail = "ryoki.kojima.dev@outlook.jp"
 
     /// 連絡先が確定しているか(確定前は、リリース前の確認事項として followups に挙がっている)
     static var hasContactEmail: Bool {
