@@ -37,6 +37,8 @@ struct PlantHeroView: View {
     /// 相手が名前を付けた・変えた知らせ(nil なら出さない)
     var nameNotice: String?
     var moderation: ModerationViewModel?
+    /// 植物の長押しメニューから「ふたりの記録」を開く。nil なら出さない(プレビュー・記録を持たない組み立て)
+    var onShowHistory: (() -> Void)?
     var onTapPlant: () -> Void = {}
     var onNameAction: () -> Void = {}
     var onDismissNameNotice: () -> Void = {}
@@ -46,8 +48,8 @@ struct PlantHeroView: View {
     @ScaledMetric(relativeTo: .footnote) private var footnoteLineHeight = WhisperBubbleMetrics.baseLineHeight
 
     /// 植物の枠の大きさ(3:4。キャンバス 240×320 と同じ比率)
-    private static let plantWidth: CGFloat = 180
-    private static let plantHeight: CGFloat = 240
+    private static let plantWidth: CGFloat = 210
+    private static let plantHeight: CGFloat = 280
 
     var body: some View {
         VStack(spacing: LienSpacing.s) {
@@ -71,6 +73,9 @@ struct PlantHeroView: View {
             .padding(.top, WhisperBubbleMetrics.roomAbovePlant(lineHeight: footnoteLineHeight))
             .contentShape(Rectangle())
             .onTapGesture { onTapPlant() }
+            // ふたりの記録(カレンダー)の入口。月に数回しか見ないものなので、常設のボタンをやめて
+            // 植物の長押しに置いた(2026-10-25 の UI/UX レビュー)。タップは「ひとこと」のまま
+            .plantHistoryMenu(onShowHistory)
             .onAppear { updateSway() }
             .onChange(of: sways) { updateSway() }
 
@@ -168,5 +173,30 @@ struct PlantHeroView: View {
                 swayAngle = 0
             }
         }
+    }
+}
+
+// MARK: - ふたりの記録(カレンダー)への入口
+
+/// 植物の長押しで「ふたりの記録」を開く。渡されていなければ何もしない
+private struct PlantHistoryMenu: ViewModifier {
+    let action: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        if let action {
+            content.contextMenu {
+                Button(action: action) {
+                    Label(Strings.History.title, systemImage: "calendar")
+                }
+            }
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func plantHistoryMenu(_ action: (() -> Void)?) -> some View {
+        modifier(PlantHistoryMenu(action: action))
     }
 }

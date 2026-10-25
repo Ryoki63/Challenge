@@ -67,7 +67,8 @@ struct HomeView: View {
                         snapshot: snapshot,
                         onInvite: onInvite,
                         moderation: moderation,
-                        onShowPaywall: showPaywall
+                        onShowPaywall: showPaywall,
+                        onShowHistory: showHistory
                     )
                 } else {
                     EmptyHomeContent()
@@ -114,19 +115,9 @@ struct HomeView: View {
             }
         }
         // カレンダー履歴(T18 #18)。ペア成立後のホームからのみ開ける
-        .toolbar {
-            if historyRepository != nil, viewModel.snapshot?.pairId != nil {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showsHistory = true
-                    } label: {
-                        Image(systemName: "calendar")
-                    }
-                    .accessibilityLabel(Strings.History.openButtonLabel)
-                }
-            }
-        }
-        // カレンダー履歴(T18 #18)。シートは名前付けと重ならないよう、ホームの NavigationStack に push する
+        // カレンダー履歴(T18 #18)の入口は、右上の常設ボタンをやめて植物の長押しにした
+        // (2026-10-25 の UI/UX レビュー。月に数回しか見ないものに常設の場所を与えない)。
+        // シートは名前付けと重ならないよう、ホームの NavigationStack に push する
         .navigationDestination(isPresented: $showsHistory) {
             if let historyRepository {
                 HistoryView(repository: historyRepository)
@@ -165,6 +156,12 @@ struct HomeView: View {
     private var showPaywall: ((PaywallContext) -> Void)? {
         guard paywall != nil else { return nil }
         return { context in paywallContext = context }
+    }
+
+    /// 植物の長押しからカレンダー履歴を開く導線(履歴を使わない組み立て・ソロでは nil)
+    private var showHistory: (() -> Void)? {
+        guard historyRepository != nil, viewModel.snapshot?.pairId != nil else { return nil }
+        return { showsHistory = true }
     }
 
     /// 名前のシートを出しているか。観測する状態は body の中で読む(Binding の getter の中では読まない — T23 #23)
@@ -237,9 +234,16 @@ struct SnapshotContent: View {
     /// ペイウォールを開く(T33)。nil なら課金の導線を出さない。
     /// 既定 nil は、課金の導線を持たないストア用スクリーンショット(issue #80)の実描画のため
     var onShowPaywall: ((PaywallContext) -> Void)? = nil
+    /// 植物の長押しからカレンダー履歴を開く(nil なら出さない)
+    var onShowHistory: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: LienSpacing.m) {
+            // 記録は一番上に1行だけ(植物の上の文脈。以前は植物とボタンの間にあって視線を割っていた)
+            if viewModel.showsStreak {
+                StreakLine(current: snapshot.streakCurrent, best: snapshot.streakBest)
+            }
+
             PlantHeroView(
                 state: viewModel.plantState,
                 sways: viewModel.plantSways,
@@ -254,6 +258,7 @@ struct SnapshotContent: View {
                 canWhisper: viewModel.canWhisper,
                 nameNotice: viewModel.plantExperience.nameNotice,
                 moderation: moderation,
+                onShowHistory: onShowHistory,
                 onTapPlant: { viewModel.plantExperience.plantTapped() },
                 onNameAction: { viewModel.presentPlantNameSheet() },
                 onDismissNameNotice: { viewModel.plantExperience.dismissNameNotice() }
@@ -279,21 +284,13 @@ struct SnapshotContent: View {
                 }
             }
 
-            // 記録は1行に畳む(3行の中央揃えブロックは、植物と主役のボタンの間で視線を割っていた)
-            if viewModel.showsStreak {
-                StreakLine(current: snapshot.streakCurrent, best: snapshot.streakBest)
-            }
+            // 約束と今日の状態。チップのカードはやめ、1行の文にした(葉がすでに誰がやったかを示している)
+            PairStatusArea(viewModel: viewModel, snapshot: snapshot, moderation: moderation)
 
-            // ふたりの今日(状態の文脈)
-            TodayArea(viewModel: viewModel, snapshot: snapshot, moderation: moderation)
-
-            // 記録の付属情報は最下部に控えめに置く(お休みチケットの残数 — §3.6 / T19a #19。0枚でも出す)
-            if let ticketBalance = viewModel.ticketBalance {
-                // 0枚のときは、タップでペイウォール(チケット切れの文脈)を開ける(T33)
-                TicketBalanceBadge(
-                    balance: ticketBalance,
-                    onTap: ticketBalance == 0 ? { onShowPaywall?(.ticketEmpty) } : nil
-                )
+            // チケットは 0 枚のときだけ出す(常時出すと在庫管理の印象になり、守られている実感にならない)
+            if let ticketBalance = viewModel.ticketBalance, ticketBalance == 0 {
+                // タップでペイウォール(チケット切れの文脈)を開ける(T33)
+                TicketBalanceBadge(balance: ticketBalance, onTap: { onShowPaywall?(.ticketEmpty) })
             }
         }
     }
@@ -359,31 +356,31 @@ private struct StreakLine: View {
     }
 }
 
-// MARK: - ふたりの今日(§3.10 の表示原則)
+// MARK: - 約束と今日の状態(§3.10 の表示原則)
+//
+// チップのカード2枚をやめ、「💪 筋トレ ・ 🏃 ランニング」の1行にした。
+// 誰が今日やったかは、植物の葉(左=自分・右=相手がひらいているか)がすでに示している。
+// 同じことを2つの表現(葉とカード)で持っていたので、カードを落とした。
+// 未完の情報は葉と、下の「(名前)が待ってるよ」の文が担う(§3.10)。
 
-private struct TodayArea: View {
+private struct PairStatusArea: View {
     let viewModel: HomeViewModel
     let snapshot: PairSnapshot
     let moderation: ModerationViewModel?
 
     var body: some View {
         VStack(spacing: LienSpacing.s) {
-            if !viewModel.isSolo {
-                Text(Strings.Home.todaySectionTitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: LienSpacing.s) {
-                TodayChip(
-                    ownerLabel: Strings.Home.meFallbackLabel,
+            // 自分の約束はソロでも出す(以前は今日のチップにしか出ておらず、チップを落とすと見えなくなる)
+            HStack(spacing: LienSpacing.xs) {
+                promiseSegment(
                     emoji: snapshot.myPromiseEmoji,
                     title: snapshot.myPromiseTitle,
                     done: snapshot.todayMeDone
                 )
                 if !viewModel.isSolo {
-                    TodayChip(
-                        ownerLabel: snapshot.partnerName ?? Strings.Home.partnerFallbackLabel,
+                    Text("・")
+                        .foregroundStyle(.tertiary)
+                    promiseSegment(
                         emoji: snapshot.partnerPromiseEmoji,
                         title: snapshot.partnerPromiseTitle,
                         done: snapshot.todayPartnerDone
@@ -397,11 +394,13 @@ private struct TodayArea: View {
                     )
                 }
             }
+            .font(.footnote)
+            .accessibilityElement(children: .combine)
 
             if let waiting = viewModel.partnerWaitingText {
                 // 相手が先に完了 →「(名前)が待ってるよ」(§3.10)
                 Text(waiting)
-                    .font(.footnote)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
@@ -416,49 +415,17 @@ private struct TodayArea: View {
             PartnerPhotoArea(model: viewModel.partnerPhoto, partnerName: snapshot.partnerName)
         }
     }
-}
 
-/// 1人分の今日の状態チップ。未完 = グレー(自分未完 = 自分側グレー — §3.10。
-/// ウィジェットの StatusChip と同じく未完側を落とす)。
-///
-/// 縦4行(名前 / 絵文字 / 約束 / 印)をやめ、横1行(絵文字 / 名前と約束 / 印)にした。
-/// 未完の表現も、チップ全体の不透明度(0.55)から**背景と印の色**に変えた。
-/// 全体を薄くすると、名前も約束も一緒に薄くなって読みにくくなるため。
-private struct TodayChip: View {
-    let ownerLabel: String
-    let emoji: String?
-    let title: String?
-    let done: Bool
-
-    var body: some View {
-        HStack(spacing: LienSpacing.s) {
+    /// 1人分の約束(絵文字 + 文)。今日やった人の文だけ濃くする(葉と同じ意味を、文字でも薄く二重に持つ)
+    private func promiseSegment(emoji: String?, title: String?, done: Bool) -> some View {
+        HStack(spacing: 3) {
             Text(emoji ?? "・")
-                .font(.title3)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(ownerLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(title ?? Strings.Home.promiseUnsetLabel)
-                    .font(.footnote.weight(.medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            Spacer(minLength: 0)
-            Image(systemName: done ? "checkmark.circle.fill" : "circle")
-                .font(.body)
-                .foregroundStyle(done ? LienColors.done : LienColors.pending)
-                .accessibilityHidden(true)
+            Text(title ?? Strings.Home.promiseUnsetLabel)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundStyle(done ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
         }
-        .padding(.horizontal, LienSpacing.s)
-        .padding(.vertical, LienSpacing.xs + 2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(done ? LienColors.chipDoneBackground : LienColors.chipBackground)
-        )
-        .accessibilityElement(children: .combine)
     }
 }
 

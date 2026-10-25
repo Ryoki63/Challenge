@@ -91,6 +91,8 @@ struct RootView: View {
         } message: {
             Text(Strings.Session.lostMessage)
         }
+        // ブランド色。アセットカタログの AccentColor と同じだが、明示しておく
+        .tint(LienColors.accent)
         .onOpenURL { url in
             // 招待リンクの受け口(DESIGN §3.6)。招待以外・不正形式は無視する
             model.handleDeepLink(url)

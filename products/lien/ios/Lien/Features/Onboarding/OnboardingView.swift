@@ -1,6 +1,12 @@
-// OnboardingView.swift — オンボーディング3画面(T10 / REQUIREMENTS §6)
+// OnboardingView.swift — オンボーディング(T10 / REQUIREMENTS §6)
 //
-// concept → nickname(+絵文字アイコン)→ notification(プレ許可)の順に進む。
+// 1画面に、コンセプト → ニックネーム+絵文字 → 規約の同意 → 通知の予告 をすべて置く。
+// もとは3画面に分けていたが、実測すると1画面に収まる分量だったので分けるのをやめた
+// (2026-10-25 の UI/UX レビュー。画面を分けないならステップ目印も要らない)。
+//
+// 送信は匿名のサインイン(アカウントの作成)を兼ねるので、規約への明示の同意が入るまで押せない
+// (App Store ガイドライン 1.2 / issue #23)。押せない理由は、押せないあいだだけ1行で書く。
+// 通知の許可は、送信できたあとに続けて OS のダイアログで求める(拒否されても完了する — issue #10)。
 // 文言は Strings.Onboarding に集約(View 内に直書きしない — DESIGN §3.8)。
 
 import SwiftUI
@@ -23,209 +29,199 @@ struct OnboardingView: View {
         ))
     }
 
-    /// 組み立て済みの ViewModel で描く(プレビュー・描画テスト・特定ステップの確認用)
-    init(viewModel: OnboardingViewModel) {
+    /// 組み立て済みの ViewModel で描く(プレビュー・描画テスト用)。
+    /// scrolls = false は、ImageRenderer が ScrollView を描けないため(スクロール位置が先頭のときの見た目と同じ)
+    init(viewModel: OnboardingViewModel, scrolls: Bool = true) {
         _viewModel = State(initialValue: viewModel)
+        self.scrolls = scrolls
     }
 
+    private var scrolls = true
+
+    // 下端の帯は safeAreaInset ではなく VStack で積む。Group に safeAreaInset を付けた形では
+    // 帯が描かれなかった(実描画で確認)。スクロールの器と帯を兄弟にすれば確実に固定できる
+    // (内容が帯の下を流れる半透明の効果は失うが、そのぶん読みやすい)
+    @ViewBuilder
     var body: some View {
         VStack(spacing: 0) {
-            // 3ステップのうちどこにいるかを常に出す(何画面あるか分からないと、先が見えず離脱する)
-            OnboardingStepIndicator(step: viewModel.step)
-                .padding(.top, LienSpacing.m)
-            Group {
-                switch viewModel.step {
-                case .concept:
-                    ConceptPage(onStart: { viewModel.advanceFromConcept() })
-                case .nickname:
-                    NicknamePage(viewModel: viewModel)
-                case .notification:
-                    NotificationPage(viewModel: viewModel)
+            if scrolls {
+                ScrollView { content }
+                    // 送信中はキーボードを閉じて、ボタンのスピナーとダイアログに集中させる
+                    .scrollDismissesKeyboard(.interactively)
+            } else {
+                content
+                Spacer(minLength: 0)
+            }
+            footer
+        }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: LienSpacing.l) {
+            header
+            profileFields
+            ConsentSection(isAgreed: $viewModel.agreedToTerms)
+            notificationNote
+
+            // 匿名開始の注意(DESIGN §10 の明示義務)
+            Text(Strings.Onboarding.anonymousStartNote)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, LienSpacing.l)
+        .padding(.bottom, LienSpacing.m)
+    }
+
+    // MARK: - 冒頭(コンセプト)
+
+    private var header: some View {
+        VStack(spacing: LienSpacing.s) {
+            // アプリの主役はタネの子。SF Symbols の葉ではなく、本物の絵を最初に見せる
+            PlantCharacterView(
+                state: PlantCharacterState(stage: 3, meOpen: true, partnerOpen: true, expression: .happy)
+            )
+            .frame(width: 104, height: 139) // 3:4
+            .padding(.top, LienSpacing.m)
+
+            Text(Strings.Onboarding.conceptTitle)
+                .font(.title2.bold())
+                .foregroundStyle(.primary)
+            Text(Strings.Onboarding.conceptBody)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text(Strings.Onboarding.conceptNote)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+    }
+
+    // MARK: - ニックネームとアイコン
+
+    private var profileFields: some View {
+        VStack(alignment: .leading, spacing: LienSpacing.m) {
+            VStack(alignment: .leading, spacing: LienSpacing.s) {
+                Text(Strings.Onboarding.profileTitle)
+                    .font(.headline)
+                TextField(Strings.Onboarding.nicknamePlaceholder, text: $viewModel.nickname)
+                    .textFieldStyle(.roundedBorder)
+                    .submitLabel(.done)
+                if let message = nicknameErrorMessage {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(LienColors.gentleAlert)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: LienSpacing.s) {
+                Text(Strings.Onboarding.avatarTitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: LienSpacing.s) {
+                    ForEach(Strings.Onboarding.avatarPalette, id: \.self) { emoji in
+                        let selected = viewModel.avatarEmoji == emoji
+                        Button {
+                            viewModel.avatarEmoji = emoji
+                        } label: {
+                            Text(emoji)
+                                .font(.title2)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    selected ? Color.accentColor.opacity(0.18) : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                )
+                                // 選択が色だけだと分かりにくいので、枠でも示す
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .strokeBorder(
+                                            selected ? Color.accentColor : Color.clear,
+                                            lineWidth: 1.5
+                                        )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                    }
                 }
             }
         }
-        .animation(.default, value: viewModel.step)
-    }
-}
-
-// MARK: - ステップの目印
-
-/// 3つの点で現在地を示す。読み上げは「3ステップ中1」。
-private struct OnboardingStepIndicator: View {
-    let step: OnboardingViewModel.Step
-
-    private var index: Int {
-        switch step {
-        case .concept: 0
-        case .nickname: 1
-        case .notification: 2
-        }
     }
 
-    var body: some View {
-        HStack(spacing: LienSpacing.xs) {
-            ForEach(0..<3, id: \.self) { i in
-                Capsule()
-                    .fill(i == index ? Color.accentColor : Color.secondary.opacity(0.25))
-                    .frame(width: i == index ? 20 : 6, height: 6)
-                    .animation(.easeInOut(duration: 0.2), value: index)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Strings.Onboarding.stepIndicator(index + 1))
-    }
-}
+    // MARK: - 通知の予告(OS のダイアログの前に、何に使うかを書く)
 
-// MARK: - ページ1: コンセプト
-
-private struct ConceptPage: View {
-    let onStart: () -> Void
-
-    var body: some View {
-        // 文字を大きくする設定でも切れないよう、スクロールできる器に入れる
-        ScrollView {
-            VStack(spacing: LienSpacing.m) {
-                // アプリの主役はタネの子。SF Symbols の葉ではなく、本物の絵を最初に見せる
-                PlantCharacterView(
-                    state: PlantCharacterState(stage: 3, meOpen: true, partnerOpen: true, expression: .happy)
-                )
-                .frame(width: 150, height: 200) // 3:4
-
-                Text(Strings.Onboarding.conceptTitle)
-                    .font(.title2.bold())
-                    .multilineTextAlignment(.center)
-                Text(Strings.Onboarding.conceptBody)
-                    .font(.body)
+    private var notificationNote: some View {
+        HStack(alignment: .top, spacing: LienSpacing.s) {
+            Image(systemName: "bell")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Strings.Onboarding.notificationTitle)
+                    .font(.footnote.weight(.medium))
+                Text(Strings.Onboarding.notificationBody)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
             }
-            .frame(maxWidth: .infinity)
-            // 画面の高さいっぱいに広げて中身を縦中央に置く(上に寄ると、下の余白だけが間延びする)
-            .containerRelativeFrame(.vertical, alignment: .center)
-            .padding(.horizontal, LienSpacing.l)
-            .padding(.bottom, LienSpacing.m)
         }
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: LienSpacing.s) {
-                Text(Strings.Onboarding.conceptNote)
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - 下部の固定(理由 + 送信)
+
+    private var footer: some View {
+        VStack(spacing: LienSpacing.s) {
+            // 押せない理由を、押せないあいだだけ書く(無効なボタンだけ置くと、なぜ進めないか分からない)
+            if let blockedReason = blockedReason {
+                Text(blockedReason)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                Button(action: onStart) {
-                    Text(Strings.Onboarding.conceptStart)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
             }
-            .padding(.horizontal, LienSpacing.l)
-            .padding(.bottom, LienSpacing.m)
-        }
-    }
-}
-
-// MARK: - ページ2: ニックネーム+アイコン
-
-private struct NicknamePage: View {
-    @Bindable var viewModel: OnboardingViewModel
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: LienSpacing.l) {
-                Text(Strings.Onboarding.profileTitle)
-                    .font(.title2.bold())
-                    .padding(.top, LienSpacing.l)
-
-                VStack(alignment: .leading, spacing: LienSpacing.s) {
-                    TextField(Strings.Onboarding.nicknamePlaceholder, text: $viewModel.nickname)
-                        .textFieldStyle(.roundedBorder)
-                        .submitLabel(.done)
-                    if let message = nicknameErrorMessage {
-                        Text(message)
-                            .font(.footnote)
-                            .foregroundStyle(LienColors.gentleAlert)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: LienSpacing.s) {
-                    Text(Strings.Onboarding.avatarTitle)
-                        .font(.headline)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: LienSpacing.s) {
-                        ForEach(Strings.Onboarding.avatarPalette, id: \.self) { emoji in
-                            let selected = viewModel.avatarEmoji == emoji
-                            Button {
-                                viewModel.avatarEmoji = emoji
-                            } label: {
-                                Text(emoji)
-                                    .font(.title2)
-                                    .frame(width: 44, height: 44)
-                                    .background(
-                                        selected
-                                            ? Color.accentColor.opacity(0.18)
-                                            : Color.clear,
-                                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    )
-                                    // 選択が色だけだと分かりにくいので、枠でも示す
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .strokeBorder(
-                                                selected ? Color.accentColor : Color.clear,
-                                                lineWidth: 1.5
-                                            )
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityAddTraits(selected ? .isSelected : [])
-                        }
-                    }
-                }
-
-                // 規約への明示の同意(チェック)。同意ボタン(下の「同意してはじめる」)はチェックが入るまで押せない
-                ConsentSection(isAgreed: $viewModel.agreedToTerms)
-            }
-            .padding(.horizontal, LienSpacing.l)
-            .padding(.bottom, LienSpacing.m)
-        }
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: LienSpacing.s) {
-                // 押せない理由を、押せないあいだだけ書く(無効なボタンだけ置くと、なぜ進めないか分からない)
-                if let blockedReason {
-                    Text(blockedReason)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                if let errorMessage = viewModel.submitErrorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(LienColors.gentleAlert)
-                        .multilineTextAlignment(.center)
-                }
-
-                Button {
-                    Task { await viewModel.submitProfile() }
-                } label: {
-                    if viewModel.isSubmitting {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Text(submitButtonTitle)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!viewModel.canSubmitProfile)
-
-                // 匿名開始の注意(DESIGN §10 の明示義務)
-                Text(Strings.Onboarding.anonymousStartNote)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if let errorMessage = viewModel.submitErrorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(LienColors.gentleAlert)
                     .multilineTextAlignment(.center)
             }
-            .padding(.horizontal, LienSpacing.l)
-            .padding(.bottom, LienSpacing.m)
+
+            submitButton
         }
+        .padding(.horizontal, LienSpacing.l)
+        .padding(.top, LienSpacing.s)
+        .padding(.bottom, LienSpacing.m)
+        .background(.bar)
+    }
+
+    /// 送信ボタン。押せないあいだは淡い塗り + 枠線にする。
+    /// iOS 26 の無効な .borderedProminent はほぼ白になり、ボタンの形が見えなくなるため自作する
+    private var submitButton: some View {
+        let ready = viewModel.canSubmitProfile
+        return Button {
+            Task { await viewModel.submitAndFinish() }
+        } label: {
+            Group {
+                if viewModel.isSubmitting {
+                    ProgressView()
+                } else {
+                    Text(submitButtonTitle)
+                }
+            }
+            .font(.body.weight(.semibold))
+            .foregroundStyle(ready ? Color.white : LienColors.accent)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 15)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(ready ? LienColors.accent : LienColors.accent.opacity(0.14))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(ready ? Color.clear : LienColors.accent.opacity(0.45), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!ready)
     }
 
     /// 送信できない理由(無ければ nil)。ボタンの無効化だけに頼らない
@@ -256,23 +252,23 @@ private struct NicknamePage: View {
     }
 }
 
-// MARK: - 規約への同意(ページ2)
+// MARK: - 規約への同意
 
 /// 利用規約・プライバシーポリシーへの同意のチェックと、それぞれを読むリンク(App Store ガイドライン 1.2 / issue #23)
 private struct ConsentSection: View {
     @Binding var isAgreed: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: LienSpacing.s) {
             Button {
                 isAgreed.toggle()
             } label: {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: LienSpacing.s) {
                     Image(systemName: isAgreed ? "checkmark.square.fill" : "square")
                         .font(.title3)
                         .foregroundStyle(isAgreed ? Color.accentColor : Color.secondary)
                     Text(Strings.Onboarding.consentLabel)
-                        .font(.subheadline)
+                        .font(.footnote)
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                 }
@@ -282,62 +278,15 @@ private struct ConsentSection: View {
                 isAgreed ? Strings.Onboarding.consentCheckedValue : Strings.Onboarding.consentUncheckedValue
             )
 
-            HStack(spacing: 16) {
+            HStack(spacing: LienSpacing.m) {
                 Link(Strings.Onboarding.consentTermsLink, destination: SupportLinks.termsURL)
                 Link(Strings.Onboarding.consentPrivacyLink, destination: SupportLinks.privacyURL)
             }
-            .font(.footnote)
+            .font(.caption)
 
             Text(Strings.Onboarding.consentNote)
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
-        }
-    }
-}
-
-// MARK: - ページ3: 通知プレ許可
-
-private struct NotificationPage: View {
-    let viewModel: OnboardingViewModel
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: LienSpacing.m) {
-                Image(systemName: "bell.badge")
-                    .font(.system(size: 56))
-                    .foregroundStyle(.tint)
-                    .padding(.top, LienSpacing.xl)
-                Text(Strings.Onboarding.notificationTitle)
-                    .font(.title2.bold())
-                    .multilineTextAlignment(.center)
-                Text(Strings.Onboarding.notificationBody)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, LienSpacing.l)
-        }
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: LienSpacing.s) {
-                Button {
-                    Task { await viewModel.requestNotifications() }
-                } label: {
-                    Text(Strings.Onboarding.notificationAllow)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(viewModel.isRequestingNotifications)
-
-                Button(Strings.Onboarding.notificationLater) {
-                    viewModel.skipNotifications()
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, LienSpacing.l)
-            .padding(.bottom, LienSpacing.m)
         }
     }
 }

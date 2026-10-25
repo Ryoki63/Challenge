@@ -23,12 +23,15 @@ private func dynamicColor(
 }
 
 enum LienColors {
-    /// 完了状態のチェック・植物のアクセント。ブランドのセージグリーン(Web サイト・シェア画像と同じ色)。
-    /// 既定の Color.green は彩度が高く、クリームの背景の上で浮いていた
-    static let done = dynamicColor(
+    /// ブランドのセージグリーン(Web サイト・シェア画像と同じ色)。ボタンの tint に使う。
+    /// アセットカタログの AccentColor と同じ値だが、こちらは **ImageRenderer で描いたときにも効く**
+    /// (アセット経由の Color.accentColor は、窓を持たない描画では既定の青に落ちる)
+    static let accent = dynamicColor(
         light: (0.239, 0.420, 0.322, 1),
         dark: (0.561, 0.780, 0.659, 1)
     )
+    /// 完了状態のチェック・植物のアクセント。accent と同じ色(意味で分けて名前を置く)
+    static let done = accent
     /// 未完了状態(自分未完 = グレー — REQUIREMENTS §3.10)
     static let pending = Color.gray
     /// エラー文言(責めないトーンの暖色 — 既存画面の .orange を踏襲)

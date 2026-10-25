@@ -432,6 +432,7 @@ final class StoreScreenshotRenderTests: XCTestCase {
             .frame(width: size.pointWidth, height: size.pointHeight, alignment: .top)
             .background(Color.white)
             .environment(\.colorScheme, .light)
+            .tint(LienColors.accent)
         )
     }
 

@@ -111,6 +111,18 @@ final class OnboardingViewModel {
         }
     }
 
+    /// 1画面のオンボーディング用: プロフィールを送り、成功したら続けて通知の許可を求めて完了する。
+    /// 送信に失敗したときは留まる(通知のダイアログは出さない)。
+    ///
+    /// 以前は「コンセプト → ニックネーム → 通知」の3画面に分けていたが、1画面に収まる分量だったので
+    /// 分けるのをやめた。`submitProfile` / `requestNotifications` は、画面を分けていた頃の
+    /// 呼び出し口として残してある(テストもそちらを使っている)。
+    func submitAndFinish() async {
+        await submitProfile()
+        guard step == .notification else { return }
+        await requestNotifications()
+    }
+
     /// ページ3: OS の通知許可ダイアログを1回だけ出して完了する。
     /// 拒否されてもオンボーディングは完了する(ブロックしない — issue #10)
     func requestNotifications() async {

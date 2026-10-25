@@ -27,12 +27,13 @@ final class UIReviewRenderTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 250_000_000)
     }
 
-    private func write(_ view: some View, name: String) async throws {
+    private func write(_ view: some View, name: String, height overrideHeight: CGFloat? = nil) async throws {
         await settle()
         let wrapped = view
-            .frame(width: width, height: height, alignment: .top)
+            .frame(width: width, height: overrideHeight ?? height, alignment: .top)
             .background(Color(uiColor: .systemBackground))
             .environment(\.colorScheme, .light)
+            .tint(LienColors.accent)
         let renderer = ImageRenderer(content: wrapped)
         renderer.scale = 2
         guard let image = renderer.cgImage else {
@@ -47,33 +48,20 @@ final class UIReviewRenderTests: XCTestCase {
         CGImageDestinationFinalize(destination)
     }
 
-    // MARK: - オンボーディング
+    // MARK: - オンボーディング(1画面)
 
-    private func onboardingModel(step: String) async -> OnboardingViewModel {
+    func testRenderOnboarding() async throws {
         let model = OnboardingViewModel(
             authService: StubAuthService(),
             pushAuthorizer: NoopPushAuthorizer(),
             onFinished: {}
         )
-        guard step != "concept" else { return model }
-        model.advanceFromConcept()
+        try await write(OnboardingView(viewModel: model, scrolls: false), name: "onboarding-tall", height: 1200)
+
+        // 入力済み(ボタンが押せる状態)。上と同じ画面なので、色の確認用に2枚目を描く
         model.nickname = "あおい"
-        guard step == "notification" else { return model }
         model.agreedToTerms = true
-        await model.submitProfile()
-        return model
-    }
-
-    func testRenderOnboardingConcept() async throws {
-        try await write(OnboardingView(viewModel: await onboardingModel(step: "concept")), name: "onboarding-concept")
-    }
-
-    func testRenderOnboardingNickname() async throws {
-        try await write(OnboardingView(viewModel: await onboardingModel(step: "nickname")), name: "onboarding-nickname")
-    }
-
-    func testRenderOnboardingNotification() async throws {
-        try await write(OnboardingView(viewModel: await onboardingModel(step: "notification")), name: "onboarding-notification")
+        try await write(OnboardingView(viewModel: model, scrolls: false), name: "onboarding-filled", height: 1200)
     }
 
     // MARK: - 約束設定
