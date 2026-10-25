@@ -1,8 +1,8 @@
 {
   "_comment": "issue #76 のティザーページ設定。null は『未確定』を意味し、生成物には出ない(--check-publishable が公開を止める)",
   "baseUrl": "https://ryoki63.github.io/Challenge",
-  "xUrl": null,
+  "xUrl": "https://x.com/lien_promise",
   "appStoreUrl": null,
-  "contactEmail": null,
+  "contactEmail": "ryoki.kojima.dev@outlook.jp",
   "statusLabel": "近日公開"
 }

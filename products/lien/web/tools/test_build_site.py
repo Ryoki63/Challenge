@@ -142,8 +142,9 @@ class LegalPagesTest(unittest.TestCase):
 
     def test_placeholders_are_highlighted_not_dropped(self):
         # G4 で人が埋めるまで、4項目は消さずに目立たせる(埋め忘れを公開物で見つけられるように)
-        for name in ("privacy.html", "terms.html"):
-            self.assertIn('<span class="placeholder">【要記入: G4:', self.pages[name])
+        # (実ファイルは記入済みのため、変換器に未記入の md を渡して確かめる)
+        rendered = build_site.render_inline("制定日: 【要記入: G4: 制定日】")
+        self.assertIn('<span class="placeholder">【要記入: G4: 制定日】</span>', rendered)
 
     def test_language_and_viewport(self):
         for content in self.pages.values():
@@ -239,9 +240,9 @@ class BuildAllTest(unittest.TestCase):
             "index.html",
             "assets/site.css",
             "assets/icon.svg",
-            "assets/shot-1-home.svg",
-            "assets/shot-2-widget.svg",
-            "assets/shot-3-checkin.svg",
+            "assets/shot-1-home.png",
+            "assets/shot-2-waiting.png",
+            "assets/shot-3-widget.png",
             "lien/legal/privacy.html",
             "lien/legal/terms.html",
         ):
@@ -254,28 +255,26 @@ class BuildAllTest(unittest.TestCase):
             deployed = os.path.join(build_site.SITE_OUT_DIR, "lien", "legal", html_name)
             self.assertEqual(outputs[canonical], outputs[deployed], html_name)
 
-    def test_screenshots_are_valid_svg_of_the_right_size(self):
+    def test_screenshots_are_real_pngs_of_the_right_size(self):
+        import struct
         outputs = build_site.build_all(default_config())
-        for name in ("shot-1-home.svg", "shot-2-widget.svg", "shot-3-checkin.svg"):
+        for name, _alt in build_site.SCREENSHOTS:
             content = outputs[os.path.join(build_site.SITE_OUT_DIR, "assets", name)]
-            root = ET.fromstring(content)
-            self.assertEqual(root.get("width"), "660")
-            self.assertEqual(root.get("height"), "1430")
-            self.assertIn('xmlns="http://www.w3.org/2000/svg"', content)
+            self.assertEqual(content[:8], b"\x89PNG\r\n\x1a\n", name)
+            width, height = struct.unpack(">II", content[16:24])
+            self.assertEqual((width, height), (660, 1431), name)
 
-    def test_no_external_references_in_screenshots(self):
-        # SVG を <img> で読むと外部参照は読み込まれない。立ち絵は埋め込みで完結させる
-        outputs = build_site.build_all(default_config())
-        for name in ("shot-1-home.svg", "shot-2-widget.svg", "shot-3-checkin.svg"):
-            content = outputs[os.path.join(build_site.SITE_OUT_DIR, "assets", name)]
-            self.assertNotIn("xlink:href", content)
-            self.assertNotIn("<image", content)
+    def test_screenshots_come_from_the_real_app_screens(self):
+        # 手描きの画面は載せない。ティザーの画像は marketing/screenshots/6.1in/ の実画面を縮めたもの
+        names = [n for n, _ in build_site.SCREENSHOTS]
+        self.assertEqual(names, ["shot-1-home.png", "shot-2-waiting.png", "shot-3-widget.png"])
 
-    def test_widget_screenshot_does_not_claim_photos(self):
-        # v1.0 のウィジェットに相手の写真は出ない(D3)。出しているように見せない
-        outputs = build_site.build_all(default_config())
-        content = outputs[os.path.join(build_site.SITE_OUT_DIR, "assets", "shot-2-widget.svg")]
-        self.assertNotIn("写真", content)
+    def test_copy_states_the_promise_per_person_and_ticket_conditions(self):
+        # REQUIREMENTS §2(約束は1人1つ)・§3.6(チケットは月2枚)に反する書き方をしない
+        html_text = build_site.render_index(default_config(), load_copy())
+        self.assertIn("それぞれが", html_text)
+        self.assertIn("毎月2枚", html_text)
+        self.assertNotIn("ふたりで決めるのは", html_text)
 
 
 class DriftTest(unittest.TestCase):
@@ -288,18 +287,16 @@ class DriftTest(unittest.TestCase):
 
 class PublishableTest(unittest.TestCase):
     def test_blocks_while_g4_placeholders_remain(self):
-        config = build_site.load_config()
-        outputs = build_site.build_all(config)
-        legal = [(p, c) for p, c in outputs.items() if p.endswith(("privacy.html", "terms.html"))]
-        index = outputs[os.path.join(build_site.SITE_OUT_DIR, "index.html")]
+        config = default_config(xUrl="https://x.com/example")
+        legal = [("privacy.html", '<span class="placeholder">【要記入: G4: 制定日】</span>')]
+        index = "<p>ok</p>"
         problems = build_site.check_publishable(config, index, legal)
         self.assertTrue(any("プレースホルダ" in p for p in problems), problems)
 
     def test_blocks_when_x_url_is_missing(self):
-        config = build_site.load_config()
-        outputs = build_site.build_all(config)
-        legal = [(p, c) for p, c in outputs.items() if p.endswith(("privacy.html", "terms.html"))]
-        index = outputs[os.path.join(build_site.SITE_OUT_DIR, "index.html")]
+        config = default_config()
+        legal = []
+        index = "<p>ok</p>"
         problems = build_site.check_publishable(config, index, legal)
         self.assertTrue(any("xUrl" in p for p in problems), problems)
 
@@ -312,6 +309,17 @@ class PublishableTest(unittest.TestCase):
         config = default_config(xUrl="https://x.com/example")
         problems = build_site.check_publishable(config, '<a href="http://example.com">x</a>', [])
         self.assertTrue(any("http://" in p for p in problems), problems)
+
+
+class PublishedStateTest(unittest.TestCase):
+    """実ファイルが公開してよい状態であること(G4 の記入・X の URL)。公開前の最後の砦。"""
+
+    def test_real_files_are_publishable(self):
+        config = build_site.load_config()
+        outputs = build_site.build_all(config)
+        legal = [(p, c) for p, c in outputs.items() if p.endswith(("privacy.html", "terms.html"))]
+        index = outputs[os.path.join(build_site.SITE_OUT_DIR, "index.html")]
+        self.assertEqual(build_site.check_publishable(config, index, legal), [])
 
 
 class ConfigTest(unittest.TestCase):
