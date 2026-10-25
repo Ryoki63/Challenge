@@ -32,6 +32,10 @@ jobs:
       - name: Run deno test
         run: deno test
 
+      - name: Run local RLS authorization boundaries
+        working-directory: ${{ github.workspace }}
+        run: deno test --allow-read --allow-net products/lien/supabase/tests/
+
       # 契約フィクスチャ(products/lien/contracts/*.json)がサーバー実装の現在の出力と一致するか。
       # 上の `deno test` は contracts/tools を含まないので別に回す。ずれたまま放置すると、iOS の
       # ContractFixtureTests が古い形を前提にデコードを検証し続ける(contracts/README.md)。
