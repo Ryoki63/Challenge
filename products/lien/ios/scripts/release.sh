@@ -101,8 +101,25 @@ require_export_env() {
   [ -n "${IOS_DIST_CERT_P12:-}" ] || die "IOS_DIST_CERT_P12(配布用証明書の p12 を base64 にしたもの)が未設定です"
   [ -n "${IOS_DIST_CERT_PASSWORD:-}" ] || die "IOS_DIST_CERT_PASSWORD が未設定です"
   local name
-  for name in IOS_PROFILE_UUID_APP IOS_PROFILE_UUID_WIDGET IOS_PROFILE_UUID_NSE; do
-    [ -n "${!name:-}" ] || die "$name(App Store 用プロファイルの UUID)が未設定です"
+  for name in IOS_PROFILE_UUID_APP IOS_PROFILE_UUID_WIDGET IOS_PROFILE_UUID_NSE \
+    IOS_PROFILE_APP IOS_PROFILE_WIDGET IOS_PROFILE_NSE; do
+    [ -n "${!name:-}" ] || die "$name(App Store 用プロファイルの UUID と中身)が未設定です"
+  done
+}
+
+# プロファイルを設置する。ExportOptions の provisioningProfiles は UUID で引くため、
+# 端末(~ /Library/MobileDevice/Provisioning Profiles)に置いておく必要がある
+install_profiles() {
+  local dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+  mkdir -p "$dir"
+  local pair uuid content
+  for pair in "$IOS_PROFILE_UUID_APP:$IOS_PROFILE_APP" \
+    "$IOS_PROFILE_UUID_WIDGET:$IOS_PROFILE_WIDGET" \
+    "$IOS_PROFILE_UUID_NSE:$IOS_PROFILE_NSE"; do
+    uuid="${pair%%:*}"
+    content="${pair#*:}"
+    printf '%s' "$content" | base64 --decode >"$dir/$uuid.mobileprovision"
+    echo "+ プロファイルを設置: $uuid.mobileprovision"
   done
 }
 
@@ -128,6 +145,7 @@ cmd_export_upload() {
   require_export_env
   auth_args
   import_distribution_cert
+  install_profiles
   local options="$TMP_BASE/ExportOptions.plist"
   cp Config/ExportOptions.plist "$options"
   # teamID の雛形(REPLACE_WITH_APPLE_TEAM_ID)を、secrets の値に差し替える
