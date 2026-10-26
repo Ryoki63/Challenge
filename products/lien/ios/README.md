@@ -108,9 +108,13 @@ xcodebuild test -project Lien.xcodeproj -scheme Lien \
 2. Developer Portal(Certificates, Identifiers & Profiles)→ **Identifiers** で、アプリ本体の App ID(Explicit)`com.ryoki63.lien` を登録する。
    **この登録を先に済ませる**: 次の App Store Connect の「新規アプリ」で選べる Bundle ID は、ここに登録済みのものだけ。
    Capabilities は選ばなくてよい(下の注記のとおり、足りないものはクラウド署名が付ける)
+   - Developer Portal → **Devices** に、実機を 1 台以上登録する。**TestFlight へ上げるだけでも 1 台は要る**
+     (自動署名は archive の時点で開発用プロファイルを作ろうとし、端末が 0 台だと
+     `Your team has no devices from which to generate a provisioning profile` で止まる)。
+     UDID は `ioreg -p IOUSB -l | grep "USB Serial Number"` で読める。ASC API の `POST /v1/devices` でも登録できる
 3. App Store Connect → アプリ →「新規アプリ」でレコードを作る(プラットフォーム iOS・名前は仮でよい・Bundle ID は 2. で登録した `com.ryoki63.lien` — G0)
-   - **実機に Xcode から直接入れる場合だけ**（E2E は TestFlight 配布が前提 — [docs/E2E-M1.md](../../../docs/E2E-M1.md) §1）: Developer Portal → **Devices** に、その実機の UDID を登録する
-     (Xcode の自動署名で実機をつなぐと、自動で登録されることもある)。TestFlight へ上げるだけなら UDID の登録は要らない
+   - **実機に Xcode から直接入れる場合**: Developer Portal → **Devices** に、その実機の UDID を登録する
+     (Xcode の自動署名で実機をつなぐと、自動で登録されることもある)。TestFlight へ上げるだけなら、2. で登録した 1 台で足りる
 4. App Store Connect → ユーザとアクセス → 統合 → **App Store Connect API** でキーを発行し、`.p8` をダウンロードする
    (一度しかダウンロードできない)。ロールは **Admin を推奨**(クラウド署名が配布用の証明書を作るため。App Manager で足りるかは初回に確認)
 5. GitHub のリポジトリ → Settings → Secrets and variables → Actions に登録する(一覧は [DESIGN §7.2](../../../docs/DESIGN.md)):
@@ -123,10 +127,22 @@ xcodebuild test -project Lien.xcodeproj -scheme Lien \
    | `APPLE_TEAM_ID` | Apple Developer の Team ID(10 桁の英数字) |
    | `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
    | `SUPABASE_ANON_KEY` | anon(publishable)キー。**service_role / secret キーは入れない** |
+   | `IOS_DIST_CERT_P12` | 配布用証明書(`Apple Distribution`)の p12 を base64 にしたもの。中間証明書(WWDR G3)を同梱する |
+   | `IOS_DIST_CERT_PASSWORD` | その p12 のパスワード |
+   | `IOS_PROFILE_UUID_APP` / `_WIDGET` / `_NSE` | App Store 用プロファイルの UUID(3 バンドルぶん) |
+   | `IOS_PROFILE_APP` / `_WIDGET` / `_NSE` | 同じプロファイルの中身(base64) |
 
-   アプリ本体以外の App ID(`com.ryoki63.lien.widget` / `.nse`)・App Group(`group.com.ryoki63.lien.shared`)・Push Notifications は、
-   クラウド署名(`-allowProvisioningUpdates`)が自動で登録・付与する。App Group の自動付与に失敗したときだけ、
-   Developer Portal で App ID に手動で付与して再実行する
+   アプリ本体以外の App ID(`com.ryoki63.lien.widget` / `.nse`)・Push Notifications は、
+   クラウド署名(`-allowProvisioningUpdates`)が自動で登録・付与する。
+   **App Group(`group.com.ryoki63.lien.shared`)だけは自動で付かない**: Developer Portal で
+   App Groups を 1 つ作り、3 つの App ID の Capabilities で Configure から紐付ける
+   (ASC API に App Groups の窓口は無い。紐付けが無いと archive が
+   `doesn't match the entitlements file's value for the com.apple.security.application-groups` で止まる)
+
+   **書き出しは手動署名**(`scripts/release.sh` の `export-upload`)。クラウド署名は archive までは通るが、
+   配布用プロファイルの作成が `Cloud signing permission error` で弾かれる環境があるため、
+   証明書とプロファイルを secrets から一時キーチェーン・`~/Library/MobileDevice/Provisioning Profiles` に入れて署名する。
+   p12 は `openssl pkcs12 -export -legacy` で作る(macOS の `security import` は既定の AES 形式を読めない)
 
 ### 8.2 実行
 
@@ -190,7 +206,7 @@ gh workflow run lien-release.yml --repo Ryoki63/Challenge -f dry_run=false -f in
 | 体験の状態(全画面の演出・名前の知らせ・ひとこと)/ 名前フォームの状態 | `Features/Plant/PlantExperienceModel.swift`・`PlantNamingModel.swift` |
 | 画面: ホームの植物まわり・吹き出し / 全画面の演出(ホームの上のオーバーレイ。シートにしない = ほかの表示と重なっても待てる。植物の行・ハートのボタンは別ファイル)/ 名前のフォームとシート | `Features/Plant/PlantHeroView.swift`・`WhisperBubbleView.swift`・`PlantCelebrationView.swift`・`PlantCelebrationPlantsView.swift`・`PlantCelebrationHeartView.swift`・`PlantNameFormView.swift`・`PlantNameSheet.swift` |
 
-- 葉の下の約束の絵文字(左 = 自分・右 = 相手)と、小さな揺れ(プレートは揺らさない)は `PlantCharacterView` の中。揺れるかは描いている状態から決める(`PlantCharacterState.sways`)
+- 葉(左 = 自分・右 = 相手)と、小さな揺れ(プレートは揺らさない)は `PlantCharacterView` の中。葉の下の約束の絵文字は 2026-10-26 に UI から廃止(出さない)。揺れるかは描いている状態から決める(`PlantCharacterState.sways`)
 - テスト: `GrowthGaugeTests`(ゲージ・のぞき・VoiceOver・揺れ)/ `StageCelebrationTests`(演出の記録・名前の知らせ・おかえり・ひとこと)/ `PlantNamingTests`(入力の検査・Live・スタブ・フォーム)/ `PlantHomeTests`(HomeViewModel とのつなぎ)/ `PlantWhisperTests` / `ContractFixtureTests`(新キーの値と plant-name の応答)/ `PairSnapshotTests`(新キー無し・往復)/ `PlantExperiencePolishTests`(仕上げ: 下の箇条書き)
 - 実描画: `PlantRenderTests` が `plant_08`〜`plant_11`(ホームの植物まわり・全画面の演出。ライト/ダーク)も `plant-render-sheets` に書く。
   ホームの植物まわりには、文字を大きくした行(xxxLarge・accessibility3)もある
@@ -294,7 +310,7 @@ v1.0 の端末のローカル通知は 2 つだけ(REQUIREMENTS §3.12)。配送
 
 ### T20 の確認項目(実機・TestFlight)
 
-1. **リマインドが届く**: 設定 → 通知 → リマインドの時刻を数分後にして「保存する」→ ホーム画面を閉じて待つ → 届く(ロック画面・バナー。本文に約束の名前と絵文字)
+1. **リマインドが届く**: 設定 → 通知 → リマインドの時刻を数分後にして「保存する」→ ホーム画面を閉じて待つ → 届く(ロック画面・バナー。本文に約束の名前。約束の絵文字は 2026-10-26 に UI から廃止したので本文に入れない)
 2. **済んでいれば出ない / 取り消しで戻る**: 上の時刻の前にチェックインする → 届かない。「取り消す」→ 時刻になると届く
 3. **ストリーク危機(夜 9 時)**: ペア成立・ストリーク 1 日以上・ふたりとも未完の状態で、21:00 に届く(待てなければ、設定 → 一般 → 日付と時刻の「自動設定」を切って 20:58 に進める)。自分だけ済んでいる / 相手だけ済んでいる / どちらも未完で、本文が出し分けられている
 4. **NSE の取り消し(未確認の項目)**: 夜 9 時の前に、相手がチェックインして**ふたりそろう** → 自分のアプリは開かずに 21:00 を迎える。**今日の 21:00 に届かなければ NSE が消せている**。届いたら消せていない(上の 1〜5 のふるまいになっているか確かめ、この節と `NotificationService.swift` の冒頭に結果を書く)
@@ -316,8 +332,8 @@ v1.0 のウィジェットは1つ(kind `LienWidget`)で、4つのファミリー
 
 | ファミリー | 内容 |
 |---|---|
-| ホーム S | 植物(ふたりの葉 = 今日の2人。左 = 自分・右 = 相手)+ストリーク「🔥 23日」+2人の今日の状態(約束の絵文字+○×。葉の意味が伝わるまでの補助 — GROWTH §5.4)+**細い進み具合のバー(数字なし)**+相手が先に完了していれば「(名前)が待ってるよ」。ソロ・データ無しは、眠るタネの子+一言(「ペアになると、タネの子が目をさますよ」/「アプリを開いてはじめよう」) |
-| ホーム M | S の内容+**植物を大きく**(高さいっぱい)。右の列に2人の呼び名つき(高さに収まらないときは呼び名を外す)。**相手の写真は v1.0.1(T17b)**。REQUIREMENTS §3.10 と TASKPLAN §9.4 は M ごと v1.0.1 としているが、オーケストレータの指示で写真なしの M を入れた(外すときは `LienWidget.supportedFamilies` から `.systemMedium` を取る 1 行) |
+| ホーム S | 植物(ふたりの葉 = 今日の2人。左 = 自分・右 = 相手)+ストリーク「🔥 23日」+2人の今日の状態(右の列に縦積み: 上 = 自分・下 = 相手。それぞれ ✓ か ○ + 呼び名。約束の絵文字は 2026-10-26 に UI から廃止。葉の意味が伝わるまでの補助 — GROWTH §5.4)+**細い進み具合のバー(数字なし)**+相手が先に完了していれば「(名前)が待ってるよ」。ソロ・データ無しは、眠るタネの子+一言(「ペアになると、タネの子が目をさますよ」/「アプリを開いてはじめよう」) |
+| ホーム M | S の内容+**植物を大きく**(高さいっぱい)。右の列に2人の状態を横に並べて呼び名つき(自分が左・相手が右。高さに収まらないときは行の間を詰める — 呼び名は外さない)。**相手の写真は v1.0.1(T17b)**。REQUIREMENTS §3.10 と TASKPLAN §9.4 は M ごと v1.0.1 としているが、オーケストレータの指示で写真なしの M を入れた(外すときは `LienWidget.supportedFamilies` から `.systemMedium` を取る 1 行) |
 | ロック画面・円形 | **相手の今日の状態** = 相手(右)の葉の開閉(ひらく = 済み / たたむ = まだ。薄く出す。段階0は芽の光る / 閉じる)。形でも見分けられる(ロック画面は単色化される)。ソロ・データ無しは眠るタネの子。v1.0.1 で進み具合のリングにする |
 | ロック画面・インライン | 🔥 ストリーク数(SF Symbols の炎+「23日」)。ストリークが無いとき(0・ソロ・データ無し)はアプリ名 |
 
@@ -343,7 +359,7 @@ v1.0 のウィジェットは1つ(kind `LienWidget`)で、4つのファミリー
 - **色合い(accented)表示**(iOS 18 のホーム画面): 画像は何もしないと脱色されて単色になる。植物の各レイヤーの Image に `widgetAccentedRenderingMode(.fullColor)`(`#available(iOS 18)`)を付けて色を保つ。`PlantCharacterView` は WidgetKit に依存させない(シェア画像・アプリ本体でも使う)ので、`PlantImageStyle` として外から渡す。ウィジェットが `PlantCharacterView` を作るときは必ず `imageStyle:` を渡す(`WidgetSourceTests` が確かめる)。進み具合のバーの塗りは `.widgetAccentable()`(色合いの色になる)
 - **ダーク**: `PlantCharacterView` が最背面に `bg_plate`(クリーム色のプレート)を敷く(ロック画面の眠るタネの子は、単色化でプレートが絵を塗りつぶすので、常にライトで描く)
 - **ロック画面は単色化(vibrant)される**: ひらく / たたむを**形で**見分けられるようにしてある(ひらいた葉は横に広く、たたんだ葉は縦に細い。たたんだ方はさらに薄く出す — 罰ではなく眠っているだけ)。円形の葉は、他のレイヤーと同じキャンバス(240×320)の最終位置の絵を、葉のある範囲(`WidgetLeafFocus`。実際に描いて測った塗りの範囲に余白を足した値)が円の中心に来るよう拡大して切り抜く。アセットを差し替えたら `WidgetRenderTests.testTheLeafFocusContainsThePaintedLayers` が落ちて気づく
-- **文字**: ホーム S / M は Dynamic Type に連れて大きくなるが、小さな枠に収まるよう xxLarge で止める。S の右の列には最小の幅(46pt)を残し(足りないぶんは植物を削る)、絵文字は縮めて収める。M の右の列は、高さに収まらないときは呼び名を外した小さい方に替える(`ViewThatFits`)
+- **文字**: ホーム S / M は Dynamic Type に連れて大きくなるが、小さな枠に収まるよう xxLarge で止める。S の右の列には最小の幅(46pt)を残し(足りないぶんは植物を削る)、2人の状態は縦に重ねて、呼び名は縮めて収める(約束の絵文字は 2026-10-26 に UI から廃止)。M の右の列は、高さに収まらないときは行の間を詰めた小さい方に替える(`ViewThatFits`。呼び名は外さない)
 - **VoiceOver**: ウィジェット全体で1つの要素。ホーム S / M は植物の読み上げ文(`PlantVoiceOver` — 「みどり、わかば。あなた: 完了、ゆうき: まだ。ふたりそろって あと2回で よりそい」)に、ストリークと「待ってるよ」を足す。円形は「ゆうき: 完了」、インラインは「ふたりの記録: 23日」
 - **メモリ**: 全レイヤーを重ねる(ベクターのまま)。S の植物は約 68×91pt(標準の機種)・M は約 95×126pt。目安は S サイズで1レイヤー約1MB・10枚前後(GROWTH §9.5)。収まらないと分かったときの代案は、ウィジェット用だけ「段階 × 葉の状態」を1枚に合成した画像を持つこと(`PlantCharacterView` の差し替えで局所化できる)。**実機で確かめる(T20)**
 
