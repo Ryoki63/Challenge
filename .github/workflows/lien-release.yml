@@ -79,9 +79,16 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROFILE_UUID_APP: ${{ secrets.IOS_PROFILE_UUID_APP }}
+          IOS_PROFILE_UUID_WIDGET: ${{ secrets.IOS_PROFILE_UUID_WIDGET }}
+          IOS_PROFILE_UUID_NSE: ${{ secrets.IOS_PROFILE_UUID_NSE }}
         run: |
           missing_asc=""
-          for name in ASC_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID APPLE_TEAM_ID; do
+          for name in ASC_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID APPLE_TEAM_ID \
+            IOS_DIST_CERT_P12 IOS_DIST_CERT_PASSWORD \
+            IOS_PROFILE_UUID_APP IOS_PROFILE_UUID_WIDGET IOS_PROFILE_UUID_NSE; do
             [ -n "${!name:-}" ] || missing_asc="$missing_asc $name"
           done
           missing_supabase=""
@@ -250,6 +257,11 @@ jobs:
           ASC_KEY_ID: DRYRUN0000
           ASC_ISSUER_ID: 00000000-0000-0000-0000-000000000000
           APPLE_TEAM_ID: ABCDE12345
+          IOS_DIST_CERT_P12: AAAA
+          IOS_DIST_CERT_PASSWORD: DRYRUN
+          IOS_PROFILE_UUID_APP: 00000000-0000-0000-0000-000000000001
+          IOS_PROFILE_UUID_WIDGET: 00000000-0000-0000-0000-000000000002
+          IOS_PROFILE_UUID_NSE: 00000000-0000-0000-0000-000000000003
         run: |
           scripts/release.sh archive-signed
           scripts/release.sh export-upload
@@ -260,6 +272,11 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROFILE_UUID_APP: ${{ secrets.IOS_PROFILE_UUID_APP }}
+          IOS_PROFILE_UUID_WIDGET: ${{ secrets.IOS_PROFILE_UUID_WIDGET }}
+          IOS_PROFILE_UUID_NSE: ${{ secrets.IOS_PROFILE_UUID_NSE }}
         run: |
           set -o pipefail
           scripts/release.sh export-upload 2>&1 | tee "$RUNNER_TEMP/export.log"

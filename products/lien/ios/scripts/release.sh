@@ -94,13 +94,48 @@ cmd_archive_signed() {
     "DEVELOPMENT_TEAM=$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic
 }
 
+# 書き出しは手動署名にする。クラウド署名(-allowProvisioningUpdates)は archive までは通るが、
+# 配布用プロファイルの作成が「Cloud signing permission error」で弾かれる環境があるため、
+# 証明書とプロファイルを secrets から入れ、ExportOptions で明示的に指定する。
+require_export_env() {
+  [ -n "${IOS_DIST_CERT_P12:-}" ] || die "IOS_DIST_CERT_P12(配布用証明書の p12 を base64 にしたもの)が未設定です"
+  [ -n "${IOS_DIST_CERT_PASSWORD:-}" ] || die "IOS_DIST_CERT_PASSWORD が未設定です"
+  local name
+  for name in IOS_PROFILE_UUID_APP IOS_PROFILE_UUID_WIDGET IOS_PROFILE_UUID_NSE; do
+    [ -n "${!name:-}" ] || die "$name(App Store 用プロファイルの UUID)が未設定です"
+  done
+}
+
+# 配布用証明書を一時キーチェーンへ入れる(ランナーの既定キーチェーンを汚さない)
+import_distribution_cert() {
+  local keychain="$TMP_BASE/Lien-signing.keychain-db"
+  local p12="$TMP_BASE/distribution.p12"
+  printf '%s' "$IOS_DIST_CERT_P12" | base64 --decode >"$p12"
+  run security create-keychain -p "" "$keychain"
+  run security set-keychain-settings -lut 3600 "$keychain"
+  run security unlock-keychain -p "" "$keychain"
+  run security import "$p12" -k "$keychain" -P "$IOS_DIST_CERT_PASSWORD" -T /usr/bin/codesign
+  run security set-key-partition-list -S apple-tool:,apple: -k "" "$keychain"
+  # 既存のキーチェーンは残したまま、一時キーチェーンを先頭に足す
+  local existing
+  existing="$(security list-keychains -d user | tr -d '"' | tr '\n' ' ')"
+  # shellcheck disable=SC2086
+  run security list-keychains -d user -s "$keychain" $existing
+}
+
 cmd_export_upload() {
   require_signing_env
+  require_export_env
   auth_args
+  import_distribution_cert
   local options="$TMP_BASE/ExportOptions.plist"
   cp Config/ExportOptions.plist "$options"
   # teamID の雛形(REPLACE_WITH_APPLE_TEAM_ID)を、secrets の値に差し替える
   plutil -replace teamID -string "$APPLE_TEAM_ID" "$options"
+  # 手動署名へ切り替え、3 バンドルぶんのプロファイルを明示する
+  plutil -replace signingStyle -string manual "$options"
+  plutil -insert provisioningProfiles -json "$(printf '{"com.ryoki63.lien":"%s","com.ryoki63.lien.widget":"%s","com.ryoki63.lien.nse":"%s"}' \
+    "$IOS_PROFILE_UUID_APP" "$IOS_PROFILE_UUID_WIDGET" "$IOS_PROFILE_UUID_NSE")" "$options"
   plutil -lint "$options" >/dev/null
   run xcodebuild -exportArchive \
     -archivePath "$ARCHIVE_PATH" \
