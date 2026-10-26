@@ -135,9 +135,11 @@ final class NotificationSettingsViewModel {
         showsSavedNote = false
         defer { isSaving = false }
         do {
+            // 約束の絵文字は UI から廃止した(2026-10-26)が、サーバーの promise-set は emoji 必須(空は不可)。
+            // いまの約束に絵文字が入っていればそのまま返し(ここで変えない)、空なら固定値を送る
             let saved = try await promiseClient.setPromise(
                 title: promise.title,
-                emoji: promise.emoji,
+                emoji: promise.emoji.isEmpty ? PromiseSetupViewModel.placeholderEmoji : promise.emoji,
                 remindAt: reminderAtToSend
             )
             self.promise = saved

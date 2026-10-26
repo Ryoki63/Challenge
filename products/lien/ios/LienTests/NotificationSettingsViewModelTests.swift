@@ -215,6 +215,22 @@ final class NotificationSettingsViewModelTests: XCTestCase {
         XCTAssertEqual(rig.saved.promises.map(\.remindAt), ["21:15"], "画面と AppModel に、保存した約束が渡る")
     }
 
+    func testSavingFallsBackToThePlaceholderEmojiWhenThePromiseHasNone() async {
+        // 約束の絵文字は UI から廃止した(2026-10-26)。サーバーの promise-set は emoji 必須(空は invalid_emoji)なので、
+        // 読んだ約束の絵文字が空なら固定値を送る(空のまま送ると、リマインドの保存が必ず失敗する)
+        let rig = makeRig(promise: Promise(id: "p-1", title: "筋トレ", emoji: "", remindAt: "20:30"))
+        await rig.vm.load()
+
+        rig.vm.reminderTime = time(21, 0)
+        await rig.vm.saveReminder()
+
+        XCTAssertEqual(
+            rig.client.calls,
+            [.init(title: "筋トレ", emoji: PromiseSetupViewModel.placeholderEmoji, remindAt: "21:00")]
+        )
+        XCTAssertNil(rig.vm.saveErrorMessage)
+    }
+
     func testTurningTheReminderOffSavesANilRemindAt() async {
         let rig = makeRig()
         await rig.vm.load()

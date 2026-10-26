@@ -11,9 +11,9 @@
 //   - ダークモードのときだけ、最背面に bg_plate を敷く(こげ茶の輪郭が暗い背景に沈まないように)
 //   - **状態が変わっても、アニメーションは掛けない**。葉のひらく / たたむを自動でクロスフェードすると、
 //     形の違う2枚が二重に見えるため(assets/plant/mapping.md §5)。変えたいときは回転・拡大縮小か、単純な差し替えにする
-//   - 葉の下の約束の絵文字(GROWTH §4.5。PB #57): 左 = 自分・右 = 相手。誰の葉かが、文章に頼らず分かる。
-//     ソロには葉が無いので出さない。位置と大きさは PlantLayers.leafBadge*(キャンバス座標)
-//   - 小さな揺れ(片方だけ完了のそわそわ): 鉢の底を支点に、**プレート以外**の絵と絵文字を回す。
+//   - 葉の下の約束の絵文字は**出さない**(2026-10-26 オーナー判断で、約束の絵文字は UI から廃止)。
+//     誰の葉か(左 = 自分・右 = 相手)は、葉の位置と開閉、ホームの文(約束のタイトル・名前)で伝わる
+//   - 小さな揺れ(片方だけ完了のそわそわ): 鉢の底を支点に、**プレート以外**の絵を回す。
 //     ダークモードのプレートまで回ると、背景の四角が一緒に傾いてしまう(PA の手直し — #57)
 //   - 各レイヤーの Image に付ける装飾 imageStyle(T17a #17): ウィジェットが、iOS 18 の「色合い(accented)」表示でも植物が単色に
 //     ならないよう widgetAccentedRenderingMode(.fullColor) を付けるのに使う。WidgetKit の API はここには持ち込まず、
@@ -41,10 +41,6 @@ struct PlantCharacterView: View {
     var meFlowerColor: Color = PlantCharacterView.defaultFlowerColor
     /// 相手の花(右)の色。v1.0 は既定色
     var partnerFlowerColor: Color = PlantCharacterView.defaultFlowerColor
-    /// ふたりの葉の下に小さく置く、自分(左)の約束の絵文字。nil なら置かない
-    var meEmoji: String?
-    /// 同じく、相手(右)の約束の絵文字
-    var partnerEmoji: String?
     /// 小さな揺れの角度(度)。鉢の底を支点に、プレート以外を回す。0 なら揺れない
     var swayDegrees: Double = 0
     /// VoiceOver で読み上げる文。nil なら装飾画像として隠す
@@ -70,9 +66,6 @@ struct PlantCharacterView: View {
                 ZStack {
                     ForEach(layers.filter { $0.slot != .backPlate }) { layer in
                         layerView(layer, size: proxy.size, unit: unit)
-                    }
-                    if !state.isSolo {
-                        leafBadges(unit: unit)
                     }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
@@ -105,28 +98,6 @@ struct PlantCharacterView: View {
         } else {
             imageStyle.apply(Image(layer.assetName).renderingMode(.original).resizable())
                 .scaledToFit()
-        }
-    }
-
-    /// 葉の下の約束の絵文字(左 = 自分 / 右 = 相手。GROWTH §4.5)
-    @ViewBuilder
-    private func leafBadges(unit: CGFloat) -> some View {
-        let size = CGFloat(PlantLayers.leafBadgeSize) * unit
-        if let meEmoji, !meEmoji.isEmpty {
-            Text(meEmoji)
-                .font(.system(size: size))
-                .position(
-                    x: CGFloat(PlantLayers.leafBadgeCenterX) * unit,
-                    y: CGFloat(PlantLayers.leafBadgeCenterY) * unit
-                )
-        }
-        if let partnerEmoji, !partnerEmoji.isEmpty {
-            Text(partnerEmoji)
-                .font(.system(size: size))
-                .position(
-                    x: CGFloat(PlantLayers.canvasWidth - PlantLayers.leafBadgeCenterX) * unit,
-                    y: CGFloat(PlantLayers.leafBadgeCenterY) * unit
-                )
         }
     }
 }

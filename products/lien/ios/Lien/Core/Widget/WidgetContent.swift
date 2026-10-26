@@ -44,10 +44,9 @@ struct WidgetContent: Equatable, Sendable {
         case paired
     }
 
-    /// 1人分の今日の状態(ホームの TodayChip と同じ。未完 = グレー)
+    /// 1人分の今日の状態(ホームの TodayChip と同じ。未完 = グレー)。
+    /// 約束の絵文字は持たない(2026-10-26 オーナー判断で UI から廃止)。誰の状態かは呼び名で示す
     struct Person: Equatable, Sendable {
-        /// 約束の絵文字(無ければ nil)
-        let emoji: String?
         /// 呼び名。自分は「じぶん」、相手はニックネーム(まだ分からなければ「あいて」)
         let name: String
         let done: Bool
@@ -184,8 +183,8 @@ struct WidgetContent: Equatable, Sendable {
             mode: .paired,
             plant: plant,
             streakDays: streak,
-            me: Person(emoji: snapshot.myPromiseEmoji, name: Strings.Widget.meFallbackLabel, done: snapshot.todayMeDone),
-            partner: Person(emoji: snapshot.partnerPromiseEmoji, name: spokenName, done: snapshot.todayPartnerDone),
+            me: Person(name: Strings.Widget.meFallbackLabel, done: snapshot.todayMeDone),
+            partner: Person(name: spokenName, done: snapshot.todayPartnerDone),
             progress: PlantProgress(snapshot: snapshot).map(barFraction),
             waitingMessage: waiting,
             partnerLeaf: leaf,

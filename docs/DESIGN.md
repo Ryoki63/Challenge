@@ -176,7 +176,7 @@ ios/Lien/
 - **「もう見せたか」の記録(`PlantMemory`)は、画面の状態ではなく見せた記録**なので、App Group ではなくアプリ本体の `UserDefaults` に置く(サーバーにも無く、ウィジェット・NSE は読まない。`PushTokenSync` の ledger と同じ扱い。サインアウト・アカウント削除で消す)。新しい版を初めて起動したときは、今の段階で静かに初期化し(過去の段階をさかのぼって祝わない)、取り消しで段階が戻ったあとに同じ段階へ上がっても、もう一度は見せない
 - ゲージの文(`GrowthGauge`)・区間の進み具合(`PlantProgress`)・VoiceOver の文(`PlantVoiceOver`)は、snapshot の新キー(`plantGrownDays` / `plantStageFloor` / `plantNextStageAt` — §3.4)だけから作る純粋関数で、**アプリは閾値表を持たない**(あとからサーバー側で閾値を下げても追従する)。新しいキーが無い snapshot・ソロではゲージを出さない。`PlantProgress`(のぞきを出す判定にも使う)は、描画の `PlantLayers` / `PlantCharacterView` と一緒に Lien / LienWidget でソース共有する(Foundation と PairSnapshot にだけ依存させる。T17a のウィジェットの「細い進み具合のバー」でも使う)
 - 名前付け(`PlantNamingModel` + `EdgeFunctionPlantNaming`): 最初の「ふたば」の演出の中か、ホームの「名前をつける」(名前が付くまで残る)から。409 `already_named` はエラーにせず、本文の `name` が**自分が送った名前と同じなら成功**、違えば**相手が先に付けた名前を採用**する(§5.3 plant-name の「クライアントの注意」)。端末の snapshot は名前だけを直す(サーバーの snapshot 全体では上書きしない — 未送信のチェックインの楽観状態を巻き戻さないため)。名前は相手が付けることもある(UGC)ので、長押しで通報・ブロックできる
-- 描画: `PlantHeroView`(植物・葉の下の約束の絵文字・名前・ゲージの文・ひとこと)・`PlantCelebrationView`(段階アップ・おかえりの全画面。ホームの上にオーバーレイで重ねる — シートにしないのは、設定・招待・通報の確認など他の表示と重なっても、先の表示が閉じるまで裏で待てるため)・`PlantNameSheet` / `PlantNameFormView`。REQUIREMENTS §3.9 の P1 のうち、のぞき・おかえり・今日のひとこと・ハートを送る(リアクションの ❤️ を使い回す)は実装済み。名前の相手名義の通知(サーバー側の push)は未実装
+- 描画: `PlantHeroView`(植物・名前・ゲージの文・ひとこと。葉の下の約束の絵文字は 2026-10-26 に UI から廃止)・`PlantCelebrationView`(段階アップ・おかえりの全画面。ホームの上にオーバーレイで重ねる — シートにしないのは、設定・招待・通報の確認など他の表示と重なっても、先の表示が閉じるまで裏で待てるため)・`PlantNameSheet` / `PlantNameFormView`。REQUIREMENTS §3.9 の P1 のうち、のぞき・おかえり・今日のひとこと・ハートを送る(リアクションの ❤️ を使い回す)は実装済み。名前の相手名義の通知(サーバー側の push)は未実装
 
 ### 3.4 App Group 共有契約(ウィジェットとの境界。変更時は要レビュー)
 

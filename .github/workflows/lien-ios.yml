@@ -24,6 +24,10 @@ on:
       - "products/lien/assets/plant/PlantAssets.xcassets/**"
       - "products/lien/assets/plant/layer_stacks.json"
       - "products/lien/assets/plant/peek_offsets.json"
+      # プロフィールのアバター12種のカタログは Lien ターゲットのリソース(project.yml が ../assets/avatar を参照)。
+      # アセット側だけの変更でも iOS ビルドが走るようにする。LienAvatarTests は並び順と名前の基準(avatars.json)も読むので、その変更でも走らせる
+      - "products/lien/assets/avatar/AvatarAssets.xcassets/**"
+      - "products/lien/assets/avatar/avatars.json"
       # アプリアイコンの正本。ios の AppIcon.appiconset と同一であることを ReleaseReadinessTests が検査する(issue #28)
       - "products/lien/assets/icon/**"
       # 罰なし文言の lint(StringsReviewTests)は、サーバー側の禁止ワード BANNED_PATTERN をこのファイルから読み、

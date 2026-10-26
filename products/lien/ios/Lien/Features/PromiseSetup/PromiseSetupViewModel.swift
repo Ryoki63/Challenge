@@ -1,8 +1,9 @@
 // PromiseSetupViewModel.swift — 約束設定画面の状態管理(T12 / REQUIREMENTS §3.3)
 //
-// - 入力: タイトル(20字・コードポイント数え=DB の char_length と一致)+絵文字(固定候補)
+// - 入力: タイトル(20字・コードポイント数え=DB の char_length と一致)
 //   +リマインド toggle(時刻のデフォルト 20:00。この remind_at が毎日のローカル通知の時刻になる — ReminderScheduler。
 //   保存したら onSaved の呼び出し元(AppModel.promiseSaved)が、端末の予約に反映する — T16 #16)
+//   絵文字は入力しない(2026-10-26 オーナー判断で UI から廃止)。サーバーが必須とするぶんは placeholderEmoji を送る
 // - save(): PromiseAPIClient.setPromise → 成功で App Group snapshot の
 //   myPromiseTitle / myPromiseEmoji を更新(ウィジェットへの楽観反映。正はサーバーで、
 //   次の GET /snapshot・push 同梱 snapshot で収束する — DESIGN §4)→ onSaved
@@ -28,10 +29,16 @@ final class PromiseSetupViewModel {
     static let defaultRemindHour = 20
     static let defaultRemindMinute = 0
 
+    /// サーバーへ送るだけの絵文字。**画面のどこにも出さない**。
+    /// 約束の絵文字は UI から廃止した(2026-10-26 オーナー判断)が、サーバーの promise-set は emoji を必須とする
+    /// (promise-set/core.ts: trim 後に空でない・PROMISE_EMOJI_MAX_LENGTH = 8 コードポイント以内)としていて、
+    /// 10/27 の提出前にはサーバーを変えられないため、クライアントが固定値を送る。
+    /// サーバー側で emoji が任意になったら、この定数ごと送信をやめる
+    static let placeholderEmoji = "🌱"
+
     // MARK: - 入力状態(View からバインド)
 
     var title = ""
-    var emoji = Strings.PromiseSetup.emojiPalette.first ?? "💪"
     var remindEnabled = true
     /// リマインド時刻(時・分のみ意味を持つ。DatePicker バインド用に Date で保持)
     var remindTime: Date
@@ -68,7 +75,6 @@ final class PromiseSetupViewModel {
         )
         if let existing {
             title = existing.title
-            emoji = existing.emoji
             if let parsed = Self.parseRemindAt(existing.remindAt, calendar: calendar) {
                 remindEnabled = true
                 remindTime = parsed
@@ -115,7 +121,7 @@ final class PromiseSetupViewModel {
         do {
             let promise = try await client.setPromise(
                 title: trimmedTitle,
-                emoji: emoji,
+                emoji: Self.placeholderEmoji,
                 remindAt: remindAtToSend
             )
             // ウィジェット表示用に snapshot へ楽観反映(失敗しても遷移は続行 —

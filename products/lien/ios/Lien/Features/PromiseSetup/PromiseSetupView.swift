@@ -1,6 +1,8 @@
 // PromiseSetupView.swift — 約束設定画面(T12 / REQUIREMENTS §3.3 / §6)
 //
-// タイトル入力+絵文字(固定候補)+リマインド toggle(デフォルト 20:00)の Form。
+// タイトル入力+リマインド toggle(デフォルト 20:00)の Form。
+// 約束の絵文字は UI から廃止した(2026-10-26 オーナー判断)。サーバーの promise-set が emoji 必須のため、
+// 保存時は PromiseSetupViewModel.placeholderEmoji を送る(画面のどこにも出さない)。
 // 文言は Strings.PromiseSetup に集約(View 内に直書きしない — DESIGN §3.8。罰なし原則)。
 // LienApp への結線は T13 ホーム画面の責務(本タスクでは独立フィーチャー — issue #12)。
 
@@ -41,10 +43,6 @@ struct PromiseSetupView: View {
                         .font(.footnote)
                         .foregroundStyle(.orange)
                 }
-            }
-
-            Section(Strings.PromiseSetup.emojiSectionTitle) {
-                EmojiPaletteGrid(selection: $viewModel.emoji)
             }
 
             Section(Strings.PromiseSetup.remindSectionTitle) {
@@ -89,38 +87,6 @@ struct PromiseSetupView: View {
         }
         .navigationTitle(Strings.PromiseSetup.title)
         .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-// MARK: - 絵文字パレット(固定候補から選択 — issue #12)
-
-private struct EmojiPaletteGrid: View {
-    @Binding var selection: String
-
-    private let columns = Array(repeating: GridItem(.flexible()), count: 8)
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(Strings.PromiseSetup.emojiPalette, id: \.self) { emoji in
-                Button {
-                    selection = emoji
-                } label: {
-                    Text(emoji)
-                        .font(.title2)
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(selection == emoji
-                                    ? Color.accentColor.opacity(0.2)
-                                    : Color.clear)
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(emoji)
-                .accessibilityAddTraits(selection == emoji ? .isSelected : [])
-            }
-        }
-        .padding(.vertical, 4)
     }
 }
 

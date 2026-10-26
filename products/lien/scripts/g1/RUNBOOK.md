@@ -128,7 +128,7 @@ curl -sS -X POST "https://lniheehfbtpfhglinfjm.supabase.co/functions/v1/checkin-
 - 証明書・プロファイルの secrets 管理が必要で手間が多い。Mac が使えるなら経路Aを推奨
 
 **push トークンの取得と登録**(T08準備②のハーネス実装済み):
-- アプリは通知許可後に APNs 登録を行う(オンボの通知許可直後+許可済みなら毎起動時に再登録)。**DEBUG ビルドではオンボ完了後の画面(solo/paired)に「Device Token(G1計測用)」**が hex 文字列で表示される(未取得時は「未取得(通知許可後に表示)」)
+- アプリは通知許可後に APNs 登録を行う(オンボの通知許可直後+許可済みなら毎起動時に再登録)。**DEBUG ビルドだけ、設定画面(ホームの歯車)のいちばん下の「開発用(DEBUG)」に「Device Token(G1計測用)」**が hex 文字列で表示される(未取得時は「未取得(通知許可後に表示)」。ホームと招待の画面には出さない。Release ビルドには含まれない)
 - 各端末で「コピー」を押してトークンを取得し、seed-pair.sh の引数(`PUSH_ENV=sandbox bash seed-pair.sh <tokenA> <tokenB>`。`PUSH_ENV` は Xcode 直インストール=sandbox / TestFlight=production)か、seed 出力末尾の PATCH コマンドで `users.push_token` と `users.push_env` に設定する(hex 文字列をそのまま渡してよい)
 - 計測に最低限必要なのは**デバイスB(観察側)のトークンのみ**(push は A→B 方向)
 

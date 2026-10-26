@@ -47,6 +47,7 @@ exclude_from_module() {
     Lien/Core/PushManager.swift) return 0 ;;                # UIKit・UserNotifications(stubs/PushAuthorizingStub.swift が代わり)
     Lien/Core/DesignSystem/Colors.swift) return 0 ;;        # UIKit(views で macOS 用に書き換えて型検査する)
     Lien/Core/DesignSystem/PlantCharacterView.swift) return 0 ;;  # SwiftUI の View
+    Lien/Core/DesignSystem/AvatarPicker.swift) return 0 ;;  # SwiftUI の View(Colors.swift の LienColors を使う。views で型検査する。LienAvatar.swift は enum と AvatarImage だけなので module に入れる)
     Lien/Core/Widget/Views/*) return 0 ;;                   # SwiftUI の View(ウィジェットの S / M / ロック画面。views で型検査する)
     Lien/Features/Debug/*) return 0 ;;                      # UIKit
     Lien/Features/Pairing/QRCodeGenerator.swift) return 0 ;; # UIImage
@@ -59,12 +60,13 @@ exclude_from_module() {
 #   AppServicesTests / ConfigTests : AppServices+Live.swift(supabase-swift)を使う
 #   PlantRenderTests / PlantLayersTests / HomeRenderChecksTests / NotificationSettingsRenderTests / WidgetRenderTests(と、その台紙・道具 WidgetRenderSheets / WidgetRenderSupport): アセットカタログ・SwiftUI の描画・UIKit のウィンドウと色・XCTAttachment を使う
 #   ShareImageRenderTests : シェア画像の実描画(ImageRenderer・アセットカタログ・XCTAttachment)。T22
+#   LienAvatarTests : アバターのイラスト12種の描画(ImageRenderer・UIImage・アセットカタログ)と選ぶ画面 AvatarPicker(module に入れない View)
 #   StoreScreenshotRenderTests(と、その枠 StoreScreenshotFrames): ストア用スクリーンショットの実描画。画面の View
 #     (HomeView / HistoryView / WidgetRootView / ShareImageCardView)を実寸で描くので、module だけでは型が足りない。issue #80
 #   DeviceTokenStoreTests : AppDelegate.swift(UIKit)を使う
 #   QRCodeGeneratorTests : QRCodeGenerator.swift(UIImage)を使う
 #   SmokeTests : アプリ本体のバンドルの前提
-EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSheets WidgetRenderSupport ShareImageRenderTests PaywallRenderTests StoreScreenshotRenderTests StoreScreenshotFrames UIReviewRenderTests DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
+EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSheets WidgetRenderSupport ShareImageRenderTests LienAvatarTests PaywallRenderTests StoreScreenshotRenderTests StoreScreenshotFrames UIReviewRenderTests DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
 
 is_excluded_test() {
   local name="$1" e

@@ -3,11 +3,12 @@
 // ペア成立中:
 //   ┌────────────────────────┐
 //   │ [植物 3:4]   🔥 23日    │   植物(ふたりの葉 = 今日の2人。左 = 自分・右 = 相手)
-//   │              💪 🏃      │   右の列: ストリーク + 2人の今日の状態(○×の補助。葉の意味が伝わるまで残す)
-//   │              ✓  ○      │
+//   │              ✓ じぶん   │   右の列: ストリーク + 2人の今日の状態(○×+呼び名。葉の意味が伝わるまで残す)。
+//   │              ○ ゆうき   │   列が狭い(46〜56pt)ので、縦に重ねる(自分が上)
 //   │ ゆうきが待ってるよ       │   相手が先に完了していれば(出ないときも行を空ける)
 //   │ ▬▬▬▬▬▬────────────      │   細い進み具合のバー(数字なし。新しいキーが無いときは出さない)
 //   └────────────────────────┘
+// 約束の絵文字は出さない(2026-10-26 オーナー判断で UI から廃止)。誰の状態かは絵文字の代わりに呼び名で示す。
 // ソロ・データ無し: 眠るタネの子+一言(「ペアになると、タネの子が目をさますよ」/「アプリを開いてはじめよう」)。
 //
 // 寸法は WidgetSmallMetrics(内側の大きさから決める。システムの余白 16pt は、描く側の外 = LienWidget が受け持つ)。
@@ -43,7 +44,7 @@ struct WidgetSmallView: View {
                         WidgetStreakLabel(days: days)
                     }
                     if let me = content.me, let partner = content.partner {
-                        WidgetStatusChips(me: me, partner: partner, spacing: 6)
+                        WidgetStatusChips(me: me, partner: partner, arrangement: .vertical, spacing: 4)
                     }
                 }
                 .frame(width: metrics.columnWidth, alignment: .leading)

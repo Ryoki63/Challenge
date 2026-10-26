@@ -1,6 +1,6 @@
 // HomeViewModel+Plant.swift — ホームの植物まわりの導出(issue #57 / docs/GROWTH.md §4.5・§5.1・§5.3・§5.4)
 //
-// ゲージの文・VoiceOver の読み上げ文・葉の下の約束の絵文字・植物の名前・名前付けの導線・ひとこと・ハートは、
+// ゲージの文・VoiceOver の読み上げ文・植物の名前・名前付けの導線・ひとこと・ハートは、
 // snapshot からの純粋な導出(状態を持たない)。HomeViewModel.swift を 300 行の目安(DESIGN §9-4)に近づけるため、ここに分けた。
 
 import Foundation
@@ -14,12 +14,6 @@ extension HomeViewModel {
     /// 植物の VoiceOver の読み上げ文(GROWTH §5.4)。snapshot が無い空状態は nil(装飾画像として隠す)
     var plantAccessibilityText: String? {
         snapshot.map(PlantVoiceOver.label(for:))
-    }
-
-    /// 葉の下に小さく置く約束の絵文字(左 = 自分 / 右 = 相手 — GROWTH §4.5)。ソロは葉が無いので置かない
-    var leafEmojis: (me: String?, partner: String?) {
-        guard let snapshot, snapshot.pairId != nil else { return (nil, nil) }
-        return (snapshot.myPromiseEmoji, snapshot.partnerPromiseEmoji)
     }
 
     /// ホームに出す植物の名前(ペアの鉢の名前だけ。ソロには名前を出さない)

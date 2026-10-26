@@ -2,7 +2,7 @@
 //
 //   [吹き出し: 今日のひとこと]         ← 植物の上(レイアウトを動かさない。数秒で消える。植物のタップでもう一度。
 //                                        VoiceOver には、アクション「タネの子のひとこと」と、出すたびの読み上げ)
-//   [植物(ふたりの葉の下に約束の絵文字)]  ← 片方だけ完了のときは小さく揺れる(プレートは揺らさない)
+//   [植物]                             ← 片方だけ完了のときは小さく揺れる(プレートは揺らさない)
 //   名前(タップで変える)/「名前をつける」
 //   名前の知らせ(「名前が『みどり』にかわったよ」)
 //   ゲージの文(「ふたりそろって あと2回で めばえ」)
@@ -20,9 +20,6 @@ struct PlantHeroView: View {
     let sways: Bool
     /// 植物の VoiceOver の読み上げ文。nil なら装飾画像として隠す
     var accessibilityText: String?
-    /// 葉の下の約束の絵文字(左 = 自分 / 右 = 相手 — GROWTH §4.5)
-    var meEmoji: String?
-    var partnerEmoji: String?
     /// 植物の名前(ペアの鉢の名前。無ければ名前の行を出さない)
     var plantName: String?
     /// 名前の行をタップして変えられる / 「名前をつける」を出す
@@ -55,8 +52,6 @@ struct PlantHeroView: View {
         VStack(spacing: LienSpacing.s) {
             PlantCharacterView(
                 state: state,
-                meEmoji: meEmoji,
-                partnerEmoji: partnerEmoji,
                 swayDegrees: swayAngle,
                 accessibilityText: accessibilityText
             )

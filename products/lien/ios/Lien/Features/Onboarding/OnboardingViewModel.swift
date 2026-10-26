@@ -27,7 +27,9 @@ final class OnboardingViewModel {
     // MARK: - 入力状態(View からバインド)
 
     var nickname = ""
-    var avatarEmoji = Strings.Onboarding.avatarPalette.first ?? "🌱"
+    /// 選んだアイコン(タネの子のイラスト12種。最初は既定の「ふたば」)。
+    /// 送信するときは id(rawValue)を、サーバーの avatar_emoji 列に入れる
+    var avatar: LienAvatar = .defaultAvatar
     /// 利用規約とプライバシーポリシーに同意したか(チェック)。入るまで送信できない
     var agreedToTerms = false
 
@@ -102,7 +104,7 @@ final class OnboardingViewModel {
             }
             try await authService.updateProfile(
                 nickname: trimmedNickname,
-                avatarEmoji: avatarEmoji,
+                avatarEmoji: avatar.rawValue,
                 timezone: TimeZone.current.identifier
             )
             step = .notification

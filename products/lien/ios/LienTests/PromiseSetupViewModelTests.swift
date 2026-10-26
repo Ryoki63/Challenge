@@ -88,9 +88,45 @@ final class PromiseSetupViewModelTests: XCTestCase {
 
         XCTAssertTrue(vm.remindEnabled)
         XCTAssertEqual(vm.remindAtToSend, "20:00", "リマインドのデフォルトは 20:00")
-        XCTAssertEqual(vm.emoji, Strings.PromiseSetup.emojiPalette.first)
         XCTAssertEqual(vm.titleError, .empty) // 未入力では送信不可
         XCTAssertFalse(vm.canSave)
+    }
+
+    // MARK: 約束の絵文字(2026-10-26 オーナー判断で UI から廃止。サーバーが必須とするぶんは固定値を送る)
+
+    func testPlaceholderEmojiSatisfiesTheServerContract() {
+        // サーバー promise-set/core.ts: emoji は trim 後に空でなく、PROMISE_EMOJI_MAX_LENGTH(8)コードポイント以内。
+        // どちらかを外れると、約束の保存がすべて invalid_emoji で失敗する
+        let placeholder = PromiseSetupViewModel.placeholderEmoji
+        XCTAssertFalse(placeholder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        XCTAssertLessThanOrEqual(placeholder.unicodeScalars.count, 8)
+    }
+
+    func testSaveAlwaysSendsThePlaceholderEmoji() async {
+        let client = MockPromiseAPIClient()
+        client.result = .success(makePromise(emoji: PromiseSetupViewModel.placeholderEmoji))
+        let vm = makeViewModel(client: client)
+        vm.title = "まいにち散歩"
+
+        await vm.save()
+
+        XCTAssertEqual(client.callCount, 1)
+        XCTAssertEqual(client.lastEmoji, PromiseSetupViewModel.placeholderEmoji, "画面で選ばせない代わりに、固定値を送る")
+    }
+
+    func testEditingAnExistingPromiseAlsoSendsThePlaceholderEmoji() async {
+        // 以前の版で選んだ絵文字(🧘)が残っていても、編集の保存は固定値を送る(絵文字は画面のどこにも出ない)
+        let existing = makePromise(title: "あさストレッチ", emoji: "🧘", remindAt: "07:30")
+        let client = MockPromiseAPIClient()
+        client.result = .success(makePromise(title: "あさストレッチ", emoji: PromiseSetupViewModel.placeholderEmoji, remindAt: "07:30"))
+        let vm = makeViewModel(client: client, existing: existing)
+
+        await vm.save()
+
+        XCTAssertEqual(client.callCount, 1)
+        XCTAssertEqual(client.lastTitle, "あさストレッチ")
+        XCTAssertEqual(client.lastEmoji, PromiseSetupViewModel.placeholderEmoji)
+        XCTAssertEqual(client.lastRemindAt, "07:30", "リマインド時刻は読んだままを送る")
     }
 
     // MARK: バリデーション(DB の char_length と同じコードポイント数え — §3.3 20字)
@@ -135,18 +171,17 @@ final class PromiseSetupViewModelTests: XCTestCase {
         var saved: [Promise] = []
         let vm = makeViewModel(client: client, store: store) { saved.append($0) }
         vm.title = "  まいにち散歩\n"
-        vm.emoji = "🚶"
 
         await vm.save()
 
         XCTAssertEqual(client.callCount, 1)
         XCTAssertEqual(client.lastTitle, "まいにち散歩", "trim してから送る")
-        XCTAssertEqual(client.lastEmoji, "🚶")
+        XCTAssertEqual(client.lastEmoji, PromiseSetupViewModel.placeholderEmoji, "絵文字は画面で選ばせない。固定値を送る")
         XCTAssertEqual(client.lastRemindAt, "20:00")
         XCTAssertEqual(saved, [promise])
         XCTAssertNil(vm.saveErrorMessage)
 
-        // snapshot の自分の約束だけが更新され、ほかのフィールドは保たれる
+        // snapshot の自分の約束だけが更新され、ほかのフィールドは保たれる(絵文字はサーバーが返した値をそのまま反映する)
         let snapshot = store.loadSnapshot()
         XCTAssertEqual(snapshot?.myPromiseTitle, "まいにち散歩")
         XCTAssertEqual(snapshot?.myPromiseEmoji, "🚶")
@@ -166,7 +201,6 @@ final class PromiseSetupViewModelTests: XCTestCase {
 
         let vm = makeViewModel(client: client, store: store)
         vm.title = "よる読書"
-        vm.emoji = "📚"
         vm.remindEnabled = false
 
         await vm.save()
@@ -220,7 +254,6 @@ final class PromiseSetupViewModelTests: XCTestCase {
         let vm = makeViewModel(client: MockPromiseAPIClient(), existing: existing)
 
         XCTAssertEqual(vm.title, "あさストレッチ")
-        XCTAssertEqual(vm.emoji, "🧘")
         XCTAssertTrue(vm.remindEnabled)
         XCTAssertEqual(vm.remindAtToSend, "07:30")
 

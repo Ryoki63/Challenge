@@ -118,7 +118,7 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(rig.vm.profile, UserProfile(nickname: "あきら", avatarEmoji: "🌱"))
         XCTAssertEqual(rig.vm.promise, savedPromise, "リマインド時刻まで含めた元の値")
         XCTAssertTrue(rig.vm.canEditPromise)
-        XCTAssertEqual(rig.vm.promiseSummary, "💪 筋トレ")
+        XCTAssertEqual(rig.vm.promiseSummary, "筋トレ", "約束の絵文字は画面に出さない(2026-10-26 オーナー判断。データには残る)")
         XCTAssertEqual(rig.vm.versionText, "1.0.0 (7)")
     }
 
@@ -170,9 +170,19 @@ final class SettingsViewModelTests: XCTestCase {
 
         XCTAssertEqual(rig.vm.loadState, .loaded)
         XCTAssertEqual(rig.vm.promise?.title, "筋トレ")
-        XCTAssertEqual(rig.vm.promise?.emoji, "💪")
+        XCTAssertEqual(rig.vm.promise?.emoji, "💪", "データとしては残す(サーバーの promise-set が emoji を必須とするため)")
         XCTAssertNil(rig.vm.promise?.remindAt)
         XCTAssertTrue(rig.vm.canEditPromise)
+        XCTAssertEqual(rig.vm.promiseSummary, "筋トレ", "絵文字は含めない")
+    }
+
+    func testPromiseSummaryFromTheSnapshotAloneHasNoEmoji() throws {
+        // サーバーの約束が読めていない(load 前)間は、snapshot の値から表示する。ここでも絵文字は付けない
+        let rig = try makeRig(snapshot: SnapshotFactory.solo())
+        defer { rig.temp.cleanup() }
+
+        XCTAssertNil(rig.vm.promise)
+        XCTAssertEqual(rig.vm.promiseSummary, "筋トレ")
     }
 
     func testNoPromiseAnywhereShowsNothingToEdit() async throws {
@@ -196,7 +206,7 @@ final class SettingsViewModelTests: XCTestCase {
         rig.vm.promiseSaved(Promise(id: "p-1", title: "ランニング", emoji: "🏃", remindAt: nil))
 
         XCTAssertEqual(rig.vm.promise?.title, "ランニング")
-        XCTAssertEqual(rig.vm.promiseSummary, "🏃 ランニング")
+        XCTAssertEqual(rig.vm.promiseSummary, "ランニング")
         XCTAssertTrue(rig.vm.showsPromiseSavedNote)
     }
 
@@ -230,13 +240,13 @@ final class SettingsViewModelTests: XCTestCase {
         let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
 
         XCTAssertEqual(editor.nickname, "あきら")
-        XCTAssertEqual(editor.avatarEmoji, "🌱")
+        XCTAssertEqual(editor.avatar, .sprout)
         XCTAssertNil(editor.nicknameError)
         XCTAssertFalse(editor.hasChanges)
         XCTAssertFalse(editor.canSave, "変更が無ければ保存ボタンは押せない")
     }
 
-    func testProfileEditorWithoutAnAvatarStartsWithThePaletteHead() async throws {
+    func testProfileEditorWithoutAnAvatarStartsWithTheDefaultAvatar() async throws {
         let rig = try makeRig()
         defer { rig.temp.cleanup() }
         rig.auth.profileResult = .success(UserProfile(nickname: "あきら", avatarEmoji: ""))
@@ -244,8 +254,42 @@ final class SettingsViewModelTests: XCTestCase {
 
         let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
 
-        XCTAssertEqual(editor.avatarEmoji, Strings.Onboarding.avatarPalette.first)
+        XCTAssertEqual(editor.avatar, .defaultAvatar)
         XCTAssertTrue(editor.hasChanges, "アイコン未設定だった人は、初期のアイコンを選んだまま保存できる")
+    }
+
+    func testProfileEditorReadsALegacyEmojiAsTheCloseIllustration() async throws {
+        // イラストに替わる前の版が保存した絵文字(avatar_emoji 列に残っている)は、近いイラストとして読む
+        let rig = try makeRig()
+        defer { rig.temp.cleanup() }
+        rig.auth.profileResult = .success(UserProfile(nickname: "あきら", avatarEmoji: "🌷"))
+        await rig.vm.load()
+
+        let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
+
+        XCTAssertEqual(editor.avatar, .tulip)
+        XCTAssertFalse(editor.hasChanges, "近いイラストを選んだままなら、変更なし(開いただけで保存ボタンが押せるようにしない)")
+        editor.avatar = .sprout
+        XCTAssertTrue(editor.canSave)
+        editor.avatar = .tulip
+        XCTAssertFalse(editor.canSave)
+    }
+
+    func testProfileEditorWithAnEmojiThatHasNoIllustrationStartsWithTheDefaultAndSavesTheId() async throws {
+        // 動物の絵文字など、対応するイラストが無い旧版の値は、既定の絵から始める。そのまま保存すれば id に置き換わる
+        let rig = try makeRig()
+        defer { rig.temp.cleanup() }
+        rig.auth.profileResult = .success(UserProfile(nickname: "あきら", avatarEmoji: "🐶"))
+        await rig.vm.load()
+        let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
+        XCTAssertEqual(editor.avatar, .defaultAvatar)
+        XCTAssertTrue(editor.canSave, "既定の絵のままでも、保存して id に置き換えられる")
+
+        let saved = await editor.save()
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(rig.auth.nicknameUpdates.first?.avatarEmoji, "sprout")
+        XCTAssertFalse(editor.hasChanges, "保存した後は、保存した絵が基準になる")
     }
 
     func testProfileEditorValidatesLikeOnboarding() async throws {
@@ -286,9 +330,9 @@ final class SettingsViewModelTests: XCTestCase {
         editor.nickname = "あきら"
         XCTAssertFalse(editor.canSave, "元に戻したら、変更なし")
 
-        editor.avatarEmoji = "🐶"
+        editor.avatar = .cactus
         XCTAssertTrue(editor.canSave, "アイコンだけの変更も保存できる")
-        editor.avatarEmoji = "🌱"
+        editor.avatar = .sprout
         XCTAssertFalse(editor.canSave)
 
         editor.nickname = "あきら  " // 空白を足しただけ(トリム後は同じ)
@@ -300,21 +344,21 @@ final class SettingsViewModelTests: XCTestCase {
         defer { rig.temp.cleanup() }
         let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
         editor.nickname = "  はる  "
-        editor.avatarEmoji = "🐶"
+        editor.avatar = .cactus
 
         let saved = await editor.save()
 
         XCTAssertTrue(saved)
         XCTAssertEqual(rig.auth.nicknameUpdates.count, 1)
         XCTAssertEqual(rig.auth.nicknameUpdates.first?.nickname, "はる")
-        XCTAssertEqual(rig.auth.nicknameUpdates.first?.avatarEmoji, "🐶")
+        XCTAssertEqual(rig.auth.nicknameUpdates.first?.avatarEmoji, "cactus", "サーバーには絵文字ではなくアイコンの id を送る")
         XCTAssertEqual(rig.auth.fullProfileUpdates, 0, "timezone を端末の値で上書きする更新口は使わない")
         XCTAssertNil(editor.errorMessage)
         XCTAssertEqual(editor.nickname, "はる", "画面の値も保存した値(空白なし)に揃う")
         XCTAssertFalse(editor.hasChanges)
         XCTAssertFalse(editor.canSave, "保存済みなので、もう一度は押せない")
         // 設定画面の表示も新しい値になり、保存の一言が出る
-        XCTAssertEqual(rig.vm.profile, UserProfile(nickname: "はる", avatarEmoji: "🐶"))
+        XCTAssertEqual(rig.vm.profile, UserProfile(nickname: "はる", avatarEmoji: "cactus"))
         XCTAssertTrue(rig.vm.showsProfileSavedNote)
     }
 
@@ -323,7 +367,7 @@ final class SettingsViewModelTests: XCTestCase {
         defer { rig.temp.cleanup() }
         let editor = try XCTUnwrap(rig.vm.makeProfileEditor())
         editor.nickname = "はる"
-        editor.avatarEmoji = "🐶"
+        editor.avatar = .cactus
         rig.auth.nicknameUpdateError = Offline()
 
         let saved = await editor.save()
@@ -331,7 +375,7 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertFalse(saved)
         XCTAssertEqual(editor.errorMessage, Strings.Settings.profileSaveError)
         XCTAssertEqual(editor.nickname, "はる", "入力はそのまま残る")
-        XCTAssertEqual(editor.avatarEmoji, "🐶")
+        XCTAssertEqual(editor.avatar, .cactus)
         XCTAssertEqual(rig.vm.profile, UserProfile(nickname: "あきら", avatarEmoji: "🌱"), "失敗したら、設定画面の表示は変えない")
         XCTAssertFalse(rig.vm.showsProfileSavedNote)
         XCTAssertTrue(editor.canSave, "もう一度できる")
@@ -341,7 +385,7 @@ final class SettingsViewModelTests: XCTestCase {
 
         XCTAssertTrue(retried)
         XCTAssertNil(editor.errorMessage, "成功したらエラーの一言は消える")
-        XCTAssertEqual(rig.vm.profile, UserProfile(nickname: "はる", avatarEmoji: "🐶"))
+        XCTAssertEqual(rig.vm.profile, UserProfile(nickname: "はる", avatarEmoji: "cactus"))
         XCTAssertTrue(rig.vm.showsProfileSavedNote)
     }
 

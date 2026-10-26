@@ -120,10 +120,12 @@ final class WidgetContentTests: XCTestCase {
         }
     }
 
-    func testPeopleCarryTheirPromiseEmojiAndAName() {
+    func testPeopleCarryANameAndTodaysState() {
+        // 約束の絵文字は持たない(2026-10-26 オーナー判断で UI から廃止)。誰の状態かは呼び名で示す。
+        // snapshot に絵文字が残っていても(paired の見本には 💪 / 🏃 が入っている)、内容には出ない
         let content = WidgetContent(snapshot: paired(me: true))
-        XCTAssertEqual(content.me, WidgetContent.Person(emoji: "💪", name: Strings.Widget.meFallbackLabel, done: true))
-        XCTAssertEqual(content.partner, WidgetContent.Person(emoji: "🏃", name: "ゆうき", done: false))
+        XCTAssertEqual(content.me, WidgetContent.Person(name: Strings.Widget.meFallbackLabel, done: true))
+        XCTAssertEqual(content.partner, WidgetContent.Person(name: "ゆうき", done: false))
     }
 
     func testAnUnknownPartnerNameFallsBackToTheGenericLabel() {

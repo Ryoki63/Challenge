@@ -1,0 +1,50 @@
+[
+  {
+    "id": "sprout",
+    "name_ja": "ふたば"
+  },
+  {
+    "id": "cactus",
+    "name_ja": "サボテン"
+  },
+  {
+    "id": "star",
+    "name_ja": "ほし"
+  },
+  {
+    "id": "mushroom",
+    "name_ja": "きのこ"
+  },
+  {
+    "id": "clover",
+    "name_ja": "クローバー"
+  },
+  {
+    "id": "moon",
+    "name_ja": "つき"
+  },
+  {
+    "id": "tulip",
+    "name_ja": "チューリップ"
+  },
+  {
+    "id": "sunflower",
+    "name_ja": "ひまわり"
+  },
+  {
+    "id": "acorn",
+    "name_ja": "どんぐり"
+  },
+  {
+    "id": "sakura",
+    "name_ja": "さくら"
+  },
+  {
+    "id": "strawberry",
+    "name_ja": "いちご"
+  },
+  {
+    "id": "drop",
+    "name_ja": "しずく"
+  }
+]

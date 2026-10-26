@@ -161,16 +161,29 @@ final class OnboardingViewModelTests: XCTestCase {
         let vm = makeViewModel(auth: auth, push: MockPushAuthorizer())
         vm.advanceFromConcept()
         vm.nickname = "  ゆき  "
-        vm.avatarEmoji = "🐰"
+        vm.avatar = .cactus
         await vm.submitProfile()
 
         XCTAssertEqual(auth.signInCallCount, 1)
         XCTAssertEqual(auth.lastNickname, "ゆき") // トリム済みで送信
-        XCTAssertEqual(auth.lastAvatarEmoji, "🐰")
+        XCTAssertEqual(auth.lastAvatarEmoji, "cactus", "サーバーには絵文字ではなくアイコンの id を送る")
         XCTAssertEqual(auth.lastTimezone, TimeZone.current.identifier)
         XCTAssertEqual(vm.step, .notification)
         XCTAssertNil(vm.submitErrorMessage)
         XCTAssertFalse(vm.isSubmitting)
+    }
+
+    func testSubmitProfileSendsTheDefaultAvatarWhenNothingWasPicked() async {
+        // アイコンを選ばずに進んだ人にも、最初から選ばれている「ふたば」の id が保存される(空のまま送らない)
+        let auth = MockAuthService()
+        let vm = makeViewModel(auth: auth, push: MockPushAuthorizer())
+        vm.advanceFromConcept()
+        vm.nickname = "ゆき"
+        XCTAssertEqual(vm.avatar, .defaultAvatar)
+        await vm.submitProfile()
+
+        XCTAssertEqual(auth.lastAvatarEmoji, LienAvatar.defaultAvatar.rawValue)
+        XCTAssertEqual(auth.lastAvatarEmoji, "sprout")
     }
 
     func testSubmitProfileSignsInOnlyOnceAcrossRetries() async {

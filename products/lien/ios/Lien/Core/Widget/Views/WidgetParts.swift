@@ -2,6 +2,7 @@
 //
 // ホーム S / M が共有する。内容(WidgetContent)を受け取って描くだけで、状態を持たない。
 // 表示原則(REQUIREMENTS §3.10): 自分未完 = 自分側をグレー(2人のチップは、未完を落とす。ホームの TodayChip と同じ)。
+// チップは「完了のチェック+呼び名」(約束の絵文字は 2026-10-26 に UI から廃止)。
 // 数字はストリークだけ(GROWTH §5.4): 進み具合のバーは長さだけで、数字も文も持たない。
 // 文言は Strings.Widget(DESIGN §3.8)。色は下の WidgetStyle に集約する(植物の絵のパレット tools/gen_v4.py の緑)。
 
@@ -66,45 +67,52 @@ struct WidgetStreakLabel: View {
 
 // MARK: - 2人の今日の状態
 
-/// 1人分の今日の状態。約束の絵文字+完了のチェック(M では呼び名も)。未完 = 落とした表示(グレー・薄く)
+/// 1人分の今日の状態。完了のチェック+呼び名(「じぶん」「ゆうき」)の1行。未完 = 落とした表示(グレー・薄く)。
+/// 約束の絵文字は出さない(2026-10-26 オーナー判断で UI から廃止)。誰の状態かは、絵文字の代わりに呼び名で示す(名前は1回だけ)
 struct WidgetStatusChip: View {
     let person: WidgetContent.Person
-    /// 呼び名(「じぶん」「ゆうき」)を添える(ホーム M)
-    var showsName = false
 
     var body: some View {
-        VStack(spacing: 2) {
-            // 狭い列(iPhone SE の S)や大きい文字でも、絵文字が欠けないよう、縮めて収める
-            Text(person.emoji ?? "・")
-                .font(.body)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            if showsName {
-                Text(person.name)
-                    .font(.caption2)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
+        HStack(spacing: 3) {
             // 完了の緑・未完のグレーも、色合い(accented)表示で単色にしない(形と濃さでも見分けられる)
             WidgetImageStyle.fullColor(Image(systemName: person.done ? "checkmark.circle.fill" : "circle"))
                 .font(.caption)
                 .foregroundStyle(person.done ? WidgetStyle.done : WidgetStyle.pending)
+            // 狭い列(iPhone SE の S)や大きい文字でも、文字が欠けないよう、縮めて収める(収まらない長い名前は末尾を省く)
+            Text(person.name)
+                .font(.caption2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .opacity(person.done ? 1.0 : WidgetStyle.pendingOpacity)
     }
 }
 
-/// 自分・相手の2つのチップ(左 = 自分 / 右 = 相手 — ふたりの葉と同じ並び。GROWTH §4.5)
+/// 自分・相手の2つのチップ(自分が先 = 左 / 上 — ふたりの葉の並び(左 = 自分・右 = 相手)と同じ向き。GROWTH §4.5)
 struct WidgetStatusChips: View {
+    /// 並べる向き。S は右の列が狭い(46〜56pt)ので縦に重ね、M は横に並べる
+    enum Arrangement {
+        case horizontal
+        case vertical
+    }
+
     let me: WidgetContent.Person
     let partner: WidgetContent.Person
-    var showsNames = false
+    var arrangement: Arrangement = .horizontal
     var spacing: CGFloat = 8
 
     var body: some View {
-        HStack(alignment: .top, spacing: spacing) {
-            WidgetStatusChip(person: me, showsName: showsNames)
-            WidgetStatusChip(person: partner, showsName: showsNames)
+        switch arrangement {
+        case .horizontal:
+            HStack(alignment: .top, spacing: spacing) {
+                WidgetStatusChip(person: me)
+                WidgetStatusChip(person: partner)
+            }
+        case .vertical:
+            VStack(alignment: .leading, spacing: spacing) {
+                WidgetStatusChip(person: me)
+                WidgetStatusChip(person: partner)
+            }
         }
     }
 }

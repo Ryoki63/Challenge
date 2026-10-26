@@ -63,7 +63,9 @@ final class ReminderPlanTests: XCTestCase {
         for item in planned {
             XCTAssertEqual(item.title, Strings.LocalNotification.title)
             XCTAssertTrue(item.body.contains("筋トレ"), "約束の名前が入る: \(item.body)")
-            XCTAssertTrue(item.body.hasSuffix("💪"), "約束の絵文字が末尾に付く: \(item.body)")
+            // 約束の絵文字は UI から廃止した(2026-10-26)。snapshot に絵文字が残っていても、文言には付けない
+            XCTAssertFalse(item.body.contains("💪"), "約束の絵文字は文言に付けない: \(item.body)")
+            XCTAssertFalse(item.body.unicodeScalars.contains { $0.properties.isEmojiPresentation }, item.body)
         }
     }
 
@@ -158,19 +160,25 @@ final class ReminderPlanTests: XCTestCase {
         let variants = Set(first.map(\.body))
         XCTAssertEqual(variants.count, 3, "14 日で 3 つの言い回しを回す: \(variants)")
         XCTAssertTrue(
-            variants.contains("今日の『筋トレ』、まだ間に合うよ💪"),
-            "REQUIREMENTS §3.12 の例の言い回しが入っている"
+            variants.contains("今日の『筋トレ』、まだ間に合うよ"),
+            "REQUIREMENTS §3.12 の例の言い回しが入っている(約束の絵文字は 2026-10-26 に UI から廃止したので付けない)"
         )
     }
 
-    func testReminderOmitsAnEmptyEmojiAndTrimsTheTitle() {
+    func testReminderTrimsTheTitleAndDoesNotDependOnTheSnapshotEmoji() {
         let now = Clock.date(2026, 10, 14, 12, 0)
-        let snapshot = NotificationSnapshots.paired(updatedAt: now, title: "  筋トレ  ", emoji: nil)
-        for item in reminders(plan(snapshot: snapshot, now: now)) {
-            XCTAssertTrue(item.body.contains("『筋トレ』"), item.body)
-            XCTAssertFalse(item.body.contains("  "), item.body)
-            XCTAssertTrue(item.body.hasSuffix("よ") || item.body.hasSuffix("ぶ") || item.body.hasSuffix("?"), item.body)
+        let withoutEmoji = NotificationSnapshots.paired(updatedAt: now, title: "  筋トレ  ", emoji: nil)
+        let bodies = reminders(plan(snapshot: withoutEmoji, now: now)).map(\.body)
+        XCTAssertEqual(bodies.count, 14)
+        for body in bodies {
+            XCTAssertTrue(body.contains("『筋トレ』"), body)
+            XCTAssertFalse(body.contains("  "), body)
+            XCTAssertTrue(body.hasSuffix("よ") || body.hasSuffix("ぶ") || body.hasSuffix("?"), body)
         }
+
+        // 約束の絵文字は UI から廃止した(2026-10-26)。snapshot に絵文字が残っていても、文言は変わらない
+        let withEmoji = NotificationSnapshots.paired(updatedAt: now, title: "  筋トレ  ", emoji: "💪")
+        XCTAssertEqual(reminders(plan(snapshot: withEmoji, now: now)).map(\.body), bodies)
     }
 
     // MARK: - ストリーク危機(夜 9 時)

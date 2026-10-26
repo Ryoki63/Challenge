@@ -22,8 +22,8 @@ struct WidgetSmallMetrics: Equatable {
     static let columnGap: CGFloat = 8
     /// 植物の幅の上限(内側の幅に対する割合)
     static let plantWidthShare: CGFloat = 0.54
-    /// 右の列(ストリーク「🔥 128日」と、2人の絵文字+チェックを並べたもの)に確保する最小の幅。狭い機種(iPhone SE の内側は 109pt)でも
-    /// 絵文字が欠けないよう、足りないぶんは植物の幅から削る(これより狭いと、絵文字は縮めて収める — WidgetStatusChip)
+    /// 右の列(ストリーク「🔥 128日」と、2人のチェック+呼び名を縦に重ねたもの)に確保する最小の幅。狭い機種(iPhone SE の内側は 109pt)でも
+    /// 呼び名が欠けないよう、足りないぶんは植物の幅から削る(これより狭いと、呼び名は縮めて収める — WidgetStatusChip)
     static let minColumnWidth: CGFloat = 46
     /// 一言の行の高さ(.caption2 の1行。出ないときも空けておく — 植物の大きさを状態で変えない)
     static let captionHeight: CGFloat = 14

@@ -3,7 +3,7 @@
 // ホームの歯車から開くシートの中身(NavigationStack は SettingsSheetView)。
 //   プロフィール(ニックネームとアイコン。編集は ProfileEditView)/ 約束(編集は約束設定の画面)/ 通知(リマインド・ストリーク危機。NotificationSettingsView)/
 //   ペア(相手の名前・ペアを解消する)/ サポート(お問い合わせ・通報・利用規約・プライバシーポリシー)/
-//   アカウント(サインアウト・アカウントを削除する)
+//   アカウント(サインアウト・アカウントを削除する)/ 開発用(DEBUG ビルドだけ・いちばん下。APNs トークンの表示とコピー — DeviceTokenDebugView)
 // 取り消せない操作(ペアの解消・アカウントの削除)は、説明の画面(push)→ 最後のアラートの2段階
 // (DestructiveFlow / DestructiveConfirmView)。文言は Strings.Settings ほか、色・余白は DesignSystem の定数(DESIGN §3.8)。
 
@@ -58,6 +58,10 @@ struct SettingsView: View {
             pairSection
             supportSection
             accountSection
+            #if DEBUG
+            // APNs トークンの表示・コピー(G1 計測用)。普段の画面には出さず、ここ(最下部)だけ。Release には含まれない
+            DeviceTokenDebugView()
+            #endif
         }
         .navigationTitle(Strings.Settings.title)
         #if os(iOS)
@@ -106,10 +110,7 @@ struct SettingsView: View {
                     }
                 } label: {
                     LabeledContent(Strings.Settings.nicknameLabel) {
-                        Text([viewModel.profile?.avatarEmoji, viewModel.profile?.nickname]
-                            .compactMap { $0 }
-                            .filter { !$0.isEmpty }
-                            .joined(separator: " "))
+                        profileSummary
                     }
                 }
                 if viewModel.showsProfileSavedNote {
@@ -117,6 +118,17 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(LienColors.done)
                 }
+            }
+        }
+    }
+
+    /// プロフィール行の右側: いまのアイコン(タネの子のイラスト。小さく)とニックネーム。
+    /// 保存されている値は LienAvatar.resolve で読み替える(旧版の絵文字は近いイラスト、未設定は既定の絵)
+    private var profileSummary: some View {
+        HStack(spacing: LienSpacing.s) {
+            if let profile = viewModel.profile {
+                AvatarImage(avatar: LienAvatar.resolve(profile.avatarEmoji), size: 28)
+                Text(profile.nickname)
             }
         }
     }

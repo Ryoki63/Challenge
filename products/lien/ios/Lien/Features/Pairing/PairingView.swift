@@ -41,11 +41,6 @@ struct PairingView: View {
                 InviteSection(viewModel: viewModel)
                 Divider()
                 AcceptSection(viewModel: viewModel)
-
-                #if DEBUG
-                // G1 計測用ハーネス(issue #8 準備②)。Release には含まれない
-                DeviceTokenDebugView()
-                #endif
             }
             .padding(24)
         }

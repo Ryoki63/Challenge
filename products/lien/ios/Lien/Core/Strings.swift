@@ -62,7 +62,7 @@ enum Strings {
         static let conceptNote = "ひとりで始めて、あとから相手を招待できます"
         static let conceptStart = "はじめる"
 
-        // ページ2: ニックネーム+アイコン(絵文字)
+        // ページ2: ニックネーム+アイコン(タネの子のイラスト12種。名前は Strings.Avatar)
         static let profileTitle = "あなたのことを教えてね"
         static let nicknamePlaceholder = "ニックネーム(8文字まで)"
         static let nicknameEmptyError = "ニックネームを入力してね"
@@ -99,13 +99,33 @@ enum Strings {
         // 送信エラー(リトライ可能。罰・恥系の表現は使わない — REQUIREMENTS §3.5)
         static let submitErrorMessage = "通信がうまくいきませんでした。もう一度お試しください"
         static let retry = "もう一度ためす"
+    }
 
-        /// アイコンの絵文字パレット(REQUIREMENTS §3.1: パレットから選択)
-        static let avatarPalette: [String] = [
-            "🌱", "🌷", "🌻", "🍀", "🐶", "🐱", "🐰", "🐻",
-            "🐼", "🦊", "🐧", "🐥", "🍎", "🍓", "🍵", "🌙",
-            "⭐️", "🎵", "📚", "🏃", "💪", "🧸", "☕️", "💛",
-        ]
+    /// プロフィールのアイコン(タネの子のイラスト12種 — REQUIREMENTS §3.1)の名前。
+    /// 絵の読み上げ(VoiceOver)に使う。並びと名前の正本は assets/avatar/avatars.json で、
+    /// LienAvatar.displayName がここを引く(LienAvatarTests が avatars.json と突き合わせる)。
+    /// 「アイコンをえらんでね」の見出しは Onboarding.avatarTitle
+    enum Avatar {
+        static let sprout = "ふたば"
+        /// avatars.json の名前は「サボテン」だが、この文言の lint(StringsReviewTests)の禁止ワード「サボ」(サボり)に
+        /// 表記だけで当たってしまう。罰なしの原則を守る検査を緩めず、読み上げは英語由来の呼び名にする
+        static let cactus = "カクタス"
+        static let star = "ほし"
+        static let mushroom = "きのこ"
+        static let clover = "クローバー"
+        static let moon = "つき"
+        static let tulip = "チューリップ"
+        static let sunflower = "ひまわり"
+        static let acorn = "どんぐり"
+        static let sakura = "さくら"
+        static let strawberry = "いちご"
+        static let drop = "しずく"
+
+        /// 表示だけの絵(設定のプロフィール行)の読み上げ: 「アイコン: ふたば」(Plant.voiceStatus と同じ「名前: 値」の形)。
+        /// えらぶときのボタンは、絵の名前だけを読む(見出しの「アイコンをえらんでね」の直後に並ぶため)
+        static func label(_ name: String) -> String {
+            "アイコン: \(name)"
+        }
     }
 
     /// 招待・ペアリング画面(REQUIREMENTS §3.2 / DESIGN §6 / T11)
@@ -165,9 +185,6 @@ enum Strings {
         static let titleEmptyError = "約束を入力してね"
         static let titleTooLongError = "約束は20文字までです"
 
-        // 絵文字選択
-        static let emojiSectionTitle = "絵文字をえらんでね"
-
         // リマインド(任意。約束の remind_at が毎日のローカル通知の時刻になる — ReminderScheduler / T16 #16)
         static let remindSectionTitle = "リマインド"
         static let remindToggleLabel = "毎日そっとお知らせ"
@@ -179,13 +196,6 @@ enum Strings {
         static let editKeepsStreakNote = "約束を変えても、ふたりの記録はそのまま続きます"
         // 送信エラー(リトライ可能。責めない文言 — REQUIREMENTS §3.5)
         static let saveErrorMessage = "通信がうまくいきませんでした。もう一度お試しください"
-
-        /// 約束の絵文字パレット(固定候補。サーバー側は長さ上限のみの検査 — issue #12)
-        static let emojiPalette: [String] = [
-            "💪", "🏃", "🚶", "🧘", "📚", "✍️", "🗣️", "🎹",
-            "💧", "🌿", "🍎", "🥗", "🛏️", "🦷", "🧹", "☀️",
-            "💊", "🤸", "🚴", "🏊", "🎨", "📷", "💌", "🌙",
-        ]
     }
 
     /// 植物(タネの子)— 段階名・ゲージ・段階アップの演出・名前付け・読み上げ・ひとこと(GROWTH §3.3・§4.5・§5 / PB #57)。
@@ -616,13 +626,13 @@ enum Strings {
     enum LocalNotification {
         static let title = "Lien"
 
-        /// リマインド(約束の remind_at)。日付で 1 つ選ぶ(同じ日は同じ言葉)。emoji は約束の絵文字(無ければ空)を末尾に付ける。
+        /// リマインド(約束の remind_at)。日付で 1 つ選ぶ(同じ日は同じ言葉)。約束の絵文字は付けない(2026-10-26 オーナー判断で UI から廃止)。
         /// 1 つ目は REQUIREMENTS §3.12 の例
-        static func reminderBodies(_ promiseTitle: String, emoji: String) -> [String] {
+        static func reminderBodies(_ promiseTitle: String) -> [String] {
             [
-                "今日の『\(promiseTitle)』、まだ間に合うよ\(emoji)",
-                "『\(promiseTitle)』の時間だよ。ゆっくりでだいじょうぶ\(emoji)",
-                "今日もひとつだけ。『\(promiseTitle)』、できそう?\(emoji)",
+                "今日の『\(promiseTitle)』、まだ間に合うよ",
+                "『\(promiseTitle)』の時間だよ。ゆっくりでだいじょうぶ",
+                "今日もひとつだけ。『\(promiseTitle)』、できそう?",
             ]
         }
 

@@ -8,7 +8,7 @@
 //   plant_03_sizes_light / plant_04_sizes_dark     毎朝の既定を 40 / 60 / 80pt(高さ)で。ソロ+段階0〜9+段階9(ひらいた葉)
 //   plant_05_expressions_light / _06_..._dark      表情6種・ソロ・ソロでチェックイン・段階0・のぞき・知らない段階
 //   plant_07_flower_colors                         花の色(左=自分・右=相手で別の色に着色できること)
-//   plant_08_hero_light / plant_09_hero_dark       ホームの植物まわり(PB #57): 葉の下の約束の絵文字・のぞき・ゲージの文・名前・
+//   plant_08_hero_light / plant_09_hero_dark       ホームの植物まわり(PB #57): のぞき・ゲージの文・名前・
 //                                                    「名前をつける」・今日のひとこと(吹き出し)・名前の知らせ
 //   plant_10_celebration_light / _11_..._dark      全画面の演出(PB #57): はじめまして・ふたば・わかば(ハートを送る)・みのり・おかえり
 //                                                    (名前のフォームは UIKit の TextField を含み ImageRenderer で描けないので、ここでは名前付けなしで描く)
@@ -244,7 +244,7 @@ private struct HeroSheet: View {
 
     private let items: [Item] = [
         Item(
-            label: "わかば・のぞき・自分だけ完了\n(葉の下の絵文字・ゲージ・ひとこと)",
+            label: "わかば・のぞき・自分だけ完了\n(ゲージ・ひとこと)",
             state: PlantCharacterState(stage: 3, meOpen: true, expression: .lookLeft, peek: true),
             gauge: "ふたりそろって あと3回で よりそい",
             whisper: "ひらいたよ。ゆうきの葉は ねんね中"
@@ -297,7 +297,7 @@ private struct HeroSheet: View {
     ]
 
     var body: some View {
-        Sheet(title: "ホームの植物まわり(葉の下の約束の絵文字・のぞき・ゲージ・名前・ひとこと。上の余白はホームの ScrollView と同じ 24pt)— \(dark ? "ダーク" : "ライト")", dark: dark) {
+        Sheet(title: "ホームの植物まわり(のぞき・ゲージ・名前・ひとこと。上の余白はホームの ScrollView と同じ 24pt)— \(dark ? "ダーク" : "ライト")", dark: dark) {
             VStack(alignment: .leading, spacing: 18) {
                 ForEach(0..<(items.count + 2) / 3, id: \.self) { row in
                     HStack(alignment: .top, spacing: 14) {
@@ -307,8 +307,6 @@ private struct HeroSheet: View {
                                 PlantHeroView(
                                     state: item.state,
                                     sways: false,
-                                    meEmoji: "💪",
-                                    partnerEmoji: "🏃",
                                     plantName: item.plantName,
                                     canRename: item.plantName != nil,
                                     canName: item.canName,

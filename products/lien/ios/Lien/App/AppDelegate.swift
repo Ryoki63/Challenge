@@ -3,7 +3,7 @@
 // - LienApp の @UIApplicationDelegateAdaptor から結線される(SwiftUI ライフサイクルは維持)
 // - APNs デバイストークンを hex 化して DeviceTokenStore に保持する。
 //   取得のたびに onUpdate フックが呼ばれ、LienApp が PushTokenSync(users.push_token / push_env の
-//   自動保存)へ橋渡しする。DEBUG ビルドの表示・コピー UI(DeviceTokenDebugView)も同じ値を読む
+//   自動保存)へ橋渡しする。DEBUG ビルドの表示・コピー UI(DeviceTokenDebugView。設定画面の最下部)も同じ値を読む
 // - リモート通知の受信(フォアグラウンドの表示前・サイレント push・通知タップ)を
 //   RemoteNotificationRelay 経由で AppModel の snapshot 同期へ伝える
 //   (サイレント push をバックグラウンドで受けるには Info.plist の UIBackgroundModes: remote-notification

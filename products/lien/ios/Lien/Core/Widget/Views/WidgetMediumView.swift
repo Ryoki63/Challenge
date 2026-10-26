@@ -1,12 +1,11 @@
 // WidgetMediumView.swift — ホーム画面・中(systemMedium)のレイアウト(issue #17 T17a / REQUIREMENTS §3.10)
 //
-// S の内容+植物を大きく(高さいっぱいの 3:4)。右の列に、ストリーク・2人の今日の状態(呼び名つき)・進み具合のバー・
-// 相手が先に完了していれば「(相手)が待ってるよ」。
+// S の内容+植物を大きく(高さいっぱいの 3:4)。右の列に、ストリーク・2人の今日の状態(○×+呼び名)・進み具合のバー・
+// 相手が先に完了していれば「(相手)が待ってるよ」。約束の絵文字は出さない(2026-10-26 オーナー判断で UI から廃止)。
 //   ┌──────────────────────────────────────────┐
 //   │ [植物      ]   🔥 23日                    │
-//   │ [大きく    ]   💪 じぶん   🏃 ゆうき       │
-//   │ [3:4      ]    ✓           ○             │
-//   │                ▬▬▬▬▬▬▬▬▬──────────        │
+//   │ [大きく    ]   ✓ じぶん   ○ ゆうき         │
+//   │ [3:4      ]    ▬▬▬▬▬▬▬▬▬──────────        │
 //   │                ゆうきが待ってるよ           │
 //   └──────────────────────────────────────────┘
 // **相手の今日の写真は v1.0.1(T17b)**。v1.0 で相手の写真を見られるのは、当日のホームだけ(PV #59。D3)。
@@ -50,22 +49,22 @@ struct WidgetMediumView: View {
         }
     }
 
-    /// 右の列。高さに収まらないとき(iPhone SE の M は内側 109pt・文字を大きくした設定)は、呼び名を外した小さい方に替える。
+    /// 右の列。高さに収まらないとき(iPhone SE の M は内側 109pt・文字を大きくした設定)は、行の間を詰めた方に替える。
     /// 収まらないまま詰めると、ストリークの文字が縮んで読みにくくなる
     private var pairedColumn: some View {
         ViewThatFits(in: .vertical) {
-            pairedStack(showsNames: true, spacing: 10)
-            pairedStack(showsNames: false, spacing: 6)
+            pairedStack(spacing: 10)
+            pairedStack(spacing: 6)
         }
     }
 
-    private func pairedStack(showsNames: Bool, spacing: CGFloat) -> some View {
+    private func pairedStack(spacing: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: spacing) {
             if let days = content.streakDays {
                 WidgetStreakLabel(days: days, font: .headline)
             }
             if let me = content.me, let partner = content.partner {
-                WidgetStatusChips(me: me, partner: partner, showsNames: showsNames, spacing: 16)
+                WidgetStatusChips(me: me, partner: partner, spacing: 16)
             }
             if let progress = content.progress {
                 WidgetProgressBar(fraction: progress, height: 6)

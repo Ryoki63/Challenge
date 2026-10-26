@@ -1,7 +1,7 @@
 // ProfileEditView.swift — プロフィール(ニックネーム8字+アイコン)の編集画面(REQUIREMENTS §3.15 / T23 #23)
 //
-// 設定のプロフィール欄から push で開く。ニックネームの検証とアイコンのパレットはオンボーディングと同じ
-// (NicknameRules / Strings.Onboarding.avatarPalette)。保存できたら前の画面へ戻る(設定画面に「保存しました」が出る)。
+// 設定のプロフィール欄から push で開く。ニックネームの検証とアイコンの選び方(タネの子のイラスト12種)は
+// オンボーディングと同じ(NicknameRules / AvatarPicker)。保存できたら前の画面へ戻る(設定画面に「保存しました」が出る)。
 // 状態と保存は ProfileEditViewModel。文言は Strings、色・余白は DesignSystem の定数(DESIGN §3.8)。
 
 import SwiftUI
@@ -31,7 +31,9 @@ struct ProfileEditView: View {
             }
 
             Section {
-                avatarGrid
+                AvatarPicker(selection: $editor.avatar)
+                    // Form の行の上下の余白とは別に、輪とチェックが行の端で詰まらないよう少し空ける
+                    .padding(.vertical, LienSpacing.xs)
             } header: {
                 Text(Strings.Onboarding.avatarTitle)
             } footer: {
@@ -68,28 +70,6 @@ struct ProfileEditView: View {
     }
 
     // MARK: 部品
-
-    private var avatarGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: LienSpacing.s) {
-            ForEach(Strings.Onboarding.avatarPalette, id: \.self) { emoji in
-                let isSelected = editor.avatarEmoji == emoji
-                Button {
-                    editor.avatarEmoji = emoji
-                } label: {
-                    Text(emoji)
-                        .font(.title2)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            isSelected ? Color.accentColor.opacity(0.2) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: LienSpacing.s)
-                        )
-                }
-                // Form の行の中のボタンは、plain にしないと行全体が 1 つのボタンとして反応する
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
-            }
-        }
-    }
 
     /// 8字超は即時に示す。空欄の案内は「空白だけ入力」のときのみ(未入力のままの保存は、ボタンが押せないことで防ぐ)
     private var nicknameErrorMessage: String? {

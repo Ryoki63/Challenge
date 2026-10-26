@@ -1,6 +1,6 @@
 // OnboardingView.swift — オンボーディング(T10 / REQUIREMENTS §6)
 //
-// 1画面に、コンセプト → ニックネーム+絵文字 → 規約の同意 → 通知の予告 をすべて置く。
+// 1画面に、コンセプト → ニックネーム+アイコン(タネの子のイラスト12種) → 規約の同意 → 通知の予告 をすべて置く。
 // もとは3画面に分けていたが、実測すると1画面に収まる分量だったので分けるのをやめた
 // (2026-10-25 の UI/UX レビュー。画面を分けないならステップ目印も要らない)。
 //
@@ -118,32 +118,8 @@ struct OnboardingView: View {
                 Text(Strings.Onboarding.avatarTitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: LienSpacing.s) {
-                    ForEach(Strings.Onboarding.avatarPalette, id: \.self) { emoji in
-                        let selected = viewModel.avatarEmoji == emoji
-                        Button {
-                            viewModel.avatarEmoji = emoji
-                        } label: {
-                            Text(emoji)
-                                .font(.title2)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    selected ? Color.accentColor.opacity(0.18) : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                )
-                                // 選択が色だけだと分かりにくいので、枠でも示す
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .strokeBorder(
-                                            selected ? Color.accentColor : Color.clear,
-                                            lineWidth: 1.5
-                                        )
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(selected ? .isSelected : [])
-                    }
-                }
+                // タネの子のイラスト12種(4列 × 3行)。ニックネームと同じ幅の中に収まる
+                AvatarPicker(selection: $viewModel.avatar)
             }
         }
     }

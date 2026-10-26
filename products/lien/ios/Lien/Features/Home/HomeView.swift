@@ -1,6 +1,6 @@
 // HomeView.swift — ホーム画面(T13+T14 / REQUIREMENTS §3.4, §3.5, §3.9, §3.10 / §6)
 //
-// 構成: 植物(SVG レイヤーの重ね合わせ+葉の下の約束の絵文字+名前+ゲージの文+今日のひとこと — PlantHeroView)/ ストリーク /
+// 構成: 植物(SVG レイヤーの重ね合わせ+名前+ゲージの文+今日のひとこと — PlantHeroView。約束の絵文字は 2026-10-26 に UI から廃止)/ ストリーク /
 //       お休みチケットの残数バッジ(T19a #19。0枚でも出す — REQUIREMENTS §3.6)/ ふたりの今日(自分・相手チップ+相手の今日の写真)/
 //       チェックインフロー(CheckinFlowView — 1タップ完了+写真添付+当日取消)。
 // 植物の全画面の演出(段階アップ・おかえり — PlantCelebrationView)は、ホームの上に重ねるオーバーレイ(PB #57)。
@@ -77,12 +77,6 @@ struct HomeView: View {
             // 内容の周りの余白。上の余白(24pt)は、植物の上に出る吹き出しの余白の計算が前提にしている
             // (WhisperBubbleMetrics.parentTopPadding。変えるときは、そちらも合わせる)
             .padding(LienSpacing.l)
-
-            #if DEBUG
-            // G1 計測用ハーネス(issue #8 準備②)。Release には含まれない
-            DeviceTokenDebugView()
-                .padding(.horizontal, LienSpacing.l)
-            #endif
         }
         // 主役の「できた!」はスクロールの外に固定する(植物の高さ・文字の大きさで位置が動かない)
         .safeAreaInset(edge: .bottom) {
@@ -248,8 +242,6 @@ struct SnapshotContent: View {
                 state: viewModel.plantState,
                 sways: viewModel.plantSways,
                 accessibilityText: viewModel.plantAccessibilityText,
-                meEmoji: viewModel.leafEmojis.me,
-                partnerEmoji: viewModel.leafEmojis.partner,
                 plantName: viewModel.plantName,
                 canRename: viewModel.canRenamePlant,
                 canName: viewModel.canNamePlant,
@@ -358,7 +350,7 @@ private struct StreakLine: View {
 
 // MARK: - 約束と今日の状態(§3.10 の表示原則)
 //
-// チップのカード2枚をやめ、「💪 筋トレ ・ 🏃 ランニング」の1行にした。
+// チップのカード2枚をやめ、「筋トレ ・ ランニング」の1行にした(約束の絵文字は 2026-10-26 に UI から廃止)。
 // 誰が今日やったかは、植物の葉(左=自分・右=相手がひらいているか)がすでに示している。
 // 同じことを2つの表現(葉とカード)で持っていたので、カードを落とした。
 // 未完の情報は葉と、下の「(名前)が待ってるよ」の文が担う(§3.10)。
@@ -373,7 +365,6 @@ private struct PairStatusArea: View {
             // 自分の約束はソロでも出す(以前は今日のチップにしか出ておらず、チップを落とすと見えなくなる)
             HStack(spacing: LienSpacing.xs) {
                 promiseSegment(
-                    emoji: snapshot.myPromiseEmoji,
                     title: snapshot.myPromiseTitle,
                     done: snapshot.todayMeDone
                 )
@@ -381,7 +372,6 @@ private struct PairStatusArea: View {
                     Text("・")
                         .foregroundStyle(.tertiary)
                     promiseSegment(
-                        emoji: snapshot.partnerPromiseEmoji,
                         title: snapshot.partnerPromiseTitle,
                         done: snapshot.todayPartnerDone
                     )
@@ -416,16 +406,12 @@ private struct PairStatusArea: View {
         }
     }
 
-    /// 1人分の約束(絵文字 + 文)。今日やった人の文だけ濃くする(葉と同じ意味を、文字でも薄く二重に持つ)
-    private func promiseSegment(emoji: String?, title: String?, done: Bool) -> some View {
-        HStack(spacing: 3) {
-            Text(emoji ?? "・")
-                .accessibilityHidden(true)
-            Text(title ?? Strings.Home.promiseUnsetLabel)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .foregroundStyle(done ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-        }
+    /// 1人分の約束(文)。今日やった人の文だけ濃くする(葉と同じ意味を、文字でも薄く二重に持つ)
+    private func promiseSegment(title: String?, done: Bool) -> some View {
+        Text(title ?? Strings.Home.promiseUnsetLabel)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .foregroundStyle(done ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
     }
 }
 

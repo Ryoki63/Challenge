@@ -205,12 +205,6 @@ enum PlantLayers {
     /// v1.0 の既定の花色 #FFB3C7(petal_sN の SVG の色と同じ。PlantLayersTests が突き合わせる)
     static let defaultPetalRGB: UInt32 = 0xFFB3C7
 
-    /// ふたりの葉の下に小さく置く約束の絵文字の位置と大きさ(キャンバス座標 240×320。GROWTH §4.5)。
-    /// 左 = 自分(x)・右 = 相手(240 − x)。頭の丸みの上の肩のあたりで、顔(目は y≒170 より下)と葉(y≒130 より上)に掛からない
-    static let leafBadgeCenterX: Double = 84
-    static let leafBadgeCenterY: Double = 150
-    static let leafBadgeSize: Double = 22
-
     /// のぞき(fx_peek)の平行移動量(キャンバス座標)。assets/plant/peek_offsets.json と一致する
     struct PeekOffset: Equatable, Sendable {
         let dx: Double

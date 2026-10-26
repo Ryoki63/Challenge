@@ -21,7 +21,10 @@ protocol AuthServicing: AnyObject {
 
     /// 自分の users 行のプロフィール列を更新する。
     /// 更新できる列は列レベル GRANT(nickname / avatar_emoji / timezone / remind_at /
-    /// push_token / push_env — 0001_init.sql, 0005)に限られる
+    /// push_token / push_env — 0001_init.sql, 0005)に限られる。
+    ///
+    /// `avatarEmoji`(列名 avatar_emoji)には、現在はアイコンの id(LienAvatar.rawValue。例: "sprout")を入れる。
+    /// 引数名・列名は絵文字だった頃のまま変えていない(DB の変更は要らない)
     func updateProfile(nickname: String, avatarEmoji: String, timezone: String) async throws
 
     /// 自分の users 行の nickname / avatar_emoji **だけ**を更新する(設定のプロフィール編集 — REQUIREMENTS §3.15)。
@@ -53,6 +56,9 @@ protocol AuthServicing: AnyObject {
 /// users 行のプロフィール(設定画面の表示用)
 struct UserProfile: Equatable, Sendable {
     let nickname: String
+    /// avatar_emoji 列の値。現在はアイコンの id(LienAvatar.rawValue。例: "sprout")が入る。
+    /// ただし、イラストに替わる前の版が保存した絵文字(🌱 など)や、空・知らない値が残っていることがあるので、
+    /// 表示には必ず `LienAvatar.resolve(_:)` を通す(近いイラスト、無ければ既定の絵に読み替える)
     let avatarEmoji: String
 }
 

@@ -155,8 +155,9 @@ final class WidgetSourceTests: XCTestCase {
             if path == "LienWidget/LienWidgetBundle.swift", let sample = source.range(of: #"static (let|var) widgetSample"#, options: .regularExpression) {
                 source = String(source[..<sample.lowerBound])
             }
-            // 「・」は、約束の絵文字が無いときの占位の点(文言ではない。ホームの TodayChip と同じ)
-            let literals = source.matches(of: #""[^"\n]*""#).filter { $0 != "\"・\"" }
+            // 約束の絵文字は UI から廃止した(2026-10-26)ので、ウィジェットには「絵文字が無いときの占位の点」も無い。
+            // 区切りの「・」を含め、日本語の文字列リテラルはすべて Strings.swift に置く
+            let literals = source.matches(of: #""[^"\n]*""#)
             for literal in literals {
                 XCTAssertNil(
                     literal.range(of: #"[\u3040-\u30FF\u3400-\u9FFF\uFF00-\uFFEF]"#, options: .regularExpression),

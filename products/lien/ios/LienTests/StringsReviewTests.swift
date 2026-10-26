@@ -86,9 +86,8 @@ enum StringsCatalog {
     static let representativeAddresses = ["support@example.com"]
     /// ゲージの文に入る段階名の代表(最初・途中・最後 — Strings.Plant.stageNames)
     static let representativeStageNames = ["めばえ", "わかば", "みのり"]
-    /// リマインドの文言に入る約束の名前と絵文字の代表(絵文字なし = 約束に絵文字が無いとき)
+    /// リマインドの文言に入る約束の名前の代表(約束の絵文字は 2026-10-26 に UI から廃止したので、文言に入れない)
     static let representativePromiseTitles = ["筋トレ", "まいにち散歩"]
-    static let representativeEmojis = ["💪", ""]
     /// 設定画面の行に出すリマインドの時刻の代表
     static let representativeTimes = ["20:00", "07:30"]
     /// 通報メールの件名に入る「種別」(Strings.Report.kind*)
@@ -147,7 +146,21 @@ enum StringsCatalog {
         add("Onboarding.notificationLater", Strings.Onboarding.notificationLater)
         add("Onboarding.submitErrorMessage", Strings.Onboarding.submitErrorMessage)
         add("Onboarding.retry", Strings.Onboarding.retry)
-        addPalette("Onboarding.avatarPalette", Strings.Onboarding.avatarPalette)
+
+        // Avatar(プロフィールのアイコン = タネの子のイラスト12種の名前。VoiceOver の読み上げ)
+        add("Avatar.sprout", Strings.Avatar.sprout)
+        add("Avatar.cactus", Strings.Avatar.cactus)
+        add("Avatar.star", Strings.Avatar.star)
+        add("Avatar.mushroom", Strings.Avatar.mushroom)
+        add("Avatar.clover", Strings.Avatar.clover)
+        add("Avatar.moon", Strings.Avatar.moon)
+        add("Avatar.tulip", Strings.Avatar.tulip)
+        add("Avatar.sunflower", Strings.Avatar.sunflower)
+        add("Avatar.acorn", Strings.Avatar.acorn)
+        add("Avatar.sakura", Strings.Avatar.sakura)
+        add("Avatar.strawberry", Strings.Avatar.strawberry)
+        add("Avatar.drop", Strings.Avatar.drop)
+        add("Avatar.label", Strings.Avatar.label(Strings.Avatar.sprout))
 
         // Pairing
         add("Pairing.title", Strings.Pairing.title)
@@ -183,14 +196,12 @@ enum StringsCatalog {
         add("PromiseSetup.titlePlaceholder", Strings.PromiseSetup.titlePlaceholder)
         add("PromiseSetup.titleEmptyError", Strings.PromiseSetup.titleEmptyError)
         add("PromiseSetup.titleTooLongError", Strings.PromiseSetup.titleTooLongError)
-        add("PromiseSetup.emojiSectionTitle", Strings.PromiseSetup.emojiSectionTitle)
         add("PromiseSetup.remindSectionTitle", Strings.PromiseSetup.remindSectionTitle)
         add("PromiseSetup.remindToggleLabel", Strings.PromiseSetup.remindToggleLabel)
         add("PromiseSetup.remindTimeLabel", Strings.PromiseSetup.remindTimeLabel)
         add("PromiseSetup.saveButton", Strings.PromiseSetup.saveButton)
         add("PromiseSetup.editKeepsStreakNote", Strings.PromiseSetup.editKeepsStreakNote)
         add("PromiseSetup.saveErrorMessage", Strings.PromiseSetup.saveErrorMessage)
-        addPalette("PromiseSetup.emojiPalette", Strings.PromiseSetup.emojiPalette)
 
         // Home
         add("Home.soloCaption", Strings.Home.soloCaption)
@@ -452,10 +463,8 @@ enum StringsCatalog {
         // LocalNotification(端末のローカル通知 — T16 #16)
         add("LocalNotification.title", Strings.LocalNotification.title)
         for promiseTitle in representativePromiseTitles {
-            for emoji in representativeEmojis {
-                for (index, line) in Strings.LocalNotification.reminderBodies(promiseTitle, emoji: emoji).enumerated() {
-                    add("LocalNotification.reminderBodies(\(promiseTitle), \(emoji))[\(index)]", line)
-                }
+            for (index, line) in Strings.LocalNotification.reminderBodies(promiseTitle).enumerated() {
+                add("LocalNotification.reminderBodies(\(promiseTitle))[\(index)]", line)
             }
         }
         for days in representativeDays {
@@ -749,7 +758,7 @@ enum StringsReviewLog {
     }
 
     /// レビューの単位。`StringsCatalog` の名前から、関数の引数部 `(…)` と配列の添字 `[n]` を落とす。
-    /// 例: `Plant.voiceHeader(みどり, たね)` → `Plant.voiceHeader` / `Onboarding.avatarPalette[0]` → `Onboarding.avatarPalette`
+    /// 例: `Plant.voiceHeader(みどり, たね)` → `Plant.voiceHeader` / `Plant.stageNames[0]` → `Plant.stageNames`
     static func units() -> [(name: String, texts: [String])] {
         var order: [String] = []
         var texts: [String: [String]] = [:]
@@ -882,15 +891,16 @@ final class StringsReviewTests: XCTestCase {
         for kind in StringsCatalog.representativeKinds {
             XCTAssertTrue(Strings.Report.subject(kind).contains(kind))
         }
-        // ローカル通知(T16 #16): 約束の名前・絵文字・相手の名前・続いている日数が文言に入る
+        // ローカル通知(T16 #16): 約束の名前・相手の名前・続いている日数が文言に入る(約束の絵文字は入れない — 2026-10-26 に UI から廃止)
         for promiseTitle in StringsCatalog.representativePromiseTitles {
-            for emoji in StringsCatalog.representativeEmojis {
-                let bodies = Strings.LocalNotification.reminderBodies(promiseTitle, emoji: emoji)
-                XCTAssertEqual(bodies.count, 3)
-                for body in bodies {
-                    XCTAssertTrue(body.contains("『\(promiseTitle)』"), body)
-                    XCTAssertTrue(body.hasSuffix(emoji), body)
-                }
+            let bodies = Strings.LocalNotification.reminderBodies(promiseTitle)
+            XCTAssertEqual(bodies.count, 3)
+            for body in bodies {
+                XCTAssertTrue(body.contains("『\(promiseTitle)』"), body)
+                XCTAssertFalse(
+                    body.unicodeScalars.contains { $0.properties.isEmojiPresentation },
+                    "約束の絵文字は文言に付けない: \(body)"
+                )
             }
         }
         for days in StringsCatalog.representativeDays {

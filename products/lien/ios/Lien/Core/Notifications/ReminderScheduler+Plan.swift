@@ -50,9 +50,8 @@ extension ReminderScheduler {
         guard case .daily(let hour, let minute) = reminder else { return [] }
         let promiseTitle = (snapshot.myPromiseTitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !promiseTitle.isEmpty else { return [] }
-        let emoji = (snapshot.myPromiseEmoji ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let meDoneToday = snapshot.todayCompletion(now: now, calendar: calendar)?.me == true
-        let bodies = Strings.LocalNotification.reminderBodies(promiseTitle, emoji: emoji)
+        let bodies = Strings.LocalNotification.reminderBodies(promiseTitle)
         let today = calendar.startOfDay(for: now)
 
         var requests: [PlannedNotification] = []

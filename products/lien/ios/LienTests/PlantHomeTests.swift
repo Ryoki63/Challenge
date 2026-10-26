@@ -1,7 +1,7 @@
 // PlantHomeTests.swift — ホームの植物まわり(HomeViewModel と PlantExperienceModel・PlantNamingModel のつなぎ / issue #57)
 //
 // 検証対象(HomeViewModel.swift):
-//   - ゲージの文・VoiceOver の読み上げ文・葉の下の約束の絵文字・植物の名前 が snapshot から導かれる(ソロ・新しいキーが無いとき)
+//   - ゲージの文・VoiceOver の読み上げ文・植物の名前 が snapshot から導かれる(ソロ・新しいキーが無いとき)
 //   - 揺れ(plantSways)は描いている状態から決まる(plantMood が古くても食い違わない — PA の手直し)
 //   - 段階アップの演出: 読み込み(load)・チェックイン(apply)・同期のどれで snapshot が変わっても、各段階で1回だけ
 //   - 名前付けの導線(「名前をつける」は最初の「ふたば」以降・名前が付くまで / 名前の行は変えるボタン)と、結果の反映
@@ -139,9 +139,9 @@ final class PlantHomeTests: XCTestCase {
         return Harness(vm: vm, service: service, naming: naming, memory: memoryStore, temp: temp, clock: clock, reloads: reloads)
     }
 
-    // MARK: ゲージの文・VoiceOver・絵文字・名前
+    // MARK: ゲージの文・VoiceOver・名前
 
-    func testGaugeAccessibilityEmojisAndNameFollowTheSnapshot() {
+    func testGaugeAccessibilityAndNameFollowTheSnapshot() {
         let h = makeHarness(snapshot(grown: 11, meDone: true))
         defer { h.temp.cleanup() }
         h.vm.load()
@@ -152,21 +152,17 @@ final class PlantHomeTests: XCTestCase {
             "みどり、わかば。あなた: 完了、ゆうき: まだ。ふたりそろって あと3回で よりそい",
             "GROWTH §5.4 の読み上げ例"
         )
-        XCTAssertEqual(h.vm.leafEmojis.me, "💪")
-        XCTAssertEqual(h.vm.leafEmojis.partner, "🏃")
         XCTAssertEqual(h.vm.plantName, "みどり")
         XCTAssertTrue(h.vm.plantState.peek, "11回から、のぞき(長い区間の後半)")
     }
 
-    func testSoloHidesGaugeNameAndLeafEmojis() {
+    func testSoloHidesGaugeAndName() {
         let h = makeHarness(snapshot(grown: 0, pairId: nil, meDone: true, plantName: "みどり"))
         defer { h.temp.cleanup() }
         h.vm.load()
 
         XCTAssertNil(h.vm.growthGaugeText)
         XCTAssertEqual(h.vm.plantAccessibilityText, "土の中で眠るタネの子")
-        XCTAssertNil(h.vm.leafEmojis.me, "ソロには葉が無い")
-        XCTAssertNil(h.vm.leafEmojis.partner)
         XCTAssertNil(h.vm.plantName, "ソロには名前を出さない")
         XCTAssertFalse(h.vm.canNamePlant)
         XCTAssertFalse(h.vm.canRenamePlant)

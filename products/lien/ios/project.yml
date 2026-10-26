@@ -50,6 +50,11 @@ targets:
       # 重ねて描くのは PlantCharacterView。LienWidget にも同じカタログを入れる(ウィジェットでも描く)
       - path: ../assets/plant/PlantAssets.xcassets
         buildPhase: resources
+      # プロフィールのアバター12種(タネの子のイラスト SVG。正本: ../assets/avatar — avatars.json が順序と名前)。
+      # imageset 名は avatar_<id>(LienAvatar.assetName)。選ぶのは AvatarPicker、表示は AvatarImage。
+      # アプリ本体だけに入れる(ウィジェットは相手のアバターを描かない)
+      - path: ../assets/avatar/AvatarAssets.xcassets
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE)"
