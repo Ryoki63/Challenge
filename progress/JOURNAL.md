@@ -834,3 +834,6 @@
   - 検証: xcodebuild test **1256 件成功**、macos-check(module / views / widget)OK。描画で オンボ・ホーム・招待・約束設定・設定・ペイウォール を目視確認。
 - 2026-11-11 widget・share: ウィジェット(S / M・ロック画面)とシェア画像の文字を `Font.lien` へ。ホーム S / M の地を白から紙の色(`LienColors.paper`)へ。シェア画像の指紋(ShareImageSnapshots.json)を作り直した。WidgetRenderTests の背景の前提を白から紙の色へ。
   - 検証: ShareImageRenderTests / WidgetRenderTests / WidgetSourceTests 成功、macos-check widget OK。描画で S / M・ロック画面・シェア画像(ストーリー・正方形・長い名前)を目視確認。
+- 2026-11-11 近接ペアは見送り: CoreBluetooth の前面交換を実装し独立レビューに出したところ、同時受諾による二重ペア・確認なしの自動ペアなど高リスクの指摘が出た。オーナー判断「やっぱこの機能はつけるのやめよう」で、未コミットの実装はすべて破棄(コミット・push はしていない)。招待はリンク / コード入力の3導線のまま。
+- 2026-11-11 history: ストア用スクショの見直しで、カレンダー履歴だけ白い地・真っ黒な印のまま残っていた。紙の地(`lienPaperBackground()`)・月のグリッドをカードに・印と文字を墨の色(`historyMark` = `ink`、無彩色の中立表現は維持)へ。StoreScreenshotRenderTests の履歴の地も紙の色に。
+  - 検証: xcodebuild test **1256 件成功**、macos-check(module / views / widget)OK。ストア用スクショ 6枚を描いて目視確認。
