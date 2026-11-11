@@ -49,6 +49,8 @@ struct HistoryView: View {
                 contentBody
             }
         }
+        // 紙の地(2026-11-11 UI 改修。ホームから push される画面も白にしない)
+        .lienPaperBackground()
         .navigationTitle(Strings.History.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -84,6 +86,7 @@ struct HistoryView: View {
 
             Text(Strings.History.monthTitle(year: viewModel.month.year, month: viewModel.month.month))
                 .font(.lien(.headline))
+                .foregroundStyle(LienColors.ink)
                 .frame(maxWidth: .infinity)
 
             Button {
@@ -131,6 +134,8 @@ struct HistoryView: View {
             }
             legend
         }
+        // 月のグリッドは紙の上のカードにのせる(2026-11-11 UI 改修)
+        .lienCard()
     }
 
     private var columns: [GridItem] {
@@ -214,7 +219,7 @@ private struct HistoryDayCell: View {
         VStack(spacing: LienSpacing.xs) {
             Text("\(day.day)")
                 .font(.lien(.caption2).monospacedDigit())
-                .foregroundStyle(day.isToday ? .primary : .secondary)
+                .foregroundStyle(day.isToday ? LienColors.ink : LienColors.inkSecondary)
             HistoryMarkView(mark: day.mark)
                 .frame(height: 10)
         }

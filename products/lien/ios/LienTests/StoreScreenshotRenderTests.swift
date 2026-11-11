@@ -485,8 +485,10 @@ final class StoreScreenshotRenderTests: XCTestCase {
         return AnyView(
             HistoryView(viewModel: model, scrolls: false, autoload: false)
                 .frame(width: size.pointWidth, height: size.pointHeight, alignment: .top)
-                .background(Color.white)
+                // HistoryView と同じ紙の地(2026-11-11 UI 改修)
+                .background(LienColors.paper)
                 .environment(\.colorScheme, .light)
+                .tint(LienColors.accent)
         )
     }
 

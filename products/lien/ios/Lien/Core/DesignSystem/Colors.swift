@@ -61,8 +61,9 @@ enum LienColors {
     static let shareAccent = Color(red: 0.239, green: 0.420, blue: 0.322)
     /// 背景にぼかして置く光(やわらかい黄)
     static let shareGlow = Color(red: 0.969, green: 0.851, blue: 0.549)
-    /// カレンダー履歴の達成の点(T18)。無彩色の中立表現にする(REVIEW-2026-10-12 §4.2)
-    static let historyMark = Color.primary
+    /// カレンダー履歴の達成の点(T18)。無彩色の中立表現にする(REVIEW-2026-10-12 §4.2)。
+    /// 真っ黒ではなく墨の色(2026-11-11 UI 改修。ほぼ無彩色のまま、紙の上でなじませる)
+    static var historyMark: Color { ink }
 
     // 紙と面(2026-11-11 UI 改修 — Issho の原則の移植)。白い画面をやめ、クリームの紙の上にカードを置く。
     // ダークは、紙の色みを残した暗い土の色(真っ黒にしない)
