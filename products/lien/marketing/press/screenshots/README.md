@@ -25,8 +25,8 @@ Issue #94 のファクトシートに添える 3 枚。MK7（issue #80）で作�
 |---|---|
 | 画風 | v4「タネの子」 |
 | 生成方法 | `LienTests/StoreScreenshotRenderTests` が本物の View を 430×932pt・3倍で `ImageRenderer` 描画 → キャプションと合成 |
-| 生成 CI | `lien-ios` #39389661638（2026-10-20、attempt 2） |
-| 生成 commit | `c308e5c`（`../../screenshots/manifest.json` の `provenance.commit`）。PR ブランチ上の生成時 commit で、main には squash マージのため含まれない。画像は `13f0570` の元画像と SHA-256 が一致する |
+| 生成 CI | `lien-ios` #43007349235（2026-11-11、attempt 2。UI 改修後） |
+| 生成 commit | `5126e81`（`../../screenshots/manifest.json` の `provenance.commit`、main 上）。画像は `../../screenshots/6.7in/` の元画像と SHA-256 が一致する |
 | キャプションの正本 | [`../../screenshots/captions.json`](../../screenshots/captions.json) |
 | 元の設計・手順 | [`../../screenshots/README.md`](../../screenshots/README.md) |
 
