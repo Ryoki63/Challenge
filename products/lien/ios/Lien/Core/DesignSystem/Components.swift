@@ -4,9 +4,10 @@
 //
 //   LienPrimaryButtonStyle   : 主役のボタン(1画面に1つ)。セージの塗り+下に濃い縁を敷いた「ぷっくり」。押すと沈む。
 //                              押せないあいだは淡い塗り+枠線(iOS 26 の無効な .borderedProminent はほぼ白で見えない — JOURNAL 2026-10-2x)
-//   LienSecondaryButtonStyle : 補助のボタン。淡いセージの塗りだけ(主役と強さを並べない)
+//   LienSecondaryButtonStyle : 補助のボタン。淡いセージの塗りだけ(主役と強さを並べない)。.lienChip は文字の幅だけの小さな1つ
 //   lienCard()               : 紙の上のカード(白に近いクリーム+細い縁。影は付けない)
 //   lienPaperBackground()    : 画面の地を紙の色にする(安全領域の外まで)
+//   lienFormBackground()     : Form / List の地を紙の色にする(設定・約束の編集など)
 //
 // 色は端末のライト / ダークに従う。ImageRenderer で描くとき(ストア用スクショ・テスト)も、アセット経由の色を使わないので緑のまま。
 
@@ -59,12 +60,14 @@ struct LienSecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     /// 小さく描く(ホームの補助の行)
     var compact = false
+    /// 横幅いっぱいに広げる(false なら文字の幅だけ。植物の「名前をつける」など、行の中の小さな1つ)
+    var fillsWidth = true
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.lien(compact ? .footnote : .subheadline, bold: true))
             .foregroundStyle(LienColors.accent)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: fillsWidth ? .infinity : nil)
             .padding(.vertical, compact ? LienSpacing.s : 12)
             .padding(.horizontal, LienSpacing.m)
             .background {
@@ -86,6 +89,8 @@ extension ButtonStyle where Self == LienSecondaryButtonStyle {
     static var lienSecondary: LienSecondaryButtonStyle { LienSecondaryButtonStyle() }
     /// 補助のボタン(小さく)
     static var lienSecondaryCompact: LienSecondaryButtonStyle { LienSecondaryButtonStyle(compact: true) }
+    /// 補助のボタン(小さく、文字の幅だけ)
+    static var lienChip: LienSecondaryButtonStyle { LienSecondaryButtonStyle(compact: true, fillsWidth: false) }
 }
 
 // MARK: - カードと紙
@@ -117,5 +122,11 @@ extension View {
     /// 画面の地を紙の色にする(安全領域の外まで敷く)
     func lienPaperBackground() -> some View {
         background(LienColors.paper.ignoresSafeArea())
+    }
+
+    /// Form / List の地を紙の色にする(標準の灰色の地を消す。行はカードの色)
+    func lienFormBackground() -> some View {
+        scrollContentBackground(.hidden)
+            .lienPaperBackground()
     }
 }

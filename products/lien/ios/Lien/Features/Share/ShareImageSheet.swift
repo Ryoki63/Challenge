@@ -51,18 +51,18 @@ struct ShareImageSheet: View {
         if let milestone = presentation.milestone {
             VStack(spacing: 6) {
                 Text(Strings.Share.milestoneTitle(milestone.days))
-                    .font(.title2.bold())
+                    .font(.lien(.title2, bold: true))
                     .multilineTextAlignment(.center)
                 Text(Strings.Share.milestoneBody)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.subheadline))
+                    .foregroundStyle(LienColors.inkSecondary)
                     .multilineTextAlignment(.center)
             }
         } else {
             VStack(spacing: 6) {
                 Text(Strings.Share.subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.subheadline))
+                    .foregroundStyle(LienColors.inkSecondary)
                     .multilineTextAlignment(.center)
             }
         }
@@ -77,27 +77,27 @@ struct ShareImageSheet: View {
             VStack(spacing: 12) {
                 ProgressView()
                 Text(Strings.Share.loading)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.footnote))
+                    .foregroundStyle(LienColors.inkSecondary)
             }
             .frame(maxWidth: .infinity, minHeight: 240)
 
         case .unavailable:
             Text(Strings.Share.unavailableMessage)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.lien(.subheadline))
+                .foregroundStyle(LienColors.inkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 240)
 
         case .failed:
             VStack(spacing: 12) {
                 Text(Strings.Share.errorMessage)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.subheadline))
+                    .foregroundStyle(LienColors.inkSecondary)
                     .multilineTextAlignment(.center)
                 Button(Strings.Share.retry) {
                     Task { await model.load() }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(LienSecondaryButtonStyle(fillsWidth: false))
             }
             .frame(maxWidth: .infinity, minHeight: 240)
 
@@ -124,11 +124,11 @@ struct ShareImageSheet: View {
             } else if renderFailed {
                 VStack(spacing: 10) {
                     Text(Strings.Share.errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(.lien(.footnote))
+                        .foregroundStyle(LienColors.inkSecondary)
                         .multilineTextAlignment(.center)
                     Button(Strings.Share.retry) { renderImages() }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(LienSecondaryButtonStyle(fillsWidth: false))
                 }
                 .frame(maxWidth: .infinity, minHeight: 180)
             } else {
@@ -151,14 +151,13 @@ struct ShareImageSheet: View {
                     )
                 ) {
                     Label(Strings.Share.shareButton, systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.lienPrimary)
             }
 
             Text(Strings.Share.privacyNote)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.lien(.footnote))
+                .foregroundStyle(LienColors.inkSecondary)
                 .multilineTextAlignment(.center)
         }
     }

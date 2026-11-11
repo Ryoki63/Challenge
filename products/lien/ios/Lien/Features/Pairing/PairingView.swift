@@ -32,18 +32,21 @@ struct PairingView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 Text(Strings.Pairing.title)
-                    .font(.title2.bold())
+                    .font(.lien(.title2, bold: true))
+                    .foregroundStyle(LienColors.ink)
                     .padding(.top, 32)
                 Text(Strings.Pairing.subtitle)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.body))
+                    .foregroundStyle(LienColors.inkSecondary)
 
                 InviteSection(viewModel: viewModel)
-                Divider()
+                    .lienCard()
                 AcceptSection(viewModel: viewModel)
+                    .lienCard()
             }
             .padding(24)
         }
+        .lienPaperBackground()
         .onAppear { consumePendingToken() }
         .onChange(of: pendingInviteToken) { consumePendingToken() }
     }
@@ -67,31 +70,30 @@ private struct InviteSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(Strings.Pairing.inviteSectionTitle)
-                .font(.headline)
+                .font(.lien(.headline))
+                .foregroundStyle(LienColors.ink)
 
             switch viewModel.issueState {
             case .idle, .loading:
                 Text(Strings.Pairing.inviteExplainer)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.footnote))
+                    .foregroundStyle(LienColors.inkSecondary)
                 if let message = viewModel.issueErrorMessage {
                     Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .font(.lien(.footnote))
+                        .foregroundStyle(LienColors.gentleAlert)
                 }
                 Button {
                     Task { await viewModel.issueInvite() }
                 } label: {
                     if viewModel.issueState == .loading {
                         ProgressView()
-                            .frame(maxWidth: .infinity)
+                            .tint(LienColors.accent)
                     } else {
                         Text(Strings.Pairing.issueButton)
-                            .frame(maxWidth: .infinity)
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(.lienPrimary)
                 .disabled(viewModel.issueState == .loading)
 
             case .issued(let invite):
@@ -114,26 +116,25 @@ private struct IssuedInviteContent: View {
                     .frame(width: 200, height: 200)
                     .accessibilityLabel(Strings.Pairing.qrCaption)
                 Text(Strings.Pairing.qrCaption)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.footnote))
+                    .foregroundStyle(LienColors.inkSecondary)
             }
 
             VStack(spacing: 4) {
                 Text(Strings.Pairing.codeCaption)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.footnote))
+                    .foregroundStyle(LienColors.inkSecondary)
                 Text(invite.token)
-                    .font(.title.monospaced().bold())
+                    .font(.title.monospaced().bold()) // 0/O・1/l を見分けやすいよう、コードだけは等幅のまま
+                    .foregroundStyle(LienColors.ink)
                     .textSelection(.enabled)
             }
 
             if let url = invite.webURL {
                 ShareLink(item: url, message: Text(Strings.Pairing.shareMessage)) {
                     Label(Strings.Pairing.shareButton, systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(.lienPrimary)
             }
 
             Text(Strings.Pairing.expiresNote(
@@ -143,8 +144,8 @@ private struct IssuedInviteContent: View {
                     Date.FormatStyle(date: .abbreviated, time: .shortened, locale: Locale(identifier: "ja_JP"))
                 )
             ))
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(.lien(.caption))
+            .foregroundStyle(LienColors.inkSecondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -158,10 +159,11 @@ private struct AcceptSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(Strings.Pairing.acceptSectionTitle)
-                .font(.headline)
+                .font(.lien(.headline))
+                .foregroundStyle(LienColors.ink)
             Text(Strings.Pairing.acceptExplainer)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.lien(.footnote))
+                .foregroundStyle(LienColors.inkSecondary)
 
             TextField(Strings.Pairing.codePlaceholder, text: $viewModel.codeInput)
                 .textFieldStyle(.roundedBorder)
@@ -172,8 +174,8 @@ private struct AcceptSection: View {
 
             if let message = viewModel.acceptErrorMessage {
                 Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .font(.lien(.footnote))
+                    .foregroundStyle(LienColors.gentleAlert)
             }
 
             Button {
@@ -181,14 +183,12 @@ private struct AcceptSection: View {
             } label: {
                 if viewModel.isAccepting {
                     ProgressView()
-                        .frame(maxWidth: .infinity)
+                        .tint(LienColors.accent)
                 } else {
                     Text(Strings.Pairing.acceptButton)
-                        .frame(maxWidth: .infinity)
                 }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
+            .buttonStyle(.lienSecondary)
             .disabled(!viewModel.canAccept)
         }
     }

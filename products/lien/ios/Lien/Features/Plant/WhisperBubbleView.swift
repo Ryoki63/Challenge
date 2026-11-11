@@ -12,7 +12,7 @@ struct WhisperBubbleView: View {
     var body: some View {
         VStack(spacing: 0) {
             Text(text)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .multilineTextAlignment(.center)
                 .lineLimit(WhisperBubbleMetrics.maxLines)
                 .padding(.horizontal, WhisperBubbleMetrics.horizontalPadding)

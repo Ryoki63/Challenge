@@ -79,12 +79,12 @@ struct PlantHeroView: View {
             if let nameNotice {
                 HStack(spacing: LienSpacing.xs) {
                     Text(nameNotice)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(.lien(.footnote))
+                        .foregroundStyle(LienColors.inkSecondary)
                         .multilineTextAlignment(.center)
                     Button(action: onDismissNameNotice) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(LienColors.inkSecondary)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Strings.Plant.nameNoticeClose)
@@ -93,8 +93,8 @@ struct PlantHeroView: View {
 
             if let gaugeText {
                 Text(gaugeText)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.footnote))
+                    .foregroundStyle(LienColors.inkSecondary)
                     .multilineTextAlignment(.center)
                     // 植物の読み上げ文(accessibilityText — GROWTH §5.4)の最後の文と同じなので、重ねて読み上げない
                     .accessibilityHidden(accessibilityText != nil)
@@ -113,10 +113,11 @@ struct PlantHeroView: View {
                 Button(action: onNameAction) {
                     HStack(spacing: LienSpacing.xs) {
                         Text(plantName)
-                            .font(.headline)
+                            .font(.lien(.title3, bold: true))
+                            .foregroundStyle(LienColors.ink)
                         Image(systemName: "pencil")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.lien(.caption))
+                            .foregroundStyle(LienColors.inkSecondary)
                             .accessibilityHidden(true) // 鉛筆の絵は装飾(ボタンの意味はヒントで伝える)
                     }
                 }
@@ -125,14 +126,14 @@ struct PlantHeroView: View {
                 .accessibilityHint(Strings.Plant.renameHint)
             } else {
                 Text(plantName)
-                    .font(.headline)
+                    .font(.lien(.title3, bold: true))
+                    .foregroundStyle(LienColors.ink)
                     .plantNameMenu(moderation, plantName: plantName)
             }
         } else if canName {
             // 最初の「ふたば」の演出を閉じても、名前が付くまで残る(GROWTH §5.3)
             Button(Strings.Plant.nameButton, action: onNameAction)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(.lienChip)
         }
     }
 

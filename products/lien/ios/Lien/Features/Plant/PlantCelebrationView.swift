@@ -116,17 +116,17 @@ struct PlantCelebrationContent: View {
     private var messages: some View {
         VStack(spacing: LienSpacing.xs) {
             Text(headline)
-                .font(.title.bold())
+                .font(.lien(.title, bold: true))
                 .multilineTextAlignment(.center)
             if let body = bodyText {
                 Text(body)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.body))
+                    .foregroundStyle(LienColors.inkSecondary)
                     .multilineTextAlignment(.center)
             }
             if let name = plantName {
                 Text(name)
-                    .font(.headline)
+                    .font(.lien(.headline))
                     .padding(.top, LienSpacing.xs)
             }
         }
@@ -166,10 +166,10 @@ struct PlantCelebrationContent: View {
     private var closeButton: some View {
         if showsNameForm {
             Button(Strings.Plant.nameLater, action: onClose)
-                .buttonStyle(.bordered)
+                .buttonStyle(.lienSecondary)
         } else {
             Button(Strings.Plant.celebrationClose, action: onClose)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.lienPrimary)
         }
     }
 
@@ -185,7 +185,7 @@ struct PlantCelebrationContent: View {
             if naming.didSave, let note = naming.resultNote {
                 // 保存できた(自分の名前が入った・相手が先に付けていた名前に決まった)
                 Text(note)
-                    .font(.headline)
+                    .font(.lien(.headline))
                     .foregroundStyle(LienColors.done)
                     .multilineTextAlignment(.center)
             } else if showsNameForm {

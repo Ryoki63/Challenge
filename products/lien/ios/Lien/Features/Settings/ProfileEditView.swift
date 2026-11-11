@@ -23,7 +23,7 @@ struct ProfileEditView: View {
                     .submitLabel(.done)
                 if let message = nicknameErrorMessage {
                     Text(message)
-                        .font(.footnote)
+                        .font(.lien(.footnote))
                         .foregroundStyle(LienColors.gentleAlert)
                 }
             } header: {
@@ -43,11 +43,12 @@ struct ProfileEditView: View {
             if let message = editor.errorMessage {
                 Section {
                     Text(message)
-                        .font(.footnote)
+                        .font(.lien(.footnote))
                         .foregroundStyle(LienColors.gentleAlert)
                 }
             }
         }
+        .lienFormBackground()
         .navigationTitle(Strings.Settings.profileEditTitle)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

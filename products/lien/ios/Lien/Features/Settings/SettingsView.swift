@@ -63,6 +63,7 @@ struct SettingsView: View {
             DeviceTokenDebugView()
             #endif
         }
+        .lienFormBackground()
         .navigationTitle(Strings.Settings.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -115,7 +116,7 @@ struct SettingsView: View {
                 }
                 if viewModel.showsProfileSavedNote {
                     Text(Strings.Settings.profileSavedNote)
-                        .font(.footnote)
+                        .font(.lien(.footnote))
                         .foregroundStyle(LienColors.done)
                 }
             }
@@ -154,7 +155,7 @@ struct SettingsView: View {
                 }
                 if viewModel.showsPromiseSavedNote {
                     Text(Strings.Settings.promiseSavedNote)
-                        .font(.footnote)
+                        .font(.lien(.footnote))
                         .foregroundStyle(LienColors.done)
                 }
             } else if viewModel.loadState == .failed {
@@ -164,7 +165,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
             } else {
                 Text(Strings.Settings.promiseUnset)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LienColors.inkSecondary)
             }
         }
     }
@@ -199,16 +200,16 @@ struct SettingsView: View {
                 }
                 if viewModel.dissolve.succeeded {
                     Text(Strings.Settings.dissolvedNote)
-                        .font(.footnote)
+                        .font(.lien(.footnote))
                         .foregroundStyle(LienColors.done)
                 }
             } else {
                 Text(Strings.Settings.soloNote)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.footnote))
+                    .foregroundStyle(LienColors.inkSecondary)
                 if viewModel.dissolve.succeeded {
                     Text(Strings.Settings.dissolvedNote)
-                        .font(.footnote)
+                        .font(.lien(.footnote))
                         .foregroundStyle(LienColors.done)
                 }
             }

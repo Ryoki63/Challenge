@@ -88,8 +88,8 @@ private struct PartnerPhotoCard: View {
             .accessibilityHint(Strings.PartnerPhoto.openHint)
 
             Text(caption)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.lien(.caption))
+                .foregroundStyle(LienColors.inkSecondary)
         }
     }
 }
@@ -207,7 +207,7 @@ struct PartnerPhotoViewer: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle.fill")
-                        .font(.title)
+                        .font(.lien(.title))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(LienColors.photoControl)
                         .padding(LienSpacing.m)
@@ -220,7 +220,7 @@ struct PartnerPhotoViewer: View {
                 model.closeViewer()
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.title)
+                    .font(.lien(.title))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(LienColors.photoControl)
                     .padding(LienSpacing.m)

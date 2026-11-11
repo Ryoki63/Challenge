@@ -827,3 +827,8 @@
 - 依頼(オーナー): 「UI がダサい」。Issho(App Store)の UI が可愛いと言われる理由を分析し反映する。Bluetooth を近づけるだけで良い体験も取り入れる。
 - 決定(オーナー選択): A=原則だけ移植し Lien の顔(タネの子・セージグリーン)で作り直す / 近接は「両方が招待画面を開いている間だけ」Bluetooth で招待コードを受け渡す(サーバー変更なし・リンク/コード入力は予備に残す) / 書体は Zen Maru Gothic(OFL)を同梱 / 1〜5 を全部進める。v1.0 提出後の変更なので v1.0.1 扱い。ストア申請はしない。
 - 方針: ①DesignSystem に書体・紙色の背景・主役ボタン・カードを足し全画面に効かせる ②ホームは「ふたりで◯日」を大きな数字の主役に ③ウィジェット・シェア画像を同じ顔に ④CoreBluetooth の前面のみの近接交換 ⑤全テスト・描画・スクショ再生成・独立レビュー。
+- 2026-11-11 tokens: 書体(Typography)・紙色とカード(Colors / Spacing の LienRadius)・主役/補助ボタンとカード(Components)を追加。FontRegistrationTests。commit a3330a5。
+- 2026-11-11 screens: アプリ本体の文字を `Font.lien` へ(ウィジェット・シェア画像・Debug は次の段)。紙の地を全画面に(Form は `lienFormBackground()`)、`.borderedProminent` / `.bordered` を `.lienPrimary` / `.lienSecondary` へ、補助の色を `LienColors.inkSecondary` へ。ホームはストリークを大きな数字(StreakHero)に、約束行をカードに。ナビゲーションの題名も丸ゴシック(LienApp で UINavigationBar の既定を変える)。ペイウォールのプランをカードの色に。
+  - 書体が変わって吹き出しの行が高くなり(13pt で 18.8pt)、最大の文字サイズで上の端に食い込んだ(WhisperBubbleRenderTests)。WhisperBubbleMetrics.baseLineHeight を 18 → 20pt に。
+  - UIReviewRenderTests: 招待・約束設定・設定・ペイウォールは ImageRenderer で描けない(ScrollView / Form)ため、ウィンドウに載せて描く形へ。
+  - 検証: xcodebuild test **1256 件成功**、macos-check(module / views / widget)OK。描画で オンボ・ホーム・招待・約束設定・設定・ペイウォール を目視確認。

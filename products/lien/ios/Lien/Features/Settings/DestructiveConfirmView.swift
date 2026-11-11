@@ -34,22 +34,22 @@ struct DestructiveConfirmView: View {
         return Form {
             Section {
                 Text(content.lead)
-                    .font(.body)
+                    .font(.lien(.body))
                     .listRowBackground(Color.clear)
             }
 
             Section {
                 ForEach(content.effects, id: \.self) { effect in
                     Text(effect)
-                        .font(.subheadline)
+                        .font(.lien(.subheadline))
                 }
             }
 
             if let footnote = content.footnote {
                 Section {
                     Text(footnote)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(.lien(.footnote))
+                        .foregroundStyle(LienColors.inkSecondary)
                         .listRowBackground(Color.clear)
                 }
             }
@@ -57,7 +57,7 @@ struct DestructiveConfirmView: View {
             Section {
                 if let message = flow.errorMessage {
                     Text(message)
-                        .font(.footnote)
+                        .font(.lien(.footnote))
                         .foregroundStyle(LienColors.gentleAlert)
                 }
                 Button(role: .destructive) {
@@ -77,6 +77,7 @@ struct DestructiveConfirmView: View {
                 .disabled(flow.stage == .working)
             }
         }
+        .lienFormBackground()
         .navigationTitle(content.screenTitle)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

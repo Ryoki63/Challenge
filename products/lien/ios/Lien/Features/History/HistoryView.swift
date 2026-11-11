@@ -83,7 +83,7 @@ struct HistoryView: View {
             .accessibilityLabel(Strings.History.previousMonth)
 
             Text(Strings.History.monthTitle(year: viewModel.month.year, month: viewModel.month.month))
-                .font(.headline)
+                .font(.lien(.headline))
                 .frame(maxWidth: .infinity)
 
             Button {
@@ -141,8 +141,8 @@ struct HistoryView: View {
         HStack(spacing: 0) {
             ForEach(0..<Strings.History.weekdaySymbols.count, id: \.self) { index in
                 Text(Strings.History.weekdaySymbols[index])
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.caption2))
+                    .foregroundStyle(LienColors.inkSecondary)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -169,8 +169,8 @@ struct HistoryView: View {
                 .frame(width: 18, height: 10)
                 .accessibilityHidden(true)
             Text(text)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.lien(.caption))
+                .foregroundStyle(LienColors.inkSecondary)
         }
     }
 
@@ -179,11 +179,11 @@ struct HistoryView: View {
     private var emptyView: some View {
         VStack(spacing: LienSpacing.s) {
             Image(systemName: "calendar")
-                .font(.title2)
-                .foregroundStyle(.secondary)
+                .font(.lien(.title2))
+                .foregroundStyle(LienColors.inkSecondary)
             Text(Strings.History.empty)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.lien(.footnote))
+                .foregroundStyle(LienColors.inkSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, minHeight: 220)
@@ -192,13 +192,14 @@ struct HistoryView: View {
     private var failureView: some View {
         VStack(spacing: LienSpacing.m) {
             Text(Strings.History.loadFailed)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .foregroundStyle(LienColors.gentleAlert)
                 .multilineTextAlignment(.center)
             Button(Strings.History.retry) {
                 Task { await viewModel.retry() }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.lienSecondary)
+            .fixedSize()
         }
         .frame(maxWidth: .infinity, minHeight: 220)
     }
@@ -212,7 +213,7 @@ private struct HistoryDayCell: View {
     var body: some View {
         VStack(spacing: LienSpacing.xs) {
             Text("\(day.day)")
-                .font(.caption2.monospacedDigit())
+                .font(.lien(.caption2).monospacedDigit())
                 .foregroundStyle(day.isToday ? .primary : .secondary)
             HistoryMarkView(mark: day.mark)
                 .frame(height: 10)

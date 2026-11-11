@@ -7,8 +7,8 @@
 // 1メソッド1枚にし、描く前に run loop を1回まわす(StoreScreenshotRenderTests と同じ作法)。
 //
 // ImageRenderer は ScrollView・Form・List・NavigationStack の中身を描けず、黄色の「禁止」マークの代わりになる
-// (settings / promise-setup / pairing の画像がそう。既知の制限で、アプリの不具合ではない)。
-// Form の中の見た目を見たい画面(プロフィール編集・設定のプロフィール行)は、NotificationSettingsRenderTests と同じく
+// (既知の制限で、アプリの不具合ではない)。
+// それらを使う画面(プロフィール編集・設定・約束設定・招待・ペイウォール)は、NotificationSettingsRenderTests と同じく
 // UIKit のウィンドウに載せて描く(writeFromWindow)。ウィンドウが取れない・空白だったときは、画像を保存せず(ログに残し)、
 // テストは落とさない(シミュレータの状態に左右されるため)。
 // UIKit を使うので、macOS の下見(macos-check)では走らせない(check.sh の EXCLUDE_TESTS)。
@@ -205,7 +205,8 @@ final class UIReviewRenderTests: XCTestCase {
     // MARK: - 約束設定
 
     func testRenderPromiseSetup() async throws {
-        try await write(
+        // Form は ImageRenderer で描けないので、ウィンドウに載せて描く
+        _ = await writeFromWindow(
             NavigationStack { PromiseSetupView(client: StubPromiseAPIClient(), store: nil) },
             name: "promise-setup"
         )
@@ -214,7 +215,8 @@ final class UIReviewRenderTests: XCTestCase {
     // MARK: - 招待
 
     func testRenderPairing() async throws {
-        try await write(
+        // ScrollView は ImageRenderer で描けないので、ウィンドウに載せて描く
+        _ = await writeFromWindow(
             NavigationStack {
                 PairingView(
                     inviteClient: StubInviteClient(),
@@ -240,7 +242,7 @@ final class UIReviewRenderTests: XCTestCase {
             onPromiseSaved: { _ in },
             onReminderSaved: { _ in }
         )
-        try await write(NavigationStack { view }, name: "settings")
+        _ = await writeFromWindow(NavigationStack { view }, name: "settings")
     }
 
     // MARK: - ペイウォール
@@ -252,7 +254,7 @@ final class UIReviewRenderTests: XCTestCase {
             entitlements: EntitlementStore()
         )
         await model.load()
-        try await write(PaywallView(model: model), name: "paywall")
+        _ = await writeFromWindow(PaywallView(model: model), name: "paywall")
     }
 
     // MARK: - ホーム(状態違い)
@@ -274,6 +276,8 @@ final class UIReviewRenderTests: XCTestCase {
         .safeAreaInset(edge: .bottom) {
             HomeActionBar(viewModel: model)
         }
+        // HomeView と同じ紙の地
+        .lienPaperBackground()
     }
 
     func testRenderHomeWaiting() async throws {

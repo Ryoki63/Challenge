@@ -31,8 +31,8 @@ struct TicketBalanceBadge: View {
 
     private var content: some View {
         Label(Strings.Tickets.balance(balance), systemImage: "ticket.fill")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .font(.lien(.footnote, bold: true))
+            .foregroundStyle(LienColors.inkSecondary)
             .padding(.horizontal, LienSpacing.s)
             .padding(.vertical, LienSpacing.xs)
             .background(

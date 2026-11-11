@@ -53,8 +53,8 @@ struct PlantCelebrationPlantsView: View {
                         .frame(width: beforeWidth)
                     // 矢印は、変わる前の植物の顔の高さのあたり(キャンバスの下から約 4 割)に置く
                     Image(systemName: "arrow.right")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
+                        .font(.lien(.title3))
+                        .foregroundStyle(LienColors.inkSecondary)
                         .padding(.bottom, max(beforeHeight * 0.41 - 10, 0))
                         .accessibilityHidden(true)
                 }

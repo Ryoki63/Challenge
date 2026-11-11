@@ -30,8 +30,8 @@ struct PromiseSetupView: View {
         Form {
             Section {
                 Text(Strings.PromiseSetup.subtitle)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.body))
+                    .foregroundStyle(LienColors.inkSecondary)
                     .listRowBackground(Color.clear)
             }
 
@@ -40,8 +40,8 @@ struct PromiseSetupView: View {
                     .submitLabel(.done)
                 if viewModel.titleError == .tooLong {
                     Text(Strings.PromiseSetup.titleTooLongError)
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .font(.lien(.footnote))
+                        .foregroundStyle(LienColors.gentleAlert)
                 }
             }
 
@@ -59,32 +59,33 @@ struct PromiseSetupView: View {
             Section {
                 if let message = viewModel.saveErrorMessage {
                     Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .font(.lien(.footnote))
+                        .foregroundStyle(LienColors.gentleAlert)
                 }
                 Button {
                     Task { await viewModel.save() }
                 } label: {
                     if viewModel.isSaving {
                         ProgressView()
-                            .frame(maxWidth: .infinity)
+                            .tint(LienColors.accent)
                     } else {
                         Text(Strings.PromiseSetup.saveButton)
-                            .frame(maxWidth: .infinity)
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(.lienPrimary)
                 .disabled(!viewModel.canSave)
                 .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
                 Text(Strings.PromiseSetup.editKeepsStreakNote)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.caption))
+                    .foregroundStyle(LienColors.inkSecondary)
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
         }
+        .lienFormBackground()
         .navigationTitle(Strings.PromiseSetup.title)
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -14,10 +14,10 @@ struct NudgeSheet: View {
     var body: some View {
         VStack(spacing: LienSpacing.m) {
             Text(Strings.Nudge.sheetTitle)
-                .font(.headline)
+                .font(.lien(.headline))
             Text(Strings.Nudge.sheetSubtitle)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.lien(.footnote))
+                .foregroundStyle(LienColors.inkSecondary)
                 .multilineTextAlignment(.center)
 
             StampGrid(stamps: NudgeStamp.allCases, isDisabled: viewModel.isSendingNudge) { stamp in
@@ -44,7 +44,7 @@ struct ReactionSheet: View {
     var body: some View {
         VStack(spacing: LienSpacing.m) {
             Text(Strings.Reaction.sheetTitle)
-                .font(.headline)
+                .font(.lien(.headline))
 
             StampGrid(stamps: ReactionStamp.allCases, isDisabled: viewModel.isSendingReaction) { stamp in
                 Task {
@@ -78,10 +78,10 @@ private struct StampGrid<Stamp: Hashable & RawRepresentable>: View where Stamp.R
                     onSelect(stamp)
                 } label: {
                     Text(stamp.rawValue)
-                        .font(.largeTitle)
+                        .font(.lien(.largeTitle))
                         .frame(maxWidth: .infinity, minHeight: 56)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.lienSecondary)
                 .disabled(isDisabled)
             }
         }

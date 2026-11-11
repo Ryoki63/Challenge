@@ -54,6 +54,7 @@ struct OnboardingView: View {
             }
             footer
         }
+        .lienPaperBackground()
     }
 
     private var content: some View {
@@ -65,8 +66,8 @@ struct OnboardingView: View {
 
             // 匿名開始の注意(DESIGN §10 の明示義務)
             Text(Strings.Onboarding.anonymousStartNote)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.lien(.caption2))
+                .foregroundStyle(LienColors.inkSecondary)
         }
         .padding(.horizontal, LienSpacing.l)
         .padding(.bottom, LienSpacing.m)
@@ -84,14 +85,14 @@ struct OnboardingView: View {
             .padding(.top, LienSpacing.m)
 
             Text(Strings.Onboarding.conceptTitle)
-                .font(.title2.bold())
-                .foregroundStyle(.primary)
+                .font(.lien(.title2, bold: true))
+                .foregroundStyle(LienColors.ink)
             Text(Strings.Onboarding.conceptBody)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.lien(.subheadline))
+                .foregroundStyle(LienColors.inkSecondary)
             Text(Strings.Onboarding.conceptNote)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.lien(.footnote))
+                .foregroundStyle(LienColors.inkSecondary)
         }
         .frame(maxWidth: .infinity)
         .multilineTextAlignment(.center)
@@ -103,21 +104,21 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: LienSpacing.m) {
             VStack(alignment: .leading, spacing: LienSpacing.s) {
                 Text(Strings.Onboarding.profileTitle)
-                    .font(.headline)
+                    .font(.lien(.headline))
                 TextField(Strings.Onboarding.nicknamePlaceholder, text: $viewModel.nickname)
                     .textFieldStyle(.roundedBorder)
                     .submitLabel(.done)
                 if let message = nicknameErrorMessage {
                     Text(message)
-                        .font(.footnote)
+                        .font(.lien(.footnote))
                         .foregroundStyle(LienColors.gentleAlert)
                 }
             }
 
             VStack(alignment: .leading, spacing: LienSpacing.s) {
                 Text(Strings.Onboarding.avatarTitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.subheadline))
+                    .foregroundStyle(LienColors.inkSecondary)
                 // タネの子のイラスト12種(4列 × 3行)。ニックネームと同じ幅の中に収まる
                 AvatarPicker(selection: $viewModel.avatar)
             }
@@ -129,15 +130,15 @@ struct OnboardingView: View {
     private var notificationNote: some View {
         HStack(alignment: .top, spacing: LienSpacing.s) {
             Image(systemName: "bell")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.lien(.footnote))
+                .foregroundStyle(LienColors.inkSecondary)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(Strings.Onboarding.notificationTitle)
-                    .font(.footnote.weight(.medium))
+                    .font(.lien(.footnote, bold: false))
                 Text(Strings.Onboarding.notificationBody)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.caption))
+                    .foregroundStyle(LienColors.inkSecondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -150,13 +151,13 @@ struct OnboardingView: View {
             // 押せない理由を、押せないあいだだけ書く(無効なボタンだけ置くと、なぜ進めないか分からない)
             if let blockedReason = blockedReason {
                 Text(blockedReason)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.footnote))
+                    .foregroundStyle(LienColors.inkSecondary)
                     .multilineTextAlignment(.center)
             }
             if let errorMessage = viewModel.submitErrorMessage {
                 Text(errorMessage)
-                    .font(.footnote)
+                    .font(.lien(.footnote))
                     .foregroundStyle(LienColors.gentleAlert)
                     .multilineTextAlignment(.center)
             }
@@ -166,38 +167,23 @@ struct OnboardingView: View {
         .padding(.horizontal, LienSpacing.l)
         .padding(.top, LienSpacing.s)
         .padding(.bottom, LienSpacing.m)
-        .background(.bar)
+        .background(LienColors.paper.ignoresSafeArea(edges: .bottom))
     }
 
-    /// 送信ボタン。押せないあいだは淡い塗り + 枠線にする。
-    /// iOS 26 の無効な .borderedProminent はほぼ白になり、ボタンの形が見えなくなるため自作する
+    /// 送信ボタン(主役)。押せないあいだは淡い塗り + 枠線になる(LienPrimaryButtonStyle)
     private var submitButton: some View {
-        let ready = viewModel.canSubmitProfile
-        return Button {
+        Button {
             Task { await viewModel.submitAndFinish() }
         } label: {
-            Group {
-                if viewModel.isSubmitting {
-                    ProgressView()
-                } else {
-                    Text(submitButtonTitle)
-                }
+            if viewModel.isSubmitting {
+                ProgressView()
+                    .tint(LienColors.accent) // 送信中は押せない(淡い塗り)ので、緑で回す
+            } else {
+                Text(submitButtonTitle)
             }
-            .font(.body.weight(.semibold))
-            .foregroundStyle(ready ? Color.white : LienColors.accent)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(ready ? LienColors.accent : LienColors.accent.opacity(0.14))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(ready ? Color.clear : LienColors.accent.opacity(0.45), lineWidth: 1)
-            )
         }
-        .buttonStyle(.plain)
-        .disabled(!ready)
+        .buttonStyle(.lienPrimary)
+        .disabled(!viewModel.canSubmitProfile)
     }
 
     /// 送信できない理由(無ければ nil)。ボタンの無効化だけに頼らない
@@ -241,11 +227,11 @@ private struct ConsentSection: View {
             } label: {
                 HStack(alignment: .top, spacing: LienSpacing.s) {
                     Image(systemName: isAgreed ? "checkmark.square.fill" : "square")
-                        .font(.title3)
-                        .foregroundStyle(isAgreed ? Color.accentColor : Color.secondary)
+                        .font(.lien(.title3))
+                        .foregroundStyle(isAgreed ? LienColors.accent : LienColors.inkSecondary)
                     Text(Strings.Onboarding.consentLabel)
-                        .font(.footnote)
-                        .foregroundStyle(.primary)
+                        .font(.lien(.footnote))
+                        .foregroundStyle(LienColors.ink)
                         .multilineTextAlignment(.leading)
                 }
             }
@@ -258,11 +244,11 @@ private struct ConsentSection: View {
                 Link(Strings.Onboarding.consentTermsLink, destination: SupportLinks.termsURL)
                 Link(Strings.Onboarding.consentPrivacyLink, destination: SupportLinks.privacyURL)
             }
-            .font(.caption)
+            .font(.lien(.caption))
 
             Text(Strings.Onboarding.consentNote)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.lien(.caption2))
+                .foregroundStyle(LienColors.inkSecondary)
         }
     }
 }

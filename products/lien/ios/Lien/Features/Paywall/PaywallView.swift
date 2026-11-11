@@ -30,7 +30,7 @@ struct PaywallView: View {
             }
             .padding(LienSpacing.l)
         }
-        .background(LienColors.chipBackground.opacity(0.35))
+        .lienPaperBackground()
         .task { await model.load() }
     }
 
@@ -39,8 +39,8 @@ struct PaywallView: View {
     private var closeRow: some View {
         HStack {
             Text(Strings.Paywall.title)
-                .font(.headline)
-                .foregroundStyle(.secondary)
+                .font(.lien(.headline))
+                .foregroundStyle(LienColors.inkSecondary)
             Spacer()
             Button(Strings.Paywall.closeButton) { dismiss() }
                 .accessibilityIdentifier("paywall.close")
@@ -52,24 +52,30 @@ struct PaywallView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: LienSpacing.s) {
             Text(model.headline)
-                .font(.title2.bold())
+                .font(.lien(.title2, bold: true))
+                .foregroundStyle(LienColors.ink)
                 .accessibilityIdentifier("paywall.headline")
             Text(model.message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.lien(.subheadline))
+                .foregroundStyle(LienColors.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let trialNote = model.trialNote {
                 Text(trialNote)
-                    .font(.footnote.weight(.semibold))
+                    .font(.lien(.footnote, bold: true))
                     .foregroundStyle(LienColors.shareAccent)
             }
             VStack(alignment: .leading, spacing: LienSpacing.xs) {
                 Text(Strings.Paywall.benefitsTitle)
-                    .font(.footnote.weight(.semibold))
+                    .font(.lien(.footnote, bold: true))
                 ForEach(Strings.Paywall.benefits, id: \.self) { benefit in
-                    Label(benefit, systemImage: "checkmark.circle.fill")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    Label {
+                        Text(benefit)
+                            .foregroundStyle(LienColors.inkSecondary)
+                    } icon: {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(LienColors.accent)
+                    }
+                    .font(.lien(.footnote))
                 }
             }
             .padding(.top, LienSpacing.xs)
@@ -98,14 +104,14 @@ struct PaywallView: View {
         } label: {
             HStack(alignment: .top, spacing: LienSpacing.s) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(selected ? LienColors.shareAccent : LienColors.pending)
+                    .foregroundStyle(selected ? LienColors.accent : LienColors.pending)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: LienSpacing.xs) {
                         Text(model.priceCaption(for: package))
-                            .font(.body.weight(.semibold))
+                            .font(.lien(.body, bold: true))
                         if package.isRecommended {
                             Text(Strings.Paywall.recommended)
-                                .font(.caption2.weight(.bold))
+                                .font(.lien(.caption2, bold: true))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(
@@ -115,20 +121,20 @@ struct PaywallView: View {
                     }
                     if let days = package.trialDays, days > 0 {
                         Text(Strings.Paywall.trialNote(days))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.lien(.caption))
+                            .foregroundStyle(LienColors.inkSecondary)
                     }
                 }
                 Spacer()
             }
             .padding(LienSpacing.m)
             .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(selected ? LienColors.chipBackground : Color.clear)
+                RoundedRectangle(cornerRadius: LienRadius.card, style: .continuous)
+                    .fill(selected ? LienColors.accentSoft : LienColors.card)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(selected ? LienColors.shareAccent : LienColors.pending.opacity(0.4), lineWidth: selected ? 2 : 1)
+                RoundedRectangle(cornerRadius: LienRadius.card, style: .continuous)
+                    .strokeBorder(selected ? LienColors.accent : LienColors.cardBorder, lineWidth: selected ? 2 : 1)
             )
         }
         .buttonStyle(.plain)
@@ -145,25 +151,23 @@ struct PaywallView: View {
                 Task { await model.purchase() }
             } label: {
                 HStack {
-                    if model.isPurchasing { ProgressView().tint(.white) }
+                    if model.isPurchasing { ProgressView().tint(LienColors.accent) }
                     Text(model.purchaseButtonTitle)
-                        .frame(maxWidth: .infinity)
                 }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(LienColors.shareAccent)
+            .buttonStyle(.lienPrimary)
             .disabled(!model.canPurchase)
             .accessibilityIdentifier("paywall.purchase")
 
             if let notice = model.noticeMessage {
                 Text(notice)
-                    .font(.footnote)
+                    .font(.lien(.footnote))
                     .foregroundStyle(LienColors.shareAccent)
                     .accessibilityIdentifier("paywall.notice")
             }
             if let error = model.errorMessage {
                 Text(error)
-                    .font(.footnote)
+                    .font(.lien(.footnote))
                     .foregroundStyle(LienColors.gentleAlert)
                     .accessibilityIdentifier("paywall.error")
             }
@@ -183,14 +187,14 @@ struct PaywallView: View {
                     Text(model.restoreButtonTitle)
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(LienSecondaryButtonStyle(fillsWidth: false))
             .disabled(model.isRestoring || model.isPurchasing)
             .accessibilityIdentifier("paywall.restore")
 
             if model.isAppliedByPartner {
                 Text(Strings.Paywall.appliedByPartner)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.footnote))
+                    .foregroundStyle(LienColors.inkSecondary)
                     .accessibilityIdentifier("paywall.appliedByPartner")
             }
         }
@@ -199,26 +203,26 @@ struct PaywallView: View {
     private var legalSection: some View {
         VStack(alignment: .leading, spacing: LienSpacing.xs) {
             Text(Strings.Paywall.legalNote)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.lien(.caption2))
+                .foregroundStyle(LienColors.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: LienSpacing.m) {
                 Link(Strings.Paywall.terms, destination: SupportLinks.termsURL)
                 Link(Strings.Paywall.privacy, destination: SupportLinks.privacyURL)
             }
-            .font(.caption2)
+            .font(.lien(.caption2))
         }
     }
 
     private var appliedByPartnerNote: some View {
         VStack(alignment: .leading, spacing: LienSpacing.s) {
             Text(Strings.Paywall.appliedByPartner)
-                .font(.subheadline)
+                .font(.lien(.subheadline))
                 .foregroundStyle(LienColors.shareAccent)
                 .accessibilityIdentifier("paywall.appliedByPartner")
             Text(Strings.Paywall.title)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.lien(.footnote))
+                .foregroundStyle(LienColors.inkSecondary)
         }
     }
 }

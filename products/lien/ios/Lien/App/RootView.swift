@@ -140,8 +140,8 @@ private struct ResolvingView: View {
         VStack(spacing: LienSpacing.m) {
             ProgressView()
             Text(Strings.Home.emptyMessage)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.lien(.footnote))
+                .foregroundStyle(LienColors.inkSecondary)
         }
     }
 }

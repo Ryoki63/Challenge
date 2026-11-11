@@ -78,6 +78,8 @@ struct HomeView: View {
             // (WhisperBubbleMetrics.parentTopPadding。変えるときは、そちらも合わせる)
             .padding(LienSpacing.l)
         }
+        // 画面の地は紙の色(2026-11-11 UI 改修。白い画面をやめ、クリームの上にカードを置く)
+        .lienPaperBackground()
         // 主役の「できた!」はスクロールの外に固定する(植物の高さ・文字の大きさで位置が動かない)
         .safeAreaInset(edge: .bottom) {
             if viewModel.snapshot != nil {
@@ -233,9 +235,9 @@ struct SnapshotContent: View {
 
     var body: some View {
         VStack(spacing: LienSpacing.m) {
-            // 記録は一番上に1行だけ(植物の上の文脈。以前は植物とボタンの間にあって視線を割っていた)
+            // 記録は一番上に、大きな数字で(2026-11-11 UI 改修。1画面1主役 — 数字が「ふたりの財産」を語る)
             if viewModel.showsStreak {
-                StreakLine(current: snapshot.streakCurrent, best: snapshot.streakBest)
+                StreakHero(current: snapshot.streakCurrent, best: snapshot.streakBest)
             }
 
             PlantHeroView(
@@ -260,23 +262,24 @@ struct SnapshotContent: View {
                 // ソロ状態: 眠るタネの子+誘導文言+招待導線(§3.2, §3.9。招待画面本体は PairingView — T11)
                 VStack(spacing: LienSpacing.xs) {
                     Text(Strings.Home.soloCaption)
-                        .font(.subheadline)
+                        .font(.lien(.subheadline, bold: true))
+                        .foregroundStyle(LienColors.ink)
                     Text(Strings.Home.soloInviteHint)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(.lien(.footnote))
+                        .foregroundStyle(LienColors.inkSecondary)
                         .multilineTextAlignment(.center)
                     if let onInvite {
                         Button(action: onInvite) {
                             Text(Strings.Home.inviteButton)
-                                .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.lienSecondary)
                         .padding(.top, LienSpacing.xs)
                     }
                 }
+                .lienCard()
             }
 
-            // 約束と今日の状態。チップのカードはやめ、1行の文にした(葉がすでに誰がやったかを示している)
+            // 約束と今日の状態。1行の文を紙の上のカード1枚にまとめた(葉がすでに誰がやったかを示している)
             PairStatusArea(viewModel: viewModel, snapshot: snapshot, moderation: moderation)
 
             // チケットは 0 枚のときだけ出す(常時出すと在庫管理の印象になり、守られている実感にならない)
@@ -293,7 +296,7 @@ struct SnapshotContent: View {
 // 主役の「できた!」は、スクロールの位置に関係なく**いつも同じ場所**に置く。
 // 以前はスクロールの中ほど(画面の 84% の位置)にあり、植物の高さや文字の大きさで毎回動いた。
 // 補助の操作(つつく・リアクション・シェア)は、その上に1行だけ。
-// 帯は半透明の材質で敷き、下を内容が流れても読めるようにする。
+// 帯は紙の色で敷き、上端に細い縁を引く(下を内容が流れても、帯の始まりが分かる)。
 
 @MainActor
 struct HomeActionBar: View {
@@ -305,8 +308,8 @@ struct HomeActionBar: View {
             // 帯の上端の細い区切り。ダークモードの .bar は背景とほぼ同じ明るさで、
             // 下を内容が流れたときに帯の始まりが見えなくなる
             Rectangle()
-                .fill(Color.primary.opacity(0.12))
-                .frame(height: 0.5)
+                .fill(LienColors.cardBorder)
+                .frame(height: 1)
 
             VStack(spacing: LienSpacing.s) {
                 SecondaryActionRow(viewModel: viewModel, onShowPaywall: onShowPaywall)
@@ -317,34 +320,59 @@ struct HomeActionBar: View {
             .padding(.top, LienSpacing.s)
             .padding(.bottom, LienSpacing.s)
         }
-        .background(.bar)
+        // 帯も紙の色(半透明の材質はやめた: 紙の上に灰色の帯が乗って、画面が2枚に割れて見えた)
+        .background(LienColors.paper)
     }
 }
 
 // MARK: - ストリーク(§3.5。最高記録は永続表示 =「ふたりの財産」)
 //
-// 1行に畳む。以前は「ふたりの記録 / 🔥 23日 / 最高記録 40日」の3行中央揃えで、
-// 植物と主役のボタンの間にあって視線を割っていた。数字だけを強く、ほかは小さく添える。
+// 画面のいちばん上に、大きな数字で置く(2026-11-11 UI 改修 — Issho の「大きな時間の数字」の移植)。
+// 以前は「ふたりの記録 23日 ・ 最高記録 40日」の1行で、植物の上の小さな文脈だった。
+// 数字は丸ゴシックの太字で大きく、下にやわらかい黄の光を敷く。ほかの語(呼び名・最高記録)は小さく添える。
+// 0日でも同じ形で出す(リセットを責めない。最高記録は残る — §3.5)
 
-private struct StreakLine: View {
+private struct StreakHero: View {
     let current: Int
     let best: Int
 
+    /// 数字の大きさ(文字を大きくする設定に連れて広がる)
+    @ScaledMetric(relativeTo: .largeTitle) private var numberSize: CGFloat = 64
+    @ScaledMetric(relativeTo: .title2) private var unitSize: CGFloat = 24
+
     var body: some View {
-        HStack(spacing: LienSpacing.xs) {
-            Text(Strings.Home.streakCaption)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(Strings.Home.streakDays(current))
-                .font(.headline.monospacedDigit())
-            Text("・")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(Strings.Home.streakBestNote(best))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        VStack(spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("\(current)")
+                    .font(.lien(size: numberSize, bold: true))
+                    .monospacedDigit()
+                Text(Strings.Share.dayUnit)
+                    .font(.lien(size: unitSize, bold: true))
+            }
+            .foregroundStyle(LienColors.ink)
+            .background {
+                // 数字の下半分に敷く光(蛍光ペンのように。数字そのものは隠さない)
+                Capsule()
+                    .fill(LienColors.highlight)
+                    .frame(height: numberSize * 0.34)
+                    .padding(.horizontal, -LienSpacing.s)
+                    .offset(y: numberSize * 0.26)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+
+            HStack(spacing: LienSpacing.xs) {
+                Text(Strings.Home.streakCaption)
+                Text("・")
+                Text(Strings.Home.streakBestNote(best))
+            }
+            .font(.lien(.caption))
+            .foregroundStyle(LienColors.inkSecondary)
         }
-        .accessibilityElement(children: .combine)
+        .frame(maxWidth: .infinity)
+        // 「ふたりの記録: 23日、最高記録 40日」と1つで読み上げる
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(Strings.Widget.streakSpoken(current)), \(Strings.Home.streakBestNote(best))")
     }
 }
 
@@ -361,7 +389,7 @@ private struct PairStatusArea: View {
     let moderation: ModerationViewModel?
 
     var body: some View {
-        VStack(spacing: LienSpacing.s) {
+        VStack(spacing: LienSpacing.xs) {
             // 自分の約束はソロでも出す(以前は今日のチップにしか出ておらず、チップを落とすと見えなくなる)
             HStack(spacing: LienSpacing.xs) {
                 promiseSegment(
@@ -370,7 +398,7 @@ private struct PairStatusArea: View {
                 )
                 if !viewModel.isSolo {
                     Text("・")
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(LienColors.cardBorder)
                     promiseSegment(
                         title: snapshot.partnerPromiseTitle,
                         done: snapshot.todayPartnerDone
@@ -384,26 +412,28 @@ private struct PairStatusArea: View {
                     )
                 }
             }
-            .font(.footnote)
+            .font(.lien(.subheadline, bold: true))
             .accessibilityElement(children: .combine)
 
             if let waiting = viewModel.partnerWaitingText {
                 // 相手が先に完了 →「(名前)が待ってるよ」(§3.10)
                 Text(waiting)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.lien(.footnote))
+                    .foregroundStyle(LienColors.inkSecondary)
             }
 
             if viewModel.showsBothDoneCelebration {
                 // 両者完了の演出(§3.4)
                 Text(Strings.Home.bothDoneCelebration)
-                    .font(.headline)
+                    .font(.lien(.headline))
                     .foregroundStyle(LienColors.done)
             }
-
-            // 相手が今日添えた写真(§3.11 / PV #59)。写真が無い日・取得に失敗したときは何も出ない
-            PartnerPhotoArea(model: viewModel.partnerPhoto, partnerName: snapshot.partnerName)
         }
+        // 約束と今日の状態は、紙の上の1枚のカードにまとめる(ばらばらの行を、1つのまとまりとして見せる)
+        .lienCard()
+
+        // 相手が今日添えた写真(§3.11 / PV #59)。写真が無い日・取得に失敗したときは何も出ない
+        PartnerPhotoArea(model: viewModel.partnerPhoto, partnerName: snapshot.partnerName)
     }
 
     /// 1人分の約束(文)。今日やった人の文だけ濃くする(葉と同じ意味を、文字でも薄く二重に持つ)
@@ -411,7 +441,7 @@ private struct PairStatusArea: View {
         Text(title ?? Strings.Home.promiseUnsetLabel)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
-            .foregroundStyle(done ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .foregroundStyle(done ? LienColors.ink : LienColors.inkSecondary)
     }
 }
 
@@ -430,7 +460,7 @@ private struct SecondaryActionRow: View {
             VStack(spacing: LienSpacing.xs) {
                 if let message {
                     Text(message.text)
-                        .font(.footnote)
+                        .font(.lien(.footnote))
                         .foregroundStyle(message.isError ? LienColors.gentleAlert : LienColors.done)
                         .multilineTextAlignment(.center)
                 }
@@ -442,14 +472,10 @@ private struct SecondaryActionRow: View {
                             viewModel.presentShareImage()
                         } label: {
                             Label(Strings.Share.shortButton, systemImage: "square.and.arrow.up")
-                                .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .tint(LienColors.shareAccent)
+                        .buttonStyle(.lienSecondaryCompact)
                     }
                 }
-                .font(.footnote)
             }
         }
     }
@@ -493,15 +519,12 @@ private struct NudgeArea: View {
                             ProgressView()
                         } else if compact {
                             Label(Strings.Nudge.button, systemImage: "hand.tap")
-                                .frame(maxWidth: .infinity)
                         } else {
                             Text(Strings.Nudge.button)
-                                .frame(maxWidth: .infinity)
                         }
                     }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(compact ? .small : .regular)
+                .buttonStyle(LienSecondaryButtonStyle(compact: compact))
                 .disabled(!viewModel.canNudge)
             }
             .sheet(isPresented: $showsSheet) {
@@ -514,12 +537,12 @@ private struct NudgeArea: View {
     private var nudgeMessageArea: some View {
         if let message = viewModel.nudgeErrorMessage {
             Text(message)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .foregroundStyle(LienColors.gentleAlert)
                 .multilineTextAlignment(.center)
         } else if let note = viewModel.nudgeSentNote {
             Text(note)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .foregroundStyle(LienColors.done)
                 .multilineTextAlignment(.center)
         }
@@ -547,15 +570,12 @@ private struct ReactionArea: View {
                             ProgressView()
                         } else if compact {
                             Label(Strings.Reaction.button, systemImage: "heart")
-                                .frame(maxWidth: .infinity)
                         } else {
                             Text(Strings.Reaction.button)
-                                .frame(maxWidth: .infinity)
                         }
                     }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(compact ? .small : .regular)
+                .buttonStyle(LienSecondaryButtonStyle(compact: compact))
                 .disabled(!viewModel.canReact)
             }
             .sheet(isPresented: $showsSheet) {
@@ -568,12 +588,12 @@ private struct ReactionArea: View {
     private var reactionMessageArea: some View {
         if let message = viewModel.reactionErrorMessage {
             Text(message)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .foregroundStyle(LienColors.gentleAlert)
                 .multilineTextAlignment(.center)
         } else if let note = viewModel.reactionSentNote {
             Text(note)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .foregroundStyle(LienColors.done)
                 .multilineTextAlignment(.center)
         }
@@ -589,10 +609,11 @@ private struct EmptyHomeContent: View {
                 .frame(width: 150, height: 200) // 3:4
                 .padding(.top, LienSpacing.xl)
             Text(Strings.Home.emptyTitle)
-                .font(.title3.bold())
+                .font(.lien(.title3, bold: true))
+                .foregroundStyle(LienColors.ink)
             Text(Strings.Home.emptyMessage)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.lien(.footnote))
+                .foregroundStyle(LienColors.inkSecondary)
                 .multilineTextAlignment(.center)
         }
     }

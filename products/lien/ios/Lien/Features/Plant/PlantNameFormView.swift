@@ -16,7 +16,7 @@ struct PlantNameFormView: View {
         let isRename = model.mode == .rename
         VStack(spacing: LienSpacing.s) {
             Text(isRename ? Strings.Plant.renameTitle : Strings.Plant.nameTitle)
-                .font(.headline)
+                .font(.lien(.headline))
 
             TextField(Strings.Plant.namePlaceholder, text: $model.draft)
                 .textFieldStyle(.roundedBorder)
@@ -26,14 +26,14 @@ struct PlantNameFormView: View {
 
             if let message {
                 Text(message)
-                    .font(.footnote)
+                    .font(.lien(.footnote))
                     .foregroundStyle(LienColors.gentleAlert)
                     .multilineTextAlignment(.center)
             }
 
             Text(Strings.Plant.nameNote)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.lien(.caption))
+                .foregroundStyle(LienColors.inkSecondary)
                 .multilineTextAlignment(.center)
 
             Button {
@@ -48,7 +48,7 @@ struct PlantNameFormView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.lienPrimary)
             .disabled(!model.canSubmit)
         }
     }

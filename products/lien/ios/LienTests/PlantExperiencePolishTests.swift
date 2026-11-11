@@ -564,9 +564,10 @@ final class WhisperBubbleMetricsTests: XCTestCase {
     }
 
     func testTheStandardSizeKeepsTheLayoutNearlyAsItWas() {
-        // 標準の文字の大きさでは、植物の上の余白は従来(32pt)に近い(余裕の分だけ少し広い)— ホームのレイアウトをほとんど動かさない
+        // 標準の文字の大きさでは、植物の上の余白は従来(32pt)に近い(余裕の分だけ少し広い)— ホームのレイアウトをほとんど動かさない。
+        // 2026-11-11 に丸ゴシック(行が高い)へ変えて 41pt になった(行の基準 18 → 20pt)ので、許す幅を 10pt にした
         let room = WhisperBubbleMetrics.roomAbovePlant(lineHeight: WhisperBubbleMetrics.baseLineHeight)
-        XCTAssertEqual(room, 32, accuracy: 6)
+        XCTAssertEqual(room, 32, accuracy: 10)
         XCTAssertGreaterThanOrEqual(room, 32)
         // iOS の実描画(CI の一覧画像)で、日本語の2行の吹き出しは標準で 55pt。親の余白と合わせて、上の端まで 3pt 以上あく
         let measuredOnIOS: CGFloat = 55

@@ -69,12 +69,12 @@ struct CheckinFlowView: View {
             ?? viewModel.cancelErrorMessage
             ?? viewModel.photoErrorMessage {
             Text(message)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .foregroundStyle(LienColors.gentleAlert)
                 .multilineTextAlignment(.center)
         } else if let note = viewModel.photoAttachedNote {
             Text(note)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .foregroundStyle(LienColors.done)
                 .multilineTextAlignment(.center)
         }
@@ -93,10 +93,9 @@ struct CheckinFlowView: View {
                     Text(Strings.Home.checkinButton)
                 }
             }
-            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
+        // 主役のボタン(ぷっくり。押すと沈む — DesignSystem/Components.swift)
+        .buttonStyle(.lienPrimary)
         .disabled(!viewModel.canCheckin)
     }
 
@@ -105,7 +104,7 @@ struct CheckinFlowView: View {
     @ViewBuilder
     private var doneStateControls: some View {
         Label(Strings.Home.checkinDoneLabel, systemImage: "checkmark.circle.fill")
-            .font(.headline)
+            .font(.lien(.headline))
             .foregroundStyle(LienColors.done)
             .frame(maxWidth: .infinity)
             .padding(.vertical, LienSpacing.s)
@@ -123,9 +122,8 @@ struct CheckinFlowView: View {
                             Label(Strings.Checkin.attachPhotoButton, systemImage: "photo")
                         }
                     }
-                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.lienSecondary)
                 .disabled(!viewModel.canAttachPhoto)
             }
 
@@ -140,13 +138,11 @@ struct CheckinFlowView: View {
                             Text(Strings.Checkin.cancelButton)
                         }
                     }
-                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.lienSecondary)
                 .disabled(!viewModel.canCancelCheckin)
             }
         }
-        .font(.subheadline)
     }
 }
 

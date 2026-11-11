@@ -28,6 +28,7 @@ struct NotificationSettingsView: View {
             streakSection
             partnerSection
         }
+        .lienFormBackground()
         .navigationTitle(Strings.NotificationSettings.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -46,7 +47,7 @@ struct NotificationSettingsView: View {
     private var deniedSection: some View {
         Section {
             Text(Strings.NotificationSettings.deniedNotice)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .foregroundStyle(LienColors.gentleAlert)
             systemSettingsButton
         }
@@ -73,7 +74,7 @@ struct NotificationSettingsView: View {
                     reminderControls
                 } else {
                     Text(Strings.NotificationSettings.reminderNoPromise)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(LienColors.inkSecondary)
                 }
             }
         } header: {
@@ -112,12 +113,12 @@ struct NotificationSettingsView: View {
         }
         if let message = viewModel.saveErrorMessage {
             Text(message)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .foregroundStyle(LienColors.gentleAlert)
         }
         if viewModel.showsSavedNote && !viewModel.isReminderDirty {
             Text(Strings.NotificationSettings.reminderSaved)
-                .font(.footnote)
+                .font(.lien(.footnote))
                 .foregroundStyle(LienColors.done)
         }
     }

@@ -36,20 +36,20 @@ struct PlantCelebrationHeartView: View {
                         Text(Strings.Plant.celebrationHeart(partnerName))
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.lienSecondary)
                     if heartState == .failed {
                         Text(Strings.Plant.celebrationHeartError)
-                            .font(.footnote)
+                            .font(.lien(.footnote))
                             .foregroundStyle(LienColors.gentleAlert)
                             .multilineTextAlignment(.center)
                     }
                 case .sending:
                     Text(Strings.Plant.celebrationHeartSending)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(.lien(.footnote))
+                        .foregroundStyle(LienColors.inkSecondary)
                 case .sent:
                     Text(Strings.Plant.celebrationHeartSent)
-                        .font(.footnote)
+                        .font(.lien(.footnote))
                         .foregroundStyle(LienColors.done)
                 }
             }
