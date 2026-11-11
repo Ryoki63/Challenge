@@ -837,3 +837,4 @@
 - 2026-11-11 近接ペアは見送り: CoreBluetooth の前面交換を実装し独立レビューに出したところ、同時受諾による二重ペア・確認なしの自動ペアなど高リスクの指摘が出た。オーナー判断「やっぱこの機能はつけるのやめよう」で、未コミットの実装はすべて破棄(コミット・push はしていない)。招待はリンク / コード入力の3導線のまま。
 - 2026-11-11 history: ストア用スクショの見直しで、カレンダー履歴だけ白い地・真っ黒な印のまま残っていた。紙の地(`lienPaperBackground()`)・月のグリッドをカードに・印と文字を墨の色(`historyMark` = `ink`、無彩色の中立表現は維持)へ。StoreScreenshotRenderTests の履歴の地も紙の色に。
   - 検証: xcodebuild test **1256 件成功**、macos-check(module / views / widget)OK。ストア用スクショ 6枚を描いて目視確認。
+- 2026-11-11 スクショ差し替え: lien-ios #43007349235(commit 5126e81)は1回目がランナー混雑でビルド中に 20 分の上限を超えて打ち切り。再実行(attempt 2)で成功。その artifact でストア用スクショ 6.7in / 6.1in 各6枚・manifest・一覧を差し替え(a013fbb)、プレス用3枚も追従(3dc6139)。verify_screenshots / verify_press OK、lien-ci 成功。lien-play.yml は以前から毎回 workflow file issue で失敗しており、今回の変更とは無関係(未対応)。
