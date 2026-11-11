@@ -24,9 +24,20 @@ struct WidgetTestFrame: View {
     var cornerRadius: CGFloat = 22
     var margin: CGFloat = 16
 
-    /// ウィジェットの背景(ライト = 白 / ダーク = 黒に近い濃い色)。余白の検査が、この色との一致を見る
+    /// ウィジェットの背景(本物と同じ LienColors.paper。ライト = #FBF6EA / ダーク = #1D1F1B)。余白の検査が、この色との一致を見る
     var background: Color {
-        dark ? Color(white: 0.11) : Color.white
+        LienColors.paper
+    }
+
+    /// background の画素値(余白の検査が比べる)
+    static func backgroundRGB(dark: Bool) -> (r: Int, g: Int, b: Int) {
+        dark ? (29, 31, 27) : (251, 246, 234)
+    }
+
+    /// 背景(紙の色)からはっきり外れた画素か(描けている画素を数えるため)
+    static func differsFromBackground(_ p: (r: Int, g: Int, b: Int, a: Int), dark: Bool) -> Bool {
+        let bg = backgroundRGB(dark: dark)
+        return abs(p.r - bg.r) > 15 || abs(p.g - bg.g) > 15 || abs(p.b - bg.b) > 15
     }
 
     var body: some View {

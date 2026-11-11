@@ -71,7 +71,7 @@ struct WidgetSmallView: View {
             PlantCharacterView(state: content.plant, imageStyle: imageStyle)
             if let note = content.note {
                 Text(note)
-                    .font(.caption2)
+                    .font(.lien(.caption2))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)

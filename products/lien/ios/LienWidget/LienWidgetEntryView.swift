@@ -3,7 +3,7 @@
 // WidgetKit のファミリー(@Environment(\.widgetFamily))を、共有の描画方式(WidgetLayout)に写し、
 // Lien/Core/Widget/ の WidgetRootView(S / M / ロック画面の円形・インライン。テストと一覧画像が描くのと同じビュー)に渡す。
 // ここで足すのは、WidgetKit にしか無いもの:
-//   - containerBackground: ホーム S / M はシステムの背景(ダークは暗い背景に、PlantCharacterView が最背面の bg_plate を敷く)。
+//   - containerBackground: ホーム S / M はアプリと同じ紙の色(LienColors.paper。ダークは暗い土の色。2026-11-11 UI 改修)。
 //     ロック画面は背景なし(円形は AccessoryWidgetBackground を敷く。システムが単色化して描く)
 //   - imageStyle: .widgetFullColor — iOS 18 の「色合い(accented)」表示でも、植物の各レイヤーが単色にならないようにする
 //     (Lien/Core/Widget/Views/WidgetAccent.swift)
@@ -29,7 +29,7 @@ struct LienWidgetEntryView: View {
         )
         switch layout {
         case .small, .medium:
-            root.containerBackground(.background, for: .widget)
+            root.containerBackground(for: .widget) { LienColors.paper }
         case .lockCircular:
             ZStack {
                 AccessoryWidgetBackground()

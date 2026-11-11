@@ -41,7 +41,7 @@ struct WidgetMediumView: View {
         case .solo, .noData:
             if let note = content.note {
                 Text(note)
-                    .font(.footnote)
+                    .font(.lien(.footnote))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
                     .minimumScaleFactor(0.8)
@@ -61,7 +61,7 @@ struct WidgetMediumView: View {
     private func pairedStack(spacing: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: spacing) {
             if let days = content.streakDays {
-                WidgetStreakLabel(days: days, font: .headline)
+                WidgetStreakLabel(days: days, font: .lien(.headline))
             }
             if let me = content.me, let partner = content.partner {
                 WidgetStatusChips(me: me, partner: partner, spacing: 16)
@@ -69,7 +69,7 @@ struct WidgetMediumView: View {
             if let progress = content.progress {
                 WidgetProgressBar(fraction: progress, height: 6)
             }
-            WidgetCaption(text: content.waitingMessage, font: .caption)
+            WidgetCaption(text: content.waitingMessage, font: .lien(.caption))
                 .frame(height: Self.captionHeight, alignment: .leading)
         }
     }

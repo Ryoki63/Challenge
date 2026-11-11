@@ -55,7 +55,7 @@ struct WidgetProgressBar: View {
 /// 「🔥 23日」。数字はストリークだけ
 struct WidgetStreakLabel: View {
     let days: Int
-    var font: Font = .caption.bold()
+    var font: Font = .lien(.caption, bold: true)
 
     var body: some View {
         Text("🔥 " + Strings.Widget.streakDays(days))
@@ -76,11 +76,11 @@ struct WidgetStatusChip: View {
         HStack(spacing: 3) {
             // 完了の緑・未完のグレーも、色合い(accented)表示で単色にしない(形と濃さでも見分けられる)
             WidgetImageStyle.fullColor(Image(systemName: person.done ? "checkmark.circle.fill" : "circle"))
-                .font(.caption)
+                .font(.lien(.caption))
                 .foregroundStyle(person.done ? WidgetStyle.done : WidgetStyle.pending)
             // 狭い列(iPhone SE の S)や大きい文字でも、文字が欠けないよう、縮めて収める(収まらない長い名前は末尾を省く)
             Text(person.name)
-                .font(.caption2)
+                .font(.lien(.caption2))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
@@ -122,7 +122,7 @@ struct WidgetStatusChips: View {
 /// 「(相手)が待ってるよ」。出ないときも行を空けて、植物の大きさを状態で変えない(WidgetSmallMetrics.captionHeight)
 struct WidgetCaption: View {
     let text: String?
-    var font: Font = .caption2
+    var font: Font = .lien(.caption2)
 
     var body: some View {
         Group {

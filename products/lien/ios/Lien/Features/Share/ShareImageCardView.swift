@@ -122,7 +122,7 @@ struct ShareImageCardView: View {
             Image(systemName: "leaf.fill")
                 .font(.system(size: 11, weight: .semibold))
             Text(Strings.Share.streakCaption)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(.lien(size: 13, bold: true))
                 .tracking(2)
         }
         .foregroundStyle(LienColors.shareAccent.opacity(0.82))
@@ -131,17 +131,17 @@ struct ShareImageCardView: View {
     private func streakBlock(numberSize: CGFloat, unitSize: CGFloat) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
             Text("\(content.streakDays)")
-                .font(.system(size: numberSize, weight: .bold, design: .rounded))
+                .font(.lien(size: numberSize, bold: true))
                 .monospacedDigit()
             Text(Strings.Share.dayUnit)
-                .font(.system(size: unitSize, weight: .bold, design: .rounded))
+                .font(.lien(size: unitSize, bold: true))
         }
         .foregroundStyle(LienColors.shareInk)
     }
 
     private func namesPill(fontSize: CGFloat) -> some View {
         Text(Strings.Share.names(content.myName, content.partnerName))
-            .font(.system(size: fontSize, weight: .semibold, design: .rounded))
+            .font(.lien(size: fontSize, bold: true))
             .foregroundStyle(LienColors.shareInk)
             .lineLimit(1)
             .minimumScaleFactor(0.55)
@@ -152,7 +152,7 @@ struct ShareImageCardView: View {
 
     private func startedOn(fontSize: CGFloat) -> some View {
         Text(Strings.Share.startedOn(content.startedOnText))
-            .font(.system(size: fontSize, weight: .medium, design: .rounded))
+            .font(.lien(size: fontSize))
             .foregroundStyle(LienColors.shareInk.opacity(0.62))
             .lineLimit(1)
     }
@@ -162,7 +162,7 @@ struct ShareImageCardView: View {
             Image(systemName: "leaf.fill")
                 .font(.system(size: 10, weight: .semibold))
             Text(content.appName)
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(.lien(size: 15, bold: true))
         }
         .foregroundStyle(LienColors.shareAccent.opacity(0.55))
     }

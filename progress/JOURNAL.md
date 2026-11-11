@@ -832,3 +832,5 @@
   - 書体が変わって吹き出しの行が高くなり(13pt で 18.8pt)、最大の文字サイズで上の端に食い込んだ(WhisperBubbleRenderTests)。WhisperBubbleMetrics.baseLineHeight を 18 → 20pt に。
   - UIReviewRenderTests: 招待・約束設定・設定・ペイウォールは ImageRenderer で描けない(ScrollView / Form)ため、ウィンドウに載せて描く形へ。
   - 検証: xcodebuild test **1256 件成功**、macos-check(module / views / widget)OK。描画で オンボ・ホーム・招待・約束設定・設定・ペイウォール を目視確認。
+- 2026-11-11 widget・share: ウィジェット(S / M・ロック画面)とシェア画像の文字を `Font.lien` へ。ホーム S / M の地を白から紙の色(`LienColors.paper`)へ。シェア画像の指紋(ShareImageSnapshots.json)を作り直した。WidgetRenderTests の背景の前提を白から紙の色へ。
+  - 検証: ShareImageRenderTests / WidgetRenderTests / WidgetSourceTests 成功、macos-check widget OK。描画で S / M・ロック画面・シェア画像(ストーリー・正方形・長い名前)を目視確認。

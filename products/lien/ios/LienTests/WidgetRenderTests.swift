@@ -102,7 +102,7 @@ final class WidgetRenderTests: XCTestCase {
         let band = 15
         var checked = 0
         for dark in [false, true] {
-            let background = dark ? 28 : 255 // Color(white: 0.11) = 28 / 白
+            let background = WidgetTestFrame.backgroundRGB(dark: dark)
             for textSize in [DynamicTypeSize.large, .accessibility5] {
                 for (layout, sizes) in [(WidgetLayout.small, smallSizes), (.medium, mediumSizes)] {
                     for size in sizes {
@@ -119,7 +119,7 @@ final class WidgetRenderTests: XCTestCase {
                                     let inBand = x < band || x >= image.width - band || y < band || y >= image.height - band
                                     guard inBand else { continue }
                                     let p = image.pixel(x, y)
-                                    if abs(p.r - background) > 3 || abs(p.g - background) > 3 || abs(p.b - background) > 3 {
+                                    if abs(p.r - background.r) > 3 || abs(p.g - background.g) > 3 || abs(p.b - background.b) > 3 {
                                         bad += 1
                                         if firstBad == nil { firstBad = (x, y) }
                                     }
@@ -158,10 +158,11 @@ final class WidgetRenderTests: XCTestCase {
         let fill = image.pixel(atPoint: 28, barY)
         XCTAssertTrue(fill.g > fill.r + 20 && fill.g > fill.b + 40, "塗り(緑)が出ていない: \(fill)")
         let track = image.pixel(atPoint: 100, barY)
-        XCTAssertTrue(abs(track.r - 219) <= 8 && abs(track.g - 219) <= 8 && abs(track.b - 219) <= 8, "土台(薄いグレー)が出ていない: \(track)")
+        // 土台は紙の色(#FBF6EA)に墨を 14% 重ねた色(約 #D8D4C9)
+        XCTAssertTrue(abs(track.r - 216) <= 8 && abs(track.g - 212) <= 8 && abs(track.b - 201) <= 8, "土台(薄い墨)が出ていない: \(track)")
         // 塗りの終わりのすぐ外は土台(52pt より先)
         let justAfter = image.pixel(atPoint: 56, barY)
-        XCTAssertTrue(abs(justAfter.r - justAfter.b) <= 8 && justAfter.g < 240, "塗りが長すぎる: \(justAfter)")
+        XCTAssertTrue(abs(justAfter.r - track.r) <= 8 && abs(justAfter.g - track.g) <= 8 && abs(justAfter.b - track.b) <= 8, "塗りが長すぎる: \(justAfter)")
     }
 
     func testTheProgressBarIsFullAtTheLastStageAndAbsentWithoutTheKeys() throws {
@@ -174,7 +175,8 @@ final class WidgetRenderTests: XCTestCase {
         let none = try smallPixels(WidgetSamples.paired(grown: nil, floor: nil, next: nil))
         for x in [20.0, 60.0, 100.0, 138.0] {
             let p = none.pixel(atPoint: CGFloat(x), barY)
-            XCTAssertTrue(p.r >= 250 && p.g >= 250 && p.b >= 250, "バーが出ている(x=\(x)): \(p)")
+            let paper = WidgetTestFrame.backgroundRGB(dark: false)
+            XCTAssertTrue(abs(p.r - paper.r) <= 3 && abs(p.g - paper.g) <= 3 && abs(p.b - paper.b) <= 3, "バーが出ている(x=\(x)): \(p)")
         }
     }
 
@@ -191,7 +193,11 @@ final class WidgetRenderTests: XCTestCase {
 
         let light = try smallPixels(WidgetSamples.paired())
         let lightPixel = light.pixel(atPoint: sampleX, sampleY)
-        XCTAssertTrue(lightPixel.r >= 250 && lightPixel.g >= 250 && lightPixel.b >= 250, "ライトはプレート無し(背景の白): \(lightPixel)")
+        let paper = WidgetTestFrame.backgroundRGB(dark: false)
+        XCTAssertTrue(
+            abs(lightPixel.r - paper.r) <= 3 && abs(lightPixel.g - paper.g) <= 3 && abs(lightPixel.b - paper.b) <= 3,
+            "ライトはプレート無し(背景の紙の色): \(lightPixel)"
+        )
 
         let dark = try pixels(
             WidgetTestFrame(
@@ -213,7 +219,7 @@ final class WidgetRenderTests: XCTestCase {
         for y in y0..<y1 {
             for x in x0..<x1 {
                 let p = light.pixel(x, y)
-                if p.r < 240 || p.g < 240 || p.b < 240 { painted += 1 }
+                if WidgetTestFrame.differsFromBackground(p, dark: false) { painted += 1 }
             }
         }
         XCTAssertGreaterThan(painted, (x1 - x0) * (y1 - y0) / 6, "植物がほとんど描けていない")
@@ -230,7 +236,7 @@ final class WidgetRenderTests: XCTestCase {
                 for y in 0..<image.height {
                     for x in 0..<image.width {
                         let p = image.pixel(x, y)
-                        if p.r < 240 || p.g < 240 || p.b < 240 { painted += 1 }
+                        if WidgetTestFrame.differsFromBackground(p, dark: false) { painted += 1 }
                     }
                 }
                 XCTAssertGreaterThan(painted, 800, "\(layout) 「\(item.label)」がほとんど描けていない")
