@@ -63,4 +63,52 @@ enum LienColors {
     static let shareGlow = Color(red: 0.969, green: 0.851, blue: 0.549)
     /// カレンダー履歴の達成の点(T18)。無彩色の中立表現にする(REVIEW-2026-10-12 §4.2)
     static let historyMark = Color.primary
+
+    // 紙と面(2026-11-11 UI 改修 — Issho の原則の移植)。白い画面をやめ、クリームの紙の上にカードを置く。
+    // ダークは、紙の色みを残した暗い土の色(真っ黒にしない)
+    /// 画面の地(紙)。#FBF6EA / ダーク #1D1F1B
+    static let paper = dynamicColor(
+        light: (0.984, 0.965, 0.918, 1),
+        dark: (0.114, 0.122, 0.106, 1)
+    )
+    /// 紙の上のカード。#FFFDF7 / ダーク #282B25
+    static let card = dynamicColor(
+        light: (1.0, 0.992, 0.969, 1),
+        dark: (0.157, 0.169, 0.145, 1)
+    )
+    /// カードの縁(紙との境い目を、影ではなく細い線で見せる)。#E9E0CB / ダーク #3A3E35
+    static let cardBorder = dynamicColor(
+        light: (0.914, 0.878, 0.796, 1),
+        dark: (0.227, 0.243, 0.208, 1)
+    )
+    /// 文字の色(真っ黒より柔らかい、深い緑の墨)。#2B3A32 / ダーク #ECEBE3
+    static let ink = dynamicColor(
+        light: (0.169, 0.227, 0.196, 1),
+        dark: (0.925, 0.922, 0.890, 1)
+    )
+    /// 補足の文字。#7A7466 / ダーク #A7A598(紙の上でも読める濃さ)
+    static let inkSecondary = dynamicColor(
+        light: (0.478, 0.455, 0.400, 1),
+        dark: (0.655, 0.647, 0.596, 1)
+    )
+    /// 主役のボタンの文字(セージの上の白。ダークは淡いセージの上の深い緑)
+    static let onAccent = dynamicColor(
+        light: (1, 1, 1, 1),
+        dark: (0.114, 0.122, 0.106, 1)
+    )
+    /// 主役のボタンの「沈み」(下に敷く濃い縁。ぷっくり見せる)。#2C503D / ダーク #6FA587
+    static let accentDeep = dynamicColor(
+        light: (0.173, 0.314, 0.239, 1),
+        dark: (0.435, 0.647, 0.529, 1)
+    )
+    /// 押せない主役のボタン・控えめなボタンの塗り(淡いセージ)
+    static let accentSoft = dynamicColor(
+        light: (0.239, 0.420, 0.322, 0.12),
+        dark: (0.561, 0.780, 0.659, 0.16)
+    )
+    /// 「ふたりで◯日」の数字の下に敷く、やわらかい黄の光(シェア画像の shareGlow と同じ色)
+    static let highlight = dynamicColor(
+        light: (0.969, 0.851, 0.549, 0.55),
+        dark: (0.969, 0.851, 0.549, 0.18)
+    )
 }

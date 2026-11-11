@@ -16,3 +16,13 @@ enum LienSpacing {
     /// 32pt — 大きな区切り
     static let xl: CGFloat = 32
 }
+
+/// 角の丸み(2026-11-11 UI 改修)。カード・ボタンの丸みを、画面をまたいでそろえる
+enum LienRadius {
+    /// 小さな部品(チップ・小さなボタン)
+    static let s: CGFloat = 12
+    /// カード
+    static let card: CGFloat = 22
+    /// 主役のボタン(高さの半分に近い、ぷっくりした丸み)
+    static let button: CGFloat = 26
+}

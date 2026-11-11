@@ -55,6 +55,10 @@ targets:
       # アプリ本体だけに入れる(ウィジェットは相手のアバターを描かない)
       - path: ../assets/avatar/AvatarAssets.xcassets
         buildPhase: resources
+      # 丸ゴシックの書体(Zen Maru Gothic の Medium・Bold。SIL OFL 1.1 — OFL.txt も同梱する。2026-11-11 UI 改修)。
+      # 登録は info の UIAppFonts。名前は LienTypeface(Typography.swift)。ウィジェットにも同じものを入れる
+      - path: ../assets/fonts/ZenMaruGothic
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(LIEN_BUNDLE_ID_BASE)"
@@ -89,6 +93,10 @@ targets:
         # 可視 push は NSE が処理するので、これが無くても通知は届く(サイレントのフォールバック経路用)
         UIBackgroundModes:
           - remote-notification
+        # 丸ゴシックの書体(Typography.swift の LienTypeface.files と同じ。FontRegistrationTests が確かめる)
+        UIAppFonts:
+          - ZenMaruGothic-Medium.ttf
+          - ZenMaruGothic-Bold.ttf
     dependencies:
       - target: LienWidget
       - target: LienNSE
@@ -129,7 +137,12 @@ targets:
       # WidgetFamily だけが LienWidget/ にあり、それ以外はここ**。アプリ本体にも入る(LienTests が単体テストと一覧画像の描画をするため)。
       # フォルダごと入れる(ファイルを足しても、ここは直さない。PrivacyManifestTests の directories もこのフォルダを見る)
       - path: Lien/Core/Widget
+      # 書体(Typography.swift)と色・部品(Colors.swift)。ウィジェットもアプリと同じ顔にする(2026-11-11 UI 改修)
+      - path: Lien/Core/DesignSystem/Typography.swift
+      - path: Lien/Core/DesignSystem/Colors.swift
       - path: ../assets/plant/PlantAssets.xcassets
+        buildPhase: resources
+      - path: ../assets/fonts/ZenMaruGothic
         buildPhase: resources
     settings:
       base:
@@ -144,6 +157,9 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LIEN_APP_GROUP_ID: "$(LIEN_APP_GROUP_ID)"
+        UIAppFonts:
+          - ZenMaruGothic-Medium.ttf
+          - ZenMaruGothic-Bold.ttf
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
 

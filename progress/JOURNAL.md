@@ -822,3 +822,8 @@
 - 結果: ①②③すべて実装。アバターは `products/lien/assets/avatar/`(生成 `tools/gen_avatars.py`、12種、SVG ベクター)+ `LienAvatar` / `AvatarPicker`。オンボ・プロフィール編集・設定の行に表示。UI の名前「サボテン」は罰なし lint(サボ)に当たるため「カクタス」。ストア用スクショ(6.7/6.1 の 01・02・03・06)とプレス用 02・06 を再生成して差し替え(provenance はローカル生成)。review-notes・REQUIREMENTS・DESIGN・GROWTH・E2E-M1・ios/README を追従。
 - 検証: xcodebuild test **1252 件成功**、macos-check 成功、verify_screenshots / press / metadata OK、deno ops 84 件成功。
 - 未対応: プライバシーポリシー(md / legal html / web)の「アイコン絵文字」表記(法務文面のためオーナー判断)、G4 のスクショ最終確認(画像が変わった)、通報メールに相手の約束の絵文字が入る件、CI 生成のスクショで provenance を差し替え。web/** と legal html の配色変更は別レーンのため本コミットに含めない。
+
+## 2026-11-11 — Issho の原則を移植した UI 改修と近接ペア(対話セッション)
+- 依頼(オーナー): 「UI がダサい」。Issho(App Store)の UI が可愛いと言われる理由を分析し反映する。Bluetooth を近づけるだけで良い体験も取り入れる。
+- 決定(オーナー選択): A=原則だけ移植し Lien の顔(タネの子・セージグリーン)で作り直す / 近接は「両方が招待画面を開いている間だけ」Bluetooth で招待コードを受け渡す(サーバー変更なし・リンク/コード入力は予備に残す) / 書体は Zen Maru Gothic(OFL)を同梱 / 1〜5 を全部進める。v1.0 提出後の変更なので v1.0.1 扱い。ストア申請はしない。
+- 方針: ①DesignSystem に書体・紙色の背景・主役ボタン・カードを足し全画面に効かせる ②ホームは「ふたりで◯日」を大きな数字の主役に ③ウィジェット・シェア画像を同じ顔に ④CoreBluetooth の前面のみの近接交換 ⑤全テスト・描画・スクショ再生成・独立レビュー。

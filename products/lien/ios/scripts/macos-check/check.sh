@@ -46,6 +46,7 @@ exclude_from_module() {
     Lien/Core/Purchases/RevenueCatPurchasesClient.swift) return 0 ;; # RevenueCat SDK(CI の iOS ビルドだけ)
     Lien/Core/PushManager.swift) return 0 ;;                # UIKit・UserNotifications(stubs/PushAuthorizingStub.swift が代わり)
     Lien/Core/DesignSystem/Colors.swift) return 0 ;;        # UIKit(views で macOS 用に書き換えて型検査する)
+    Lien/Core/DesignSystem/Components.swift) return 0 ;;    # Colors.swift の LienColors を使う SwiftUI の部品(views で型検査する)
     Lien/Core/DesignSystem/PlantCharacterView.swift) return 0 ;;  # SwiftUI の View
     Lien/Core/DesignSystem/AvatarPicker.swift) return 0 ;;  # SwiftUI の View(Colors.swift の LienColors を使う。views で型検査する。LienAvatar.swift は enum と AvatarImage だけなので module に入れる)
     Lien/Core/Widget/Views/*) return 0 ;;                   # SwiftUI の View(ウィジェットの S / M / ロック画面。views で型検査する)
@@ -66,7 +67,7 @@ exclude_from_module() {
 #   DeviceTokenStoreTests : AppDelegate.swift(UIKit)を使う
 #   QRCodeGeneratorTests : QRCodeGenerator.swift(UIImage)を使う
 #   SmokeTests : アプリ本体のバンドルの前提
-EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSheets WidgetRenderSupport ShareImageRenderTests LienAvatarTests PaywallRenderTests StoreScreenshotRenderTests StoreScreenshotFrames UIReviewRenderTests DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests"
+EXCLUDE_TESTS="AppServicesTests ConfigTests PlantRenderTests PlantLayersTests HomeRenderChecksTests NotificationSettingsRenderTests WidgetRenderTests WidgetRenderSheets WidgetRenderSupport ShareImageRenderTests LienAvatarTests PaywallRenderTests StoreScreenshotRenderTests StoreScreenshotFrames UIReviewRenderTests DeviceTokenStoreTests QRCodeGeneratorTests SmokeTests FontRegistrationTests"
 
 is_excluded_test() {
   local name="$1" e
@@ -285,6 +286,12 @@ PY
   for f in "$dir"/LienWidget/*.swift; do
     sed -i '' -e 's/\.accessoryCircular/.systemLarge/g' -e 's/\.accessoryInline/.systemExtraLarge/g' -e 's/\.accessoryRectangular/.systemExtraLarge/g' "$f"
   done
+  # Colors.swift は UIKit の色を使う。views と同じく macOS の色に書き換えたコピーで型検査する
+  if [ -f "$dir/Lien/Core/DesignSystem/Colors.swift" ]; then
+    sed -i '' -e 's/import UIKit/import AppKit/' \
+        -e 's/Color(uiColor: *\.[A-Za-z]*)/Color(nsColor: .controlBackgroundColor)/g' \
+        "$dir/Lien/Core/DesignSystem/Colors.swift"
+  fi
 
   local files=()
   while IFS= read -r f; do files+=("$f"); done < <(find "$dir" -name '*.swift' | sort)
