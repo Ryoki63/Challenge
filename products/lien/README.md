@@ -50,6 +50,7 @@ products/lien/
 | 対象 | 検証コマンド | 動く場所 |
 |---|---|---|
 | functions 純粋ロジック | `cd products/lien/supabase/functions && deno test` | ローカル(Windowsループ可)/ CI |
+| RLS 認可境界 (合成データ) | `deno test --allow-read --allow-net products/lien/supabase/tests/` | ローカル / CI (PGlite、外部 Supabase 不使用。詳細は [tests/README.md](supabase/tests/README.md)) |
 | functions 統合 | `supabase functions serve` + curl | Mac(Docker)または G0 後のリモート dev |
 | iOS ビルド | `xcodegen generate` → `xcodebuild build CODE_SIGNING_ALLOWED=NO` | GitHub Actions(macos)/ Mac |
 | iOS 単体テスト | LienTests(日付処理・スナップショット解釈・キュー) | CI / Mac |
